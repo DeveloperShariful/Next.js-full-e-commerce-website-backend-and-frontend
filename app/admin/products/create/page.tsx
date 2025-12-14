@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ImageUpload from "@/components/ui/image-upload";
 import { createProduct, getProductById } from "@/app/actions/product";
 import { getCategories } from "@/app/actions/category";
-import { getAttributes } from "@/app/actions/attribute"; // ✅ Get Global Attributes
+import { getAttributes } from "@/app/actions/attribute"; 
 import { toast } from "react-hot-toast";
 import {
   Save, ArrowLeft, X, ChevronDown, ChevronUp,
@@ -51,7 +51,7 @@ export default function CreateProductPage() {
 
   // --- DATA STATES ---
   const [dbCategories, setDbCategories] = useState<CategoryData[]>([]); 
-  const [globalAttributes, setGlobalAttributes] = useState<any[]>([]); // ✅ Global Attributes
+  const [globalAttributes, setGlobalAttributes] = useState<any[]>([]);
 
   // --- 1. BASIC INFO ---
   const [name, setName] = useState("");
@@ -132,9 +132,9 @@ export default function CreateProductPage() {
         const catRes = await getCategories();
         if (catRes.success) setDbCategories(catRes.data as any);
 
-        // ✅ Fetch Global Attributes
+        // ✅ FIX: Added '|| []' to handle undefined data safely
         const attrRes = await getAttributes();
-        if (attrRes.success) setGlobalAttributes(attrRes.data);
+        if (attrRes.success) setGlobalAttributes(attrRes.data || []);
 
       } catch (error) {
         console.error(error);
@@ -374,6 +374,7 @@ export default function CreateProductPage() {
                             <div className="grid grid-cols-3 items-center gap-4"><label className="text-right font-medium">Regular price ($)</label><input type="number" required value={price} onChange={(e) => setPrice(parseFloat(e.target.value))} className="col-span-2 border border-[#8c8f94] p-1.5 rounded-sm w-full focus:border-[#2271b1] outline-none shadow-sm" /></div>
                             <div className="grid grid-cols-3 items-center gap-4"><label className="text-right font-medium">Sale price ($)</label><input type="number" value={salePrice} onChange={(e) => setSalePrice(parseFloat(e.target.value))} className="col-span-2 border border-[#8c8f94] p-1.5 rounded-sm w-full focus:border-[#2271b1] outline-none shadow-sm" /></div>
                             <div className="border-t border-[#f0f0f1] pt-3 mt-3 grid grid-cols-3 items-center gap-4"><label className="text-right font-medium text-gray-500">Cost per item</label><div className="col-span-2"><input type="number" value={cost} onChange={(e) => setCost(parseFloat(e.target.value))} className="border border-[#8c8f94] p-1.5 rounded-sm w-full focus:border-[#2271b1] outline-none shadow-sm" placeholder="0.00" /><p className="text-[11px] text-[#646970] mt-1">Customers won't see this</p></div></div>
+                            <div className="grid grid-cols-3 items-center gap-4"><label className="text-right font-medium">Tax status</label><select value={taxStatus} onChange={(e) => setTaxStatus(e.target.value)} className="col-span-2 border border-[#8c8f94] p-1.5 rounded-sm w-full bg-white focus:border-[#2271b1] outline-none shadow-sm"><option value="taxable">Taxable</option><option value="shipping">Shipping only</option><option value="none">None</option></select></div>
                         </div>
                     )}
 
@@ -564,7 +565,24 @@ export default function CreateProductPage() {
                 )}
             </div>
 
-            {/* PRODUCT IMAGE */}
+            {/* TAGS */}
+            <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
+                <div className="px-3 py-2 border-b border-[#c3c4c7] bg-[#f6f7f7] font-semibold text-[#1d2327]">Product tags</div>
+                <div className="p-3">
+                    <div className="flex gap-2 mb-2">
+                        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => {if(e.key==='Enter'){e.preventDefault(); if(tagInput.trim()){setTags([...tags, tagInput.trim()]); setTagInput('')}}}} className="flex-1 border border-[#8c8f94] rounded-sm px-2 py-1 text-sm focus:border-[#2271b1] outline-none" />
+                        <button type="button" onClick={() => {if(tagInput){setTags([...tags, tagInput]); setTagInput('')}}} className="bg-[#f6f7f7] border border-[#c3c4c7] px-3 py-1 rounded text-sm hover:bg-[#f0f0f1] text-[#2271b1]">Add</button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                        {tags.map(tag => (
+                            <span key={tag} className="flex items-center gap-1 text-xs text-[#3c434a]"><X size={10} className="cursor-pointer bg-[#c3c4c7] rounded-full text-white hover:bg-red-500" onClick={() => setTags(tags.filter(t => t !== tag))} /> {tag}</span>
+                        ))}
+                    </div>
+                    <p className="text-xs text-[#2271b1] underline mt-2 cursor-pointer">Choose from the most used tags</p>
+                </div>
+            </div>
+
+            {/* PRODUCT IMAGE (FIXED) */}
             <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
                 <div className="px-3 py-2 border-b border-[#c3c4c7] bg-[#f6f7f7] font-semibold text-[#1d2327]">Product image</div>
                 <div className="p-3">
@@ -578,10 +596,11 @@ export default function CreateProductPage() {
                 </div>
             </div>
 
-            {/* PRODUCT GALLERY */}
+            {/* PRODUCT GALLERY (FIXED: Grid Style Added) */}
             <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
                 <div className="px-3 py-2 border-b border-[#c3c4c7] bg-[#f6f7f7] font-semibold text-[#1d2327]">Product gallery</div>
                 <div className="p-3">
+                    {/* ✅ FIX: Gallery Image Grid */}
                     <div className="grid grid-cols-4 gap-2 mb-3">
                         {galleryImages.map((img, i) => (
                             <div key={i} className="relative aspect-square group border border-[#dcdcde] rounded-sm overflow-hidden">
@@ -596,6 +615,7 @@ export default function CreateProductPage() {
                             </div>
                         ))}
                     </div>
+                    
                     <div className="mt-2">
                         <ImageUpload 
                             value={[]} 

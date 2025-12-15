@@ -1,20 +1,32 @@
-// app/actions/analytics.ts
-
 "use server";
 
 import { db } from "@/lib/db";
 import { OrderStatus } from "@prisma/client";
 
 // --- TYPES ---
-export type AnalyticsData = {
-  summary: {
-    revenue: number;
-    orders: number;
-    aov: number; // Average Order Value
-    refunded: number;
-  };
-  chartData: { date: string; sales: number; orders: number }[];
-  topProducts: { name: string; sales: number; quantity: number }[];
+export type AnalyticsSummary = {
+  revenue: number;
+  orders: number;
+  aov: number; // Average Order Value
+  refunded: number;
+};
+
+export type ChartDataPoint = {
+  date: string;
+  sales: number;
+  orders: number;
+};
+
+export type TopProduct = {
+  name: string;
+  sales: number;
+  quantity: number;
+};
+
+export type AnalyticsResponse = {
+  summary: AnalyticsSummary;
+  chartData: ChartDataPoint[];
+  topProducts: TopProduct[];
 };
 
 export async function getAnalyticsData(period: string = "30d") {
@@ -28,42 +40,53 @@ export async function getAnalyticsData(period: string = "30d") {
     else if (period === "90d") startDate.setDate(now.getDate() - 90);
     else if (period === "year") startDate.setFullYear(now.getFullYear() - 1);
 
-    // 2. Fetch Orders (Only Valid Orders)
-    const orders = await db.order.findMany({
+    // 2. Fetch Summary using AGGREGATE (Much Faster)
+    const orderAggregates = await db.order.aggregate({
+      _sum: { total: true },
+      _count: { id: true },
       where: {
         createdAt: { gte: startDate },
-        status: { not: OrderStatus.CANCELLED } // বাতিল অর্ডার বাদ
+        status: { not: OrderStatus.CANCELLED }
+      }
+    });
+
+    const refundAggregates = await db.refund.aggregate({
+      _sum: { amount: true },
+      where: {
+        createdAt: { gte: startDate },
+        status: 'approved' // Ensure status matches your DB logic
+      }
+    });
+
+    const revenue = orderAggregates._sum.total || 0;
+    const totalOrders = orderAggregates._count.id || 0;
+    const refunded = refundAggregates._sum.amount || 0;
+    const aov = totalOrders > 0 ? (revenue / totalOrders) : 0;
+
+    // 3. Fetch Data for Chart (Lightweight Query)
+    // We only fetch createdAt and total, not the whole order object
+    const ordersForChart = await db.order.findMany({
+      where: {
+        createdAt: { gte: startDate },
+        status: { not: OrderStatus.CANCELLED }
       },
-      include: {
-        items: true
+      select: {
+        createdAt: true,
+        total: true
       },
       orderBy: { createdAt: 'asc' }
     });
 
-    // 3. Fetch Refunds
-    const refunds = await db.refund.findMany({
-      where: {
-        createdAt: { gte: startDate },
-        status: 'approved'
-      }
-    });
-
-    // 4. Calculate Summary
-    const totalRevenue = orders.reduce((acc, order) => acc + Number(order.total), 0);
-    const totalOrders = orders.length;
-    const totalRefunded = refunds.reduce((acc, ref) => acc + Number(ref.amount), 0);
-    const aov = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
-
-    // 5. Prepare Chart Data (Group by Date)
+    // Group by Date for Chart
     const chartMap = new Map<string, { sales: number; orders: number }>();
 
-    orders.forEach(order => {
-      // Format Date: "Dec 10"
+    ordersForChart.forEach(order => {
+      // Format: "Dec 10"
       const dateStr = new Date(order.createdAt).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
       
       const existing = chartMap.get(dateStr) || { sales: 0, orders: 0 };
       chartMap.set(dateStr, {
-        sales: existing.sales + Number(order.total),
+        sales: existing.sales + (order.total || 0),
         orders: existing.orders + 1
       });
     });
@@ -74,33 +97,37 @@ export async function getAnalyticsData(period: string = "30d") {
       orders: data.orders
     }));
 
-    // 6. Calculate Top Products
-    const productMap = new Map<string, { sales: number; quantity: number }>();
-
-    orders.forEach(order => {
-      order.items.forEach(item => {
-        const existing = productMap.get(item.productName) || { sales: 0, quantity: 0 };
-        productMap.set(item.productName, {
-          sales: existing.sales + Number(item.total),
-          quantity: existing.quantity + item.quantity
-        });
-      });
+    // 4. Fetch Top Products using GROUP BY (Optimized)
+    const topItems = await db.orderItem.groupBy({
+      by: ['productName'],
+      _sum: {
+        quantity: true,
+        total: true,
+      },
+      where: {
+        order: {
+          createdAt: { gte: startDate },
+          status: { not: OrderStatus.CANCELLED }
+        }
+      },
+      orderBy: {
+        _sum: {
+          total: 'desc'
+        }
+      },
+      take: 5
     });
 
-    const topProducts = Array.from(productMap.entries())
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.sales - a.sales) // Highest sales first
-      .slice(0, 5); // Top 5
+    const topProducts = topItems.map(item => ({
+      name: item.productName,
+      sales: item._sum.total || 0,
+      quantity: item._sum.quantity || 0
+    }));
 
     return {
       success: true,
       data: {
-        summary: {
-          revenue: totalRevenue,
-          orders: totalOrders,
-          aov,
-          refunded: totalRefunded
-        },
+        summary: { revenue, orders: totalOrders, aov, refunded },
         chartData,
         topProducts
       }
@@ -108,13 +135,6 @@ export async function getAnalyticsData(period: string = "30d") {
 
   } catch (error) {
     console.error("ANALYTICS_ERROR", error);
-    return { 
-        success: false, 
-        data: { 
-            summary: { revenue: 0, orders: 0, aov: 0, refunded: 0 }, 
-            chartData: [], 
-            topProducts: [] 
-        } 
-    };
+    return { success: false, error: "Failed to fetch analytics data" };
   }
 }

@@ -1,61 +1,62 @@
-// app/actions/attribute.ts
-
 "use server";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { z } from "zod"; // ডিটা ভ্যালিডেশনের জন্য Zod লাইব্রেরি
+import { z } from "zod";
 
 // ==============================================================================
-// 1. ZOD SCHEMAS (VALIDATION RULES)
+// 1. ZOD SCHEMAS (FIXED)
 // ==============================================================================
 
-// কালার কোড চেক করার জন্য Regex (যেমন: #FFFFFF)
-const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
-
-// অ্যাট্রিবিউট তৈরি বা আপডেটের নিয়মাবলী
-const AttributeSchema = z.object({
-  name: z.string().min(1, { message: "Attribute name is required" }),
+// 1. Base Schema (শুধু ফিল্ডগুলো ডিফাইন করা হলো, কোনো refine নেই)
+const BaseAttributeSchema = z.object({
+  name: z.string().min(1, { message: "Name is required" }),
   slug: z.string().optional(),
-  type: z.enum(["TEXT", "COLOR", "BUTTON"]).default("TEXT"), // নতুন টাইপ ম্যানেজমেন্ট
+  type: z.enum(["TEXT", "COLOR", "BUTTON"]).default("TEXT"),
   values: z.array(z.string()).min(1, { message: "At least one value is required" }),
 });
 
-// ডাটা আপডেট করার সময় ID লাগবেই
-const UpdateAttributeSchema = AttributeSchema.extend({
+// 2. Refinement Logic (কালার চেক করার লজিক আলাদা ফাংশনে রাখলাম)
+const colorRefinement = (data: { type: string; values: string[] }) => {
+  if (data.type === "COLOR") {
+    // Check if values look like colors (Hex or Name)
+    return data.values.every((v) => v.includes("#") || /^[a-zA-Z]+$/.test(v));
+  }
+  return true;
+};
+
+// 3. Create Schema (Base + Refine)
+const AttributeSchema = BaseAttributeSchema.refine(colorRefinement, {
+  message: "For Color type, values must be valid colors (e.g. #FF0000 or Red)",
+  path: ["values"],
+});
+
+// 4. Update Schema (Base + ID + Refine)
+// [FIXED] আমরা এখন Base স্কিমাকে extend করছি, refined স্কিমাকে নয়
+const UpdateAttributeSchema = BaseAttributeSchema.extend({
   id: z.string().uuid(),
+}).refine(colorRefinement, {
+  message: "For Color type, values must be valid colors (e.g. #FF0000 or Red)",
+  path: ["values"],
 });
 
 // ==============================================================================
-// 2. TYPES & INTERFACES
+// 2. TYPES
 // ==============================================================================
 
 export type AttributeState = {
   success: boolean;
   message?: string;
-  errors?: Record<string, string[]>; // ফর্মের এরর দেখানোর জন্য
-  data?: any;
+  errors?: Record<string, string[]>;
 };
 
 // ==============================================================================
-// 3. GET ATTRIBUTES (SEARCH & PAGINATION)
+// 3. ACTIONS (Rest of the code remains same, just ensure schema usage is correct)
 // ==============================================================================
 
-/**
- * অ্যাট্রিবিউট লিস্ট নিয়ে আসার ফাংশন।
- * @param query - সার্চ টেক্সট (নাম দিয়ে খোঁজার জন্য)
- * @param page - বর্তমান পেজ নম্বর
- * @param limit - প্রতি পেজে কয়টি ডাটা দেখাবে
- */
-export async function getAttributes(
-  query: string = "",
-  page: number = 1,
-  limit: number = 10
-) {
+export async function getAttributes(query: string = "", page: number = 1, limit: number = 10) {
   try {
     const skip = (page - 1) * limit;
-
-    // ডাটা ফিল্টার করার লজিক
     const whereCondition = query
       ? {
           OR: [
@@ -65,27 +66,28 @@ export async function getAttributes(
         }
       : {};
 
-    // প্যারালাল রিকোয়েস্ট: ডাটা এবং টোটাল কাউন্ট একসাথে নিয়ে আসা
     const [attributes, totalCount] = await Promise.all([
       db.attribute.findMany({
         where: whereCondition,
-        orderBy: { updatedAt: "desc" }, // লেটেস্ট ডাটা আগে দেখাবে
+        orderBy: { updatedAt: "desc" },
         skip,
         take: limit,
       }),
       db.attribute.count({ where: whereCondition }),
     ]);
 
-    // প্রোডাক্টে এই অ্যাট্রিবিউট কতবার ব্যবহার হয়েছে তার কাউন্ট বের করা (Optional Optimization)
-    // এটি ড্যাশবোর্ডে "Usage Count" দেখানোর জন্য কাজে লাগবে
-    const attributesWithUsage = await Promise.all(
-      attributes.map(async (attr) => {
-        const usageCount = await db.productAttribute.count({
-          where: { name: attr.name }, // নাম দিয়ে ম্যাচ করা হচ্ছে
-        });
-        return { ...attr, count: usageCount };
-      })
-    );
+    const usageCounts = await db.productAttribute.groupBy({
+      by: ['name'],
+      _count: { name: true },
+      where: {
+        name: { in: attributes.map(a => a.name) }
+      }
+    });
+
+    const attributesWithUsage = attributes.map(attr => {
+      const usage = usageCounts.find(u => u.name === attr.name);
+      return { ...attr, count: usage?._count.name || 0 };
+    });
 
     return {
       success: true,
@@ -103,99 +105,46 @@ export async function getAttributes(
   }
 }
 
-// ==============================================================================
-// 4. GET SINGLE ATTRIBUTE (FOR EDIT)
-// ==============================================================================
-
-export async function getAttributeById(id: string) {
-  try {
-    const attribute = await db.attribute.findUnique({
-      where: { id },
-    });
-
-    if (!attribute) return { success: false, message: "Attribute not found" };
-
-    return { success: true, data: attribute };
-  } catch (error) {
-    return { success: false, message: "Error fetching attribute details." };
-  }
-}
-
-// ==============================================================================
-// 5. CREATE ATTRIBUTE (WITH VALIDATION)
-// ==============================================================================
-
 export async function createAttribute(prevState: any, formData: FormData): Promise<AttributeState> {
   try {
-    // 1. FormData থেকে ডাটা বের করা
     const rawData = {
       name: formData.get("name") as string,
       slug: formData.get("slug") as string,
       type: (formData.get("type") as "TEXT" | "COLOR" | "BUTTON") || "TEXT",
-      // ভ্যালুগুলোকে কমা (,) দিয়ে আলাদা করে অ্যারে বানানো হচ্ছে
-      values: (formData.get("values") as string)
-        ?.split(",")
-        .map((v) => v.trim())
-        .filter((v) => v.length > 0) || [],
+      values: (formData.get("values") as string)?.split(",").map(v => v.trim()).filter(Boolean) || [],
     };
 
-    // 2. Zod দিয়ে ভ্যালিডেশন চেক করা
-    const validatedFields = AttributeSchema.safeParse(rawData);
-
-    if (!validatedFields.success) {
-      return {
-        success: false,
-        message: "Invalid input data",
-        errors: validatedFields.error.flatten().fieldErrors,
-      };
+    // Use AttributeSchema (Create)
+    const validated = AttributeSchema.safeParse(rawData);
+    
+    if (!validated.success) {
+      return { success: false, message: "Invalid data", errors: validated.error.flatten().fieldErrors };
     }
 
-    const { name, slug, type, values } = validatedFields.data;
-
-    // 3. স্লাগ জেনারেট করা (যদি না থাকে) এবং ডুপ্লিকেট চেক
-    let finalSlug = slug || name.toLowerCase().trim().replace(/ /g, "-");
+    const { name, slug, type, values } = validated.data;
     
-    const existingAttribute = await db.attribute.findFirst({
-      where: {
-        OR: [{ slug: finalSlug }, { name: name }], // নাম বা স্লাগ কোনোটিই ডুপ্লিকেট হতে পারবে না
-      },
+    let finalSlug = slug 
+      ? slug.toLowerCase().trim().replace(/\s+/g, "-")
+      : name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+    const exists = await db.attribute.findFirst({
+      where: { OR: [{ slug: finalSlug }, { name: { equals: name, mode: "insensitive" } }] }
     });
 
-    if (existingAttribute) {
-      return {
-        success: false,
-        message: `Attribute with name "${name}" or slug "${finalSlug}" already exists.`,
-      };
-    }
+    if (exists) return { success: false, message: "Attribute already exists." };
 
-    // 4. কালার হ্যান্ডলিং (Type Management)
-    // যদি টাইপ COLOR হয়, আমরা ভ্যালুগুলো চেক করব যে সেগুলো সঠিক ফরম্যাটে আছে কিনা
-    // আমরা ধরে নিচ্ছি ফ্রন্টএন্ড থেকে ডাটা আসবে "Red|#FF0000" ফরম্যাটে অথবা সিম্পল টেক্সট
-    // ডাটাবেসে সেভ করার আগে আমরা এটা প্রসেস করতে পারি, আপাতত সিম্পল রাখছি।
-
-    // 5. ডাটাবেসে সেভ করা
     await db.attribute.create({
-      data: {
-        name,
-        slug: finalSlug,
-        values, // স্কিমাতে `type` ফিল্ড না থাকলে values এর মধ্যেই টাইপ হ্যান্ডেল করতে হবে
-        // @ts-ignore: আপনার বর্তমান স্কিমায় 'type' ফিল্ড নেই, তাই ইগনোর করা হচ্ছে। 
-        // আপনার স্কিমায় `type String @default("TEXT")` যোগ করার পরামর্শ রইলো।
-      },
+      data: { name, slug: finalSlug, type, values }
     });
 
     revalidatePath("/admin/attributes");
     return { success: true, message: "Attribute created successfully!" };
 
   } catch (error) {
-    console.error("CREATE_ATTRIBUTE_ERROR", error);
+    console.error(error);
     return { success: false, message: "Internal Server Error" };
   }
 }
-
-// ==============================================================================
-// 6. UPDATE ATTRIBUTE (WITH SAFETY CHECKS)
-// ==============================================================================
 
 export async function updateAttribute(prevState: any, formData: FormData): Promise<AttributeState> {
   try {
@@ -204,99 +153,57 @@ export async function updateAttribute(prevState: any, formData: FormData): Promi
       name: formData.get("name") as string,
       slug: formData.get("slug") as string,
       type: (formData.get("type") as "TEXT" | "COLOR" | "BUTTON") || "TEXT",
-      values: (formData.get("values") as string)
-        ?.split(",")
-        .map((v) => v.trim())
-        .filter((v) => v.length > 0) || [],
+      values: (formData.get("values") as string)?.split(",").map(v => v.trim()).filter(Boolean) || [],
     };
 
-    const validatedFields = UpdateAttributeSchema.safeParse(rawData);
+    // Use UpdateAttributeSchema (Update)
+    const validated = UpdateAttributeSchema.safeParse(rawData);
+    
+    if (!validated.success) return { success: false, errors: validated.error.flatten().fieldErrors };
 
-    if (!validatedFields.success) {
-      return {
-        success: false,
-        message: "Invalid input data",
-        errors: validatedFields.error.flatten().fieldErrors,
-      };
-    }
+    const { id, name, slug, type, values } = validated.data;
 
-    const { id, name, slug, values } = validatedFields.data;
+    const existing = await db.attribute.findUnique({ where: { id } });
+    if (!existing) return { success: false, message: "Not found" };
 
-    // 1. চেক করা অ্যাট্রিবিউট আদৌ আছে কিনা
-    const existingAttr = await db.attribute.findUnique({ where: { id } });
-    if (!existingAttr) {
-      return { success: false, message: "Attribute not found." };
-    }
+    let finalSlug = slug 
+      ? slug.toLowerCase().trim().replace(/\s+/g, "-")
+      : name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
-    // 2. স্লাগ কনফ্লিক্ট চেক (নিজের স্লাগ বাদে অন্যের সাথে মিলছে কিনা)
-    let finalSlug = slug || name.toLowerCase().trim().replace(/ /g, "-");
-    const duplicateCheck = await db.attribute.findFirst({
-      where: {
-        slug: finalSlug,
-        NOT: { id: id },
-      },
+    const duplicate = await db.attribute.findFirst({
+      where: { slug: finalSlug, NOT: { id } }
     });
 
-    if (duplicateCheck) {
-      return { success: false, message: "This slug is already used by another attribute." };
-    }
+    if (duplicate) return { success: false, message: "Slug already in use" };
 
-    // 3. ডাটা আপডেট
     await db.attribute.update({
       where: { id },
-      data: {
-        name,
-        slug: finalSlug,
-        values,
-      },
+      data: { name, slug: finalSlug, type, values }
     });
 
-    // 4. (Advanced) Product Attribute Sync
-    // যদি অ্যাট্রিবিউটের নাম পরিবর্তন হয়, তবে প্রোডাক্টের ভেতর থাকা পুরনো নামগুলোও আপডেট করা উচিত?
-    // সাধারণত ই-কমার্সে এটি জটিল প্রক্রিয়া। আমরা আপাতত வ ওয়ার্নিং দিতে পারি বা ম্যানুয়ালি হ্যান্ডেল করতে পারি।
-    // এখানে আমরা লজিক সিম্পল রাখছি, কিন্তু ফিউচারে এখানে বাল্ক আপডেটের কোড বসবে।
-
     revalidatePath("/admin/attributes");
-    return { success: true, message: "Attribute updated successfully." };
+    return { success: true, message: "Updated successfully" };
 
   } catch (error) {
-    console.error("UPDATE_ATTRIBUTE_ERROR", error);
-    return { success: false, message: "Failed to update attribute." };
+    console.error(error);
+    return { success: false, message: "Update failed" };
   }
 }
 
-// ==============================================================================
-// 7. DELETE ATTRIBUTE (WITH DEPENDENCY CHECK)
-// ==============================================================================
-
 export async function deleteAttribute(id: string) {
   try {
-    // 1. অ্যাট্রিবিউট খুঁজে বের করা
-    const attribute = await db.attribute.findUnique({ where: { id } });
-    if (!attribute) return { success: false, message: "Attribute not found" };
+    const attr = await db.attribute.findUnique({ where: { id } });
+    if (!attr) return { success: false, message: "Not found" };
 
-    // 2. DEPENDENCY CHECK: এই অ্যাট্রিবিউট কোনো প্রোডাক্টে ব্যবহার হচ্ছে কিনা?
-    // স্কিমা অনুযায়ী `ProductAttribute` টেবিলে `name` দিয়ে লিঙ্ক থাকে।
-    const usageCount = await db.productAttribute.count({
-      where: { name: attribute.name },
-    });
+    const usage = await db.productAttribute.count({ where: { name: attr.name } });
+    if (usage > 0) return { success: false, message: `Cannot delete. Used in ${usage} products.` };
 
-    if (usageCount > 0) {
-      // যদি ব্যবহার হয়ে থাকে, তবে ডিলিট আটকানো হবে
-      return { 
-        success: false, 
-        message: `Cannot delete "${attribute.name}". It is currently used in ${usageCount} products. Please remove it from products first.` 
-      };
-    }
-
-    // 3. সেইফ হলে ডিলিট করা
     await db.attribute.delete({ where: { id } });
-
     revalidatePath("/admin/attributes");
-    return { success: true, message: "Attribute deleted successfully." };
+    return { success: true, message: "Deleted successfully" };
 
   } catch (error) {
-    console.error("DELETE_ATTRIBUTE_ERROR", error);
-    return { success: false, message: "Internal error during deletion." };
+    console.error(error);
+    return { success: false, message: "Delete failed" };
   }
 }

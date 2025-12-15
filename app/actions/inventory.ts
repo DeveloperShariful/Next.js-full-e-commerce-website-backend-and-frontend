@@ -1,144 +1,149 @@
-// app/actions/inventory.ts
-
 "use server";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { auth } from "@/auth"; // [ADDED] সেশন পাওয়ার জন্য
 
-// --- TYPES (FIXED) ---
-export type InventoryItem = {
-  id: string;
-  productName: string;
-  variantName: string | null;
-  sku: string | null;
-  locationName: string;
-  quantity: number;
-  image: string | null;
-};
+// --- SCHEMAS ---
+const SupplierSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Name is required"),
+  // contactName: z.string().optional(), // [REMOVED] স্কিমায় নেই তাই বাদ দিলাম
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+});
 
-// ✅ FIX: Made fields optional/nullable to match DB response
-export type SupplierData = {
-  id: string;
-  name: string;
-  contactName?: string | null; // Optional
-  email?: string | null;
-  phone?: string | null;
-  address?: string | null;
-  website?: string | null; // Added website as it appeared in error log
-  createdAt?: Date;
+const LocationSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Name is required"),
+  address: z.string().optional(),
+});
+
+export type ActionState = {
+  success: boolean;
+  message?: string;
+  errors?: Record<string, string[]>;
+  data?: any;
 };
 
 // ==========================================
-// 1. GET INVENTORY
+// 1. STOCK MANAGEMENT
 // ==========================================
-export async function getInventory(query?: string) {
+
+export async function getInventory(query: string = "") {
   try {
-    const whereCondition: any = query ? {
+    const where = query ? {
       OR: [
-        { product: { name: { contains: query, mode: 'insensitive' } } },
-        { product: { sku: { contains: query, mode: 'insensitive' } } },
-        { location: { name: { contains: query, mode: 'insensitive' } } }
+        { product: { name: { contains: query, mode: 'insensitive' as const } } },
+        { product: { sku: { contains: query, mode: 'insensitive' as const } } },
       ]
     } : {};
 
     const levels = await db.inventoryLevel.findMany({
-      where: whereCondition,
+      where,
       include: {
-        product: { select: { name: true, sku: true, featuredImage: true, images: true } },
+        product: { select: { name: true, sku: true, featuredImage: true } },
         variant: { select: { name: true, sku: true, image: true } },
         location: { select: { name: true } }
       },
-      orderBy: { product: { name: 'asc' } }
+      orderBy: { quantity: 'asc' },
+      take: 50 
     });
 
-    const data: InventoryItem[] = levels.map(level => ({
-      id: level.id,
-      productName: level.product.name,
-      variantName: level.variant?.name || null,
-      sku: level.variant?.sku || level.product.sku,
-      locationName: level.location.name,
-      quantity: level.quantity,
-      image: level.variant?.image || level.product.featuredImage || level.product.images[0]?.url || null
+    const data = levels.map(l => ({
+      id: l.id,
+      name: l.product.name,
+      variant: l.variant?.name,
+      sku: l.variant?.sku || l.product.sku,
+      location: l.location.name,
+      quantity: l.quantity,
+      image: l.variant?.image || l.product.featuredImage
     }));
 
     return { success: true, data };
   } catch (error) {
-    return { success: false, data: [] };
+    return { success: false, message: "Failed to fetch inventory" };
   }
 }
 
-// ==========================================
-// 2. ADJUST STOCK
-// ==========================================
-export async function adjustStock(inventoryId: string, adjustment: number, reason: string) {
+export async function adjustStock(id: string, adjustment: number, reason: string) {
   try {
-    const level = await db.inventoryLevel.findUnique({
-      where: { id: inventoryId }
-    });
+    // [FIXED] Get Current User Session
+    const session = await auth();
+    const userId = session?.user?.id;
 
-    if (!level) return { success: false, error: "Record not found" };
+    if (!userId) {
+      return { success: false, message: "Unauthorized: User not found" };
+    }
 
-    const newQuantity = level.quantity + adjustment;
-    if (newQuantity < 0) return { success: false, error: "Stock cannot be negative" };
+    const level = await db.inventoryLevel.findUnique({ where: { id } });
+    if (!level) return { success: false, message: "Inventory record not found" };
 
+    const newQty = level.quantity + adjustment;
+    if (newQty < 0) return { success: false, message: "Stock cannot be negative" };
+
+    // Transaction
     await db.$transaction([
       db.inventoryLevel.update({
-        where: { id: inventoryId },
-        data: { quantity: newQuantity }
+        where: { id },
+        data: { quantity: newQty }
       }),
       db.activityLog.create({
         data: {
-          action: `Stock Adjusted: ${adjustment > 0 ? '+' : ''}${adjustment}`,
-          entityId: inventoryId,
-          details: { reason, previous: level.quantity, new: newQuantity },
-          userId: "ADMIN"
+          action: `Stock Adjusted (${adjustment > 0 ? '+' : ''}${adjustment})`,
+          entityId: id,
+          details: { reason, old: level.quantity, new: newQty },
+          userId: userId // [FIXED] Dynamic User ID
         }
       })
     ]);
 
     revalidatePath("/admin/inventory");
     return { success: true, message: "Stock updated successfully" };
-
   } catch (error) {
-    return { success: false, error: "Failed to adjust stock" };
+    console.error("ADJUST_STOCK_ERROR", error); // ডিবাগিংয়ের জন্য লগ
+    return { success: false, message: "Update failed. Check console for details." };
   }
 }
 
 // ==========================================
-// 3. SUPPLIER MANAGEMENT
+// 2. SUPPLIERS
 // ==========================================
+
 export async function getSuppliers() {
   try {
-    const suppliers = await db.supplier.findMany({ orderBy: { createdAt: 'desc' } });
-    return { success: true, data: suppliers };
+    const data = await db.supplier.findMany({ orderBy: { createdAt: 'desc' } });
+    return { success: true, data };
   } catch (error) {
-    return { success: false, data: [] };
+    return { success: false, message: "Failed to load suppliers" };
   }
 }
 
-export async function saveSupplier(formData: FormData) {
+export async function saveSupplier(prevState: any, formData: FormData): Promise<ActionState> {
+  const rawData = Object.fromEntries(formData.entries());
+  
+  // [FIXED] Remove contactName from validation since it's not in DB
+  const validated = SupplierSchema.safeParse(rawData);
+
+  if (!validated.success) {
+    return { success: false, errors: validated.error.flatten().fieldErrors };
+  }
+
+  const { id, ...data } = validated.data;
+
   try {
-    const id = formData.get("id") as string;
-    const name = formData.get("name") as string;
-    const contactName = formData.get("contactName") as string;
-    const email = formData.get("email") as string;
-    const phone = formData.get("phone") as string;
-    const address = formData.get("address") as string;
-
-    if (!name) return { success: false, error: "Supplier name is required" };
-
-    const data = { name, contactName, email, phone, address };
-
     if (id) {
       await db.supplier.update({ where: { id }, data });
     } else {
       await db.supplier.create({ data });
     }
-
     revalidatePath("/admin/inventory");
     return { success: true, message: "Supplier saved successfully" };
   } catch (error) {
-    return { success: false, error: "Operation failed" };
+    console.error("SAVE_SUPPLIER_ERROR", error);
+    return { success: false, message: "Database error. Likely missing column." };
   }
 }
 
@@ -148,40 +153,44 @@ export async function deleteSupplier(id: string) {
     revalidatePath("/admin/inventory");
     return { success: true, message: "Supplier deleted" };
   } catch (error) {
-    return { success: false, error: "Failed to delete" };
+    return { success: false, message: "Failed to delete" };
   }
 }
 
 // ==========================================
-// 4. LOCATIONS
+// 3. LOCATIONS
 // ==========================================
+
 export async function getLocations() {
   try {
-    const locations = await db.location.findMany({ 
-      include: { _count: { select: { inventoryLevels: true } } } 
+    const data = await db.location.findMany({
+      include: { _count: { select: { inventoryLevels: true } } }
     });
-    return { success: true, data: locations };
+    return { success: true, data };
   } catch (error) {
-    return { success: false, data: [] };
+    return { success: false, message: "Failed to load locations" };
   }
 }
 
-export async function saveLocation(formData: FormData) {
-  try {
-    const id = formData.get("id") as string;
-    const name = formData.get("name") as string;
-    const address = formData.get("address") as string;
-    
-    if(!name) return { success: false, error: "Name required" };
+export async function saveLocation(prevState: any, formData: FormData): Promise<ActionState> {
+  const rawData = Object.fromEntries(formData.entries());
+  const validated = LocationSchema.safeParse(rawData);
 
-    if(id) {
-        await db.location.update({ where: { id }, data: { name, address } });
+  if (!validated.success) {
+    return { success: false, errors: validated.error.flatten().fieldErrors };
+  }
+
+  const { id, ...data } = validated.data;
+
+  try {
+    if (id) {
+      await db.location.update({ where: { id }, data });
     } else {
-        await db.location.create({ data: { name, address, isDefault: false } });
+      await db.location.create({ data: { ...data, isDefault: false } });
     }
     revalidatePath("/admin/inventory");
-    return { success: true, message: "Location saved" };
-  } catch(error) {
-    return { success: false, error: "Failed" };
+    return { success: true, message: "Location saved successfully" };
+  } catch (error) {
+    return { success: false, message: "Database error" };
   }
 }

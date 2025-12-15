@@ -138,7 +138,6 @@ const useCart = create(
       name: 'cart-storage',
       storage: createJSONStorage(() => localStorage),
       
-      // ✅ FIX: 'as any' যোগ করা হয়েছে
       partialize: (state) => ({
         items: state.items,
         couponCode: state.couponCode,

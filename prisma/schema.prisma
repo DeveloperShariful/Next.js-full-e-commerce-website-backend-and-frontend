@@ -96,13 +96,12 @@ model User {
   role          Role      @default(CUSTOMER)
   isActive      Boolean   @default(true)
   
-  // Profile Info
   dateOfBirth   DateTime?
   gender        String?
   notes         String?   
   metafields    Json?      
+  deletedAt     DateTime? 
 
-  // Relations
   accounts      Account[] 
   addresses     Address[]
   orders        Order[]
@@ -112,19 +111,19 @@ model User {
   viewedProducts RecentlyViewed[]
   wallet        Wallet?   
   
-  // Vendor Relation
   vendorProfile Vendor?   
   
-  // Staff Relations
   activityLogs    ActivityLog[]
   blogPosts       BlogPost[]
   
-  // Support Tickets
   createdTickets  SupportTicket[] @relation("UserCreatedTickets") 
   assignedTickets SupportTicket[] @relation("StaffTickets")        
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@index([email, phone])
+  @@index([role])
 }
 
 model Account {
@@ -140,10 +139,10 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -182,6 +181,9 @@ model Address {
   phone        String
   email        String?
   isDefault    Boolean @default(false)
+  taxZoneId    String? 
+
+  @@index([userId])
 }
 
 model Wallet {
@@ -199,13 +201,14 @@ model WalletTransaction {
   walletId    String
   wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
   amount      Float    
-  type        String   // CREDIT, DEBIT
+  type        TransactionType 
   description String?
-  reference   String?  // Order ID
+  reference   String?  
   createdAt   DateTime @default(now())
+
+  @@index([walletId])
 }
 
-// Vendor / Shop Profile
 model Vendor {
   id              String   @id @default(uuid())
   userId          String   @unique
@@ -214,17 +217,20 @@ model Vendor {
   slug            String   @unique
   description     String?  @db.Text
   logo            String?
-  banner          String? // Cover Image
+  banner          String? 
   commissionRate  Float    @default(10.0) 
   isVerified      Boolean  @default(false)
   isActive        Boolean  @default(true)
   rating          Float    @default(0)
-  
+  deletedAt       DateTime?
+
   products        Product[]
   payouts         Payout[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([storeName])
 }
 
 model Payout { 
@@ -232,9 +238,11 @@ model Payout {
   vendorId      String
   vendor        Vendor   @relation(fields: [vendorId], references: [id])
   amount        Float
-  status        String   // PENDING, PAID
+  status        String   
   transactionId String?
   createdAt     DateTime @default(now())
+
+  @@index([vendorId])
 }
 
 // ==========================================
@@ -259,8 +267,12 @@ model Category {
   metafields  Json?
   metaTitle   String?
   metaDesc    String?
+  deletedAt   DateTime?
+  
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  @@index([parentId])
 }
 
 model Brand {
@@ -275,6 +287,7 @@ model Brand {
   metaTitle   String?
   metaDesc    String?
   metafields  Json?
+  deletedAt   DateTime? 
 }
 
 model Tag {
@@ -308,7 +321,6 @@ model Product {
   productType      ProductType   @default(SIMPLE)
   status           String        @default("draft") 
   
-  // Organization
   categoryId       String?
   category         Category?     @relation(fields: [categoryId], references: [id])
   brandId          String?
@@ -318,21 +330,20 @@ model Product {
   tags             Tag[]
   collections      Collection[]
 
-  // Media
   featuredImage    String?
   images           ProductImage[]
   videoUrl         String?
 
-  // Pricing
   price            Float         @default(0.00) 
   salePrice        Float?        
   saleStart        DateTime?
   saleEnd          DateTime?
   costPerItem      Float?        
+  
   taxable          Boolean       @default(true)
-  taxClassId       String?       
+  taxRateId        String?       
+  taxRate          TaxRate?      @relation(fields: [taxRateId], references: [id])
 
-  // Inventory & Dimensions
   sku              String?       @unique
   barcode          String?
   trackQuantity    Boolean       @default(true)
@@ -341,44 +352,45 @@ model Product {
   width            Float?
   height           Float?
   
-  // Digital
   isVirtual        Boolean       @default(false)
   isDownloadable   Boolean       @default(false)
   downloadFiles    DigitalFile[] 
 
-  // Bundle Logic
   bundleItems      BundleItem[]  @relation("BundleParent") 
   partOfBundles    BundleItem[]  @relation("BundleChild")  
 
-  // Relations
   attributes       ProductAttribute[]
   variants         ProductVariant[]
   reviews          Review[]
   questions        QuestionAnswer[]
   inventoryLevels  InventoryLevel[]
   
-  // Linked Products
   upsellIds        String[]
   crossSellIds     String[]
 
-  // Analytics & SEO
   viewCount        Int           @default(0)
   soldCount        Int           @default(0)
   rating           Float         @default(0)
   metaTitle        String?
   metaDesc         String?
 
-  // System
   metafields       Json?         
   menuOrder        Int           @default(0)
   purchaseNote     String?
+  deletedAt        DateTime?
 
   wishlistedBy     Wishlist[]
   recentViews      RecentlyViewed[]
-  orderItems       OrderItem[]   // Relation constraint check
+  orderItems       OrderItem[]   
 
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([vendorId])
+  @@index([status])
+  @@index([price])
 }
 
 model ProductImage {
@@ -386,8 +398,12 @@ model ProductImage {
   url       String
   altText   String?
   position  Int      @default(0)
+  
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  mediaId   String?
+  media     Media?   @relation(fields: [mediaId], references: [id])
 }
 
 model DigitalFile {
@@ -416,6 +432,7 @@ model Attribute {
   id        String   @id @default(uuid())
   name      String   @unique
   slug      String   @unique
+  type      String   @default("TEXT")
   values    String[] 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -430,6 +447,8 @@ model ProductAttribute {
   values    String[] 
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model ProductVariant {
@@ -449,6 +468,9 @@ model ProductVariant {
   metafields      Json?    
   
   inventoryLevels InventoryLevel[]
+
+  @@index([productId])
+  @@index([sku])
 }
 
 // ==========================================
@@ -477,6 +499,7 @@ model InventoryLevel {
   variant     ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@unique([locationId, productId, variantId])
+  @@index([productId, variantId])
 }
 
 model Supplier {
@@ -499,6 +522,8 @@ model PurchaseOrder {
   totalCost   Float    
   notes       String?
   createdAt   DateTime @default(now())
+  
+  @@index([supplierId])
 }
 
 model StockTransfer { 
@@ -534,8 +559,9 @@ model Order {
   discountTotal     Float             @default(0) 
   shippingTotal     Float             @default(0) 
   taxTotal          Float             @default(0) 
-  total             Float             
-  
+  total             Float  
+             
+  couponCode        String?           
   shippingAddress   Json
   billingAddress    Json
   
@@ -552,9 +578,16 @@ model Order {
   refunds           Refund[]
   returns           ReturnRequest[]    
   orderNotes        OrderNote[] 
+
+  deletedAt         DateTime?
   
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([orderNumber])
 }
 
 model OrderItem {
@@ -576,6 +609,8 @@ model OrderItem {
   tax          Float    @default(0) 
   
   metadata     Json?    
+
+  @@index([orderId])
 }
 
 model OrderTransaction { 
@@ -586,9 +621,11 @@ model OrderTransaction {
   gateway       String   
   amount        Float    
   status        String   
-  type          String   
+  type          TransactionType   
   metadata      Json?
   createdAt     DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model Shipment {
@@ -601,6 +638,8 @@ model Shipment {
   items           Json     
   shippedDate     DateTime @default(now())
   deliveredDate   DateTime?
+
+  @@index([orderId])
 }
 
 model ReturnRequest {
@@ -615,6 +654,8 @@ model ReturnRequest {
   images      String[] 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
 }
 
 model Refund {
@@ -625,6 +666,8 @@ model Refund {
   reason      String?
   status      String   @default("pending")
   createdAt   DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model OrderNote {
@@ -648,6 +691,8 @@ model Cart {
   sessionId String?    
   items     CartItem[]
   updatedAt DateTime   @updatedAt
+
+  @@index([sessionId])
 }
 
 model CartItem {
@@ -668,6 +713,7 @@ model Wishlist {
   createdAt DateTime @default(now())
 
   @@unique([userId, productId])
+  @@index([userId])
 }
 
 model RecentlyViewed {
@@ -677,6 +723,8 @@ model RecentlyViewed {
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   viewedAt  DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ==========================================
@@ -704,7 +752,12 @@ model Discount {
   productIds      String[]     
   categoryIds     String[]     
   
+  ruleLogic       Json?        
+
   isActive        Boolean      @default(true)
+
+  @@index([code])
+  @@index([startDate, endDate])
 }
 
 model GiftCard {
@@ -745,6 +798,8 @@ model BlogPost {
   metaDesc    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([slug])
 }
 
 model Page {
@@ -774,6 +829,9 @@ model Review {
   
   reply       String?  
   createdAt   DateTime @default(now())
+
+  @@index([productId])
+  @@index([status])
 }
 
 model QuestionAnswer { 
@@ -801,6 +859,9 @@ model SupportTicket {
   
   messages     TicketMessage[]
   createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
 }
 
 model TicketMessage {
@@ -828,6 +889,19 @@ model StoreSettings {
   smtpConfig     Json?
   paymentConfig  Json? 
   maintenance    Boolean @default(false)
+}
+
+model TaxRate {
+  id          String    @id @default(uuid())
+  name        String
+  rate        Float     
+  country     String?   
+  state       String?   
+  priority    Int       @default(0)
+  compound    Boolean   @default(false)
+  
+  products    Product[]
+  isActive    Boolean   @default(true)
 }
 
 model ShippingZone {       
@@ -868,6 +942,8 @@ model Notification {
   link      String?
   type      String?  
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Analytics {
@@ -883,21 +959,24 @@ model Analytics {
 model Media {
   id         String   @id @default(uuid())
   url        String
-  type       String   // IMAGE, VIDEO, DOCUMENT
+  type       String   
   filename   String
   mimeType   String
   size       Int
   uploadedBy String
   createdAt  DateTime @default(now())
+  
+  productImages ProductImage[]
 }
 
 model UrlRedirect {
   id        String   @id @default(uuid())
-  source    String   @unique // old-url
-  target    String   // new-url
+  source    String   @unique 
+  target    String   
   code      Int      @default(301)
   isActive  Boolean  @default(true)
 }
+
 model Banner {
   id        String   @id @default(uuid())
   title     String

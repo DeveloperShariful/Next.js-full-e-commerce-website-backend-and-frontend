@@ -1,3 +1,5 @@
+// components/admin/sidebar/user-nav.tsx
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -18,7 +20,6 @@ export function UserNav({ user }: UserNavProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Click outside to close logic
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -32,7 +33,8 @@ export function UserNav({ user }: UserNavProps) {
   const roleLabel = user.role?.replace(/_/g, " ") || "Staff";
 
   return (
-    <div className="p-4 border-t border-slate-700 bg-[#0f172a] relative" ref={menuRef}>
+    // [UPDATED] Added mb-safe class logic via style or tailwind padding
+    <div className="p-4 border-t border-slate-700 bg-[#0f172a] relative pb-6 md:pb-4" ref={menuRef}>
       
       {/* Pop-up Menu */}
       <div className={`
@@ -79,7 +81,7 @@ export function UserNav({ user }: UserNavProps) {
           isOpen ? 'bg-slate-800 border-slate-600' : 'hover:bg-slate-800'
         }`}
       >
-         <div className="flex items-center gap-3">
+         <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm border border-blue-400/30">
                {user.image ? (
                   <img src={user.image} alt={user.name || ""} className="w-full h-full rounded-full object-cover" />
@@ -87,12 +89,12 @@ export function UserNav({ user }: UserNavProps) {
                   user.name?.charAt(0).toUpperCase() || "A"
                )}
             </div>
-            <div className="text-left overflow-hidden hidden md:block w-32">
+            <div className="text-left overflow-hidden block w-full">
                 <p className="text-sm font-bold text-white truncate">{user.name || "Admin"}</p>
                 <p className="text-[10px] text-slate-400 truncate uppercase font-semibold tracking-wider">{roleLabel}</p>
             </div>
          </div>
-         <ChevronUp size={16} className={`text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/>
+         <ChevronUp size={16} className={`text-slate-500 shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/>
       </button>
     </div>
   );

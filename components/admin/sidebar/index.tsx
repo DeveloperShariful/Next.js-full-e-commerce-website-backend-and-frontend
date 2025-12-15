@@ -1,3 +1,5 @@
+// components/admin/sidebar/index.tsx
+
 "use client";
 
 import Link from "next/link";
@@ -15,20 +17,18 @@ interface AdminSidebarProps {
 }
 
 export default function AdminSidebar({ user }: AdminSidebarProps) {
-  // Filter menu based on user role (Basic implementation)
-  // In a real app, strict checking should be done.
-  // For now, we show everything if role is missing in config, or if user has the role.
   
   const filteredMenu = sidebarConfig.map(group => ({
     ...group,
     items: group.items.filter(item => 
       !item.roles || (user.role && item.roles.includes(user.role as any))
     )
-  })).filter(group => group.items.length > 0); // Hide empty groups
+  })).filter(group => group.items.length > 0); 
 
   return (
     <aside className="
-      hidden md:flex flex-col w-64 h-screen sticky top-0
+      hidden md:flex flex-col w-64 
+      h-[100dvh] sticky top-0  // [UPDATED] h-screen -> h-[100dvh]
       bg-[#1e293b] text-slate-300 border-r border-slate-800 
       transition-all duration-300 shadow-2xl z-40
     ">
@@ -51,7 +51,7 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
         {/* 2. Scrollable Navigation Menu */}
         <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
           {filteredMenu.map((group, groupIdx) => (
-            <div key={groupIdx} className="animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${groupIdx * 100}ms` }}>
+            <div key={groupIdx}>
               <h3 className="px-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-3 opacity-80">
                 {group.title}
               </h3>
@@ -65,7 +65,10 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
         </nav>
 
         {/* 3. User Profile Footer */}
-        <UserNav user={user} />
+        {/* [UPDATED] Added padding-bottom to lift it up on mobile */}
+        <div className="pb-4 md:pb-0 bg-[#0f172a]"> 
+           <UserNav user={user} />
+        </div>
       </aside>
   );
 }

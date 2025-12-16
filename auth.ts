@@ -40,17 +40,14 @@ export const {
     async jwt({ token }) {
       if (!token.sub) return token;
 
+      // ডাটাবেস থেকে রিয়েল-টাইম চেক
       const existingUser = await db.user.findUnique({
         where: { id: token.sub }
       });
-
+      
       if (!existingUser) return null;
 
       token.role = existingUser.role;
-      token.name = existingUser.name;
-      token.email = existingUser.email;
-      token.picture = existingUser.image;
-
       return token;
     }
   },

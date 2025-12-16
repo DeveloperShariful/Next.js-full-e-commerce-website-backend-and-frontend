@@ -66,7 +66,8 @@ export function UserNav({ user }: UserNavProps) {
           </Link>
 
           <button 
-            onClick={() => logout()} 
+            onClick={async () => {
+           await logout(); window.location.href = "/auth/login"; }}
             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-400 hover:bg-red-950/30 hover:text-red-300 rounded-md transition text-left"
           >
             <LogOut size={16} /> Sign Out

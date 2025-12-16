@@ -1,4 +1,4 @@
-// actions/register.ts
+// app/actions/auth/register.ts
 
 "use server";
 
@@ -16,8 +16,8 @@ export const register = async (values: z.infer<typeof RegisterSchema>) => {
   }
 
   const { email, password, name } = validatedFields.data;
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  // ১. চেক করি ইউজার আগে থেকেই আছে কিনা
   const existingUser = await db.user.findUnique({
     where: { email },
   });
@@ -26,10 +26,6 @@ export const register = async (values: z.infer<typeof RegisterSchema>) => {
     return { error: "Email already in use!" };
   }
 
-  // ২. পাসওয়ার্ড এনক্রিপ্ট করা
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  // ৩. ইউজার তৈরি করা (ডিফল্ট রোল: CUSTOMER)
   await db.user.create({
     data: {
       name,
@@ -38,8 +34,6 @@ export const register = async (values: z.infer<typeof RegisterSchema>) => {
       role: Role.CUSTOMER, // Default role
     },
   });
-
-  // TODO: Send verification email here (ভবিষ্যতে অ্যাড করব)
 
   return { success: "Account created! Please login." };
 };

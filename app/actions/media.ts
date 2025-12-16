@@ -5,79 +5,63 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
+// --- TYPES ---
 export type MediaItem = {
   id: string;
   url: string;
-  type: "PRODUCT" | "CATEGORY" | "USER" | "UPLOADED"; // ✅ UPLOADED Type Added
-  name: string;
+  type: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  altText?: string | null;
+  caption?: string | null;
+  description?: string | null;
   createdAt: Date;
+  updatedAt: Date;
 };
 
-// --- 1. GET ALL MEDIA ---
-export async function getAllMedia() {
+// ==========================================
+// 1. GET MEDIA (WITH FILTER & SORT)
+// ==========================================
+export async function getAllMedia(
+  query: string = "", 
+  sortBy: string = "newest", // newest, oldest, name_asc, name_desc, size_asc, size_desc
+  typeFilter: string = "ALL" // ALL, IMAGE, VIDEO, DOCUMENT
+) {
   try {
-    let mediaList: MediaItem[] = [];
-
-    // A. Manually Uploaded Images (From Media Table)
-    const uploadedItems = await db.media.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+    // 1. Filter Logic
+    const where: any = {};
     
-    const uploadedImages: MediaItem[] = uploadedItems.map(item => ({
-      id: item.id,
-      url: item.url,
-      type: "UPLOADED", // ✅ Type set to UPLOADED
-      name: item.filename || "Uploaded Image",
-      createdAt: item.createdAt
-    }));
+    if (query) {
+      where.OR = [
+        { filename: { contains: query, mode: 'insensitive' } },
+        { altText: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } }
+      ];
+    }
 
-    // B. Product Images
-    const productImages = await db.productImage.findMany({
-      include: { product: { select: { name: true } } },
-      orderBy: { id: 'desc' },
-      take: 50
+    if (typeFilter !== "ALL") {
+      where.type = typeFilter;
+    }
+
+    // 2. Sort Logic
+    let orderBy: any = { createdAt: 'desc' };
+    
+    switch (sortBy) {
+      case "oldest": orderBy = { createdAt: 'asc' }; break;
+      case "name_asc": orderBy = { filename: 'asc' }; break;
+      case "name_desc": orderBy = { filename: 'desc' }; break;
+      case "size_asc": orderBy = { size: 'asc' }; break;
+      case "size_desc": orderBy = { size: 'desc' }; break;
+      default: orderBy = { createdAt: 'desc' }; // newest
+    }
+
+    const data = await db.media.findMany({
+      where,
+      orderBy
     });
-    const products: MediaItem[] = productImages.map(img => ({
-      id: img.id,
-      url: img.url,
-      type: "PRODUCT",
-      name: img.product.name,
-      createdAt: new Date()
-    }));
 
-    // C. Category Images
-    const categories = await db.category.findMany({
-      where: { image: { not: null } },
-      select: { id: true, name: true, image: true }
-    });
-    const categoryImages: MediaItem[] = categories.map(cat => ({
-      id: cat.id,
-      url: cat.image!,
-      type: "CATEGORY",
-      name: cat.name,
-      createdAt: new Date()
-    }));
-
-    // D. User Images
-    const users = await db.user.findMany({
-      where: { image: { not: null } },
-      select: { id: true, name: true, image: true }
-    });
-    const userImages: MediaItem[] = users.map(user => ({
-      id: user.id,
-      url: user.image!,
-      type: "USER",
-      name: user.name || "User",
-      createdAt: new Date()
-    }));
-
-    // Merge All
-    mediaList = [...uploadedImages, ...products, ...categoryImages, ...userImages];
-
-    // Sort: Latest first
-    mediaList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return { success: true, data: mediaList };
+    return { success: true, data };
 
   } catch (error) {
     console.error("GET_MEDIA_ERROR", error);
@@ -85,49 +69,76 @@ export async function getAllMedia() {
   }
 }
 
-// --- 2. SAVE MEDIA (Returns the new object) ---
-export async function saveMedia(url: string) {
+// ==========================================
+// 2. SAVE MEDIA (UPLOAD)
+// ==========================================
+export async function saveMedia(fileData: { url: string, filename: string, size: number, mimeType: string }) {
   try {
-    const filename = url.split('/').pop() || "uploaded-image.jpg";
+    // Determine type based on mime
+    let type = "DOCUMENT";
+    if (fileData.mimeType.startsWith("image/")) type = "IMAGE";
+    else if (fileData.mimeType.startsWith("video/")) type = "VIDEO";
 
     const newMedia = await db.media.create({
       data: {
-        url,
-        type: "IMAGE",
-        filename: filename,       
-        mimeType: "image/jpeg",   
-        size: 0,                  
-        uploadedBy: "Admin"       
+        url: fileData.url,
+        filename: fileData.filename,
+        mimeType: fileData.mimeType,
+        size: fileData.size,
+        type: type,
+        uploadedBy: "Admin", // Should be dynamic in real auth
+        altText: fileData.filename.split('.')[0] // Default alt text from filename
       }
     });
 
     revalidatePath("/admin/media");
-    
-    // Return the new item to frontend
-    return { 
-      success: true, 
-      data: {
-        id: newMedia.id,
-        url: newMedia.url,
-        type: "UPLOADED",
-        name: newMedia.filename,
-        createdAt: newMedia.createdAt
-      } as MediaItem
-    };
+    return { success: true, data: newMedia };
 
   } catch (error) {
-    console.log(error);
-    return { success: false };
+    console.error("SAVE_MEDIA_ERROR", error);
+    return { success: false, message: "Failed to save file info" };
   }
 }
 
-// --- 3. DELETE MEDIA ---
-export async function deleteMedia(id: string) {
+// ==========================================
+// 3. UPDATE METADATA (DETAILS DRAWER)
+// ==========================================
+export async function updateMediaMetadata(id: string, data: { filename: string, altText: string, caption: string, description: string }) {
   try {
-    await db.media.delete({ where: { id } });
+    await db.media.update({
+      where: { id },
+      data: {
+        filename: data.filename,
+        altText: data.altText,
+        caption: data.caption,
+        description: data.description
+      }
+    });
+
     revalidatePath("/admin/media");
-    return { success: true, message: "Deleted successfully" };
+    return { success: true, message: "File details updated" };
+
   } catch (error) {
-    return { success: false, error: "Delete failed" };
+    return { success: false, message: "Update failed" };
+  }
+}
+
+// ==========================================
+// 4. BULK DELETE
+// ==========================================
+export async function bulkDeleteMedia(ids: string[]) {
+  try {
+    // Note: In a real production app, you should also delete the actual files 
+    // from your storage provider (Uploadthing/S3) here using their SDK.
+    
+    await db.media.deleteMany({
+      where: { id: { in: ids } }
+    });
+
+    revalidatePath("/admin/media");
+    return { success: true, message: `Successfully deleted ${ids.length} files` };
+
+  } catch (error) {
+    return { success: false, message: "Failed to delete files" };
   }
 }

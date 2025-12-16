@@ -963,8 +963,13 @@ model Media {
   filename   String
   mimeType   String
   size       Int
+  altText     String?
+  caption     String?
+  description String?
+
   uploadedBy String
   createdAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   
   productImages ProductImage[]
 }

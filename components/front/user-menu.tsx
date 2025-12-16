@@ -4,7 +4,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { logout } from "@/actions/logout";
+import { logout } from "@/app/actions/auth/logout";
 import { User, LogOut, ShoppingBag, LayoutDashboard, ChevronDown } from "lucide-react";
 import Image from "next/image";
 

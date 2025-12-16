@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { LoginSchema } from "@/schemas";
-import { login } from "@/app/actions/login";
+import { login } from "@/app/actions/auth/login";
 import Link from "next/link";
 import { Loader2, Lock, Mail, AlertCircle, Eye, EyeOff } from "lucide-react"; // Icons added
 

@@ -5,7 +5,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { LogOut, User, ChevronUp, Settings } from "lucide-react";
-import { logout } from "@/actions/logout";
+import { logout } from "@/app/actions/auth/logout";
 
 interface UserNavProps {
   user: {

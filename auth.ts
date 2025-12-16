@@ -44,9 +44,13 @@ export const {
         where: { id: token.sub }
       });
 
-      if (!existingUser) return token;
+      if (!existingUser) return null;
 
       token.role = existingUser.role;
+      token.name = existingUser.name;
+      token.email = existingUser.email;
+      token.picture = existingUser.image;
+
       return token;
     }
   },

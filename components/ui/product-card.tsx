@@ -1,5 +1,3 @@
-// components/ui/product-card.tsx
-
 "use client";
 
 import Image from "next/image";
@@ -7,7 +5,7 @@ import Link from "next/link";
 import { ShoppingCart, Eye, Star } from "lucide-react";
 import { Product, Category, ProductImage } from "@prisma/client";
 import { MouseEventHandler } from "react";
-import useCart from "@/hooks/use-cart"; // Cart Hook Import
+import useCart from "@/hooks/use-cart"; 
 
 interface ProductCardProps {
   data: Product & {
@@ -25,26 +23,32 @@ export default function ProductCard({ data }: ProductCardProps) {
     }).format(amount);
   };
 
-  // ✅ FIX: Safe access for salePrice
   const price = Number(data.price);
   const salePrice = data.salePrice ? Number(data.salePrice) : null;
+  const finalPrice = salePrice || price;
 
   const discount = salePrice 
     ? Math.round(((price - salePrice) / price) * 100)
     : 0;
 
-  // ✅ Add to Cart Handler (Prevents Link Navigation)
   const onAddToCart: MouseEventHandler<HTMLButtonElement> = (event) => {
-    event.preventDefault(); // Stop Link Click
+    event.preventDefault(); 
     event.stopPropagation();
     
-    // Add item to cart
-    cart.addItem(data);
+    // [FIXED] Manually mapping fields to match CartItem type
+    cart.addItem({
+      id: data.id,
+      name: data.name,
+      price: finalPrice,
+      quantity: 1, // Default quantity
+      cartItemId: `${data.id}-base`, // Generate unique ID
+      image: data.featuredImage || data.images?.[0]?.url || "",
+      category: data.category ? { name: data.category.name } : undefined
+    });
   };
 
-  // ✅ Preview Handler (Prevents Link Navigation)
   const onPreview: MouseEventHandler<HTMLAnchorElement> = (event) => {
-    event.stopPropagation(); // Just prevent bubbling
+    event.stopPropagation(); 
   };
 
   return (
@@ -72,9 +76,8 @@ export default function ProductCard({ data }: ProductCardProps) {
             )}
         </div>
 
-        {/* Overlay Actions (Fix: Button inside div, not link) */}
+        {/* Overlay Actions */}
         <div className="absolute inset-x-4 bottom-4 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-20 flex gap-2">
-           {/* Add to Cart Button */}
            <button 
              onClick={onAddToCart}
              className="flex-1 bg-slate-900 text-white py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-black shadow-lg"
@@ -82,7 +85,6 @@ export default function ProductCard({ data }: ProductCardProps) {
              <ShoppingCart size={16} /> Add
            </button>
            
-           {/* Preview Button */}
            <Link 
              href={`/product/${data.slug}`} 
              onClick={onPreview}
@@ -99,7 +101,6 @@ export default function ProductCard({ data }: ProductCardProps) {
             {data.category?.name || "Accessories"}
         </div>
         
-        {/* Name Link */}
         <Link href={`/product/${data.slug}`} className="block mb-2">
           <h3 className="font-bold text-slate-800 text-base truncate group-hover:text-blue-600 transition">
             {data.name}

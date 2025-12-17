@@ -1,29 +1,34 @@
 // app/admin/profile/page.tsx
 
-import { auth } from "@/auth";
-import { db } from "@/lib/db";
-import ProfileForm from "./profile-form"; // ✅ Importing Client Component
+"use client";
 
-export default async function ProfilePage() {
-  const session = await auth();
-  
-  // Fetch fresh data from DB
-  const user = await db.user.findUnique({
-    where: { id: session?.user?.id }
-  });
+import { UserProfile } from "@clerk/nextjs";
 
-  if (!user) return <div>User not found</div>;
-
+export default function AdminProfilePage() {
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
+    <div className="p-6 max-w-[1920px] mx-auto min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
+      
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800">My Profile</h1>
-        <p className="text-slate-500">Manage your account settings and preferences.</p>
+        <h1 className="text-2xl font-bold text-slate-800">My Profile</h1>
+        <p className="text-sm text-slate-500">Manage your account settings, security, and preferences.</p>
       </div>
 
-      {/* Client Form Component */}
-      <ProfileForm user={user} />
+      <div className="flex justify-center pb-10">
+        <UserProfile 
+          path="/admin/profile"
+          routing="path"
+          appearance={{
+            elements: {
+              rootBox: "w-full max-w-5xl",
+              card: "shadow-sm border border-slate-200 rounded-xl w-full bg-white",
+              navbar: "border-r border-slate-100",
+              navbarButton: "text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium",
+              headerTitle: "text-xl font-bold text-slate-800",
+              headerSubtitle: "text-slate-500",
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }

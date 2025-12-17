@@ -3,11 +3,11 @@
 "use client";
 
 import { useState } from "react";
-import { deleteStaff } from "@/app/actions/auth/staff";
+import { deleteStaff } from "@/app/actions/staff"; // [FIXED Import]
 import { Trash2, Mail, Shield, Loader2, Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { StaffModal } from "./create-staff-modal"; 
+import { StaffModal } from "./staff-modal"; 
 
 interface StaffCardProps {
   staff: {
@@ -51,10 +51,8 @@ export function StaffCard({ staff }: StaffCardProps) {
     <>
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition relative group">
         
-        {/* Action Buttons (Always Visible & Better Styling) */}
+        {/* Action Buttons */}
         <div className="absolute top-4 right-4 flex gap-2">
-          
-          {/* Edit Button */}
           <button 
             onClick={() => setIsEditOpen(true)}
             className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition shadow-sm"
@@ -63,7 +61,6 @@ export function StaffCard({ staff }: StaffCardProps) {
             <Pencil size={14} />
           </button>
 
-          {/* Delete Button */}
           {staff.role !== 'SUPER_ADMIN' && (
             <button 
               onClick={handleDelete} 
@@ -76,7 +73,7 @@ export function StaffCard({ staff }: StaffCardProps) {
           )}
         </div>
         
-        {/* User Info (Added pr-20 to prevent overlap with buttons) */}
+        {/* User Info */}
         <div className="flex items-center gap-4 mb-4 pr-20">
           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-lg border border-slate-200 shrink-0">
               {staff.name?.charAt(0).toUpperCase() || "U"}
@@ -99,7 +96,6 @@ export function StaffCard({ staff }: StaffCardProps) {
         </div>
       </div>
 
-      {/* Edit Modal */}
       <StaffModal 
         isOpen={isEditOpen} 
         onClose={() => setIsEditOpen(false)} 

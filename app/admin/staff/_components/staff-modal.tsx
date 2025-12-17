@@ -2,16 +2,16 @@
 
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
-import { createStaff, updateStaff } from "@/app/actions/auth/staff";
-import { X, Loader2, Save, User, Mail, Lock, Shield } from "lucide-react";
+import { useTransition } from "react";
+import { createStaff, updateStaff } from "@/app/actions/staff"; // [FIXED Import]
+import { X, Loader2, Save, User, Mail, Shield } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
 interface StaffModalProps {
   isOpen: boolean;
   onClose: () => void;
-  staffToEdit?: any; // If present, mode is EDIT
+  staffToEdit?: any;
 }
 
 export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
@@ -26,13 +26,10 @@ export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
 
     startTransition(async () => {
       let res;
-      
       if (staffToEdit) {
-        // Edit Mode
         formData.append("id", staffToEdit.id);
         res = await updateStaff(null, formData);
       } else {
-        // Create Mode
         res = await createStaff(null, formData);
       }
       
@@ -52,14 +49,13 @@ export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
         
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-lg text-slate-800">
-            {staffToEdit ? "Edit Staff Member" : "New Staff Member"}
+            {staffToEdit ? "Edit Staff" : "Add New Staff"}
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition"><X size={20}/></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           
-          {/* Name */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-600 uppercase">Full Name</label>
             <div className="relative">
@@ -74,7 +70,6 @@ export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
             </div>
           </div>
 
-          {/* Email */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-600 uppercase">Email</label>
             <div className="relative">
@@ -88,26 +83,13 @@ export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
                   className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition"
                 />
             </div>
+            {!staffToEdit && (
+                <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                    * The user must Sign Up with this email to access the panel.
+                </p>
+            )}
           </div>
 
-          {/* Password */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-600 uppercase">
-              {staffToEdit ? "New Password (Optional)" : "Password"}
-            </label>
-            <div className="relative">
-                <Lock className="absolute left-3 top-2.5 text-slate-400" size={16}/>
-                <input 
-                  name="password" 
-                  type="password" 
-                  required={!staffToEdit} // Required only on create
-                  placeholder={staffToEdit ? "Leave blank to keep current" : "••••••"} 
-                  className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition"
-                />
-            </div>
-          </div>
-
-          {/* Role */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-600 uppercase">Role</label>
             <div className="relative">
@@ -132,7 +114,7 @@ export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
               className="w-full bg-slate-900 text-white py-2.5 rounded-lg font-bold hover:bg-slate-800 transition flex items-center justify-center gap-2 disabled:opacity-70 shadow-md"
             >
               {isPending ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} 
-              {staffToEdit ? "Update Account" : "Create Account"}
+              {staffToEdit ? "Update Staff" : "Add Staff"}
             </button>
           </div>
         </form>

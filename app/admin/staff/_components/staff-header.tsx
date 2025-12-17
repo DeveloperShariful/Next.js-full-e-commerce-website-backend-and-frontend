@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { ShieldCheck, Plus } from "lucide-react";
-import { StaffModal } from "./create-staff-modal";
+import { StaffModal } from "./staff-modal";
 
 export function StaffHeader() {
   const [isOpen, setIsOpen] = useState(false);

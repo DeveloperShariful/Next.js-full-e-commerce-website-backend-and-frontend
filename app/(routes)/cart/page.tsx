@@ -17,7 +17,6 @@ export default function CartPage() {
   const router = useRouter();
   const cart = useCart();
   const [isMounted, setIsMounted] = useState(false);
-
   useEffect(() => {
     setIsMounted(true);
   }, []);

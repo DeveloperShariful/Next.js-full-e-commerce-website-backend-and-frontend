@@ -8,22 +8,29 @@ export interface CartItem {
   price: number;
   image?: string;
   quantity: number;
-  cartItemId: string; // Unique ID to handle duplicates
-  // [FIXED] এই ফিল্ডগুলো যোগ করা হয়েছে
+  cartItemId: string; // Unique ID
   variantId?: string;
   selectedVariantName?: string; 
+  // [FIXED] Category Added
+  category?: { name: string }; 
 }
 
 interface CartStore {
   items: CartItem[];
   shippingCost: number;
   discountAmount: number;
+  couponCode?: string; // [FIXED] Coupon Code Added
+
   addItem: (data: CartItem) => void;
-  removeItem: (cartItemId: string) => void; // Remove by unique cartItemId
+  removeItem: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
+  // [FIXED] Increment/Decrement Added
+  incrementItem: (cartItemId: string) => void;
+  decrementItem: (cartItemId: string) => void;
+  
   removeAll: () => void;
   setShippingCost: (cost: number) => void;
-  setDiscount: (amount: number) => void;
+  setDiscount: (amount: number, code?: string) => void;
   getSubtotal: () => number;
   getTotal: () => number;
 }
@@ -34,6 +41,7 @@ const useCart = create(
       items: [],
       shippingCost: 0,
       discountAmount: 0,
+      couponCode: undefined,
 
       addItem: (data: CartItem) => {
         const currentItems = get().items;
@@ -64,11 +72,34 @@ const useCart = create(
         set({ items: updatedItems });
       },
 
-      removeAll: () => set({ items: [], shippingCost: 0, discountAmount: 0 }),
+      // [FIXED] Increment Logic
+      incrementItem: (cartItemId: string) => {
+        const currentItems = get().items;
+        const updatedItems = currentItems.map((item) => 
+          item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item
+        );
+        set({ items: updatedItems });
+      },
+
+      // [FIXED] Decrement Logic
+      decrementItem: (cartItemId: string) => {
+        const currentItems = get().items;
+        const updatedItems = currentItems.map((item) => {
+          if (item.cartItemId === cartItemId) {
+            // Prevent going below 1
+            const newQuantity = item.quantity > 1 ? item.quantity - 1 : 1;
+            return { ...item, quantity: newQuantity };
+          }
+          return item;
+        });
+        set({ items: updatedItems });
+      },
+
+      removeAll: () => set({ items: [], shippingCost: 0, discountAmount: 0, couponCode: undefined }),
 
       setShippingCost: (cost: number) => set({ shippingCost: cost }),
       
-      setDiscount: (amount: number) => set({ discountAmount: amount }),
+      setDiscount: (amount: number, code?: string) => set({ discountAmount: amount, couponCode: code }),
 
       getSubtotal: () => {
         return get().items.reduce((total, item) => total + Number(item.price) * item.quantity, 0);

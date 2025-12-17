@@ -1,0 +1,112 @@
+import { Webhook } from 'svix'
+import { headers } from 'next/headers'
+import { WebhookEvent } from '@clerk/nextjs/server'
+import { db } from '@/lib/db'
+
+export async function POST(req: Request) {
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET
+
+  if (!WEBHOOK_SECRET) {
+    throw new Error('Please add CLERK_WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local')
+  }
+
+  // [FIX] headers() এর আগে await বসানো হয়েছে
+  const headerPayload = await headers();
+  const svix_id = headerPayload.get("svix-id");
+  const svix_timestamp = headerPayload.get("svix-timestamp");
+  const svix_signature = headerPayload.get("svix-signature");
+
+  if (!svix_id || !svix_timestamp || !svix_signature) {
+    return new Response('Error occured -- no svix headers', {
+      status: 400
+    })
+  }
+
+  const payload = await req.json()
+  const body = JSON.stringify(payload);
+
+  const wh = new Webhook(WEBHOOK_SECRET);
+  let evt: WebhookEvent
+
+  try {
+    evt = wh.verify(body, {
+      "svix-id": svix_id,
+      "svix-timestamp": svix_timestamp,
+      "svix-signature": svix_signature,
+    }) as WebhookEvent
+  } catch (err) {
+    console.error('Error verifying webhook:', err);
+    return new Response('Error occured', {
+      status: 400
+    })
+  }
+
+  const eventType = evt.type;
+
+  if (eventType === "user.created") {
+    const { id, email_addresses, first_name, last_name, image_url } = evt.data;
+    
+    const email = email_addresses[0]?.email_address;
+    const name = `${first_name || ""} ${last_name || ""}`.trim();
+
+    if (email) {
+      const existingUser = await db.user.findUnique({
+        where: { email }
+      });
+
+      if (existingUser) {
+        await db.user.update({
+          where: { email },
+          data: { 
+            clerkId: id, // [NOTE] যদি এখানে লাল দাগ থাকে, নিচের স্টেপ ফলো করুন
+            image: image_url || existingUser.image
+          }
+        });
+      } else {
+        await db.user.create({
+          data: {
+            clerkId: id,
+            email,
+            name,
+            image: image_url,
+            role: "CUSTOMER",
+          }
+        });
+      }
+    }
+  }
+
+  if (eventType === "user.updated") {
+    const { id, first_name, last_name, image_url } = evt.data;
+    const name = `${first_name || ""} ${last_name || ""}`.trim();
+
+    // [FIX] clerkId দিয়ে খোঁজার আগে নিশ্চিত হতে হবে id আছে
+    if (id) {
+        // প্রথমে চেক করি ইউজার আছে কিনা, না থাকলে এরর এড়াতে update করব না
+        const userExists = await db.user.findUnique({ where: { clerkId: id } });
+        
+        if (userExists) {
+            await db.user.update({
+                where: { clerkId: id },
+                data: { name, image: image_url }
+            });
+        }
+    }
+  }
+
+  if (eventType === "user.deleted") {
+    const { id } = evt.data;
+    
+    if (id) {
+        // [FIX] ডিলিট করার আগেও চেক করা ভালো
+        const userExists = await db.user.findUnique({ where: { clerkId: id } });
+        if (userExists) {
+            await db.user.delete({
+                where: { clerkId: id }
+            });
+        }
+    }
+  }
+
+  return new Response('', { status: 200 })
+}

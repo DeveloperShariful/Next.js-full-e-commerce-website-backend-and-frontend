@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
-import ProductView from "@/components/product-view";
+import ProductView from "@/components/front/product-view";
 import Link from "next/link";
 import ProductCard from "@/components/ui/product-card";
 

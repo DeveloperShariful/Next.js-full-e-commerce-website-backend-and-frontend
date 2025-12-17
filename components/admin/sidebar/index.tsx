@@ -15,7 +15,6 @@ interface AdminSidebarProps {
     image?: string | null;
   }
 }
-
 export default function AdminSidebar({ user }: AdminSidebarProps) {
   
   const filteredMenu = sidebarConfig.map(group => ({
@@ -67,7 +66,7 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
         {/* 3. User Profile Footer */}
         {/* [UPDATED] Added padding-bottom to lift it up on mobile */}
         <div className="pb-4 md:pb-0 bg-[#0f172a]"> 
-           <UserNav user={user} />
+           <UserNav />
         </div>
       </aside>
   );

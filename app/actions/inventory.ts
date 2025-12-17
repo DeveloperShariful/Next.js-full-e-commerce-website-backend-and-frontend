@@ -1,15 +1,16 @@
+// app/actions/inventory.ts
+
 "use server";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@/auth"; // [ADDED] সেশন পাওয়ার জন্য
+import { auth } from "@clerk/nextjs/server";
 
 // --- SCHEMAS ---
 const SupplierSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, "Name is required"),
-  // contactName: z.string().optional(), // [REMOVED] স্কিমায় নেই তাই বাদ দিলাম
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   address: z.string().optional(),
@@ -21,6 +22,7 @@ const LocationSchema = z.object({
   address: z.string().optional(),
 });
 
+// --- TYPES ---
 export type ActionState = {
   success: boolean;
   message?: string;
@@ -70,9 +72,8 @@ export async function getInventory(query: string = "") {
 
 export async function adjustStock(id: string, adjustment: number, reason: string) {
   try {
-    // [FIXED] Get Current User Session
-    const session = await auth();
-    const userId = session?.user?.id;
+    // [FIXED] Clerk Authentication
+    const { userId } = await auth();
 
     if (!userId) {
       return { success: false, message: "Unauthorized: User not found" };
@@ -84,7 +85,6 @@ export async function adjustStock(id: string, adjustment: number, reason: string
     const newQty = level.quantity + adjustment;
     if (newQty < 0) return { success: false, message: "Stock cannot be negative" };
 
-    // Transaction
     await db.$transaction([
       db.inventoryLevel.update({
         where: { id },
@@ -95,7 +95,7 @@ export async function adjustStock(id: string, adjustment: number, reason: string
           action: `Stock Adjusted (${adjustment > 0 ? '+' : ''}${adjustment})`,
           entityId: id,
           details: { reason, old: level.quantity, new: newQty },
-          userId: userId // [FIXED] Dynamic User ID
+          userId: userId 
         }
       })
     ]);
@@ -103,8 +103,8 @@ export async function adjustStock(id: string, adjustment: number, reason: string
     revalidatePath("/admin/inventory");
     return { success: true, message: "Stock updated successfully" };
   } catch (error) {
-    console.error("ADJUST_STOCK_ERROR", error); // ডিবাগিংয়ের জন্য লগ
-    return { success: false, message: "Update failed. Check console for details." };
+    console.error("ADJUST_STOCK_ERROR", error);
+    return { success: false, message: "Update failed" };
   }
 }
 
@@ -124,7 +124,6 @@ export async function getSuppliers() {
 export async function saveSupplier(prevState: any, formData: FormData): Promise<ActionState> {
   const rawData = Object.fromEntries(formData.entries());
   
-  // [FIXED] Remove contactName from validation since it's not in DB
   const validated = SupplierSchema.safeParse(rawData);
 
   if (!validated.success) {
@@ -143,7 +142,7 @@ export async function saveSupplier(prevState: any, formData: FormData): Promise<
     return { success: true, message: "Supplier saved successfully" };
   } catch (error) {
     console.error("SAVE_SUPPLIER_ERROR", error);
-    return { success: false, message: "Database error. Likely missing column." };
+    return { success: false, message: "Database error" };
   }
 }
 

@@ -3,60 +3,105 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 
-export async function placeOrder(orderData: any, cartItems: any[]) {
+// --- TYPES ---
+type CartItem = {
+  productId: string;
+  variantId?: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image?: string;
+};
+
+type CheckoutData = {
+  items: CartItem[];
+  total: number;
+  shippingAddress: any;
+  paymentMethod: string;
+};
+
+// ==========================================
+// PROCESS CHECKOUT (CREATE ORDER)
+// ==========================================
+
+export async function processCheckout(data: CheckoutData) {
   try {
-    const session = await auth();
-    const userId = session?.user?.id; // লগইন থাকলে আইডি পাবে, না থাকলে undefined
+    // 1. Authenticate User (Clerk)
+    const { userId } = await auth();
+    const clerkUser = await currentUser();
 
-    // 1. Generate Order Number (Random 6 digits)
-    const orderNumber = Math.floor(100000 + Math.random() * 900000).toString();
+    if (!userId || !clerkUser) {
+      return { success: false, message: "Please login to place an order" };
+    }
 
-    // 2. Create Order
-    const order = await db.order.create({
-      data: {
-        orderNumber,
-        userId: userId || null, // Guest or User
-        guestEmail: !userId ? orderData.email : null, // Save email if guest
-        
-        // Address Snapshots
-        shippingAddress: orderData.shippingAddress,
-        billingAddress: orderData.shippingAddress, // Assuming same for now
-
-        // Financials
-        subtotal: orderData.subtotal,
-        shippingTotal: orderData.shippingCost,
-        discountTotal: orderData.discount,
-        total: orderData.total,
-        
-        paymentMethod: "COD", // আপাতত শুধু ক্যাশ অন ডেলিভারি
-        paymentStatus: "UNPAID",
-        status: "PENDING",
-
-        // Order Items
-        items: {
-          create: cartItems.map((item: any) => ({
-            productId: item.id,
-            productName: item.name,
-            variantId: item.selectedVariantId || null,
-            variantName: item.selectedVariantName || null,
-            sku: item.sku,
-            price: item.price,
-            quantity: item.quantity,
-            total: item.price * item.quantity
-          }))
-        }
-      }
+    // 2. Find Database User (Sync check)
+    // We use email to ensure we link to the correct DB record
+    const dbUser = await db.user.findUnique({
+      where: { email: clerkUser.emailAddresses[0].emailAddress }
     });
 
-    // 3. Optional: Decrease Stock (Advanced Step)
-    // লুপ চালিয়ে স্টক কমানো যেতে পারে, আপাতত স্কিপ করছি কমপ্লেক্সিটি কমানোর জন্য
+    if (!dbUser) {
+      return { success: false, message: "User account not synced. Please contact support." };
+    }
 
-    return { success: true, orderId: order.id, orderNumber };
+    // 3. Generate Order Number
+    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // 4. Database Transaction
+    const newOrder = await db.$transaction(async (tx) => {
+      
+      // A. Create Order
+      const order = await tx.order.create({
+        data: {
+          orderNumber,
+          userId: dbUser.id,
+          total: data.total,
+          subtotal: data.total, // Assuming no tax/shipping calc for simple example
+          status: "PENDING",
+          paymentStatus: "UNPAID",
+          paymentMethod: data.paymentMethod,
+          shippingAddress: data.shippingAddress,
+          billingAddress: data.shippingAddress, 
+          guestEmail: dbUser.email,
+        }
+      });
+
+      // B. Create Order Items
+      for (const item of data.items) {
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: item.productId,
+            variantId: item.variantId,
+            productName: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            total: item.price * item.quantity,
+          }
+        });
+
+        // C. Update Stock (Optional - if tracking stock)
+        if (item.variantId) {
+           await tx.productVariant.update({
+             where: { id: item.variantId },
+             data: { stock: { decrement: item.quantity } }
+           });
+        }
+      }
+
+      return order;
+    });
+
+    revalidatePath("/orders");
+    revalidatePath("/admin/orders");
+    
+    return { success: true, message: "Order placed successfully", orderId: newOrder.id };
 
   } catch (error) {
-    console.error("ORDER_PLACE_ERROR", error);
-    return { success: false, error: "Failed to place order" };
+    console.error("CHECKOUT_ERROR", error);
+    return { success: false, message: "Failed to process order" };
   }
 }

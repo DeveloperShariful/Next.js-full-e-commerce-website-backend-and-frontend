@@ -18,7 +18,6 @@ enum Role {
   MANAGER
   EDITOR
   SUPPORT
-  VENDOR
   CUSTOMER
 }
 
@@ -77,12 +76,13 @@ enum ReturnStatus {
 enum TransactionType {
   SALE
   REFUND
-  PAYOUT
-  COMMISSION
+  VOID
+  DISPUTE
+  CHARGEBACK
 }
 
 // ==========================================
-// 3. USER, AUTH & VENDOR SYSTEM
+// 3. USER, AUTH & SYSTEM
 // ==========================================
 
 model User {
@@ -105,14 +105,13 @@ model User {
 
   accounts      Account[] 
   addresses     Address[]
+  paymentMethods UserPaymentMethod[]
   orders        Order[]
   reviews       Review[]
   wishlist      Wishlist[]
   cart          Cart?
   viewedProducts RecentlyViewed[]
   wallet        Wallet?   
-  
-  vendorProfile Vendor?   
   
   activityLogs    ActivityLog[]
   blogPosts       BlogPost[]
@@ -143,6 +142,29 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model UserPaymentMethod {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  gateway         String   @default("stripe")
+  type            String   @default("card") 
+  stripeCustomerId String? 
+  methodId        String   
+  
+  brand           String?  
+  last4           String?  
+  expiryMonth     Int?
+  expiryYear      Int?
+  
+  billingDetails  Json?    
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   @@index([userId])
 }
 
@@ -208,42 +230,6 @@ model WalletTransaction {
   createdAt   DateTime @default(now())
 
   @@index([walletId])
-}
-
-model Vendor {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  storeName       String   @unique
-  slug            String   @unique
-  description     String?  @db.Text
-  logo            String?
-  banner          String? 
-  commissionRate  Float    @default(10.0) 
-  isVerified      Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  rating          Float    @default(0)
-  deletedAt       DateTime?
-
-  products        Product[]
-  payouts         Payout[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([storeName])
-}
-
-model Payout { 
-  id            String   @id @default(uuid())
-  vendorId      String
-  vendor        Vendor   @relation(fields: [vendorId], references: [id])
-  amount        Float
-  status        String   
-  transactionId String?
-  createdAt     DateTime @default(now())
-
-  @@index([vendorId])
 }
 
 // ==========================================
@@ -326,8 +312,7 @@ model Product {
   category         Category?     @relation(fields: [categoryId], references: [id])
   brandId          String?
   brand            Brand?        @relation(fields: [brandId], references: [id])
-  vendorId         String?
-  vendor           Vendor?       @relation(fields: [vendorId], references: [id])
+  
   tags             Tag[]
   collections      Collection[]
 
@@ -389,7 +374,6 @@ model Product {
 
   @@index([slug])
   @@index([categoryId])
-  @@index([vendorId])
   @@index([status])
   @@index([price])
 }
@@ -555,18 +539,27 @@ model Order {
   paymentStatus     PaymentStatus     @default(UNPAID)
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
   
-  currency          String            @default("BDT")
+  currency          String            @default("AUD")
   subtotal          Float             
   discountTotal     Float             @default(0) 
   shippingTotal     Float             @default(0) 
   taxTotal          Float             @default(0) 
+  
+  surcharge         Float             @default(0) 
   total             Float  
              
+  paymentGateway    String?           
+  paymentMethod     String?           
+  paymentId         String?           @unique 
+  payerId           String?
+  
+  invoiceNumber     String?           
+  invoiceUrl        String?           
+  
   couponCode        String?           
   shippingAddress   Json
   billingAddress    Json
   
-  paymentMethod     String?           
   shippingMethod    String?           
   
   customerNote      String?           
@@ -587,7 +580,7 @@ model Order {
 
   @@index([userId])
   @@index([status])
-  @@index([createdAt])
+  @@index([paymentId])
   @@index([orderNumber])
 }
 
@@ -617,16 +610,39 @@ model OrderItem {
 model OrderTransaction { 
   id            String   @id @default(uuid())
   orderId       String
-  order         Order    @relation(fields: [orderId], references: [id])
-  transactionId String   
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
   gateway       String   
-  amount        Float    
-  status        String   
   type          TransactionType   
+  amount        Float    
+  currency      String   @default("AUD")
+  
+  transactionId String   
+  idempotencyKey String? 
+  status        String   
+  
+  rawResponse   Json?    
+  errorCode     String?
+  errorMessage  String?
+
   metadata      Json?
   createdAt     DateTime @default(now())
 
   @@index([orderId])
+  @@index([transactionId])
+}
+
+model PaymentWebhookLog {
+  id              String   @id @default(uuid())
+  provider        String   
+  eventId         String   
+  eventType       String   
+  payload         Json     
+  processed       Boolean  @default(false) 
+  processingError String?  
+  createdAt       DateTime @default(now())
+
+  @@unique([eventId])
 }
 
 model Shipment {
@@ -880,8 +896,8 @@ model StoreSettings {
   storeName      String @default("My Store")
   storeEmail     String?
   storePhone     String?
-  currency       String @default("BDT")
-  currencySymbol String @default("৳")
+  currency       String @default("AUD")
+  currencySymbol String @default("$")
   
   logo           String?
   favicon        String?
@@ -892,11 +908,29 @@ model StoreSettings {
   maintenance    Boolean @default(false)
 }
 
+model PaymentMethodConfig {
+  id             String   @id @default(uuid())
+  identifier     String   @unique 
+  name           String   
+  isEnabled      Boolean  @default(true)
+  
+  minOrderAmount Float?   
+  maxOrderAmount Float?   
+  surchargeType  String   @default("percentage") 
+  surchargeValue Float    @default(0)
+  
+  displayOrder   Int      @default(0)
+  description    String?  
+  logo           String?
+  
+  updatedAt      DateTime @updatedAt
+}
+
 model TaxRate {
   id          String    @id @default(uuid())
-  name        String
-  rate        Float     
-  country     String?   
+  name        String    @default("GST")
+  rate        Float     @default(10.0)
+  country     String?   @default("AU")
   state       String?   
   priority    Int       @default(0)
   compound    Boolean   @default(false)

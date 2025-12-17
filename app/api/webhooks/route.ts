@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         await db.user.update({
           where: { email },
           data: { 
-            clerkId: id, // [NOTE] যদি এখানে লাল দাগ থাকে, নিচের স্টেপ ফলো করুন
+            clerkId: id,
             image: image_url || existingUser.image
           }
         });
@@ -80,9 +80,8 @@ export async function POST(req: Request) {
     const { id, first_name, last_name, image_url } = evt.data;
     const name = `${first_name || ""} ${last_name || ""}`.trim();
 
-    // [FIX] clerkId দিয়ে খোঁজার আগে নিশ্চিত হতে হবে id আছে
+    
     if (id) {
-        // প্রথমে চেক করি ইউজার আছে কিনা, না থাকলে এরর এড়াতে update করব না
         const userExists = await db.user.findUnique({ where: { clerkId: id } });
         
         if (userExists) {
@@ -98,7 +97,6 @@ export async function POST(req: Request) {
     const { id } = evt.data;
     
     if (id) {
-        // [FIX] ডিলিট করার আগেও চেক করা ভালো
         const userExists = await db.user.findUnique({ where: { clerkId: id } });
         if (userExists) {
             await db.user.delete({

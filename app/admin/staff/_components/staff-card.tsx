@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { deleteStaff } from "@/app/actions/staff"; // [FIXED Import]
+import { deleteStaff } from "@/app/actions/staff"; 
 import { Trash2, Mail, Shield, Loader2, Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";

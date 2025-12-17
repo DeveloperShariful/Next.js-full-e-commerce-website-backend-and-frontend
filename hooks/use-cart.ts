@@ -8,23 +8,28 @@ export interface CartItem {
   price: number;
   image?: string;
   quantity: number;
-  cartItemId: string; // Unique ID
+  cartItemId: string; 
   variantId?: string;
   selectedVariantName?: string; 
-  // [FIXED] Category Added
   category?: { name: string }; 
 }
 
 interface CartStore {
+  // Data State
   items: CartItem[];
   shippingCost: number;
   discountAmount: number;
-  couponCode?: string; // [FIXED] Coupon Code Added
+  couponCode?: string;
+  
+  // UI State (Mini Cart Drawer) - এই অংশটি মিসিং ছিল তাই এরর আসছিল
+  isOpen: boolean;
+  onOpen: () => void;
+  onClose: () => void;
 
+  // Actions
   addItem: (data: CartItem) => void;
   removeItem: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
-  // [FIXED] Increment/Decrement Added
   incrementItem: (cartItemId: string) => void;
   decrementItem: (cartItemId: string) => void;
   
@@ -42,10 +47,14 @@ const useCart = create(
       shippingCost: 0,
       discountAmount: 0,
       couponCode: undefined,
+      
+      // UI Logic
+      isOpen: false,
+      onOpen: () => set({ isOpen: true }),
+      onClose: () => set({ isOpen: false }),
 
       addItem: (data: CartItem) => {
         const currentItems = get().items;
-        // Check if exact same product + variant exists
         const existingItem = currentItems.find((item) => 
           item.id === data.id && item.variantId === data.variantId
         );
@@ -55,13 +64,13 @@ const useCart = create(
           return;
         }
 
-        set({ items: [...get().items, data] });
+        set({ items: [...get().items, data], isOpen: true }); // Open cart automatically
         toast.success("Item added to cart.");
       },
 
       removeItem: (cartItemId: string) => {
         set({ items: [...get().items.filter((item) => item.cartItemId !== cartItemId)] });
-        toast.success("Item removed from cart.");
+        toast.success("Item removed.");
       },
 
       updateQuantity: (cartItemId: string, quantity: number) => {
@@ -72,7 +81,6 @@ const useCart = create(
         set({ items: updatedItems });
       },
 
-      // [FIXED] Increment Logic
       incrementItem: (cartItemId: string) => {
         const currentItems = get().items;
         const updatedItems = currentItems.map((item) => 
@@ -81,12 +89,10 @@ const useCart = create(
         set({ items: updatedItems });
       },
 
-      // [FIXED] Decrement Logic
       decrementItem: (cartItemId: string) => {
         const currentItems = get().items;
         const updatedItems = currentItems.map((item) => {
           if (item.cartItemId === cartItemId) {
-            // Prevent going below 1
             const newQuantity = item.quantity > 1 ? item.quantity - 1 : 1;
             return { ...item, quantity: newQuantity };
           }

@@ -1,4 +1,3 @@
-// 1. CONFIGURATION
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,7 +8,7 @@ datasource db {
 }
 
 // ==========================================
-// 2. ENUMS (CONSTANTS)
+// ENUMS
 // ==========================================
 
 enum Role {
@@ -31,6 +30,7 @@ enum ProductType {
 }
 
 enum OrderStatus {
+  DRAFT
   PENDING
   AWAITING_PAYMENT
   PROCESSING
@@ -63,6 +63,8 @@ enum DiscountType {
   FIXED_AMOUNT
   FREE_SHIPPING
   BUY_X_GET_Y
+  FIXED_CART
+  FIXED_PRODUCT
 }
 
 enum ReturnStatus {
@@ -81,8 +83,32 @@ enum TransactionType {
   CHARGEBACK
 }
 
+enum BackorderStatus {
+  DO_NOT_ALLOW
+  ALLOW
+  ALLOW_BUT_NOTIFY
+}
+
+enum TaxStatus {
+  TAXABLE
+  SHIPPING_ONLY
+  NONE
+}
+
+enum AddressType {
+  BILLING
+  SHIPPING
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  ARCHIVE
+}
+
 // ==========================================
-// 3. USER, AUTH & SYSTEM
+// USER, AUTH & SYSTEM
 // ==========================================
 
 model User {
@@ -104,6 +130,7 @@ model User {
   deletedAt     DateTime? 
 
   accounts      Account[] 
+  sessions      Session[]
   addresses     Address[]
   paymentMethods UserPaymentMethod[]
   orders        Order[]
@@ -145,6 +172,34 @@ model Account {
   @@index([userId])
 }
 
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  id      String   @id @default(uuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
+
+model PasswordResetToken {
+  id      String   @id @default(uuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
+
 model UserPaymentMethod {
   id              String   @id @default(uuid())
   userId          String
@@ -168,30 +223,12 @@ model UserPaymentMethod {
   @@index([userId])
 }
 
-model VerificationToken {
-  id      String   @id @default(uuid())
-  email   String
-  token   String   @unique
-  expires DateTime
-
-  @@unique([email, token])
-}
-
-model PasswordResetToken {
-  id      String   @id @default(uuid())
-  email   String
-  token   String   @unique
-  expires DateTime
-
-  @@unique([email, token])
-}
-
 model Address {
-  id           String  @id @default(uuid())
+  id           String      @id @default(uuid())
   userId       String
-  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   title        String? 
-  type         String  @default("shipping") 
+  type         AddressType @default(SHIPPING)
   firstName    String
   lastName     String
   company      String?
@@ -203,7 +240,7 @@ model Address {
   country      String
   phone        String
   email        String?
-  isDefault    Boolean @default(false)
+  isDefault    Boolean     @default(false)
   taxZoneId    String? 
 
   @@index([userId])
@@ -220,20 +257,20 @@ model Wallet {
 }
 
 model WalletTransaction {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   walletId    String
-  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
   amount      Float    
   type        TransactionType 
   description String?
   reference   String?  
-  createdAt   DateTime @default(now())
+  createdAt   DateTime        @default(now())
 
   @@index([walletId])
 }
 
 // ==========================================
-// 4. PRODUCT CATALOG
+// PRODUCT CATALOG
 // ==========================================
 
 model Category {
@@ -269,17 +306,23 @@ model Brand {
   logo        String?
   description String?   @db.Text
   website     String?
+  
   products    Product[]
+  productAttributes ProductAttribute[] 
   
   metaTitle   String?
   metaDesc    String?
   metafields  Json?
   deletedAt   DateTime? 
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Tag {
   id       String    @id @default(uuid())
   name     String    @unique
+  slug     String?   @unique
   products Product[]
 }
 
@@ -296,6 +339,9 @@ model Collection {
   
   metaTitle   String?
   metaDesc    String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Product {
@@ -307,6 +353,7 @@ model Product {
   
   productType      ProductType   @default(SIMPLE)
   status           String        @default("draft") 
+  isFeatured       Boolean       @default(false)
   
   categoryId       String?
   category         Category?     @relation(fields: [categoryId], references: [id])
@@ -327,20 +374,32 @@ model Product {
   costPerItem      Float?        
   
   taxable          Boolean       @default(true)
+  taxStatus        TaxStatus     @default(TAXABLE)
+  
   taxRateId        String?       
   taxRate          TaxRate?      @relation(fields: [taxRateId], references: [id])
+  taxClassId       String?       
 
   sku              String?       @unique
   barcode          String?
+  mpn              String?       
   trackQuantity    Boolean       @default(true)
+  stock            Int           @default(0)
+  lowStockThreshold Int          @default(2)
+  backorderStatus  BackorderStatus @default(DO_NOT_ALLOW)
+  soldIndividually Boolean       @default(false)
+  
   weight           Float?        @default(0)
   length           Float?
   width            Float?
   height           Float?
+  shippingClassId  String?       
   
   isVirtual        Boolean       @default(false)
   isDownloadable   Boolean       @default(false)
   downloadFiles    DigitalFile[] 
+  downloadLimit    Int?          
+  downloadExpiry   Int?          
 
   bundleItems      BundleItem[]  @relation("BundleParent") 
   partOfBundles    BundleItem[]  @relation("BundleChild")  
@@ -354,15 +413,20 @@ model Product {
   upsellIds        String[]
   crossSellIds     String[]
 
+  metaTitle        String?
+  metaDesc         String?
+  gender           String?       
+  ageGroup         String?       
+
   viewCount        Int           @default(0)
   soldCount        Int           @default(0)
   rating           Float         @default(0)
-  metaTitle        String?
-  metaDesc         String?
+  reviewCount      Int           @default(0)
 
   metafields       Json?         
   menuOrder        Int           @default(0)
   purchaseNote     String?
+  enableReviews    Boolean       @default(true)
   deletedAt        DateTime?
 
   wishlistedBy     Wishlist[]
@@ -389,6 +453,9 @@ model ProductImage {
   
   mediaId   String?
   media     Media?   @relation(fields: [mediaId], references: [id])
+  
+  variantId String?         
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
 }
 
 model DigitalFile {
@@ -398,6 +465,9 @@ model DigitalFile {
   fileSize  String?
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  accessCount Int      @default(0)
+  createdAt   DateTime @default(now())
 }
 
 model BundleItem {
@@ -410,7 +480,7 @@ model BundleItem {
 }
 
 // ==========================================
-// 5. ATTRIBUTES & VARIANTS
+// ATTRIBUTES & VARIANTS
 // ==========================================
 
 model Attribute {
@@ -429,6 +499,11 @@ model ProductAttribute {
   position  Int      @default(0)
   visible   Boolean  @default(true)
   variation Boolean  @default(true)
+  isFeatured       Boolean       @default(false)
+  
+  brandId          String?
+  brand            Brand?        @relation(fields: [brandId], references: [id])
+  
   values    String[] 
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -443,23 +518,35 @@ model ProductVariant {
   
   name            String   
   sku             String?
+  barcode         String?  
   price           Float    
   salePrice       Float?   
+  costPerItem     Float?   
+  
   stock           Int      @default(0) 
+  trackQuantity   Boolean  @default(true)
+  
   image           String?  
+  images          ProductImage[]
+  
   weight          Float?
+  length          Float?   
+  width           Float?   
+  height          Float?   
   
   attributes      Json     
   metafields      Json?    
   
   inventoryLevels InventoryLevel[]
+  wishlistedBy    Wishlist[]       
+  recentViews     RecentlyViewed[]
 
   @@index([productId])
   @@index([sku])
 }
 
 // ==========================================
-// 6. INVENTORY & WAREHOUSING
+// INVENTORY & WAREHOUSING
 // ==========================================
 
 model Location {
@@ -524,7 +611,7 @@ model StockTransfer {
 }
 
 // ==========================================
-// 7. SALES, ORDERS & RETURNS
+// SALES, ORDERS & RETURNS
 // ==========================================
 
 model Order {
@@ -547,6 +634,9 @@ model Order {
   
   surcharge         Float             @default(0) 
   total             Float  
+  
+  refundedAmount    Float             @default(0)
+  netTotal          Float             @default(0)
              
   paymentGateway    String?           
   paymentMethod     String?           
@@ -556,7 +646,10 @@ model Order {
   invoiceNumber     String?           
   invoiceUrl        String?           
   
-  couponCode        String?           
+  couponCode        String?
+  discountId        String?
+  discount          Discount?         @relation(fields: [discountId], references: [id])
+  
   shippingAddress   Json
   billingAddress    Json
   
@@ -564,7 +657,10 @@ model Order {
   
   customerNote      String?           
   adminNote         String? 
-  metafields        Json?           
+  metafields        Json?     
+
+  ipAddress         String?
+  userAgent         String?
   
   items             OrderItem[]
   shipments         Shipment[]
@@ -596,6 +692,7 @@ model OrderItem {
   variantId    String?
   variantName  String?
   sku          String?
+  image        String?
   
   price        Float    
   quantity     Int
@@ -698,16 +795,18 @@ model OrderNote {
 }
 
 // ==========================================
-// 8. CART & WISHLIST
+// CART & WISHLIST
 // ==========================================
 
 model Cart {
-  id        String     @id @default(uuid())
-  userId    String?    @unique
-  user      User?      @relation(fields: [userId], references: [id])
-  sessionId String?    
-  items     CartItem[]
-  updatedAt DateTime   @updatedAt
+  id             String     @id @default(uuid())
+  userId         String?    @unique
+  user           User?      @relation(fields: [userId], references: [id])
+  sessionId      String?    
+  items          CartItem[]
+  
+  reminderSentAt DateTime?
+  updatedAt      DateTime   @updatedAt
 
   @@index([sessionId])
 }
@@ -722,30 +821,38 @@ model CartItem {
 }
 
 model Wishlist {
-  id        String   @id @default(uuid())
+  id        String          @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  
+  createdAt DateTime        @default(now())
 
-  @@unique([userId, productId])
+  @@unique([userId, productId, variantId])
   @@index([userId])
 }
 
 model RecentlyViewed {
-  id        String   @id @default(uuid())
+  id        String          @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  viewedAt  DateTime @default(now())
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  
+  viewedAt  DateTime        @default(now())
 
   @@index([userId])
 }
 
 // ==========================================
-// 9. MARKETING & DISCOUNTS
+// MARKETING & DISCOUNTS
 // ==========================================
 
 model Discount {
@@ -766,12 +873,15 @@ model Discount {
   usagePerUser    Int?         
   usedCount       Int          @default(0)
   
+  excludeSaleItems Boolean     @default(false)
+  
   productIds      String[]     
   categoryIds     String[]     
   
   ruleLogic       Json?        
-
   isActive        Boolean      @default(true)
+
+  orders          Order[]
 
   @@index([code])
   @@index([startDate, endDate])
@@ -797,7 +907,7 @@ model Newsletter {
 }
 
 // ==========================================
-// 10. CMS & SYSTEM
+// CMS & SYSTEM
 // ==========================================
 
 model BlogPost {
@@ -899,6 +1009,9 @@ model StoreSettings {
   currency       String @default("AUD")
   currencySymbol String @default("$")
   
+  weightUnit     String @default("kg")
+  dimensionUnit  String @default("cm")
+  
   logo           String?
   favicon        String?
   
@@ -934,6 +1047,7 @@ model TaxRate {
   state       String?   
   priority    Int       @default(0)
   compound    Boolean   @default(false)
+  shipping    Boolean   @default(true)
   
   products    Product[]
   isActive    Boolean   @default(true)
@@ -991,19 +1105,33 @@ model Analytics {
   @@unique([date])
 }
 
+model MediaFolder {
+  id        String   @id @default(uuid())
+  name      String
+  parentId  String?
+  parent    MediaFolder? @relation("FolderToFolder", fields: [parentId], references: [id])
+  children  MediaFolder[] @relation("FolderToFolder")
+  files     Media[]
+  createdAt DateTime @default(now())
+}
+
 model Media {
-  id         String   @id @default(uuid())
-  url        String
-  type       String   
-  filename   String
-  mimeType   String
-  size       Int
+  id          String   @id @default(uuid())
+  url         String
+  type        MediaType @default(IMAGE)
+  filename    String   
+  mimeType    String
+  size        Int
+  
   altText     String?
   caption     String?
   description String?
 
-  uploadedBy String
-  createdAt  DateTime @default(now())
+  folderId    String?
+  folder      MediaFolder? @relation(fields: [folderId], references: [id])
+
+  uploadedBy  String
+  createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   productImages ProductImage[]

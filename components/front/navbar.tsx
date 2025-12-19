@@ -76,7 +76,8 @@ const Navbar = () => {
                 afterSignOutUrl="/"
                 appearance={{
                   elements: {
-                    avatarBox: "w-9 h-9 border border-slate-200"
+                    avatarBox: "w-9 h-9 border border-slate-200",
+                    userButtonPopoverFooter: "hidden" 
                   }
                 }}
               />

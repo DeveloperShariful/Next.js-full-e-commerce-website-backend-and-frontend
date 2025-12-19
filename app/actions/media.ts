@@ -89,6 +89,7 @@ export async function saveMedia(fileData: { url: string, filename: string, size:
         type: type as MediaType,
         uploadedBy: "Admin", 
         altText: fileData.filename.split('.')[0] 
+      } // <--- এই ব্র্যাকেটটি যোগ করা হয়েছে
     });
 
     revalidatePath("/admin/media");

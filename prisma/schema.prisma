@@ -1,3 +1,4 @@
+// 1. CONFIGURATION
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,7 +9,7 @@ datasource db {
 }
 
 // ==========================================
-// ENUMS
+// 2. ENUMS
 // ==========================================
 
 enum Role {
@@ -41,6 +42,7 @@ enum OrderStatus {
   REFUNDED
   FAILED
   RETURNED
+  READY_FOR_PICKUP // New for Local Pickup
 }
 
 enum PaymentStatus {
@@ -56,12 +58,13 @@ enum FulfillmentStatus {
   PARTIALLY_FULFILLED
   FULFILLED
   RETURNED
+  PICKED_UP // New for Local Pickup
 }
 
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
-  FREE_SHIPPING
+  FREE_SHIPPING // Coupon use kore free shipping er jonno
   BUY_X_GET_Y
   FIXED_CART
   FIXED_PRODUCT
@@ -107,8 +110,16 @@ enum MediaType {
   ARCHIVE
 }
 
+// ✅ NEW: Shipping Types
+enum ShippingMethodType {
+  FLAT_RATE
+  FREE_SHIPPING
+  LOCAL_PICKUP
+  CARRIER_CALCULATED // For Transdirect & others
+}
+
 // ==========================================
-// USER, AUTH & SYSTEM
+// 3. USER, AUTH & SYSTEM
 // ==========================================
 
 model User {
@@ -139,6 +150,7 @@ model User {
   cart          Cart?
   viewedProducts RecentlyViewed[]
   wallet        Wallet?   
+  abandonedCheckouts AbandonedCheckout[] // New Relation
   
   activityLogs    ActivityLog[]
   blogPosts       BlogPost[]
@@ -270,7 +282,7 @@ model WalletTransaction {
 }
 
 // ==========================================
-// PRODUCT CATALOG
+// 4. PRODUCT CATALOG & I18N
 // ==========================================
 
 model Category {
@@ -287,6 +299,7 @@ model Category {
   children    Category[] @relation("CategoryToCategory")
   
   products    Product[]
+  translations CategoryTranslation[] // ✅ Relation for i18n
   
   metafields  Json?
   metaTitle   String?
@@ -297,6 +310,20 @@ model Category {
   updatedAt   DateTime   @updatedAt
 
   @@index([parentId])
+}
+
+// ✅ NEW: Category Translation Table
+model CategoryTranslation {
+  id          String   @id @default(uuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  language    String   // e.g. "bn", "es"
+  name        String
+  description String?  @db.Text
+  metaTitle   String?
+  metaDesc    String?
+  
+  @@unique([categoryId, language])
 }
 
 model Brand {
@@ -344,6 +371,15 @@ model Collection {
   updatedAt   DateTime  @updatedAt
 }
 
+model ShippingClass {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String?
+  products    Product[] 
+  createdAt   DateTime  @default(now())
+}
+
 model Product {
   id               String        @id @default(uuid())
   name             String
@@ -366,6 +402,7 @@ model Product {
   featuredImage    String?
   images           ProductImage[]
   videoUrl         String?
+  videoThumbnail   String?       // ✅ Added for UX
 
   price            Float         @default(0.00) 
   salePrice        Float?        
@@ -393,7 +430,9 @@ model Product {
   length           Float?
   width            Float?
   height           Float?
+  
   shippingClassId  String?       
+  shippingClass    ShippingClass? @relation(fields: [shippingClassId], references: [id])
   
   isVirtual        Boolean       @default(false)
   isDownloadable   Boolean       @default(false)
@@ -409,6 +448,8 @@ model Product {
   reviews          Review[]
   questions        QuestionAnswer[]
   inventoryLevels  InventoryLevel[]
+  
+  translations     ProductTranslation[] // ✅ Relation for i18n
   
   upsellIds        String[]
   crossSellIds     String[]
@@ -440,6 +481,21 @@ model Product {
   @@index([categoryId])
   @@index([status])
   @@index([price])
+}
+
+// ✅ NEW: Product Translation Table
+model ProductTranslation {
+  id               String   @id @default(uuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  language         String   // e.g. "bn", "es"
+  name             String
+  description      String?  @db.Text
+  shortDescription String?  @db.Text
+  metaTitle        String?
+  metaDesc         String?
+  
+  @@unique([productId, language])
 }
 
 model ProductImage {
@@ -480,7 +536,7 @@ model BundleItem {
 }
 
 // ==========================================
-// ATTRIBUTES & VARIANTS
+// 5. ATTRIBUTES & VARIANTS
 // ==========================================
 
 model Attribute {
@@ -546,7 +602,7 @@ model ProductVariant {
 }
 
 // ==========================================
-// INVENTORY & WAREHOUSING
+// 6. INVENTORY & WAREHOUSING
 // ==========================================
 
 model Location {
@@ -558,6 +614,26 @@ model Location {
   inventoryLevels InventoryLevel[]
   stockTransfers  StockTransfer[]  @relation("FromLocation")
   stockReceived   StockTransfer[]  @relation("ToLocation")
+}
+
+// ✅ NEW: Pickup Location (Distinct from Warehouse Location for customer visibility)
+model PickupLocation {
+  id              String   @id @default(uuid())
+  name            String   // e.g., "Sydney CBD Store"
+  address         String
+  city            String
+  state           String?
+  postcode        String
+  country         String   @default("AU")
+  instructions    String?  // e.g. "Pick up from Level 2, counter 4"
+  isActive        Boolean  @default(true)
+  orders          Order[]
+  
+  latitude        Float?
+  longitude       Float?
+  
+  openingHours    Json?
+  createdAt       DateTime @default(now())
 }
 
 model InventoryLevel {
@@ -611,7 +687,7 @@ model StockTransfer {
 }
 
 // ==========================================
-// SALES, ORDERS & RETURNS
+// 7. SALES, ORDERS & RETURNS
 // ==========================================
 
 model Order {
@@ -653,7 +729,12 @@ model Order {
   shippingAddress   Json
   billingAddress    Json
   
+  // ✅ Shipping Logic Update
   shippingMethod    String?           
+  shippingType      ShippingMethodType @default(FLAT_RATE) 
+  
+  pickupLocationId  String?           
+  pickupLocation    PickupLocation?   @relation(fields: [pickupLocationId], references: [id])
   
   customerNote      String?           
   adminNote         String? 
@@ -795,7 +876,7 @@ model OrderNote {
 }
 
 // ==========================================
-// CART & WISHLIST
+// 8. CART, WISHLIST & ABANDONED CHECKOUT
 // ==========================================
 
 model Cart {
@@ -818,6 +899,35 @@ model CartItem {
   productId String
   variantId String?
   quantity  Int
+}
+
+// ✅ NEW: Abandoned Checkout (Cart Recovery)
+model AbandonedCheckout {
+  id            String   @id @default(uuid())
+  cartToken     String?  // Can link back to a cart session
+  email         String?
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  
+  items         Json     // Stores a snapshot of products
+  subtotal      Float
+  currency      String   @default("AUD")
+  
+  recoveryUrl   String
+  isRecovered   Boolean  @default(false)
+  recoveredAt   DateTime?
+  
+  remindersSent Int      @default(0)
+  lastReminder  DateTime?
+  
+  ipAddress     String?
+  userAgent     String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([email])
+  @@index([isRecovered])
 }
 
 model Wishlist {
@@ -852,7 +962,7 @@ model RecentlyViewed {
 }
 
 // ==========================================
-// MARKETING & DISCOUNTS
+// 9. MARKETING & DISCOUNTS
 // ==========================================
 
 model Discount {
@@ -907,7 +1017,7 @@ model Newsletter {
 }
 
 // ==========================================
-// CMS & SYSTEM
+// 10. CMS & SYSTEM
 // ==========================================
 
 model BlogPost {
@@ -1001,6 +1111,10 @@ model TicketMessage {
   createdAt  DateTime @default(now())
 }
 
+// ==========================================
+// 11. SETTINGS & ADVANCED SHIPPING
+// ==========================================
+
 model StoreSettings {
   id             String @id @default("settings") 
   storeName      String @default("My Store")
@@ -1009,6 +1123,10 @@ model StoreSettings {
   currency       String @default("AUD")
   currencySymbol String @default("$")
   
+  storeAddress   Json?  
+  taxSettings    Json?  
+  generalConfig  Json?  
+
   weightUnit     String @default("kg")
   dimensionUnit  String @default("cm")
   
@@ -1020,6 +1138,10 @@ model StoreSettings {
   paymentConfig  Json? 
   maintenance    Boolean @default(false)
 }
+
+// ==========================================
+// PAYMENT CONFIGURATION (HYBRID APPROACH)
+// ==========================================
 
 model PaymentMethodConfig {
   id             String   @id @default(uuid())
@@ -1035,9 +1157,46 @@ model PaymentMethodConfig {
   displayOrder   Int      @default(0)
   description    String?  
   logo           String?
+
+  settings       Json? 
+  stripeConfig   StripeConfig?
+  paypalConfig   PaypalConfig?
   
   updatedAt      DateTime @updatedAt
 }
+
+model StripeConfig {
+  id                    String              @id @default(uuid())
+  paymentMethodId       String              @unique
+  paymentMethod         PaymentMethodConfig @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+
+  // Stripe Specific Fields
+  publishableKey        String
+  secretKey             String
+  webhookSecret         String?
+  isTestMode            Boolean             @default(true)
+  captureMethod         String              @default("automatic") // automatic, manual
+  inlineCreditCardForm  Boolean             @default(true)
+}
+
+// ✅ Separate Schema for PayPal
+model PaypalConfig {
+  id                    String              @id @default(uuid())
+  paymentMethodId       String              @unique
+  paymentMethod         PaymentMethodConfig @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+
+  // PayPal Specific Fields
+  email                 String?             // Receiver Email
+  clientId              String
+  clientSecret          String
+  environment           String              @default("sandbox") // sandbox, production
+  landingPage           String              @default("LOGIN")   // LOGIN, BILLING
+  requireAddress        Boolean             @default(false)
+}
+
+// ==========================================
+// tax AREA
+// ==========================================
 
 model TaxRate {
   id          String    @id @default(uuid())
@@ -1048,6 +1207,7 @@ model TaxRate {
   priority    Int       @default(0)
   compound    Boolean   @default(false)
   shipping    Boolean   @default(true)
+  class       String    @default("STANDARD")
   
   products    Product[]
   isActive    Boolean   @default(true)
@@ -1060,15 +1220,49 @@ model ShippingZone {
   rates     ShippingRate[]       
 }
 
+// ✅ Updated Shipping Rate with Type
 model ShippingRate {       
   id        String @id @default(uuid())       
   zoneId    String       
   zone      ShippingZone @relation(fields: [zoneId], references: [id])       
-  name      String        
+  
+  name      String  // e.g. "Standard Shipping", "Express"
+  type      ShippingMethodType @default(FLAT_RATE) 
+  
   price     Float        
   minWeight Float?       
   maxWeight Float?       
-  minPrice  Float?        
+  minPrice  Float?   // For Free Shipping conditions (e.g. over $100)
+  taxStatus             String    @default("taxable")
+  freeShippingRequirement String?
+  
+  carrierServiceId String? // Future: For Transdirect mapping
+  carrierService   CarrierService? @relation(fields: [carrierServiceId], references: [id])
+}
+
+// ✅ NEW: Carrier Service (Prep for Transdirect)
+model CarrierService {
+  id          String   @id @default(uuid())
+  name        String   // "Transdirect", "Australia Post"
+  slug        String   @unique
+  isEnabled   Boolean  @default(false)
+  apiKey      String?
+  apiSecret   String?
+  isSandbox   Boolean  @default(true)
+  settings    Json?    
+  rates       ShippingRate[]
+}
+
+model EmailTemplate {
+  id          String   @id @default(uuid())
+  slug        String   @unique 
+  name        String   
+  subject     String
+  heading     String?
+  content     String   @db.Text 
+  isEnabled   Boolean  @default(true)
+  recipients  String?  
+  updatedAt   DateTime @updatedAt
 }
 
 model ActivityLog {

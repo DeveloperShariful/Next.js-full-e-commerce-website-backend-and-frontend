@@ -18,6 +18,7 @@ import Variations from "@/app/admin/products/create/_components/Variations";
 import Advanced from "@/app/admin/products/create/_components/Advanced";
 import Publish from "@/app/admin/products/create/_components/Publish";
 import Categories from "@/app/admin/products/create/_components/categoris";
+import Brand from "@/app/admin/products/create/_components/Brand"; 
 import Tag from "@/app/admin/products/create/_components/tag";
 import ProductImage from "@/app/admin/products/create/_components/Product_image";
 import GalleryImages from "@/app/admin/products/create/_components/Gallery_images";
@@ -287,6 +288,7 @@ export default function CreateProductPage() {
                 <Categories data={formData} updateData={updateData} />
                 <ProductImage data={formData} updateData={updateData} />
                 <GalleryImages data={formData} updateData={updateData} />
+                <Brand data={formData} updateData={updateData} /> 
                 <Tag data={formData} updateData={updateData} />
             </div>
         </div>

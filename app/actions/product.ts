@@ -547,3 +547,16 @@ export async function duplicateProduct(id: string) {
     return { success: false, message: "Failed to duplicate product" };
   }
 }
+
+//brand
+export async function getBrands() {
+  try {
+    const brands = await db.brand.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true }
+    });
+    return { success: true, data: brands };
+  } catch (error) {
+    return { success: false, data: [] };
+  }
+}

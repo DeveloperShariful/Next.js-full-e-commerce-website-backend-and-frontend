@@ -3,7 +3,6 @@ import { ComponentProps } from "../types";
 import { X, Search } from "lucide-react";
 
 export default function LinkedProducts({ data, updateData }: ComponentProps) {
-    // নোট: বর্তমানে এটি ম্যানুয়াল ইনপুট নিচ্ছে। ভবিষ্যতে এখানে API সার্চ ইমপ্লিমেন্ট করতে হবে।
     const [upsellInput, setUpsellInput] = useState("");
     const [crossSellInput, setCrossSellInput] = useState("");
 

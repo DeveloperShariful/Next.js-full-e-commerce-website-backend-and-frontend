@@ -1,5 +1,5 @@
 import { ComponentProps } from "../types";
-import ImageUpload from "@/components/ui/image-upload"; // Ensure this path is correct
+import ImageUpload from "@/components/ui/image-upload";
 import { X } from "lucide-react";
 
 export default function ProductImage({ data, updateData }: ComponentProps) {

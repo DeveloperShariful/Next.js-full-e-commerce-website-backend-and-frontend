@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { MediaType } from "@prisma/client";
 
 // --- TYPES ---
 export type MediaItem = {
@@ -85,10 +86,9 @@ export async function saveMedia(fileData: { url: string, filename: string, size:
         filename: fileData.filename,
         mimeType: fileData.mimeType,
         size: fileData.size,
-        type: type,
-        uploadedBy: "Admin", // Should be dynamic in real auth
-        altText: fileData.filename.split('.')[0] // Default alt text from filename
-      }
+        type: type as MediaType,
+        uploadedBy: "Admin", 
+        altText: fileData.filename.split('.')[0] 
     });
 
     revalidatePath("/admin/media");

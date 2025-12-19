@@ -91,7 +91,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
   return (
     // FIX: Responsive Negative Margin applied (-m-4 for mobile, -m-6 for desktop)
     // This matches the parent layout padding exactly to prevent overflow scrollbar
-    <div className="-m-4 md:-m-6 p-4 md:p-6 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
+    <div className="p-4 md:p-3 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
       
       {/* HEADER - RESPONSIVE */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">

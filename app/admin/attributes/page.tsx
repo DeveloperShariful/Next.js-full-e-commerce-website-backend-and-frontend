@@ -43,7 +43,7 @@ export default function AttributesPage() {
   };
 
   return (
-    <div className="font-sans text-slate-800 pb-10">
+    <div className="p-5 font-sans text-slate-800 pb-10">
       <AttributeHeader onRefresh={fetchData} loading={loading} />
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

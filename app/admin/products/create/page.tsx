@@ -176,27 +176,16 @@ export default function CreateProductPage() {
     </div>
   );
 
-  return (
-    // LAYOUT FIX: -mt-[85px] pulls the page up to cover the admin dashboard title
-    // -mx-6 -mb-6 expands it to full width/height
-    <div className="-m-6 min-h-screen bg-[#f0f0f1] font-sans text-sm text-[#3c434a] relative">
-        
-        {/* Header (Not Sticky per request) */}
+   return (
+    <div className=" m-1 min-h-screen bg-[#f0f0f1] font-sans text-sm text-[#3c434a] relative">
         <Header loading={loading} onSubmit={handleSubmit} title={formData.name} isEdit={!!productId} />
-
-        {/* Content Wrapper */}
-        <div className="w-full px-6 py-6 flex flex-col lg:flex-row gap-5">
-            
-            {/* LEFT COLUMN (Main Data) */}
-            <div className="flex-1 min-w-0 space-y-5">
-                
-                {/* Title & Slug Input */}
-                <div className="space-y-2">
+        <div className="w-full p-0 md:p-6 flex flex-col lg:flex-row gap-4 md:gap-5">
+            <div className="flex-1 min-w-0 space-y-4 md:space-y-5">
+                <div className="space-y-2 px-4 md:px-0 mt-4 md:mt-0">
                     <input 
                         value={formData.name} 
                         onChange={(e) => {
                             updateData('name', e.target.value);
-                            // Auto-generate slug if not editing or slug is empty
                             if (!productId || !formData.slug) {
                                 const newSlug = e.target.value.toLowerCase().trim().replace(/ /g, '-').replace(/[^\w-]+/g, '');
                                 updateData('slug', newSlug);
@@ -205,26 +194,26 @@ export default function CreateProductPage() {
                         placeholder="Product Name"
                         className="w-full px-3 py-2 border border-gray-400 text-lg rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none shadow-sm"
                     />
+                     
                      {formData.name && (
-                        <div className="text-xs flex items-center gap-1 text-[#646970]">
-                            <span>Permalink:</span>
-                            <span>{typeof window !== 'undefined' ? window.location.origin : ''}/product/</span>
+                        <div className="text-xs flex flex-wrap items-center gap-1 text-[#646970] leading-relaxed">
+                            <span className="font-semibold whitespace-nowrap">Permalink:</span>
+                            <span className="break-all">
+                                {typeof window !== 'undefined' ? window.location.origin : ''}/product/
+                            </span>
                             <input 
                                 value={formData.slug}
                                 onChange={(e) => updateData('slug', e.target.value)}
-                                className="bg-transparent border border-transparent hover:border-gray-400 px-1 rounded text-xs text-[#3c434a] font-medium focus:border-[#2271b1] outline-none"
+                                className="bg-transparent border border-transparent hover:border-gray-400 px-1 rounded text-xs text-[#3c434a] font-medium focus:border-[#2271b1] outline-none min-w-[50px] max-w-full"
                             />
                         </div>
                      )}
                 </div>
 
-                {/* Long Description */}
                 <Description data={formData} updateData={updateData} />
-                {/* Short Description */}
-                <ShortDescription data={formData} updateData={updateData} />
 
                 {/* PRODUCT DATA TABS BOX */}
-                <div className="bg-white border border-gray-300 rounded-sm shadow-sm">
+                <div className="bg-white border-y md:border border-gray-300 md:rounded-sm shadow-sm">
                     {/* Data Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-50 gap-3 sm:gap-0">
                         <div className="flex items-center gap-3">
@@ -251,7 +240,7 @@ export default function CreateProductPage() {
                         </div>
                     </div>
 
-                    {/* Tabs & Content - RESPONSIVE LAYOUT (flex-col on mobile, row on desktop) */}
+                    {/* Tabs & Content */}
                     <div className="flex flex-col md:flex-row min-h-[300px]">
                         
                         {/* Sidebar Tabs */}
@@ -288,10 +277,12 @@ export default function CreateProductPage() {
                         </div>
                     </div>
                 </div>
+
+                <ShortDescription data={formData} updateData={updateData} />
             </div>
 
             {/* RIGHT COLUMN (Sidebar) */}
-            <div className="w-full lg:w-[280px] space-y-5 shrink-0">
+            <div className="w-full lg:w-[280px] space-y-4 md:space-y-5 shrink-0 px-4 md:px-0 pb-10 md:pb-0">
                 <Publish data={formData} updateData={updateData} loading={loading} onSubmit={handleSubmit} />
                 <Categories data={formData} updateData={updateData} />
                 <ProductImage data={formData} updateData={updateData} />

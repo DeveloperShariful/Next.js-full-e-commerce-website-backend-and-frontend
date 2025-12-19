@@ -75,7 +75,7 @@ export default async function AdminDashboardPage() {
   });
 
   return (
-    <div className="font-sans text-slate-800 pb-10">
+    <div className="p-4 font-sans text-slate-800 pb-10">
       
       <div className="flex justify-between items-center mb-8">
         <div>

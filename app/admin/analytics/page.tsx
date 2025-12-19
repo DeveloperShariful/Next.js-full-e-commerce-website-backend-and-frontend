@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="font-sans text-slate-800 pb-10">
+    <div className=" p-5 font-sans text-slate-800 pb-10">
       
       {/* 1. Filter Header */}
       <AnalyticsHeader period={period} setPeriod={setPeriod} />

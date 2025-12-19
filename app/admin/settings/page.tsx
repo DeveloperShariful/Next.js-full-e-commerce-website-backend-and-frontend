@@ -171,7 +171,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
+    <div className="p-6 mx-auto min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
       
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6">

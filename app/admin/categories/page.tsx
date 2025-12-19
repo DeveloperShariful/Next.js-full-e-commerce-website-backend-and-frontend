@@ -237,7 +237,7 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
+    <div className="p-5 mx-auto min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">

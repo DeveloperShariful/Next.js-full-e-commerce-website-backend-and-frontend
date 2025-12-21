@@ -92,8 +92,6 @@ export default async function HomePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
           {newArrivals.map((product) => (
-            // ✅ Using Reusable Product Card
-            // @ts-ignore
             <ProductCard key={product.id} data={product} />
           ))}
         </div>

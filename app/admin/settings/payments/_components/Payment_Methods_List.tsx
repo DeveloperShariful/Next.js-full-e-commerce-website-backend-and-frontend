@@ -1,88 +1,110 @@
-// File: app/admin/settings/payments/_components/Payment_Methods_List.tsx
+// app/admin/settings/payments/_components/Payment_Methods_List.tsx
+"use client"
 
-"use client";
+import { useState } from "react"
+import { PaymentMethodWithConfig } from "@/app/admin/settings/payments/types"
+import { Switch } from "@/components/ui/switch"
+import { Button } from "@/components/ui/button"
+import { Settings2 } from "lucide-react"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
-import { useState } from "react";
-import { PaymentMethod } from "../types"; // Path fix: go back one step
-import { togglePaymentMethod } from "@/app/actions/settings/payments/general";
-import { toast } from "react-hot-toast";
-import Payment_Config_Modal from "./Payment_Config_Modal";
+// Correct Imports based on our file structure
+import { Payment_Status_Badge } from "./Payment_Status_Badge"
+import { togglePaymentMethodStatus } from "@/app/actions/settings/payments/toggle-method-status"
+
+// Modals
+import { Stripe_Main_Modal } from "./Payment_Gateways/Stripe/Stripe_Main_Modal"
+import { Paypal_Main_Modal } from "./Payment_Gateways/Paypal/Paypal_Main_Modal"
+import { Bank_Transfer_Modal } from "./Offline_Methods/Bank_Transfer_Modal"
+import { Cheque_Modal } from "./Offline_Methods/Cheque_Modal"
+import { COD_Modal } from "./Offline_Methods/COD_Modal"
 
 interface Props {
-    methods: PaymentMethod[];
-    refreshData: () => void;
+  initialMethods: PaymentMethodWithConfig[]
 }
 
-export default function Payment_Methods_List({ methods, refreshData }: Props) {
-    const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
+// Export name must match exactly what page.tsx expects
+export const Payment_Methods_List = ({ initialMethods }: Props) => {
+  const router = useRouter()
 
-    const handleToggle = async (id: string, currentStatus: boolean) => {
-        const res = await togglePaymentMethod(id, !currentStatus);
-        if (res.success) {
-            toast.success(currentStatus ? "Method disabled" : "Method enabled");
-            refreshData();
-        } else {
-            toast.error("Failed to update status");
-        }
-    };
+  const handleToggle = async (id: string, currentStatus: boolean) => {
+    const res = await togglePaymentMethodStatus(id, !currentStatus)
+    if (res.success) {
+      toast.success("Status updated")
+      router.refresh()
+    } else {
+      toast.error("Failed to update status")
+    }
+  }
 
-    return (
-        <>
-            <div className="bg-white rounded-sm border border-slate-200 shadow-sm overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 border-b">
-                        <tr>
-                            <th className="p-4 w-24 text-center">Enabled</th>
-                            <th className="p-4 w-1/4">Method</th>
-                            <th className="p-4">Description</th>
-                            <th className="p-4 text-right w-24">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {methods.map((method) => (
-                            <tr key={method.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-4 text-center">
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={method.isEnabled} 
-                                            onChange={() => handleToggle(method.id, method.isEnabled)}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#2271b1]"></div>
-                                    </label>
-                                </td>
-                                <td className="p-4 font-bold text-[#2271b1]">
-                                    <span 
-                                        className="cursor-pointer hover:underline" 
-                                        onClick={() => setEditingMethod(method)}
-                                    >
-                                        {method.name}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-slate-500 text-xs sm:text-sm">{method.description}</td>
-                                <td className="p-4 text-right">
-                                    <button 
-                                        onClick={() => setEditingMethod(method)}
-                                        className="px-3 py-1.5 border border-slate-300 rounded text-xs font-bold hover:bg-slate-100 text-slate-700 transition-colors"
-                                    >
-                                        Manage
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+  // Function to determine which modal to show
+  const renderModal = (method: PaymentMethodWithConfig) => {
+    switch (method.identifier) {
+      case "stripe":
+        return <Stripe_Main_Modal method={method} />
+      case "paypal":
+        return <Paypal_Main_Modal method={method} />
+      case "bank_transfer":
+        return <Bank_Transfer_Modal methodId={method.id} config={method} offlineConfig={method.offlineConfig} />
+      case "cheque":
+        return <Cheque_Modal methodId={method.id} config={method} offlineConfig={method.offlineConfig} />
+      case "cod":
+        return <COD_Modal methodId={method.id} config={method} offlineConfig={method.offlineConfig} />
+      default:
+        return (
+          <Button variant="outline" size="sm" onClick={() => toast.info("Coming soon")}>
+            <Settings2 className="w-4 h-4 mr-2" />
+            Manage
+          </Button>
+        )
+    }
+  }
+
+  return (
+    <div className="divide-y divide-gray-200 dark:divide-gray-700 border rounded-lg bg-card">
+      {initialMethods.map((method) => (
+        <div key={method.id} className="flex flex-col sm:flex-row items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors gap-4">
+          
+          {/* Info Section */}
+          <div className="flex items-start gap-4 w-full sm:w-auto">
+            <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+               {method.identifier === 'stripe' ? (
+                 <span className="font-bold text-[#635BFF] text-xl">S</span>
+               ) : method.identifier === 'paypal' ? (
+                 <span className="font-bold text-[#003087] text-xl">P</span>
+               ) : (
+                 <span className="font-bold text-gray-500 text-lg">{method.name.charAt(0)}</span>
+               )}
             </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">{method.name}</h3>
+                <Payment_Status_Badge isEnabled={method.isEnabled} mode={method.mode} />
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-lg">
+                {method.description || "No description available."}
+              </p>
+            </div>
+          </div>
 
-            {/* Config Modal */}
-            {editingMethod && (
-                <Payment_Config_Modal 
-                    method={editingMethod} 
-                    onClose={() => setEditingMethod(null)} 
-                    refreshData={refreshData}
-                />
-            )}
-        </>
-    );
+          {/* Action Section */}
+          <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={method.isEnabled}
+                onCheckedChange={() => handleToggle(method.id, method.isEnabled)}
+              />
+              <span className="text-sm text-muted-foreground sm:hidden">
+                {method.isEnabled ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+            
+            {/* Render the correct modal based on identifier */}
+            {renderModal(method)}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }

@@ -1,33 +1,42 @@
-// File: app/actions/settings/payments/bank.ts
-"use server";
+// app/actions/settings/payments/bank.ts
+"use server"
 
-import { db } from "@/lib/db";
-import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db"
+import { BankTransferSchema } from "@/app/admin/settings/payments/schemas"
+import { z } from "zod"
+import { revalidatePath } from "next/cache"
 
-export async function updateBankSettings(formData: FormData) {
+export async function updateBankTransferSettings(
+  id: string,
+  values: z.infer<typeof BankTransferSchema>
+) {
   try {
-    const id = formData.get("id") as string;
-    const name = formData.get("name") as string;
-    const description = formData.get("description") as string;
-    
-    // ✅ FIX: "as string" যোগ করা হয়েছে
-    const settings = {
-        instructions: formData.get("setting_instructions") as string || "",
-        accountDetails: formData.get("setting_accountDetails") as string || ""
-    };
+    const validated = BankTransferSchema.parse(values)
 
-    await db.paymentMethodConfig.update({
-      where: { id },
-      data: {
-        name,
-        description,
-        settings: settings as any // Prisma Json এর জন্য any কাস্ট করা নিরাপদ
-      }
-    });
+    await db.$transaction(async (tx) => {
+      // Update the main config (Name, Description)
+      await tx.paymentMethodConfig.update({
+        where: { id },
+        data: {
+          name: validated.name,
+          description: validated.description,
+          instructions: validated.instructions,
+        },
+      })
 
-    revalidatePath("/admin/settings/payments");
-    return { success: true, message: "Bank settings saved" };
+      // Update the offline specific config (Bank Details JSON)
+      await tx.offlinePaymentConfig.update({
+        where: { paymentMethodId: id },
+        data: {
+          bankDetails: validated.bankDetails,
+        },
+      })
+    })
+
+    revalidatePath("/admin/settings/payments")
+    return { success: true }
   } catch (error) {
-    return { success: false, error: "Failed to save bank settings" };
+    console.error("Bank update error:", error)
+    return { success: false, error: "Failed to update bank settings" }
   }
 }

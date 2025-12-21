@@ -11,7 +11,7 @@ export interface SidebarItem {
   name: string;
   href: string;
   icon: any;
-  roles?: Role[]; // কোন রোলের মানুষ দেখতে পাবে
+  roles?: Role[]; 
 }
 
 export interface SidebarGroup {

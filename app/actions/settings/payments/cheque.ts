@@ -1,32 +1,41 @@
-// File: app/actions/settings/payments/cheque.ts
-"use server";
+// app/actions/settings/payments/cheque.ts
+"use server"
 
-import { db } from "@/lib/db";
-import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db"
+import { ChequeSchema } from "@/app/admin/settings/payments/schemas"
+import { z } from "zod"
+import { revalidatePath } from "next/cache"
 
-export async function updateChequeSettings(formData: FormData) {
+export async function updateChequeSettings(
+  id: string,
+  values: z.infer<typeof ChequeSchema>
+) {
   try {
-    const id = formData.get("id") as string;
-    const name = formData.get("name") as string;
-    const description = formData.get("description") as string;
-    
-    // ✅ FIX: "as string" যোগ করা হয়েছে
-    const settings = {
-        instructions: formData.get("setting_instructions") as string || "",
-    };
+    const validated = ChequeSchema.parse(values)
 
-    await db.paymentMethodConfig.update({
-      where: { id },
-      data: {
-        name,
-        description,
-        settings: settings as any
-      }
-    });
+    await db.$transaction(async (tx) => {
+      await tx.paymentMethodConfig.update({
+        where: { id },
+        data: {
+          name: validated.name,
+          description: validated.description,
+          instructions: validated.instructions,
+        },
+      })
 
-    revalidatePath("/admin/settings/payments");
-    return { success: true, message: "Check settings saved" };
+      await tx.offlinePaymentConfig.update({
+        where: { paymentMethodId: id },
+        data: {
+          chequePayTo: validated.chequePayTo,
+          addressInfo: validated.addressInfo,
+        },
+      })
+    })
+
+    revalidatePath("/admin/settings/payments")
+    return { success: true }
   } catch (error) {
-    return { success: false, error: "Failed to save check settings" };
+    console.error("Cheque update error:", error)
+    return { success: false, error: "Failed to update cheque settings" }
   }
 }

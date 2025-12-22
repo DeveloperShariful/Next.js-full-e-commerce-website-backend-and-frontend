@@ -5,6 +5,7 @@ import { db } from "@/lib/db"
 import { StripeSettingsSchema } from "@/app/admin/settings/payments/schemas"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
+import Stripe from "stripe"
 
 export async function updateStripeSettings(
   paymentMethodId: string,
@@ -12,6 +13,33 @@ export async function updateStripeSettings(
 ) {
   try {
     const validated = StripeSettingsSchema.parse(values)
+
+    if (validated.enableStripe) {
+      const secretKeyToCheck = validated.testMode 
+        ? validated.testSecretKey 
+        : validated.liveSecretKey
+
+      if (!secretKeyToCheck) {
+        return { success: false, error: "Please enter the Secret Key before enabling Stripe." }
+      }
+
+      try {
+        const stripe = new Stripe(secretKeyToCheck, {
+          apiVersion: "2025-01-27.acacia" as any, 
+          typescript: true,
+        })
+
+        await stripe.balance.retrieve() 
+        
+      } catch (error: any) {
+        console.error("Stripe Real-time Verification Failed:", error.message)
+
+        return { 
+          success: false, 
+          error: `Authentication Failed: ${error.message}` 
+        }
+      }
+    }
 
     await db.$transaction(async (tx) => {
       await tx.paymentMethodConfig.update({
@@ -26,7 +54,7 @@ export async function updateStripeSettings(
       await tx.stripeConfig.upsert({
         where: { paymentMethodId },
         create: {
-          paymentMethodId, // Foreign key link
+          paymentMethodId,
           testMode: validated.testMode ?? false,
           title: validated.title,
           description: validated.description ?? "",

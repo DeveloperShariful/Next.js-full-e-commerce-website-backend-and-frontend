@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { CheckCircle2, AlertTriangle, Loader2, Info, Eye, EyeOff } from "lucide-react"
 import { savePaypalManualCreds } from "@/app/actions/settings/payments/paypal/save-manual-creds"
 import { clearPaypalSettings } from "@/app/actions/settings/payments/paypal/clear-database"
-import { toast } from "sonner" // 👈 Toast import
+import { toast } from "sonner"
 import { PaypalConfigType } from "@/app/admin/settings/payments/types"
 import { useRouter } from "next/navigation"
 
@@ -41,7 +41,6 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
   const handleSave = async (isSandbox: boolean) => {
     setLoading(true)
     
-    // Server Action Call
     const res = await savePaypalManualCreds(methodId, {
       sandbox: isSandbox,
       clientId: creds.clientId,
@@ -51,15 +50,9 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
     })
 
     if (res.success) {
-      // ✅ Success Message
-      toast.success(
-        isSandbox 
-          ? "Sandbox connected successfully!" 
-          : "Live account connected successfully!"
-      )
+      toast.success(isSandbox ? "Sandbox connected successfully!" : "Live account connected successfully!")
       router.refresh()
     } else {
-      // ❌ Error Message with Reason
       toast.error(res.error || "Connection failed. Please check your keys.")
     }
     
@@ -78,17 +71,17 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start gap-4">
             <div>
                 <CardTitle>PayPal Connection</CardTitle>
                 <CardDescription>Enter your PayPal credentials manually.</CardDescription>
             </div>
             {hasCreds ? (
-                <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
+                <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200 whitespace-nowrap">
                     <CheckCircle2 size={14} /> Connected
                 </div>
             ) : (
-                <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-xs font-bold border border-yellow-200">
+                <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-xs font-bold border border-yellow-200 whitespace-nowrap">
                     <AlertTriangle size={14} /> Not Connected
                 </div>
             )}
@@ -96,7 +89,7 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
       </CardHeader>
       <CardContent>
         <Tabs defaultValue={config.sandbox ? "sandbox" : "live"} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="sandbox">Sandbox (Test)</TabsTrigger>
             <TabsTrigger value="live">Live (Production)</TabsTrigger>
           </TabsList>
@@ -113,9 +106,7 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <Label>
-                        PayPal Email Address <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
-                    </Label>
+                    <Label>PayPal Email Address <span className="text-muted-foreground font-normal text-xs">(Optional)</span></Label>
                     <Input 
                         value={creds.email} 
                         onChange={(e) => setCreds({...creds, email: e.target.value})}
@@ -123,9 +114,7 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>
-                        Merchant ID <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
-                    </Label>
+                    <Label>Merchant ID <span className="text-muted-foreground font-normal text-xs">(Optional)</span></Label>
                     <Input 
                         value={creds.merchantId} 
                         onChange={(e) => setCreds({...creds, merchantId: e.target.value})}
@@ -144,7 +133,6 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
                 />
             </div>
             
-            {/* Secret with Eye Icon */}
             <div className="space-y-2">
                 <Label>Sandbox Secret</Label>
                 <div className="relative">
@@ -167,11 +155,23 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
                 </div>
             </div>
             
-            <div className="flex justify-between pt-4 border-t mt-4">
+            {/* 👇 RESPONSIVE BUTTONS (Sandbox) */}
+            <div className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
                 {hasCreds && (
-                    <Button variant="destructive" onClick={handleDisconnect} type="button">Disconnect</Button>
+                    <Button 
+                        variant="destructive" 
+                        onClick={handleDisconnect} 
+                        type="button"
+                        className="w-full sm:w-auto"
+                    >
+                        Disconnect
+                    </Button>
                 )}
-                <Button onClick={() => handleSave(true)} disabled={loading} className="ml-auto bg-[#0070BA] hover:bg-[#003087]">
+                <Button 
+                    onClick={() => handleSave(true)} 
+                    disabled={loading} 
+                    className="w-full sm:w-auto bg-[#0070BA] hover:bg-[#003087]"
+                >
                     {loading && <Loader2 className="animate-spin mr-2 h-4 w-4"/>} 
                     Verify & Connect Sandbox
                 </Button>
@@ -190,9 +190,7 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <Label>
-                        PayPal Email Address <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
-                    </Label>
+                    <Label>PayPal Email Address <span className="text-muted-foreground font-normal text-xs">(Optional)</span></Label>
                     <Input 
                         value={creds.email} 
                         onChange={(e) => setCreds({...creds, email: e.target.value})}
@@ -200,9 +198,7 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>
-                        Merchant ID <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
-                    </Label>
+                    <Label>Merchant ID <span className="text-muted-foreground font-normal text-xs">(Optional)</span></Label>
                     <Input 
                         value={creds.merchantId} 
                         onChange={(e) => setCreds({...creds, merchantId: e.target.value})}
@@ -221,7 +217,6 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
                 />
             </div>
             
-            {/* Secret with Eye Icon */}
             <div className="space-y-2">
                 <Label>Live Secret</Label>
                 <div className="relative">
@@ -244,11 +239,23 @@ export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionPro
                 </div>
             </div>
 
-            <div className="flex justify-between pt-4 border-t mt-4">
+            {/* 👇 RESPONSIVE BUTTONS (Live) */}
+            <div className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
                 {hasCreds && (
-                    <Button variant="destructive" onClick={handleDisconnect} type="button">Disconnect</Button>
+                    <Button 
+                        variant="destructive" 
+                        onClick={handleDisconnect} 
+                        type="button"
+                        className="w-full sm:w-auto"
+                    >
+                        Disconnect
+                    </Button>
                 )}
-                <Button onClick={() => handleSave(false)} disabled={loading} className="ml-auto bg-[#0070BA] hover:bg-[#003087]">
+                <Button 
+                    onClick={() => handleSave(false)} 
+                    disabled={loading} 
+                    className="w-full sm:w-auto bg-[#0070BA] hover:bg-[#003087]"
+                >
                     {loading && <Loader2 className="animate-spin mr-2 h-4 w-4"/>} 
                     Verify & Connect Live
                 </Button>

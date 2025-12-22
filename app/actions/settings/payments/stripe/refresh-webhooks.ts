@@ -1,3 +1,5 @@
+// app/actions/settings/payments/stripe/refresh-webhooks.ts
+
 "use server"
 
 import { db } from "@/lib/db"
@@ -18,41 +20,50 @@ export async function refreshStripeWebhooks(paymentMethodId: string) {
     if (!secretKey) throw new Error("API Key is missing. Cannot setup webhook.")
 
     const stripe = new Stripe(secretKey, {
-      apiVersion: "2025-12-15.clover" as any,
+      apiVersion: "2025-01-27.acacia" as any, // লেটেস্ট ভার্সন ব্যবহার করাই ভালো
       typescript: true,
     })
 
-    // ২. তোমার অ্যাপের ওয়েবহুক URL
-    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/stripe`
+    // ২. আপনার অ্যাপের ওয়েবহুক URL তৈরি
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const webhookUrl = `${appUrl}/api/webhooks/stripe`
 
-    // ৩. চেক করা আগে থেকেই আছে কি না
+    // ৩. চেক করা আগে থেকেই আছে কি না (Sync Logic)
     const webhooks = await stripe.webhookEndpoints.list()
     const existingWebhook = webhooks.data.find(w => w.url === webhookUrl)
 
     let webhookSecret = ""
 
     if (existingWebhook) {
-      // যদি থাকে, তাহলে আমরা ধরে নিচ্ছি আগেরটাই ঠিক আছে।
-      // (Stripe API থেকে সিক্রেট রিট্রিভ করা যায় না, তাই নতুন বানাচ্ছি না যদি না প্রয়োজন হয়)
-      // তবে ইউজার ফোর্স করলে আমরা আপডেট করতে পারি।
+      // যদি আগে থেকেই থাকে, আমরা সেটাকেই ব্যবহার করব (Delete করব না)
+      // এতে Signing Secret পরিবর্তন হয় না, ফলে প্রোডাকশনে ডাউনটাইম হয় না
+      webhookSecret = existingWebhook.secret as string || "" 
       
-      // আপাতত আমরা নতুন করে বানাচ্ছি যাতে নিশ্চিত হওয়া যায় সিক্রেটটি সঠিক
-      await stripe.webhookEndpoints.del(existingWebhook.id);
+      // তবে ইভেন্টগুলো আপডেট করা প্রয়োজন হতে পারে
+      await stripe.webhookEndpoints.update(existingWebhook.id, {
+        enabled_events: [
+          "payment_intent.succeeded",
+          "payment_intent.payment_failed",
+          "charge.refunded",
+          "charge.dispute.created"
+        ]
+      })
+    } else {
+      // ৪. না থাকলে নতুন ওয়েবহুক তৈরি
+      const newWebhook = await stripe.webhookEndpoints.create({
+        url: webhookUrl,
+        enabled_events: [
+          "payment_intent.succeeded",
+          "payment_intent.payment_failed",
+          "charge.refunded",
+          "charge.dispute.created"
+        ],
+      })
+      webhookSecret = newWebhook.secret as string
     }
 
-    // ৪. নতুন ওয়েবহুক তৈরি
-    const newWebhook = await stripe.webhookEndpoints.create({
-      url: webhookUrl,
-      enabled_events: [
-        "payment_intent.succeeded",
-        "payment_intent.payment_failed",
-        "charge.refunded",
-        "charge.dispute.created"
-      ],
-    })
-    webhookSecret = newWebhook.secret as string
-
     // ৫. সিক্রেট ডাটাবেসে সেভ করা
+    // এবং আমরা webhookUrl টিও রিটার্ন করব যাতে ফ্রন্টএন্ডে দেখাতে পারি
     await db.stripeConfig.update({
       where: { paymentMethodId },
       data: config.testMode 
@@ -61,7 +72,10 @@ export async function refreshStripeWebhooks(paymentMethodId: string) {
     })
 
     revalidatePath("/admin/settings/payments")
-    return { success: true }
+    
+    // 👇 UPDATE: URL টি রিটার্ন করছি (Gap #1 Solution)
+    return { success: true, webhookUrl }
+
   } catch (error: any) {
     console.error("Webhook Setup Error:", error)
     return { success: false, error: error.message || "Failed to setup webhooks" }

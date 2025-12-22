@@ -28,7 +28,6 @@ export const Paypal_Danger_Zone = ({ methodId }: DangerZoneProps) => {
     if (res.success) {
       toast.success("PayPal settings reset to default")
       router.refresh()
-      // Optional: Close modal trigger via context if needed
     } else {
       toast.error(res.error)
     }
@@ -36,7 +35,7 @@ export const Paypal_Danger_Zone = ({ methodId }: DangerZoneProps) => {
   }
 
   return (
-    <Card className="border-red-200">
+    <Card className="border-red-200 shadow-sm">
       <CardHeader>
         <div className="flex items-center gap-2 text-red-600">
           <AlertTriangle className="h-5 w-5" />
@@ -47,17 +46,21 @@ export const Paypal_Danger_Zone = ({ methodId }: DangerZoneProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center justify-between p-4 border border-red-100 bg-red-50 rounded-lg">
+        {/* 👇 RESPONSIVE FIX: flex-col on mobile, flex-row on desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-red-100 bg-red-50 rounded-lg">
           <div className="space-y-1">
             <h4 className="font-medium text-red-900">Reset Configuration</h4>
             <p className="text-sm text-red-700">
               Disconnects PayPal, removes all API keys, and disables the payment method.
             </p>
           </div>
+          
+          {/* 👇 BUTTON FIX: w-full on mobile, auto on desktop */}
           <Button 
             variant="destructive" 
             onClick={handleReset}
             disabled={isPending}
+            className="w-full sm:w-auto shrink-0"
           >
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Reset PayPal

@@ -18,9 +18,12 @@ interface WebhookTabProps {
 
 export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
   const [loading, setLoading] = useState(false)
+  
+  // 👇 State for URL (Initially load from DB config, then update dynamically)
+  const [currentWebhookUrl, setCurrentWebhookUrl] = useState(config.webhookUrl)
+  
   const router = useRouter()
 
-  // কানেকশন আছে কি না চেক করা
   const isConnected = config.sandbox 
     ? (!!config.sandboxClientId && !!config.sandboxClientSecret)
     : (!!config.liveClientId && !!config.liveClientSecret)
@@ -31,6 +34,12 @@ export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
     
     if (res.success) {
       toast.success("Webhook configured successfully!")
+      
+      // 👇 Update the local state instantly to show the URL
+      if (res.webhookUrl) {
+        setCurrentWebhookUrl(res.webhookUrl)
+      }
+      
       router.refresh()
     } else {
       toast.error(res.error || "Failed to configure webhook")
@@ -47,7 +56,7 @@ export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
             Webhook Configuration
           </CardTitle>
           <CardDescription>
-            Manage automatic notifications from PayPal to your store (e.g., Payment success, Refunds).
+            Manage automatic notifications from PayPal to your store.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -56,13 +65,14 @@ export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Connection Required</AlertTitle>
               <AlertDescription>
-                Please connect your PayPal account in the <strong>Connection</strong> tab before configuring webhooks.
+                Please connect your PayPal account in the <strong>Connection</strong> tab first.
               </AlertDescription>
             </Alert>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               <Paypal_Webhook_Status_Card 
                 webhookId={config.webhookId}
+                webhookUrl={currentWebhookUrl} // 👈 Using State Variable
                 isSandbox={!!config.sandbox}
                 onRefresh={handleRefresh}
                 isRefreshing={loading}
@@ -71,8 +81,7 @@ export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
               <div className="mt-4 text-sm text-muted-foreground bg-muted/30 p-4 rounded-md border border-dashed">
                 <p className="font-medium text-gray-700 mb-1">Why do I need this?</p>
                 <p>
-                  Webhooks ensure your orders are marked as "Paid" even if the customer closes their browser immediately after payment. 
-                  It acts as a reliable communication line between PayPal server and your store.
+                  Webhooks ensure your orders are marked as "Paid" even if the customer closes their browser immediately after payment.
                 </p>
               </div>
             </div>

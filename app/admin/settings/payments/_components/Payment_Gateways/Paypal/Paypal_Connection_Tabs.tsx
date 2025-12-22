@@ -1,167 +1,261 @@
 // app/admin/settings/payments/_components/Payment_Gateways/Paypal/Paypal_Connection_Tabs.tsx
 "use client"
 
-import { useState, useTransition } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react"
-
-// 👇 FIX: Imported from dedicated Paypal components
-import { Paypal_Connect_Button } from "./Components/Paypal_Connect_Button"
-import { PaypalConfigType } from "@/app/admin/settings/payments/types"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { CheckCircle2, AlertTriangle, Loader2, Info, Eye, EyeOff } from "lucide-react"
 import { savePaypalManualCreds } from "@/app/actions/settings/payments/paypal/save-manual-creds"
-import { toast } from "sonner"
+import { clearPaypalSettings } from "@/app/actions/settings/payments/paypal/clear-database"
+import { toast } from "sonner" // 👈 Toast import
+import { PaypalConfigType } from "@/app/admin/settings/payments/types"
 import { useRouter } from "next/navigation"
 
-interface ConnectionTabsProps {
-  config: PaypalConfigType
+interface PaypalConnectionProps {
   methodId: string
+  config: PaypalConfigType
 }
 
-export const Paypal_Connection_Tabs = ({ config, methodId }: ConnectionTabsProps) => {
-  const [activeTab, setActiveTab] = useState("automatic")
-  const [isPending, startTransition] = useTransition()
+export const Paypal_Connection_Tabs = ({ methodId, config }: PaypalConnectionProps) => {
+  const [loading, setLoading] = useState(false)
+  const [showSecret, setShowSecret] = useState(false)
   const router = useRouter()
   
-  const [manualSandbox, setManualSandbox] = useState(config.sandbox)
-  const [manualClientId, setManualClientId] = useState(config.sandbox ? config.sandboxClientId || "" : config.liveClientId || "")
-  const [manualSecret, setManualSecret] = useState(config.sandbox ? config.sandboxClientSecret || "" : config.liveClientSecret || "")
-  const [manualEmail, setManualEmail] = useState(config.sandbox ? config.sandboxEmail || "" : config.liveEmail || "")
+  // Credentials State
+  const [creds, setCreds] = useState({
+    clientId: config.sandbox ? (config.sandboxClientId || "") : (config.liveClientId || ""),
+    clientSecret: config.sandbox ? (config.sandboxClientSecret || "") : (config.liveClientSecret || ""),
+    email: config.sandbox ? (config.sandboxEmail || "") : (config.liveEmail || ""),
+    merchantId: config.merchantId || ""
+  })
 
-  const handleOAuthConnect = () => {
-    // FIX: Opening a real popup window
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
+  // Detect connection status
+  const hasCreds = config.sandbox 
+    ? !!config.sandboxClientId && !!config.sandboxClientSecret
+    : !!config.liveClientId && !!config.liveClientSecret
+
+  const handleSave = async (isSandbox: boolean) => {
+    setLoading(true)
     
-    // Note: Use your actual Partner Link here
-    const partnerUrl = "https://www.sandbox.paypal.com/bizsignup/partner/entry?partnerId=REST_API_PARTNER_ID"; 
+    // Server Action Call
+    const res = await savePaypalManualCreds(methodId, {
+      sandbox: isSandbox,
+      clientId: creds.clientId,
+      clientSecret: creds.clientSecret,
+      email: creds.email,
+      merchantId: creds.merchantId
+    })
+
+    if (res.success) {
+      // ✅ Success Message
+      toast.success(
+        isSandbox 
+          ? "Sandbox connected successfully!" 
+          : "Live account connected successfully!"
+      )
+      router.refresh()
+    } else {
+      // ❌ Error Message with Reason
+      toast.error(res.error || "Connection failed. Please check your keys.")
+    }
     
-    window.open(
-      partnerUrl, 
-      "PayPalConnect", 
-      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`
-    );
-    
-    toast.info("PayPal Login Window Opened", {
-        description: "If nothing happened, please allow popups for this site."
-    });
+    setLoading(false)
   }
 
-  const handleManualSave = () => {
-    startTransition(() => {
-      savePaypalManualCreds(methodId, {
-        sandbox: manualSandbox,
-        clientId: manualClientId,
-        clientSecret: manualSecret,
-        email: manualEmail
-      }).then((res) => {
-        if (res.success) {
-          toast.success("Credentials saved successfully")
-          router.refresh()
-        } else {
-          toast.error("Failed to save credentials")
-        }
-      })
-    })
+  const handleDisconnect = async () => {
+    if(!confirm("Are you sure? This will remove all PayPal keys.")) return;
+    setLoading(true)
+    await clearPaypalSettings(methodId)
+    toast.success("Disconnected successfully")
+    router.refresh()
+    setLoading(false)
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Connection Settings</h2>
-        {config.liveClientId || config.sandboxClientId ? (
-          <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full text-sm font-medium">
-            <CheckCircle2 className="h-4 w-4" />
-            Connected
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-sm font-medium">
-            <AlertTriangle className="h-4 w-4" />
-            Not Connected
-          </div>
-        )}
-      </div>
-
-      <Tabs defaultValue="automatic" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="automatic">Automatic Connect (Recommended)</TabsTrigger>
-          <TabsTrigger value="manual">Manual API Keys</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="automatic" className="space-y-4 pt-4">
-          <Card className="border-l-4 border-l-[#003087]">
-            <CardHeader>
-              <CardTitle>PayPal Partner Connection</CardTitle>
-              <CardDescription>
-                Securely connect your account without copying and pasting API keys.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center p-8 gap-6 border border-dashed rounded-lg bg-gray-50/50">
-                {/* 👇 FIX: Used dedicated button (no providerName prop needed) */}
-                <Paypal_Connect_Button 
-                  isConnected={config.isOnboarded} 
-                  onClick={handleOAuthConnect}
-                />
-                <p className="text-sm text-muted-foreground text-center max-w-md">
-                  Clicking connect will open a PayPal login window. <br/>
-                  <span className="text-xs italic">(Requires a PayPal Partner Account ID in production)</span>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="manual" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Manual API Credentials</CardTitle>
-              <CardDescription>
-                Manually enter your REST API credentials from the PayPal Developer Dashboard.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between border p-3 rounded-lg bg-muted/20">
-                <div className="space-y-0.5">
-                  <Label>Sandbox Mode</Label>
-                  <p className="text-xs text-muted-foreground">Enable for testing without real money.</p>
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle>PayPal Connection</CardTitle>
+                <CardDescription>Enter your PayPal credentials manually.</CardDescription>
+            </div>
+            {hasCreds ? (
+                <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
+                    <CheckCircle2 size={14} /> Connected
                 </div>
-                <Switch 
-                  checked={manualSandbox} 
-                  onCheckedChange={setManualSandbox} 
-                />
-              </div>
-              
-              {/* Manual Input Fields... (No changes here) */}
-              <div className="space-y-2">
-                <Label>PayPal Email</Label>
-                <Input value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} placeholder="merchant@example.com" />
-              </div>
-              <div className="space-y-2">
-                <Label>Client ID</Label>
-                <Input value={manualClientId} onChange={(e) => setManualClientId(e.target.value)} type="password" placeholder="Enter Client ID" />
-              </div>
-              <div className="space-y-2">
-                <Label>Secret Key</Label>
-                <Input value={manualSecret} onChange={(e) => setManualSecret(e.target.value)} type="password" placeholder="Enter Secret Key" />
-              </div>
+            ) : (
+                <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full text-xs font-bold border border-yellow-200">
+                    <AlertTriangle size={14} /> Not Connected
+                </div>
+            )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue={config.sandbox ? "sandbox" : "live"} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="sandbox">Sandbox (Test)</TabsTrigger>
+            <TabsTrigger value="live">Live (Production)</TabsTrigger>
+          </TabsList>
 
-              <div className="pt-2 flex justify-end">
-                <Button onClick={handleManualSave} disabled={isPending}>
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Credentials
+          {/* === SANDBOX FORM === */}
+          <TabsContent value="sandbox" className="space-y-4">
+            <Alert className="bg-yellow-50 border-yellow-200 mb-4">
+              <Info className="h-4 w-4 text-yellow-800" />
+              <AlertTitle className="text-yellow-800">Sandbox Mode</AlertTitle>
+              <AlertDescription className="text-yellow-700">
+                Enter your <span className="font-bold">Sandbox Business Account</span> details.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>
+                        PayPal Email Address <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
+                    </Label>
+                    <Input 
+                        value={creds.email} 
+                        onChange={(e) => setCreds({...creds, email: e.target.value})}
+                        placeholder="sb-business@example.com" 
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>
+                        Merchant ID <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
+                    </Label>
+                    <Input 
+                        value={creds.merchantId} 
+                        onChange={(e) => setCreds({...creds, merchantId: e.target.value})}
+                        placeholder="e.g. WUC89X..." 
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Sandbox Client ID</Label>
+                <Input 
+                    value={creds.clientId} 
+                    onChange={(e) => setCreds({...creds, clientId: e.target.value})}
+                    placeholder="AbC..." 
+                    className="font-mono text-xs"
+                />
+            </div>
+            
+            {/* Secret with Eye Icon */}
+            <div className="space-y-2">
+                <Label>Sandbox Secret</Label>
+                <div className="relative">
+                    <Input 
+                        type={showSecret ? "text" : "password"}
+                        value={creds.clientSecret} 
+                        onChange={(e) => setCreds({...creds, clientSecret: e.target.value})}
+                        placeholder="EMj..." 
+                        className="font-mono text-xs pr-10"
+                    />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                        onClick={() => setShowSecret(!showSecret)}
+                    >
+                        {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                </div>
+            </div>
+            
+            <div className="flex justify-between pt-4 border-t mt-4">
+                {hasCreds && (
+                    <Button variant="destructive" onClick={handleDisconnect} type="button">Disconnect</Button>
+                )}
+                <Button onClick={() => handleSave(true)} disabled={loading} className="ml-auto bg-[#0070BA] hover:bg-[#003087]">
+                    {loading && <Loader2 className="animate-spin mr-2 h-4 w-4"/>} 
+                    Verify & Connect Sandbox
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+            </div>
+          </TabsContent>
+
+          {/* === LIVE FORM === */}
+          <TabsContent value="live" className="space-y-4">
+              <Alert className="bg-blue-50 border-blue-200 mb-4">
+              <Info className="h-4 w-4 text-blue-800" />
+              <AlertTitle className="text-blue-800">Live Mode</AlertTitle>
+              <AlertDescription className="text-blue-700">
+                Enter your <span className="font-bold">Real Business Account</span> details.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>
+                        PayPal Email Address <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
+                    </Label>
+                    <Input 
+                        value={creds.email} 
+                        onChange={(e) => setCreds({...creds, email: e.target.value})}
+                        placeholder="your-email@business.com" 
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>
+                        Merchant ID <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
+                    </Label>
+                    <Input 
+                        value={creds.merchantId} 
+                        onChange={(e) => setCreds({...creds, merchantId: e.target.value})}
+                        placeholder="e.g. WUC89X..." 
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Live Client ID</Label>
+                <Input 
+                      value={creds.clientId} 
+                      onChange={(e) => setCreds({...creds, clientId: e.target.value})}
+                      placeholder="AbC..." 
+                      className="font-mono text-xs"
+                />
+            </div>
+            
+            {/* Secret with Eye Icon */}
+            <div className="space-y-2">
+                <Label>Live Secret</Label>
+                <div className="relative">
+                    <Input 
+                        type={showSecret ? "text" : "password"}
+                        value={creds.clientSecret} 
+                        onChange={(e) => setCreds({...creds, clientSecret: e.target.value})}
+                        placeholder="EMj..." 
+                        className="font-mono text-xs pr-10"
+                    />
+                     <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                        onClick={() => setShowSecret(!showSecret)}
+                    >
+                        {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                </div>
+            </div>
+
+            <div className="flex justify-between pt-4 border-t mt-4">
+                {hasCreds && (
+                    <Button variant="destructive" onClick={handleDisconnect} type="button">Disconnect</Button>
+                )}
+                <Button onClick={() => handleSave(false)} disabled={loading} className="ml-auto bg-[#0070BA] hover:bg-[#003087]">
+                    {loading && <Loader2 className="animate-spin mr-2 h-4 w-4"/>} 
+                    Verify & Connect Live
+                </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   )
 }

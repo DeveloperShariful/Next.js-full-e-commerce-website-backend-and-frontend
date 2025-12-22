@@ -40,6 +40,7 @@ export const StripeSettingsSchema = z.object({
 })
 
 export const PaypalSettingsSchema = z.object({
+  isEnabled: booleanField, // 👈 NEW: Enable/Disable Toggle
   sandbox: booleanField,
   liveEmail: stringField,
   liveClientId: stringField,
@@ -75,6 +76,7 @@ export const PaypalSettingsSchema = z.object({
   payLaterMessaging: booleanField,
   payLaterMessageTheme: stringField,
   
+  subtotalMismatchBehavior: stringField, // 👈 Added for completeness
   invoicePrefix: stringField,
   debugLog: booleanField
 })

@@ -14,10 +14,11 @@ export async function updatePaypalSettings(
     const validated = PaypalSettingsSchema.parse(values)
 
     await db.$transaction(async (tx) => {
-      // 1. Update Parent Config
+      // 1. Update Parent Config (Enable/Disable handled here)
       await tx.paymentMethodConfig.update({
         where: { id: paymentMethodId },
         data: {
+          isEnabled: validated.isEnabled ?? false, // 👈 NEW: Updating status
           name: validated.title,
           description: validated.description ?? "",
           mode: validated.sandbox ? "TEST" : "LIVE",
@@ -67,6 +68,7 @@ export async function updatePaypalSettings(
           payLaterMessageTheme: validated.payLaterMessageTheme ?? "light",
 
           // Advanced / Debug
+          subtotalMismatchBehavior: validated.subtotalMismatchBehavior ?? "add_line_item",
           invoicePrefix: validated.invoicePrefix ?? null,
           debugLog: validated.debugLog ?? false,
         }

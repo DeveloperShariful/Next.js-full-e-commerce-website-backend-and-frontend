@@ -30,7 +30,7 @@ export type StripeConfigType = {
   testMode: boolean
   title: string
   description: string
-  isConnected: boolean
+  isConnected?: boolean // Frontend helper
   accountId: string | null
   livePublishableKey: string | null
   liveSecretKey: string | null
@@ -56,6 +56,7 @@ export type PaypalConfigType = {
   paymentMethodId: string
   sandbox: boolean
   isOnboarded: boolean
+  isConnected?: boolean // Frontend helper
   merchantId: string | null
   liveEmail: string | null
   liveClientId: string | null

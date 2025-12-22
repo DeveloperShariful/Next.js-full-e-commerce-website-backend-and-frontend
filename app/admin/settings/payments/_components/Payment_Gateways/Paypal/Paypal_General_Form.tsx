@@ -15,10 +15,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 
-// 👇 FIX: Imported from dedicated Paypal components
+// Custom Components
 import { Paypal_Save_Sticky_Bar } from "./Components/Paypal_Save_Sticky_Bar"
 
 interface GeneralFormProps {
@@ -32,6 +31,7 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
   const form = useForm<z.infer<typeof PaypalSettingsSchema>>({
     resolver: zodResolver(PaypalSettingsSchema),
     defaultValues: {
+      isEnabled: method.isEnabled, // 👈 NEW: Initial value from parent
       sandbox: !!config.sandbox,
       title: method.name || "PayPal",
       description: method.description || "",
@@ -61,6 +61,7 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
       payLaterLocations: config.payLaterLocations || [],
       payLaterMessaging: config.payLaterMessaging ?? true,
       payLaterMessageTheme: config.payLaterMessageTheme || "light",
+      subtotalMismatchBehavior: config.subtotalMismatchBehavior || "add_line_item",
       invoicePrefix: config.invoicePrefix || "",
       debugLog: !!config.debugLog,
     }
@@ -83,10 +84,29 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
         <Card>
-          {/* Card Content... (No changes needed inside CardContent) */}
           <CardContent className="pt-6 space-y-4">
-             {/* ... Form Fields ... */}
-             <FormField
+            
+            {/* 1. ENABLE / DISABLE SWITCH (NEW) */}
+            <FormField
+              control={form.control}
+              name="isEnabled"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Enable PayPal</FormLabel>
+                    <FormDescription>
+                      Show PayPal as a payment option at checkout.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {/* 2. SANDBOX SWITCH */}
+            <FormField
               control={form.control}
               name="sandbox"
               render={({ field }) => (
@@ -103,13 +123,57 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
                 </FormItem>
               )}
             />
-            {/* ... Other fields like title, description ... */}
+
+            {/* 3. TITLE & DESCRIPTION */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Method Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormDescription>User sees this title at checkout.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="brandName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Brand Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} placeholder="Your Store Name" />
+                    </FormControl>
+                     <FormDescription>Overrides business name on PayPal page.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormDescription>Short description displayed to customer.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
           </CardContent>
         </Card>
 
-        {/* ... Other Form Fields Containers ... */}
-        
-        {/* 👇 FIX: Used dedicated sticky bar */}
         <Paypal_Save_Sticky_Bar onSave={form.handleSubmit(onSubmit)} isPending={isPending} />
       </form>
     </Form>

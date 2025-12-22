@@ -5,42 +5,51 @@ import Stripe from "stripe"
 
 export async function testStripeConnection(paymentMethodId: string) {
   try {
-    // ১. ডাটাবেস থেকে কনফিগারেশন আনছি
     const config = await db.stripeConfig.findUnique({
       where: { paymentMethodId }
     })
 
     if (!config) {
-      return { success: false, error: "Configuration not found in database." }
+      return { success: false, error: "Configuration not found." }
     }
 
-    // ২. টেস্ট বা লাইভ মোড অনুযায়ী সঠিক সিক্রেট কি নিচ্ছি
     const secretKey = config.testMode ? config.testSecretKey : config.liveSecretKey
 
     if (!secretKey) {
-      return { success: false, error: "No API Key found. Please save keys first." }
+      return { success: false, error: "No API Key found." }
     }
 
-    // ৩. Stripe এর সাথে কানেক্ট করার চেষ্টা
     const stripe = new Stripe(secretKey, {
-      apiVersion: "2025-12-15.clover" as any, // অথবা লেটেস্ট ভার্সন
+      apiVersion: "2025-01-27.acacia" as any, // বা তোমার ভার্সন
       typescript: true,
     })
 
-    // ৪. ব্যালেন্স চেক (এটা জাস্ট কানেকশন টেস্ট, টাকা কাটবে না)
-    const balance = await stripe.balance.retrieve()
+    // ১. একই সাথে ব্যালেন্স এবং অ্যাকাউন্টের তথ্য আনা
+    const [balance, account] = await Promise.all([
+      stripe.balance.retrieve(),
+      stripe.accounts.retrieve()
+    ]);
 
-    // ৫. সফল হলে মেসেজ রিটার্ন
+    // ২. সফল হলে সব তথ্য রিটার্ন করা
     return { 
       success: true, 
-      message: `Connection Successful! Mode: ${balance.livemode ? 'Live' : 'Test'}. Currency: ${balance.available[0]?.currency.toUpperCase()}` 
+      message: "Verified",
+      data: {
+        mode: balance.livemode ? 'Live' : 'Test',
+        currency: balance.available[0]?.currency.toUpperCase(),
+        account_email: account.email || "N/A", // স্ট্রাইপ অ্যাকাউন্টের ইমেইল
+        account_id: account.id, // যেমন: acct_1Hq...
+        payouts_enabled: account.payouts_enabled, // টাকা তোলা যাবে কি না
+        charges_enabled: account.charges_enabled, // পেমেন্ট নেওয়া যাবে কি না
+        country: account.country
+      }
     }
 
   } catch (error: any) {
     console.error("Stripe Connection Test Failed:", error)
     return { 
       success: false, 
-      error: error.message || "Failed to connect to Stripe. Check your keys." 
+      error: error.message || "Failed to connect to Stripe." 
     }
   }
 }

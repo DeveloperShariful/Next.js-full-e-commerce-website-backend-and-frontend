@@ -1570,6 +1570,8 @@ model PaypalConfig {
   paymentMethodId       String              @unique
   paymentMethod         PaymentMethodConfig @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
 
+  enablePaypal          Boolean             @default(true)
+
   sandbox               Boolean             @default(false) 
   
   isOnboarded           Boolean             @default(false)

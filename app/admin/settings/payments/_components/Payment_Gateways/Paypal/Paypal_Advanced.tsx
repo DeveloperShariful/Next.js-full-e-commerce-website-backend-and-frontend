@@ -1,7 +1,7 @@
 // app/admin/settings/payments/_components/Payment_Gateways/Paypal/Paypal_Advanced.tsx
 "use client"
 
-import { useTransition } from "react"
+import { useTransition, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PaypalSettingsSchema } from "@/app/admin/settings/payments/schemas"
@@ -9,13 +9,15 @@ import { updatePaypalSettings } from "@/app/actions/settings/payments/paypal/upd
 import { PaymentMethodWithConfig, PaypalConfigType } from "@/app/admin/settings/payments/types"
 import { z } from "zod"
 import { toast } from "sonner"
+import { RefreshCw } from "lucide-react" // 👈 Import Refresh Icon
 
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
-// 👇 FIX: Imported from dedicated Paypal components
+// Components
 import { Paypal_Save_Sticky_Bar } from "./Components/Paypal_Save_Sticky_Bar"
 import { Paypal_Debug_Log_Viewer } from "./Components/Paypal_Debug_Log_Viewer"
 
@@ -26,6 +28,9 @@ interface AdvancedProps {
 
 export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
   const [isPending, startTransition] = useTransition()
+  
+  // 👇 State to force refresh the logs
+  const [logRefreshKey, setLogRefreshKey] = useState(0)
 
   const form = useForm<z.infer<typeof PaypalSettingsSchema>>({
     resolver: zodResolver(PaypalSettingsSchema),
@@ -33,7 +38,7 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
       invoicePrefix: config.invoicePrefix || "WC-",
       debugLog: !!config.debugLog,
       
-      // Defaults
+      // Hidden / Defaults fields required for Schema validation
       sandbox: !!config.sandbox,
       title: method.name || "",
       description: method.description || "",
@@ -77,15 +82,27 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
     })
   }
 
+  // 👇 Function to refresh logs manually
+  const handleRefreshLogs = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setLogRefreshKey(prev => prev + 1) // Changing key forces component re-mount
+    toast.info("Refreshing logs...")
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          
+          {/* Settings Card */}
           <Card>
             <CardHeader>
               <CardTitle>Advanced Options</CardTitle>
+              <CardDescription>Configure technical parameters for PayPal.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              
+              {/* Invoice Prefix Field */}
               <FormField
                 control={form.control}
                 name="invoicePrefix"
@@ -93,25 +110,26 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
                   <FormItem>
                     <FormLabel>Invoice Prefix</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ""} />
+                      <Input {...field} value={field.value || ""} placeholder="e.g. GOBIKE-" />
                     </FormControl>
                     <FormDescription>
-                      Added to invoice numbers sent to PayPal to prevent duplicate invoice errors (e.g., WC-).
+                      Added to invoice numbers sent to PayPal to prevent "Duplicate Invoice ID" errors (e.g., WC-, GB-).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Debug Logging Switch */}
               <FormField
                 control={form.control}
                 name="debugLog"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
                     <div className="space-y-0.5">
-                      <FormLabel>Enable Debug Logging</FormLabel>
+                      <FormLabel className="text-base">Enable Debug Logging</FormLabel>
                       <FormDescription>
-                        Log PayPal events, such as IPN requests, inside System Logs.
+                        Save detailed PayPal API responses to System Logs. Useful for troubleshooting errors.
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -123,19 +141,26 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
             </CardContent>
           </Card>
           
-          {/* 👇 FIX: Used dedicated sticky bar */}
           <Paypal_Save_Sticky_Bar onSave={form.handleSubmit(onSubmit)} isPending={isPending} />
         </form>
       </Form>
 
+      {/* Logs Viewer Card */}
       <Card>
-        <CardHeader>
-          <CardTitle>PayPal Debug Logs</CardTitle>
-          <CardDescription>Recent API interaction logs.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div className="space-y-1">
+            <CardTitle>PayPal Debug Logs</CardTitle>
+            <CardDescription>Recent system events and API interactions.</CardDescription>
+          </div>
+          {/* 👇 Refresh Button added here */}
+          <Button variant="outline" size="sm" onClick={handleRefreshLogs} className="gap-2">
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </Button>
         </CardHeader>
         <CardContent>
-          {/* 👇 FIX: Used dedicated log viewer (no source prop needed) */}
-          <Paypal_Debug_Log_Viewer />
+          {/* Passing the key forces the viewer to re-fetch when button is clicked */}
+          <Paypal_Debug_Log_Viewer key={logRefreshKey} />
         </CardContent>
       </Card>
     </div>

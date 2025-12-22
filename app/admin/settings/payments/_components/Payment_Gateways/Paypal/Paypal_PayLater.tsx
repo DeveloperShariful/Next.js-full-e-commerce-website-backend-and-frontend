@@ -12,10 +12,8 @@ import { toast } from "sonner"
 
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form"
 import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-// 👇 FIX: Imported from dedicated Paypal components
 import { Paypal_Save_Sticky_Bar } from "./Components/Paypal_Save_Sticky_Bar"
 
 interface PayLaterProps {
@@ -26,14 +24,15 @@ interface PayLaterProps {
 export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
   const [isPending, startTransition] = useTransition()
 
-  // ... (useForm Logic same as before) ...
   const form = useForm<z.infer<typeof PaypalSettingsSchema>>({
     resolver: zodResolver(PaypalSettingsSchema),
     defaultValues: {
       payLaterEnabled: config.payLaterEnabled ?? true,
       payLaterMessaging: config.payLaterMessaging ?? true,
       payLaterMessageTheme: config.payLaterMessageTheme || "light",
-      // ... defaults ...
+      
+      // Defaults
+      isEnabled: method.isEnabled,
       sandbox: !!config.sandbox,
       title: method.name || "",
       description: method.description || "",
@@ -86,12 +85,49 @@ export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
               Offer your customers flexible payment options (Buy Now, Pay Later).
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-             {/* ... Fields ... */}
+          <CardContent className="space-y-6">
+             
+             {/* Enable Pay Later */}
+             <FormField
+                control={form.control}
+                name="payLaterEnabled"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Enable Pay Later</FormLabel>
+                      <FormDescription>
+                        Show "Pay Later" button at checkout.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* Enable Messaging */}
+              <FormField
+                control={form.control}
+                name="payLaterMessaging"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Enable Messaging</FormLabel>
+                      <FormDescription>
+                        Show "Pay in 4 installments" messages on product pages and cart.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
           </CardContent>
         </Card>
 
-        {/* 👇 FIX: Used dedicated sticky bar */}
         <Paypal_Save_Sticky_Bar onSave={form.handleSubmit(onSubmit)} isPending={isPending} />
       </form>
     </Form>

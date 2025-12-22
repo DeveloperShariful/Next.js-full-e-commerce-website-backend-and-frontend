@@ -4,6 +4,7 @@
 import { useState } from "react"
 import { Paypal_Webhook_Status_Card } from "./Components/Paypal_Webhook_Status_Card"
 import { refreshPaypalWebhook } from "@/app/actions/settings/payments/paypal/refresh-webhooks"
+import { deletePaypalWebhook } from "@/app/actions/settings/payments/paypal/delete-webhook" // 👈 New Import
 import { PaypalConfigType } from "@/app/admin/settings/payments/types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
@@ -18,8 +19,7 @@ interface WebhookTabProps {
 
 export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
   const [loading, setLoading] = useState(false)
-  
-  // 👇 State for URL (Initially load from DB config, then update dynamically)
+  const [deleting, setDeleting] = useState(false) // 👈 Deleting state
   const [currentWebhookUrl, setCurrentWebhookUrl] = useState(config.webhookUrl)
   
   const router = useRouter()
@@ -28,23 +28,36 @@ export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
     ? (!!config.sandboxClientId && !!config.sandboxClientSecret)
     : (!!config.liveClientId && !!config.liveClientSecret)
 
+  // 1. Sync & Repair / Create Logic
   const handleRefresh = async () => {
     setLoading(true)
     const res = await refreshPaypalWebhook(methodId)
     
     if (res.success) {
-      toast.success("Webhook configured successfully!")
-      
-      // 👇 Update the local state instantly to show the URL
-      if (res.webhookUrl) {
-        setCurrentWebhookUrl(res.webhookUrl)
-      }
-      
+      toast.success("Webhook synced successfully!")
+      if (res.webhookUrl) setCurrentWebhookUrl(res.webhookUrl)
       router.refresh()
     } else {
-      toast.error(res.error || "Failed to configure webhook")
+      toast.error(res.error || "Failed to sync webhook")
     }
     setLoading(false)
+  }
+
+  // 2. Delete / Disconnect Logic
+  const handleDelete = async () => {
+    if(!confirm("Are you sure you want to delete this webhook? It will stop automatic payment updates.")) return;
+    
+    setDeleting(true)
+    const res = await deletePaypalWebhook(methodId)
+
+    if(res.success) {
+        toast.success("Webhook disconnected")
+        setCurrentWebhookUrl(null)
+        router.refresh()
+    } else {
+        toast.error(res.error || "Failed to disconnect")
+    }
+    setDeleting(false)
   }
 
   return (
@@ -72,10 +85,12 @@ export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               <Paypal_Webhook_Status_Card 
                 webhookId={config.webhookId}
-                webhookUrl={currentWebhookUrl} // 👈 Using State Variable
+                webhookUrl={currentWebhookUrl}
                 isSandbox={!!config.sandbox}
                 onRefresh={handleRefresh}
+                onDelete={handleDelete} // 👈 Pass delete handler
                 isRefreshing={loading}
+                isDeleting={deleting}   // 👈 Pass deleting state
               />
               
               <div className="mt-4 text-sm text-muted-foreground bg-muted/30 p-4 rounded-md border border-dashed">

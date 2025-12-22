@@ -1,17 +1,21 @@
+//app/admin/settings/payments/_components/Payment_Gateways/Paypal/Components/Paypal_Webhook_Status_Card.tsx
+
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, CheckCircle2, XCircle, Globe, Link as LinkIcon } from "lucide-react"
+import { RefreshCw, CheckCircle2, XCircle, Globe, Link as LinkIcon, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PaypalWebhookProps {
   isSandbox: boolean
   webhookId: string | null
-  webhookUrl: string | null // 👈 NEW Prop
+  webhookUrl: string | null
   onRefresh: () => void
+  onDelete: () => void // 👈 New Prop
   isRefreshing: boolean
+  isDeleting: boolean  // 👈 New Prop
 }
 
 export const Paypal_Webhook_Status_Card = ({
@@ -19,7 +23,9 @@ export const Paypal_Webhook_Status_Card = ({
   webhookId,
   webhookUrl,
   onRefresh,
-  isRefreshing
+  onDelete,
+  isRefreshing,
+  isDeleting
 }: PaypalWebhookProps) => {
   const isActive = !!webhookId
 
@@ -40,7 +46,7 @@ export const Paypal_Webhook_Status_Card = ({
       </CardHeader>
       <CardContent className="space-y-4">
         
-        {/* Status Bar */}
+        {/* Status Bar & Actions */}
         <div className="flex items-center justify-between bg-muted/30 p-3 rounded-md border">
           <div className="flex items-center gap-2">
             {isActive ? (
@@ -53,19 +59,36 @@ export const Paypal_Webhook_Status_Card = ({
             </span>
           </div>
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            className="gap-2 h-8"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-            {isActive ? "Re-Check Status" : "Create Webhook"}
-          </Button>
+          <div className="flex gap-2">
+            {/* Delete Button (Only shows if Active) */}
+            {isActive && (
+                <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={onDelete}
+                    disabled={isDeleting || isRefreshing}
+                    className="h-8"
+                >
+                    {isDeleting ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-2" />}
+                    Disconnect
+                </Button>
+            )}
+
+            {/* Sync/Create Button */}
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onRefresh}
+                disabled={isRefreshing || isDeleting}
+                className="gap-2 h-8"
+            >
+                <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+                {isActive ? "Sync & Repair" : "Create Webhook"}
+            </Button>
+          </div>
         </div>
 
-        {/* 👇 NEW: URL Display Section */}
+        {/* URL Display */}
         {isActive && webhookUrl && (
             <div className="space-y-1.5">
                 <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">

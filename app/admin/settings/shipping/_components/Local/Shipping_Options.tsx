@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateShippingOptions } from "@/app/actions/settings/shipping/local";
+import { updateShippingOptions } from "@/app/actions/admin/settings/shipping/local";
 import { ComponentProps } from "../../types";
 import { Loader2, Save, HelpCircle } from "lucide-react";
 import { toast } from "react-hot-toast";

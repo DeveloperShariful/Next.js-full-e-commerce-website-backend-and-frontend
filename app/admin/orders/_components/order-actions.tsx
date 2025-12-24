@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Save, Settings2, Loader2 } from "lucide-react";
-import { updateOrderStatus } from "@/app/actions/order/update-status";
+import { updateOrderStatus } from "@/app/actions/admin/order/update-status";
 import { toast } from "sonner";
 
 interface OrderActionsProps {

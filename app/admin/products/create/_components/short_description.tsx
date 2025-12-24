@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/short_description.tsx
+
 import { ComponentProps } from "../types";
 
 export default function ShortDescription({ data, updateData }: ComponentProps) {

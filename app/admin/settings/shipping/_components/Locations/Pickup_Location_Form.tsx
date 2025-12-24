@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { savePickupLocation } from "@/app/actions/settings/shipping/locations";
+import { savePickupLocation } from "@/app/actions/admin/settings/shipping/locations";
 import { PickupLocation } from "@prisma/client";
 import { X, Loader2, Save, Store } from "lucide-react";
 import { toast } from "react-hot-toast";

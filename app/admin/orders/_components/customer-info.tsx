@@ -18,8 +18,8 @@ import {
 import { toast } from "sonner";
 
 // Server Actions
-import { searchTransdirectLocations } from "@/app/actions/order/transdirect-locations";
-import { updateOrderCustomerDetails } from "@/app/actions/order/update-order-customer";
+import { searchTransdirectLocations } from "@/app/actions/admin/order/transdirect-locations";
+import { updateOrderCustomerDetails } from "@/app/actions/admin/order/update-order-customer";
 
 export const CustomerInfo = ({ order }: { order: any }) => {
   // Parsing Address

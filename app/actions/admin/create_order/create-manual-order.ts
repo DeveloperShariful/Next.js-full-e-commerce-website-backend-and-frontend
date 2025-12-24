@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { generateNextOrderNumber } from "@/app/actions/create_order/generate-order-number"; // 👈 নতুন ইমপোর্ট
+import { generateNextOrderNumber } from "@/app/actions/admin/create_order/generate-order-number"; // 👈 নতুন ইমপোর্ট
 
 export async function createManualOrder(data: any) {
   try {

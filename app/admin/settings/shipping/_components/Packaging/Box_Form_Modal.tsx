@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { saveShippingBox } from "@/app/actions/settings/shipping/packaging";
+import { saveShippingBox } from "@/app/actions/admin/settings/shipping/packaging";
 import { ShippingBox } from "@prisma/client";
 import { X, Loader2, Save } from "lucide-react";
 import { toast } from "react-hot-toast";

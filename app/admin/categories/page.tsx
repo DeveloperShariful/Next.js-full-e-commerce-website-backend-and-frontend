@@ -10,7 +10,7 @@ import {
   deleteCategory, 
   getCategories,
   getCategoryTree
-} from "@/app/actions/category";
+} from "@/app/actions/admin/category";
 import { toast } from "react-hot-toast";
 import { 
   Search, Plus, Pencil, Trash2, 

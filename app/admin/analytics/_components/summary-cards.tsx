@@ -1,7 +1,7 @@
 "use client";
 
 import { TrendingUp, ShoppingBag, CreditCard, Undo2 } from "lucide-react";
-import { AnalyticsSummary } from "@/app/actions/analytics";
+import { AnalyticsSummary } from "@/app/actions/admin/analytics";
 
 interface SummaryCardsProps {
   summary: AnalyticsSummary;

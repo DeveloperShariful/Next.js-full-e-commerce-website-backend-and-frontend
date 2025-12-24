@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/header.tsx
+
 import { Save } from "lucide-react";
 
 interface Props {

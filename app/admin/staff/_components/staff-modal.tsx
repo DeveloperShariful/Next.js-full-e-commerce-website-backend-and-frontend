@@ -3,7 +3,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { createStaff, updateStaff } from "@/app/actions/staff"; // [FIXED Import]
+import { createStaff, updateStaff } from "@/app/actions/admin/staff"; // [FIXED Import]
 import { X, Loader2, Save, User, Mail, Shield } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";

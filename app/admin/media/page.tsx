@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAllMedia, bulkDeleteMedia, MediaItem } from "@/app/actions/media";
+import { getAllMedia, bulkDeleteMedia, MediaItem } from "@/app/actions/admin/media";
 import { toast } from "react-hot-toast";
 import { MediaHeader } from "./_components/media-header";
 import { MediaToolbar } from "./_components/media-toolbar";

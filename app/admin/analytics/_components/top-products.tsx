@@ -1,6 +1,6 @@
 "use client";
 
-import { TopProduct } from "@/app/actions/analytics";
+import { TopProduct } from "@/app/actions/admin/analytics";
 
 interface TopProductsProps {
   products: TopProduct[];

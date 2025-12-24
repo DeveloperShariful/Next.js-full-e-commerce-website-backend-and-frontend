@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { getPaymentSystemLogs } from "@/app/actions/settings/payments/get-system-logs"
+import { getPaymentSystemLogs } from "@/app/actions/admin/settings/payments/get-system-logs"
 import { Loader2, Terminal } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 

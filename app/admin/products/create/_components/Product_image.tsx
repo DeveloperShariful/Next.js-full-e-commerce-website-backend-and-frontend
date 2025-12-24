@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/Product_image.tsx
+
 import { ComponentProps } from "../types";
 import ImageUpload from "@/components/ui/image-upload";
 import { X } from "lucide-react";

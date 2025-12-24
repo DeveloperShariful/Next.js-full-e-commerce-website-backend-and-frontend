@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { Role } from "@prisma/client";
-import AdminSidebar from "@/components/admin/sidebar";
-import AdminHeader from "@/components/admin/header";
+import AdminSidebar from "@/app/admin/Header-Sideber/sidebar";
+import AdminHeader from "@/app/admin/Header-Sideber/header";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const clerkUser = await currentUser();

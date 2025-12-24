@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/Inventory.tsx
+
 import { ComponentProps } from "../types";
 
 export default function Inventory({ data, updateData }: ComponentProps) {

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { updateEmailTemplate } from "@/app/actions/settings/email/email-templates";
+import { updateEmailTemplate } from "@/app/actions/admin/settings/email/email-templates";
 import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
 

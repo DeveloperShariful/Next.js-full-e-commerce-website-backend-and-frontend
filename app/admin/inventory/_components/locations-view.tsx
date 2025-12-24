@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getLocations, saveLocation } from "@/app/actions/inventory";
+import { getLocations, saveLocation } from "@/app/actions/admin/inventory";
 import { Plus, MapPin, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 

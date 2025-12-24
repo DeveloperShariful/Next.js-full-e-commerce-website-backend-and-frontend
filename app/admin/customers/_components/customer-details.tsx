@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCustomerDetails } from "@/app/actions/customer";
+import { getCustomerDetails } from "@/app/actions/admin/customer";
 import { X, MapPin, Mail, Phone, Calendar, ShoppingBag, Loader2, CreditCard } from "lucide-react";
 import { OrderStatus } from "@prisma/client";
 

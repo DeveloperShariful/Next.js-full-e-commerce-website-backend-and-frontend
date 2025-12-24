@@ -4,7 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer 
 } from "recharts";
-import { ChartDataPoint } from "@/app/actions/analytics";
+import { ChartDataPoint } from "@/app/actions/admin/analytics";
 
 interface SalesChartProps {
   data: ChartDataPoint[];

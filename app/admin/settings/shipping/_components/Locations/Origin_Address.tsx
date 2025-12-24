@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { saveOriginAddress } from "@/app/actions/settings/shipping/locations";
+import { saveOriginAddress } from "@/app/actions/admin/settings/shipping/locations";
 import { Location } from "@prisma/client";
 import { MapPin, Save, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";

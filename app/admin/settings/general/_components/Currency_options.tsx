@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { HelpCircle } from "lucide-react";
-import { getAllCurrencies } from "@/app/actions/settings/general/location-helpers";
+import { getAllCurrencies } from "@/app/actions/admin/settings/general/location-helpers";
 import { GeneralSettingsData } from "../page";
 
 interface Props {

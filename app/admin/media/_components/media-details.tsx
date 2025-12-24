@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MediaItem, updateMediaMetadata } from "@/app/actions/media";
+import { MediaItem, updateMediaMetadata } from "@/app/actions/admin/media";
 import { X, Save, Copy, FileText, Calendar, HardDrive, Check, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import Image from "next/image";

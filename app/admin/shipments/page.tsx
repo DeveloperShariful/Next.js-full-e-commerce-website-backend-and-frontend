@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { 
   getShipments, updateTracking, 
   markAsDelivered, deleteShipment, ShipmentData 
-} from "@/app/actions/shipment";
+} from "@/app/actions/admin/shipment";
 import { toast } from "react-hot-toast";
 import { 
   Truck, Search, RefreshCcw, Loader2, 

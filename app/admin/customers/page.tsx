@@ -1,6 +1,6 @@
 // app/admin/customers/page.tsx
 
-import { getCustomers } from "@/app/actions/customer";
+import { getCustomers } from "@/app/actions/admin/customer";
 import { CustomerHeader } from "./_components/customer-header";
 import { CustomerTable } from "./_components/customer-table";
 import { Search } from "lucide-react";

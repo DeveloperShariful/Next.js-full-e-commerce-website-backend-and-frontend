@@ -9,7 +9,7 @@ import { Loader2, User, RefreshCw, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StripeConfigType } from "@/app/admin/settings/payments/types"
 import { toast } from "sonner"
-import { testStripeConnection } from "@/app/actions/settings/payments/stripe/test-connection"
+import { testStripeConnection } from "@/app/actions/admin/settings/payments/stripe/test-connection"
 import { cn } from "@/lib/utils"
 
 interface ConnectionCardProps {

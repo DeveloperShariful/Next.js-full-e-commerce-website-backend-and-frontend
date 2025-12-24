@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { saveTransdirectSender } from "@/app/actions/settings/shipping/transdirect-sender";
+import { saveTransdirectSender } from "@/app/actions/admin/settings/shipping/transdirect-sender";
 import { TransdirectConfig } from "@prisma/client";
 import { Save, Loader2, Building, User } from "lucide-react";
 import { toast } from "react-hot-toast";

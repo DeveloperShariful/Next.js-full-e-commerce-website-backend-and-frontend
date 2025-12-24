@@ -3,11 +3,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { createShippingZone, deleteShippingZone } from "@/app/actions/settings/shipping/local";
+import { createShippingZone, deleteShippingZone } from "@/app/actions/admin/settings/shipping/local";
 import { ComponentProps, ShippingZone } from "../../types";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { getCountryAndStatesList } from "@/app/actions/settings/general/location-helpers"; 
+import { getCountryAndStatesList } from "@/app/actions/admin/settings/general/location-helpers"; 
 import Shipping_Method from "./Shipping_Method";
 import { TransdirectConfig, CarrierService } from "@prisma/client";
 

@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { Search, Loader2, Layers, CheckCircle, ChevronLeft, ChevronRight, Trash2, Edit2 } from "lucide-react";
-import { deleteAttribute } from "@/app/actions/attribute";
+import { deleteAttribute } from "@/app/actions/admin/attribute";
 import { toast } from "react-hot-toast";
 
 interface AttributeListProps {

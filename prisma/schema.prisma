@@ -538,6 +538,8 @@ model Product {
 
   metaTitle        String?
   metaDesc         String?
+  seoCanonicalUrl  String?
+  seoSchema        Json?
   gender           String?       
   ageGroup         String?       
 
@@ -1247,6 +1249,16 @@ model Page {
   updatedAt   DateTime @updatedAt
 }
 
+model Menu {
+  id        String      @id @default(uuid())
+  title     String      
+  slug      String      @unique 
+  items     Json        
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
 model Review {
   id          String   @id @default(uuid())
   rating      Int      
@@ -1625,6 +1637,66 @@ model UrlRedirect {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model SeoGlobalConfig {
+  id               String   @id @default("global_seo")
+  siteName         String   @default("GoBike")
+  titleSeparator   String   @default("|") 
+  siteUrl          String   @default("https://gobike.au")
+  organizationData Json?    @db.JsonB 
+  defaultMetaTitle String?
+  defaultMetaDesc  String?  @db.Text
+  defaultKeywords  String[] 
+  robotsTxtContent String?  @db.Text 
+  globalRobotsProps Json?   
+  sitemapEnabled   Boolean  @default(true)
+  isPublic         Boolean  @default(true) 
+  ogImage          String?  
+  ogImageWidth     Int?     @default(1200) 
+  ogImageHeight    Int?     @default(630)
+  ogType           String   @default("website")
+  ogLocale         String   @default("en_AU") 
+  twitterCard      String   @default("summary_large_image")
+  twitterSite      String?  
+  twitterCreator   String?  
+  themeColor       String?  @default("#2271b1") 
+  manifestJson     Json?    
+
+  updatedAt        DateTime @updatedAt
+}
+
+model MarketingIntegration {
+  id                 String   @id @default("marketing_config")
+  gtmEnabled         Boolean  @default(false)
+  gtmContainerId     String?  
+  gtmAuth            String?  
+  gtmPreview         String?  
+  dataLayerName      String   @default("dataLayer") 
+
+  gscVerificationCode String? 
+  gscServiceAccountJson String? @db.Text 
+
+  gmcMerchantId      String?
+  gmcTargetCountry   String   @default("AU")
+  gmcLanguage        String   @default("en")
+  gmcContentApiEnabled Boolean @default(false)
+
+  fbPixelId          String?
+  fbEnabled          Boolean  @default(false)
+  fbAccessToken      String?  @db.Text 
+  fbTestEventCode    String?  
+  fbDataProcessingOptions Json? 
+  fbDomainVerification String? 
+
+  klaviyoEnabled     Boolean  @default(false)
+  klaviyoPublicKey   String? 
+  klaviyoPrivateKey  String?  @db.Text 
+  klaviyoListIds     Json?    
+  klaviyoTrackViewedProduct Boolean @default(true)
+  klaviyoTrackAddedToCart   Boolean @default(true) 
+
+  updatedAt          DateTime @updatedAt
 }
 
 model Banner {

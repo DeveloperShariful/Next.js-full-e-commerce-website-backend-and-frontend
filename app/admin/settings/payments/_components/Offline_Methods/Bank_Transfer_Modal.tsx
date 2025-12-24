@@ -5,7 +5,7 @@ import { useState, useTransition } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { BankTransferSchema } from "@/app/admin/settings/payments/schemas"
-import { updateBankTransferSettings } from "@/app/actions/settings/payments/bank"
+import { updateBankTransferSettings } from "@/app/actions/admin/settings/payments/bank"
 import { z } from "zod"
 import { toast } from "sonner"
 

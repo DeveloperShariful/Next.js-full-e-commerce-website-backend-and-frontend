@@ -2,7 +2,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getStripeLogs } from "@/app/actions/settings/payments/stripe/get-system-logs"
+import { getStripeLogs } from "@/app/actions/admin/settings/payments/stripe/get-system-logs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, AlertCircle, CheckCircle2, Clock } from "lucide-react"

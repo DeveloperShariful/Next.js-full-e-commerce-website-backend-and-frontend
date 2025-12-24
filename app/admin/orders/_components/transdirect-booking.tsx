@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Truck, RefreshCw, CheckCircle, AlertTriangle } from "lucide-react";
-import { syncOrderToTransdirect } from "@/app/actions/order/transdirect-sync-order";
+import { syncOrderToTransdirect } from "@/app/actions/admin/order/transdirect-sync-order";
 import { toast } from "sonner"; // Make sure Toaster is in layout.tsx
 
 export const TransdirectBooking = ({ order }: { order: any }) => {

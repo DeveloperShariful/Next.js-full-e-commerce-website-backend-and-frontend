@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { saveCarrierService, toggleCarrierStatus, deleteCarrierService } from "@/app/actions/settings/shipping/carriers";
+import { saveCarrierService, toggleCarrierStatus, deleteCarrierService } from "@/app/actions/admin/settings/shipping/carriers";
 import { CarrierService } from "@prisma/client";
 import { Truck, Plus, Power, Settings, Trash2, Save, X, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";

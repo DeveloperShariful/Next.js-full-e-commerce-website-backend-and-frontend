@@ -4,8 +4,8 @@
 
 import { useState, useEffect } from "react"
 import { StripeConfigType } from "@/app/admin/settings/payments/types"
-import { refreshStripeWebhooks } from "@/app/actions/settings/payments/stripe/refresh-webhooks"
-import { deleteStripeWebhook } from "@/app/actions/settings/payments/stripe/delete-webhook" // 👈 Import Delete Action
+import { refreshStripeWebhooks } from "@/app/actions/admin/settings/payments/stripe/refresh-webhooks"
+import { deleteStripeWebhook } from "@/app/actions/admin/settings/payments/stripe/delete-webhook" // 👈 Import Delete Action
 import { toast } from "sonner"
 import { Stripe_Webhook_Status_Card } from "./Components/Stripe_Webhook_Status_Card"
 import { Stripe_Debug_Log_Viewer } from "./Components/Stripe_Debug_Log_Viewer"

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ShoppingCart, Eye, Star } from "lucide-react";
 import { Product, Category, ProductImage } from "@prisma/client";
 import { MouseEventHandler } from "react";
-import useCart from "@/hooks/use-cart"; 
+import useCart from "@/app/actions/storeFont/use-cart"; 
 
 interface ProductCardProps {
   data: Product & {

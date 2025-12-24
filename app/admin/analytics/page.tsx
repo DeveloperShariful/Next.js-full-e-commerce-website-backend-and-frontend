@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAnalyticsData, AnalyticsResponse } from "@/app/actions/analytics";
+import { getAnalyticsData, AnalyticsResponse } from "@/app/actions/admin/analytics";
 import { Loader2 } from "lucide-react";
 import { AnalyticsHeader } from "@/app/admin/analytics/_components/analytics-header";
 import { SummaryCards } from "@/app/admin/analytics/_components/summary-cards";

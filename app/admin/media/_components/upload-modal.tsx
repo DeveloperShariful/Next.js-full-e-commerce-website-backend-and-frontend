@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { saveMedia } from "@/app/actions/media";
+import { saveMedia } from "@/app/actions/admin/media";
 import { X, Loader2 } from "lucide-react";
 import ImageUpload from "@/components/ui/image-upload"; // Ensure this path is correct
 import { toast } from "react-hot-toast";

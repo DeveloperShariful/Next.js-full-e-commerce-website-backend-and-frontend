@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getBanners, saveBanner, deleteBanner } from "@/app/actions/banner";
+import { getBanners, saveBanner, deleteBanner } from "@/app/actions/admin/banner";
 import ImageUpload from "@/components/ui/image-upload";
 import { toast } from "react-hot-toast";
 import { 

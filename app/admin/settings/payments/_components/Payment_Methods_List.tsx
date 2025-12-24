@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation"
 
 // Correct Imports based on our file structure
 import { Payment_Status_Badge } from "./Payment_Status_Badge"
-import { togglePaymentMethodStatus } from "@/app/actions/settings/payments/toggle-method-status"
+import { togglePaymentMethodStatus } from "@/app/actions/admin/settings/payments/toggle-method-status"
 
 // Modals
 import { Stripe_Main_Modal } from "./Payment_Gateways/Stripe/Stripe_Main_Modal"

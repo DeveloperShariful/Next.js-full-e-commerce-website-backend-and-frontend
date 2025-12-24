@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Truck, CreditCard, ExternalLink, PackageCheck, Loader2, Info } from "lucide-react";
-import { addTrackingInfo } from "@/app/actions/order/fulfillment"; 
+import { addTrackingInfo } from "@/app/actions/admin/order/fulfillment"; 
 import { useState } from "react";
 import { toast } from "sonner";
 import {

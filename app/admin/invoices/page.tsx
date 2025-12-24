@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getInvoices } from "@/app/actions/invoice";
+import { getInvoices } from "@/app/actions/admin/invoice";
 import { InvoiceHeader } from "./_components/invoice-header";
 import { InvoiceFilters } from "./_components/invoice-filters";
 import { InvoiceTable } from "./_components/invoice-table";

@@ -17,11 +17,11 @@ import {
 } from "@prisma/client";
 
 // --- ACTIONS ---
-import { getShippingData } from "@/app/actions/settings/shipping/local";
-import { getPackagingData } from "@/app/actions/settings/shipping/packaging";
-import { getLocationsData } from "@/app/actions/settings/shipping/locations";
-import { getTransdirectConfig } from "@/app/actions/settings/shipping/transdirect-config";
-import { getCarrierServices } from "@/app/actions/settings/shipping/carriers";
+import { getShippingData } from "@/app/actions/admin/settings/shipping/local";
+import { getPackagingData } from "@/app/actions/admin/settings/shipping/packaging";
+import { getLocationsData } from "@/app/actions/admin/settings/shipping/locations";
+import { getTransdirectConfig } from "@/app/actions/admin/settings/shipping/transdirect-config";
+import { getCarrierServices } from "@/app/actions/admin/settings/shipping/carriers";
 
 // --- COMPONENTS ---
 import Shipping_Zones from "./_components/Local/Shipping_Zones";

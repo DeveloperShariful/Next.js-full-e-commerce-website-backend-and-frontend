@@ -1,3 +1,5 @@
+// app/admin/products/page.tsx
+
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { ProductType } from '@prisma/client';

@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
-import { processRefund } from "@/app/actions/order/process-refund";
+import { processRefund } from "@/app/actions/admin/order/process-refund";
 
 interface RefundModalProps {
   isOpen: boolean;

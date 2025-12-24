@@ -1,6 +1,6 @@
 // File: app/admin/orders/[orderId]/page.tsx
 
-import { getOrderDetails } from "@/app/actions/order/get-order-details"; 
+import { getOrderDetails } from "@/app/actions/admin/order/get-order-details"; 
 import { notFound } from "next/navigation";
 
 // --- COMPONENTS ---

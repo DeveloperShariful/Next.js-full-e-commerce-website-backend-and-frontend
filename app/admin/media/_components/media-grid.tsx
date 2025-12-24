@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { CheckSquare, Square, FileText } from "lucide-react";
-import { MediaItem } from "@/app/actions/media";
+import { MediaItem } from "@/app/actions/admin/media";
 
 interface MediaGridProps {
   data: MediaItem[];

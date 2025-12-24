@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { deletePickupLocation, togglePickupStatus } from "@/app/actions/settings/shipping/locations";
+import { deletePickupLocation, togglePickupStatus } from "@/app/actions/admin/settings/shipping/locations";
 import { PickupLocation } from "@prisma/client";
 import { Plus, Store, Trash2, Edit, MapPin } from "lucide-react";
 import { toast } from "react-hot-toast";

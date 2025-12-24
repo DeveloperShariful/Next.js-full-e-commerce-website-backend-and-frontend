@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { deleteShippingBox, toggleBoxStatus } from "@/app/actions/settings/shipping/packaging";
+import { deleteShippingBox, toggleBoxStatus } from "@/app/actions/admin/settings/shipping/packaging";
 import { ShippingBox, TransdirectBox } from "@prisma/client"; 
 import { Plus, Package, Trash2, Edit, Box, Info } from "lucide-react";
 import { toast } from "react-hot-toast";

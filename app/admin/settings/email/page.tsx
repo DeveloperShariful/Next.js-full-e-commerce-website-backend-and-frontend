@@ -8,9 +8,9 @@ import { Loader2 } from "lucide-react";
 import { EmailConfiguration, EmailTemplate, EmailLog } from "@prisma/client";
 
 // --- ACTIONS ---
-import { getEmailConfiguration } from "@/app/actions/settings/email/email-config";
-import { getEmailTemplates } from "@/app/actions/settings/email/email-templates";
-import { getEmailLogs } from "@/app/actions/settings/email/email-logs";
+import { getEmailConfiguration } from "@/app/actions/admin/settings/email/email-config";
+import { getEmailTemplates } from "@/app/actions/admin/settings/email/email-templates";
+import { getEmailLogs } from "@/app/actions/admin/settings/email/email-logs";
 
 // --- COMPONENTS ---
 import { EmailSettingsView } from "./_components/email-settings-view";

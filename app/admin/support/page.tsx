@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getTickets } from "@/app/actions/support";
+import { getTickets } from "@/app/actions/admin/support";
 import Link from "next/link";
 import { 
   MessageSquare, Search, RefreshCcw, 

@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { addShippingRate, deleteShippingRate, updateShippingRate } from "@/app/actions/settings/shipping/local";
+import { addShippingRate, deleteShippingRate, updateShippingRate } from "@/app/actions/admin/settings/shipping/local";
 // ✅ আমরা Local Types ব্যবহার করছি যাতে String vs Enum কনফ্লিক্ট না হয়
 import { ShippingZone, ShippingRate } from "../../types"; 
 import { TransdirectConfig, CarrierService } from "@prisma/client";

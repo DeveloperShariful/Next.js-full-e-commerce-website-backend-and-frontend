@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import useCart from "@/hooks/use-cart"; 
+import useCart from "@/app/actions/storeFont/use-cart"; 
 import { ShoppingCart, Heart, Minus, Plus, Check } from "lucide-react";
 import { toast } from "react-hot-toast";
 

@@ -1,6 +1,6 @@
 // app/admin/staff/page.tsx
 
-import { getStaffs } from "@/app/actions/staff"; // [FIXED Import]
+import { getStaffs } from "@/app/actions/admin/staff"; // [FIXED Import]
 import { StaffHeader } from "./_components/staff-header";
 import { StaffList } from "./_components/staff-list";
 

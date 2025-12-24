@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/variation.tsx
+
 import { ComponentProps } from "../types";
 import { toast } from "react-hot-toast";
 

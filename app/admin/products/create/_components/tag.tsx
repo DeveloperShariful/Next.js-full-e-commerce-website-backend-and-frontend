@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/tag.tsx
+
 import { useState } from "react";
 import { ComponentProps } from "../types";
 import { X } from "lucide-react";

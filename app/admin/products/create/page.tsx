@@ -1,10 +1,17 @@
+// app/admin/products/create/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
+
+// Updated Imports: Using split server action files
+import { createProduct, updateProduct } from "@/app/actions/admin/product/create-update-product";
+import { getProductById } from "@/app/actions/admin/product/product-read";
+
+// Import Types
 import { ProductFormData } from "./types";
-import { createProduct, updateProduct, getProductById } from "@/app/actions/product";
 
 // Components Imports
 import Header from "@/app/admin/products/create/_components/header";
@@ -18,6 +25,7 @@ import Variations from "@/app/admin/products/create/_components/Variations";
 import Advanced from "@/app/admin/products/create/_components/Advanced";
 import Publish from "@/app/admin/products/create/_components/Publish";
 import Categories from "@/app/admin/products/create/_components/categoris";
+import Collections from "@/app/admin/products/create/_components/Collections"; // New Component
 import Brand from "@/app/admin/products/create/_components/Brand"; 
 import Tag from "@/app/admin/products/create/_components/tag";
 import ProductImage from "@/app/admin/products/create/_components/Product_image";
@@ -33,7 +41,7 @@ export default function CreateProductPage() {
   const [fetching, setFetching] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
 
-  // Initial Form State
+  // Initial Form State (Updated with new fields for SEO, Tax, etc.)
   const [formData, setFormData] = useState<ProductFormData>({
     name: "", 
     slug: "", 
@@ -43,29 +51,51 @@ export default function CreateProductPage() {
     status: "draft",
     isVirtual: false, 
     isDownloadable: false,
+    
+    // Pricing
     price: "", 
     salePrice: "", 
     cost: "", 
+    
+    // Tax & Shipping
     taxStatus: "taxable",
+    taxRateId: "",
+    shippingClassId: "",
+
+    // Inventory
     sku: "", 
     barcode: "", 
     trackQuantity: true, 
     stock: 0,
+    
+    // Dimensions
     weight: "", 
     length: "", 
     width: "", 
     height: "",
+    
+    // Relations
     category: "", 
     vendor: "", 
     tags: [],
+    collectionIds: [], // New Field
+    
+    // Media
     featuredImage: null, 
     galleryImages: [],
+    digitalFiles: [], // New Field for downloadable products
+    
+    // Product Data
     attributes: [], 
     variations: [],
-    upsells: [],    // Added
-    crossSells: [], // Added
+    upsells: [],    
+    crossSells: [], 
+    
+    // SEO & Meta
     metaTitle: "", 
     metaDesc: "", 
+    seoCanonicalUrl: "", // New Field
+    
     purchaseNote: "", 
     menuOrder: 0, 
     enableReviews: true
@@ -81,6 +111,7 @@ export default function CreateProductPage() {
     if (productId) {
       const fetchData = async () => {
         setFetching(true);
+        // Using action from product-read.ts
         const res = await getProductById(productId);
         if (res.success && res.product) {
           const p = res.product as any;
@@ -98,6 +129,15 @@ export default function CreateProductPage() {
             price: p.price,
             salePrice: p.salePrice || "",
             cost: p.costPerItem || "",
+            
+            // Map New Fields (Tax, SEO, Collections)
+            taxStatus: p.taxStatus || "taxable",
+            taxRateId: p.taxRateId || "",
+            shippingClassId: p.shippingClassId || "",
+            seoCanonicalUrl: p.seoCanonicalUrl || "",
+            collectionIds: p.collections ? p.collections.map((c:any) => c.id) : [],
+            digitalFiles: p.downloadFiles ? p.downloadFiles.map((d:any) => ({ name: d.name, url: d.url })) : [],
+
             sku: p.sku || "",
             barcode: p.barcode || "",
             trackQuantity: p.trackQuantity,
@@ -106,22 +146,30 @@ export default function CreateProductPage() {
             length: p.length?.toString() || "",
             width: p.width?.toString() || "",
             height: p.height?.toString() || "",
+            
             category: p.category?.name || "",
             vendor: p.brand?.name || "",
             tags: p.tags ? p.tags.map((t: any) => t.name) : [],
+            
             featuredImage: p.featuredImage,
             galleryImages: p.images ? p.images.map((img: any) => img.url) : [],
+            
             metaTitle: p.metaTitle || "",
             metaDesc: p.metaDesc || "",
             purchaseNote: p.purchaseNote || "",
             menuOrder: p.menuOrder || 0,
             enableReviews: p.enableReviews,
-            // Mapping Linked Products (assuming API returns arrays of names/ids)
+            
+            // Linking Products
             upsells: p.upsellIds || [],
             crossSells: p.crossSellIds || [],
+            
+            // Attributes Mapping
             attributes: p.attributes ? p.attributes.map((a: any) => ({
               id: a.id, name: a.name, values: a.values, visible: a.visible, variation: a.variation
             })) : [],
+            
+            // Variations Mapping
             variations: p.variants ? p.variants.map((v: any) => ({
               id: v.id, name: v.name, price: v.price, stock: v.stock, sku: v.sku || "", attributes: v.attributes || {}
             })) : []
@@ -146,7 +194,7 @@ export default function CreateProductPage() {
     Object.keys(formData).forEach(key => {
         const value = formData[key as keyof ProductFormData];
         // JSON Stringify complex arrays
-        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells'].includes(key)) {
+        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles'].includes(key)) {
             submitData.append(key, JSON.stringify(value));
         } else if (value !== null && value !== undefined) {
             submitData.append(key, String(value));
@@ -154,6 +202,7 @@ export default function CreateProductPage() {
     });
 
     try {
+        // Using actions from create-update-product.ts
         const action = productId ? updateProduct : createProduct;
         const result = await action(submitData);
         if (result.success) {
@@ -180,8 +229,12 @@ export default function CreateProductPage() {
    return (
     <div className=" m-1 min-h-screen bg-[#f0f0f1] font-sans text-sm text-[#3c434a] relative">
         <Header loading={loading} onSubmit={handleSubmit} title={formData.name} isEdit={!!productId} />
+        
         <div className="w-full p-0 md:p-6 flex flex-col lg:flex-row gap-4 md:gap-5">
+            {/* LEFT COLUMN - Main Content */}
             <div className="flex-1 min-w-0 space-y-4 md:space-y-5">
+                
+                {/* Product Name & Slug */}
                 <div className="space-y-2 px-4 md:px-0 mt-4 md:mt-0">
                     <input 
                         value={formData.name} 
@@ -195,8 +248,8 @@ export default function CreateProductPage() {
                         placeholder="Product Name"
                         className="w-full px-3 py-2 border border-gray-400 text-lg rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none shadow-sm"
                     />
-                     
-                     {formData.name && (
+                      
+                      {formData.name && (
                         <div className="text-xs flex flex-wrap items-center gap-1 text-[#646970] leading-relaxed">
                             <span className="font-semibold whitespace-nowrap">Permalink:</span>
                             <span className="break-all">
@@ -208,7 +261,7 @@ export default function CreateProductPage() {
                                 className="bg-transparent border border-transparent hover:border-gray-400 px-1 rounded text-xs text-[#3c434a] font-medium focus:border-[#2271b1] outline-none min-w-[50px] max-w-full"
                             />
                         </div>
-                     )}
+                      )}
                 </div>
 
                 <Description data={formData} updateData={updateData} />
@@ -271,7 +324,10 @@ export default function CreateProductPage() {
                             {activeTab === 'general' && <General data={formData} updateData={updateData} />}
                             {activeTab === 'inventory' && <Inventory data={formData} updateData={updateData} />}
                             {activeTab === 'shipping' && <Shipping data={formData} updateData={updateData} />}
-                            {activeTab === 'attributes' && <Attributes data={formData} updateData={updateData} />}
+                            
+                            {/* Updated: Attributes now receives onSubmit for the Save button */}
+                            {activeTab === 'attributes' && <Attributes data={formData} updateData={updateData} onSubmit={handleSubmit} loading={loading} />}
+                            
                             {activeTab === 'variations' && <Variations data={formData} updateData={updateData} />}
                             {activeTab === 'advanced' && <Advanced data={formData} updateData={updateData} />}
                             {activeTab === 'linked' && <LinkedProducts data={formData} updateData={updateData} />}
@@ -286,6 +342,7 @@ export default function CreateProductPage() {
             <div className="w-full lg:w-[280px] space-y-4 md:space-y-5 shrink-0 px-4 md:px-0 pb-10 md:pb-0">
                 <Publish data={formData} updateData={updateData} loading={loading} onSubmit={handleSubmit} />
                 <Categories data={formData} updateData={updateData} />
+                <Collections data={formData} updateData={updateData} /> {/* NEW Collection Component */}
                 <ProductImage data={formData} updateData={updateData} />
                 <GalleryImages data={formData} updateData={updateData} />
                 <Brand data={formData} updateData={updateData} /> 

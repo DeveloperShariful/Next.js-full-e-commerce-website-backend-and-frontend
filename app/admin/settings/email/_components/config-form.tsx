@@ -7,8 +7,8 @@ import { EmailConfiguration } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { saveEmailConfiguration } from "@/app/actions/settings/email/email-config";
-import { sendTestEmail } from "@/app/actions/settings/email/send-test-email";
+import { saveEmailConfiguration } from "@/app/actions/admin/settings/email/email-config";
+import { sendTestEmail } from "@/app/actions/admin/settings/email/send-test-email";
 import { toast } from "sonner";
 import { Save, Loader2, Send } from "lucide-react";
 import { BrandingPreview } from "./branding-preview"; // ✅ Import Preview

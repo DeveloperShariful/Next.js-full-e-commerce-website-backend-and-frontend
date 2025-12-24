@@ -1,6 +1,6 @@
 // File Location: app/admin/orders/page.tsx
 
-import { getOrders } from "@/app/actions/order/get-orders"; 
+import { getOrders } from "@/app/actions/admin/order/get-orders"; 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -1,6 +1,8 @@
+// app/admin/products/create/_components/Brand.tsx
+
 import { useState, useEffect } from "react";
-import { ComponentProps } from "../types"; // Adjust path if needed
-import { getBrands } from "@/app/actions/product";
+import { ComponentProps } from "../types"; // Using shared type
+import { getBrands } from "@/app/actions/admin/product/product-read"; // Updated Import
 import { ChevronUp, Plus, Search } from "lucide-react";
 
 export default function Brand({ data, updateData }: ComponentProps) {
@@ -26,7 +28,6 @@ export default function Brand({ data, updateData }: ComponentProps) {
     };
 
     const handleSelect = (brandName: string) => {
-        // If clicking the same brand, deselect it
         if (data.vendor === brandName) {
             updateData('vendor', "");
         } else {
@@ -50,8 +51,6 @@ export default function Brand({ data, updateData }: ComponentProps) {
                 <ChevronUp size={14} />
             </div>
             <div className="p-3">
-                
-                {/* Search / Add Input */}
                 <div className="mb-2 relative">
                     <input 
                         value={input}
@@ -63,7 +62,6 @@ export default function Brand({ data, updateData }: ComponentProps) {
                     <Search size={12} className="absolute left-2 top-2 text-gray-400"/>
                 </div>
 
-                {/* Brand List */}
                 <div className="max-h-[150px] overflow-y-auto border border-gray-200 p-2 bg-gray-50 mb-2 rounded-sm custom-scrollbar">
                     {filteredBrands.length > 0 ? (
                         filteredBrands.map(brand => (
@@ -82,7 +80,6 @@ export default function Brand({ data, updateData }: ComponentProps) {
                     )}
                 </div>
 
-                {/* Add New Button Logic */}
                 {input && !filteredBrands.some(b => b.name.toLowerCase() === input.toLowerCase()) && (
                     <button 
                         type="button" 

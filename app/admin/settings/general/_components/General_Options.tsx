@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { HelpCircle, X, Check, Star, User } from "lucide-react";
-import { getAllCountries } from "@/app/actions/settings/general/location-helpers";
+import { getAllCountries } from "@/app/actions/admin/settings/general/location-helpers";
 import { GeneralSettingsData } from "../page";
 
 interface Props {

@@ -5,7 +5,7 @@ import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { CodSchema } from "@/app/admin/settings/payments/schemas"
-import { updateCodSettings } from "@/app/actions/settings/payments/cod"
+import { updateCodSettings } from "@/app/actions/admin/settings/payments/cod"
 import { z } from "zod"
 import { toast } from "sonner"
 

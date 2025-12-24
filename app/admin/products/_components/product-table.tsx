@@ -1,3 +1,5 @@
+// app/admin/products/_components/product-table.tsx
+
 "use client";
 
 import { useState, useTransition } from "react";
@@ -6,7 +8,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Search, Image as ImageIcon, Star
 } from "lucide-react";
-import { bulkProductAction, moveToTrash, duplicateProduct } from "@/app/actions/product"; 
+// Updated Imports from new separated file
+import { bulkProductAction, moveToTrash } from "@/app/actions/admin/product/product-list"; 
+import { duplicateProduct } from "@/app/actions/admin/product/duplicate-product"; 
 import { toast } from "react-hot-toast";
 
 interface ProductTableProps {

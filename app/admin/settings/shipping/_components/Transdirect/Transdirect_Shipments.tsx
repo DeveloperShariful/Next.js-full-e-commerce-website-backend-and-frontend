@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getTransdirectBookings } from "@/app/actions/settings/shipping/transdirect-orders";
+import { getTransdirectBookings } from "@/app/actions/admin/settings/shipping/transdirect-orders";
 import { Loader2, RefreshCw, ExternalLink, Package, AlertCircle, Clock, CheckCircle, Truck, XCircle, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
 export default function Transdirect_Shipments() {

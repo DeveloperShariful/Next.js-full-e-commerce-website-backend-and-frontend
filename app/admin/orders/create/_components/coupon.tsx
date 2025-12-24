@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { validateDiscount } from "@/app/actions/create_order/validate-discount";
+import { validateDiscount } from "@/app/actions/admin/create_order/validate-discount";
 import { toast } from "sonner";
 import { Tag } from "lucide-react";
 

@@ -3,8 +3,8 @@
 
 import { useState } from "react"
 import { Paypal_Webhook_Status_Card } from "./Components/Paypal_Webhook_Status_Card"
-import { refreshPaypalWebhook } from "@/app/actions/settings/payments/paypal/refresh-webhooks"
-import { deletePaypalWebhook } from "@/app/actions/settings/payments/paypal/delete-webhook" // 👈 New Import
+import { refreshPaypalWebhook } from "@/app/actions/admin/settings/payments/paypal/refresh-webhooks"
+import { deletePaypalWebhook } from "@/app/actions/admin/settings/payments/paypal/delete-webhook" // 👈 New Import
 import { PaypalConfigType } from "@/app/admin/settings/payments/types"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"

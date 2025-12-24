@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import useCart from "@/hooks/use-cart";
+import useCart from "@/app/actions/storeFont/use-cart";
 // [FIXED] 'placeOrder' এর বদলে 'processCheckout' হবে
-import { processCheckout } from "@/app/actions/checkout"; 
+import { processCheckout } from "@/app/actions/storeFont/checkout"; 
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Loader2, Lock, Truck, CreditCard, CheckCircle2 } from "lucide-react";

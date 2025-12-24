@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Save, X } from "lucide-react";
 
-import { createManualOrder } from "@/app/actions/create_order/create-manual-order";
+import { createManualOrder } from "@/app/actions/admin/create_order/create-manual-order";
 import { ProductSearch } from "./_components/product-search";
 import { CartItemsTable } from "./_components/cart-items-table";
 import { CustomerSelector } from "./_components/customer-selector";

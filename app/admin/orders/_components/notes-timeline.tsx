@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Clock, MessageSquare, Send, Mail } from "lucide-react"; 
-import { addOrderNote } from "@/app/actions/order/add-note"; 
+import { addOrderNote } from "@/app/actions/admin/order/add-note"; 
 import { useState } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";

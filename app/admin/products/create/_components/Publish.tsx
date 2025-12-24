@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/publish.tsx
+
 import { ComponentProps } from "../types";
 import { ChevronUp, Calendar } from "lucide-react";
 

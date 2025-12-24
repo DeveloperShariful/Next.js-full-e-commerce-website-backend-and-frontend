@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getGeneralSettings, updateGeneralSettings } from "@/app/actions/settings/general/general";
+import { getGeneralSettings, updateGeneralSettings } from "@/app/actions/admin/settings/general/general";
 import { toast } from "react-hot-toast";
 import { Loader2, Save, Store, Globe, Share2 } from "lucide-react";
 

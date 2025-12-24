@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/LinkedProduct.tsx
+
 import { useState } from "react";
 import { ComponentProps } from "../types";
 import { X, Search } from "lucide-react";

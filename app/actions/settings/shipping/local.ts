@@ -1,4 +1,4 @@
-// File: app/actions/settings/shipping.ts
+// File: app/actions/settings/shipping/local.ts
 
 "use server";
 
@@ -30,13 +30,11 @@ export async function getShippingData() {
 
     const config = settings?.generalConfig as any || {};
 
-    // Prepare options object with explicit defaults for filtering logic
     const options = {
         enableShippingCalc: config.enableShippingCalc ?? true,
         hideShippingCosts: config.hideShippingCosts ?? false,
         shippingDestination: config.shippingDestination ?? 'billing',
         
-        // Critical for UI Filtering
         sellingLocation: config.sellingLocation || 'all',
         sellingCountries: config.sellingCountries || [],
         shippingLocation: config.shippingLocation || 'all',
@@ -97,9 +95,11 @@ export async function addShippingRate(formData: FormData) {
     const minWeight = formData.get("minWeight") ? parseFloat(formData.get("minWeight") as string) : null;
     const maxWeight = formData.get("maxWeight") ? parseFloat(formData.get("maxWeight") as string) : null;
 
-    // New Fields
     const taxStatus = (formData.get("taxStatus") as string) || "taxable";
     const freeShippingRequirement = formData.get("freeShippingRequirement") as string || null;
+
+    // ✅ NEW: Receive Carrier ID
+    const carrierServiceId = formData.get("carrierServiceId") as string || null;
 
     await db.shippingRate.create({
       data: {
@@ -110,8 +110,9 @@ export async function addShippingRate(formData: FormData) {
         minPrice,
         minWeight,
         maxWeight,
-        taxStatus,              // Saved
-        freeShippingRequirement // Saved
+        taxStatus,              
+        freeShippingRequirement,
+        carrierServiceId // ✅ Save to DB
       }
     });
 
@@ -120,6 +121,42 @@ export async function addShippingRate(formData: FormData) {
   } catch (error) {
     console.error("ADD_RATE_ERROR", error);
     return { success: false, error: "Failed to add rate" };
+  }
+}
+
+export async function updateShippingRate(formData: FormData) {
+  try {
+    const id = formData.get("id") as string;
+    const name = formData.get("name") as string;
+    const price = parseFloat(formData.get("price") as string) || 0;
+    
+    const minPrice = formData.get("minPrice") ? parseFloat(formData.get("minPrice") as string) : null;
+    const minWeight = formData.get("minWeight") ? parseFloat(formData.get("minWeight") as string) : null;
+    const maxWeight = formData.get("maxWeight") ? parseFloat(formData.get("maxWeight") as string) : null;
+    
+    const taxStatus = (formData.get("taxStatus") as string) || "taxable";
+    const freeShippingRequirement = formData.get("freeShippingRequirement") as string || null;
+
+    // We typically don't update carrierServiceId once created, but logic can be added here if needed
+    
+    await db.shippingRate.update({
+      where: { id },
+      data: {
+        name,
+        price,
+        minPrice,
+        minWeight,
+        maxWeight,
+        taxStatus,
+        freeShippingRequirement
+      }
+    });
+
+    revalidatePath("/admin/settings/shipping");
+    return { success: true, message: "Rate updated successfully" };
+  } catch (error) {
+    console.error("UPDATE_RATE_ERROR", error);
+    return { success: false, error: "Failed to update rate" };
   }
 }
 
@@ -187,40 +224,5 @@ export async function updateShippingOptions(formData: FormData) {
     return { success: true, message: "Shipping options saved" };
   } catch (error) {
     return { success: false, error: "Failed to save options" };
-  }
-}
-//edit
-export async function updateShippingRate(formData: FormData) {
-  try {
-    const id = formData.get("id") as string;
-    const name = formData.get("name") as string;
-    const price = parseFloat(formData.get("price") as string) || 0;
-    
-    // Optional fields
-    const minPrice = formData.get("minPrice") ? parseFloat(formData.get("minPrice") as string) : null;
-    const minWeight = formData.get("minWeight") ? parseFloat(formData.get("minWeight") as string) : null;
-    const maxWeight = formData.get("maxWeight") ? parseFloat(formData.get("maxWeight") as string) : null;
-    
-    const taxStatus = (formData.get("taxStatus") as string) || "taxable";
-    const freeShippingRequirement = formData.get("freeShippingRequirement") as string || null;
-
-    await db.shippingRate.update({
-      where: { id },
-      data: {
-        name,
-        price,
-        minPrice,
-        minWeight,
-        maxWeight,
-        taxStatus,
-        freeShippingRequirement
-      }
-    });
-
-    revalidatePath("/admin/settings/shipping");
-    return { success: true, message: "Rate updated successfully" };
-  } catch (error) {
-    console.error("UPDATE_RATE_ERROR", error);
-    return { success: false, error: "Failed to update rate" };
   }
 }

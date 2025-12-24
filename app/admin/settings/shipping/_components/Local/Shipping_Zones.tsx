@@ -1,33 +1,36 @@
-// File: app/admin/settings/shipping/_components/Shipping_Zones.tsx
+// File: app/admin/settings/shipping/_components/Local/Shipping_Zones.tsx
 
 "use client";
 
 import { useState, useMemo } from "react";
-import { createShippingZone, deleteShippingZone } from "@/app/actions/settings/shipping";
-import { ComponentProps, ShippingZone } from "../types";
+import { createShippingZone, deleteShippingZone } from "@/app/actions/settings/shipping/local";
+import { ComponentProps, ShippingZone } from "../../types";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { getCountryAndStatesList } from "@/lib/location-helpers"; // ✅ Import updated helper
+import { getCountryAndStatesList } from "@/app/actions/settings/general/location-helpers"; 
 import Shipping_Method from "./Shipping_Method";
+import { TransdirectConfig, CarrierService } from "@prisma/client";
 
-export default function Shipping_Zones({ zones, options, refreshData }: ComponentProps) {
+// ✅ Update Interface
+interface Props extends ComponentProps {
+    transdirectConfig: TransdirectConfig | null;
+    carriers: CarrierService[];
+}
+
+export default function Shipping_Zones({ zones, options, refreshData, transdirectConfig, carriers }: Props) {
     const [view, setView] = useState<'list' | 'manage'>('list');
     const [selectedZone, setSelectedZone] = useState<ShippingZone | null>(null);
     const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
 
-    // ✅ UPDATED: Filter Countries AND States based on General Settings
     const availableRegions = useMemo(() => {
         let allowedCountries: string[] = [];
 
-        // 1. Determine which countries are allowed based on settings
         if (options.shippingLocation === 'specific' && options.shippingCountries.length > 0) {
             allowedCountries = options.shippingCountries;
         } else if (options.shippingLocation === 'all_selling' && options.sellingLocation === 'specific' && options.sellingCountries.length > 0) {
             allowedCountries = options.sellingCountries;
         }
 
-        // 2. Generate list with States using the new helper
-        // If allowedCountries is empty array [], it fetches ALL countries + states
         return getCountryAndStatesList(allowedCountries);
 
     }, [options]);
@@ -53,7 +56,7 @@ export default function Shipping_Zones({ zones, options, refreshData }: Componen
         }
     };
 
-    // If viewing a single zone, render the Method Component
+    // View: Manage Rates
     if (view === 'manage' && selectedZone) {
         const zoneData = zones.find(z => z.id === selectedZone.id) || selectedZone;
         return (
@@ -61,11 +64,14 @@ export default function Shipping_Zones({ zones, options, refreshData }: Componen
                 zone={zoneData} 
                 onBack={() => setView('list')} 
                 refreshData={refreshData} 
+                // ✅ Pass the new props here
+                transdirectConfig={transdirectConfig}
+                carriers={carriers}
             />
         );
     }
 
-    // Default: List View
+    // View: List Zones
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-sm border border-slate-200 shadow-sm">
@@ -95,10 +101,8 @@ export default function Shipping_Zones({ zones, options, refreshData }: Componen
                                     {zone.name}
                                 </td>
                                 <td className="p-4 text-slate-600">
-                                    {/* Display cleaner region names */}
                                     {zone.countries.length > 0 
                                         ? <span className="line-clamp-2" title={zone.countries.join(", ")}>
-                                            {/* We just show raw codes here for now, or you can map them back to labels if needed */}
                                             {zone.countries.join(", ")}
                                           </span>
                                         : <span className="text-slate-400 italic">Everywhere else</span>
@@ -138,7 +142,6 @@ export default function Shipping_Zones({ zones, options, refreshData }: Componen
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Zone Region</label>
                                 <select name="countries" className="w-full border p-2 rounded outline-none focus:border-[#2271b1] bg-white text-sm h-64" multiple>
-                                    {/* ✅ Render availableRegions (Countries + States) */}
                                     {availableRegions.map(region => (
                                         <option key={region.value} value={JSON.stringify([region.value])}>
                                             {region.label}

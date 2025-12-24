@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { 
   Store, 
@@ -6,7 +7,8 @@ import {
   ChevronRight,
   Settings,
   ShieldCheck,
-  Globe
+  Globe,
+  Mail // ✅ NEW ICON IMPORT
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -35,6 +37,15 @@ export default function SettingsDashboard() {
       href: "/admin/settings/payments",
       color: "text-green-600",
       bgColor: "bg-green-50",
+    },
+    // ✅ NEW EMAIL MODULE ADDED HERE
+    {
+      title: "Email & Notifications",
+      description: "Configure SMTP, customize email templates, and view logs.",
+      icon: Mail,
+      href: "/admin/settings/email",
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
     },
   ];
 

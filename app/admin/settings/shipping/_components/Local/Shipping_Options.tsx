@@ -1,10 +1,10 @@
-// File: app/admin/settings/shipping/_components/Shipping_Options.tsx
+
 
 "use client";
 
 import { useState } from "react";
-import { updateShippingOptions } from "@/app/actions/settings/shipping";
-import { ComponentProps } from "../types";
+import { updateShippingOptions } from "@/app/actions/settings/shipping/local";
+import { ComponentProps } from "../../types";
 import { Loader2, Save, HelpCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 

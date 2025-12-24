@@ -1,10 +1,10 @@
-// File: app/admin/settings/shipping/_components/Shipping_Classes.tsx
+
 
 "use client";
 
 import { useState } from "react";
-import { createShippingClass, deleteShippingClass } from "@/app/actions/settings/shipping";
-import { ComponentProps } from "../types";
+import { createShippingClass, deleteShippingClass } from "@/app/actions/settings/shipping/local";
+import { ComponentProps } from "../../types";
 import { Plus, Trash2, Package, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 

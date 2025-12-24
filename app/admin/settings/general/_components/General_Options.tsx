@@ -1,13 +1,19 @@
-// app/admin/settings/general/_components/General_options.tsx
-import { useState, useRef, useEffect } from "react";
-import { ComponentProps } from "../types";
-import { HelpCircle, X, Check } from "lucide-react";
-import { getAllCountries } from "@/lib/location-helpers";
+// File: app/admin/settings/general/_components/General_Options.tsx
 
-export default function General_Options({ data, updateNestedData }: ComponentProps) {
+import { useState, useRef, useEffect } from "react";
+import { HelpCircle, X, Check, Star, User } from "lucide-react";
+import { getAllCountries } from "@/app/actions/settings/general/location-helpers";
+import { GeneralSettingsData } from "../page";
+
+interface Props {
+    data: GeneralSettingsData;
+    updateNestedData: (section: keyof GeneralSettingsData | 'maintenance', field: string, value: any) => void;
+}
+
+export default function General_Options({ data, updateNestedData }: Props) {
     const allCountries = getAllCountries();
     
-    // --- MULTI SELECT LOGIC START ---
+    // --- MULTI SELECT STATE ---
     const [searchSell, setSearchSell] = useState("");
     const [searchShip, setSearchShip] = useState("");
     const [sellDropdownOpen, setSellDropdownOpen] = useState(false);
@@ -16,7 +22,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
     const sellWrapperRef = useRef<HTMLDivElement>(null);
     const shipWrapperRef = useRef<HTMLDivElement>(null);
 
-    // Click outside to close dropdowns
+    // Click outside handler to close dropdowns
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (sellWrapperRef.current && !sellWrapperRef.current.contains(event.target as Node)) {
@@ -30,7 +36,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Helper to toggle country selection
+    // Toggle logic for multi-select countries
     const toggleCountry = (type: 'selling' | 'shipping', code: string) => {
         const currentList = type === 'selling' ? data.generalConfig.sellingCountries : data.generalConfig.shippingCountries;
         let newList;
@@ -47,22 +53,13 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
         toggleCountry(type, code);
     };
 
-    const handleSelectAll = (type: 'selling' | 'shipping') => {
-        updateNestedData('generalConfig', type === 'selling' ? 'sellingCountries' : 'shippingCountries', allCountries.map(c => c.value));
-    };
-
-    const handleSelectNone = (type: 'selling' | 'shipping') => {
-        updateNestedData('generalConfig', type === 'selling' ? 'sellingCountries' : 'shippingCountries', []);
-    };
-    // --- MULTI SELECT LOGIC END ---
-
     return (
         <div className="bg-white p-6 rounded-sm border border-gray-300 shadow-sm mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-6">General options</h3>
             
             <div className="space-y-6 max-w-3xl">
                 
-                {/* Selling Locations */}
+                {/* ======================= 1. SELLING LOCATIONS ======================= */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label className="text-xs font-bold text-gray-700 flex items-center gap-1">
                         Selling location(s) <HelpCircle size={12} className="text-gray-400"/>
@@ -71,7 +68,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                         <select 
                             value={data.generalConfig.sellingLocation}
                             onChange={(e) => updateNestedData('generalConfig', 'sellingLocation', e.target.value)}
-                            className="w-full border border-gray-300 px-3 py-2 rounded-sm focus:border-[#2271b1] outline-none text-sm shadow-sm bg-white"
+                            className="w-full border border-gray-300 px-3 py-2 rounded-sm focus:border-[#2271b1] outline-none text-sm bg-white"
                         >
                             <option value="all">Sell to all countries</option>
                             <option value="all_except">Sell to all countries, except for...</option>
@@ -80,7 +77,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                     </div>
                 </div>
 
-                {/* Selling Countries Multi-Select */}
+                {/* Selling Countries Multi-Select (Shows only if specific/except selected) */}
                 {(data.generalConfig.sellingLocation === 'specific' || data.generalConfig.sellingLocation === 'all_except') && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                         <label className="text-xs font-bold text-gray-700 pt-2">
@@ -108,12 +105,6 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                                 />
                             </div>
                             
-                            {/* Actions */}
-                            <div className="flex gap-2 mt-1 text-xs">
-                                <button type="button" onClick={() => handleSelectAll('selling')} className="text-[#2271b1] hover:underline">Select all</button>
-                                <button type="button" onClick={() => handleSelectNone('selling')} className="text-[#2271b1] hover:underline">Select none</button>
-                            </div>
-
                             {/* Dropdown List */}
                             {sellDropdownOpen && (
                                 <div className="absolute z-50 top-full left-0 w-full bg-white border border-gray-300 mt-1 max-h-60 overflow-y-auto shadow-lg rounded-sm">
@@ -136,7 +127,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                     </div>
                 )}
 
-                {/* Shipping Locations */}
+                {/* ======================= 2. SHIPPING LOCATIONS ======================= */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label className="text-xs font-bold text-gray-700 flex items-center gap-1">
                         Shipping location(s) <HelpCircle size={12} className="text-gray-400"/>
@@ -145,7 +136,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                         <select 
                             value={data.generalConfig.shippingLocation}
                             onChange={(e) => updateNestedData('generalConfig', 'shippingLocation', e.target.value)}
-                            className="w-full border border-gray-300 px-3 py-2 rounded-sm focus:border-[#2271b1] outline-none text-sm shadow-sm bg-white"
+                            className="w-full border border-gray-300 px-3 py-2 rounded-sm focus:border-[#2271b1] outline-none text-sm bg-white"
                         >
                             <option value="all_selling">Ship to all countries you sell to</option>
                             <option value="all">Ship to all countries</option>
@@ -155,7 +146,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                     </div>
                 </div>
 
-                {/* Shipping Countries Multi-Select */}
+                {/* Shipping Countries Multi-Select (Shows only if specific selected) */}
                 {data.generalConfig.shippingLocation === 'specific' && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                         <label className="text-xs font-bold text-gray-700 pt-2">Ship to specific countries</label>
@@ -181,11 +172,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                                 />
                             </div>
                             
-                            <div className="flex gap-2 mt-1 text-xs">
-                                <button type="button" onClick={() => handleSelectAll('shipping')} className="text-[#2271b1] hover:underline">Select all</button>
-                                <button type="button" onClick={() => handleSelectNone('shipping')} className="text-[#2271b1] hover:underline">Select none</button>
-                            </div>
-
+                            {/* Dropdown List */}
                             {shipDropdownOpen && (
                                 <div className="absolute z-50 top-full left-0 w-full bg-white border border-gray-300 mt-1 max-h-60 overflow-y-auto shadow-lg rounded-sm">
                                     {allCountries.filter(c => c.label.toLowerCase().includes(searchShip.toLowerCase())).map(c => (
@@ -204,7 +191,7 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                     </div>
                 )}
 
-                {/* Default Customer Location */}
+                {/* ======================= 3. DEFAULT CUSTOMER LOCATION ======================= */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label className="text-xs font-bold text-gray-700 flex items-center gap-1">
                         Default customer location <HelpCircle size={12} className="text-gray-400"/>
@@ -213,13 +200,52 @@ export default function General_Options({ data, updateNestedData }: ComponentPro
                         <select 
                             value={data.generalConfig.defaultCustomerLocation}
                             onChange={(e) => updateNestedData('generalConfig', 'defaultCustomerLocation', e.target.value)}
-                            className="w-full border border-gray-300 px-3 py-2 rounded-sm focus:border-[#2271b1] outline-none text-sm shadow-sm bg-white"
+                            className="w-full border border-gray-300 px-3 py-2 rounded-sm focus:border-[#2271b1] outline-none text-sm bg-white"
                         >
                             <option value="no_address">No location by default</option>
                             <option value="shop_base">Shop country/region</option>
                             <option value="geoip">Geolocate</option>
                             <option value="geoip_address">Geolocate (with page caching support)</option>
                         </select>
+                    </div>
+                </div>
+
+                <hr className="border-gray-200 my-4"/>
+
+                {/* ======================= 4. REVIEWS & CHECKOUT ======================= */}
+                <h4 className="text-sm font-bold text-gray-800 mb-3">Reviews & Checkout</h4>
+                
+                {/* Enable Reviews */}
+                <div className="flex items-start gap-3">
+                    <input 
+                        type="checkbox" 
+                        id="enable_reviews"
+                        checked={data.generalConfig.enableReviews} 
+                        onChange={(e) => updateNestedData('generalConfig', 'enableReviews', e.target.checked)} 
+                        className="mt-0.5 w-4 h-4 text-[#2271b1] rounded border-gray-300 focus:ring-[#2271b1]"
+                    />
+                    <div>
+                        <label htmlFor="enable_reviews" className="block text-sm text-gray-700 select-none cursor-pointer flex items-center gap-1">
+                            Enable product reviews <Star size={12} className="text-gray-400"/>
+                        </label>
+                        <p className="text-xs text-gray-500 mt-0.5">Allow customers to leave reviews on products.</p>
+                    </div>
+                </div>
+
+                {/* Enable Guest Checkout */}
+                <div className="flex items-start gap-3 mt-4">
+                    <input 
+                        type="checkbox" 
+                        id="enable_guest_checkout"
+                        checked={data.generalConfig.enableGuestCheckout} 
+                        onChange={(e) => updateNestedData('generalConfig', 'enableGuestCheckout', e.target.checked)} 
+                        className="mt-0.5 w-4 h-4 text-[#2271b1] rounded border-gray-300 focus:ring-[#2271b1]"
+                    />
+                    <div>
+                        <label htmlFor="enable_guest_checkout" className="block text-sm text-gray-700 select-none cursor-pointer flex items-center gap-1">
+                            Enable guest checkout <User size={12} className="text-gray-400"/>
+                        </label>
+                        <p className="text-xs text-gray-500 mt-0.5">Allow customers to place orders without an account.</p>
                     </div>
                 </div>
 

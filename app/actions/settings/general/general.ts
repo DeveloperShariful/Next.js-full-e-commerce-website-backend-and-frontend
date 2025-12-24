@@ -1,8 +1,21 @@
-// File: app/actions/settings/general.ts
+// File: app/actions/settings/general/general.ts
+
 "use server";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+
+// Helper to extract symbol from code (e.g., USD -> $)
+// আমরা এখানে Intl ব্যবহার করছি যাতে তোমার helper ফাইলের লজিকের সাথে মিল থাকে
+const getSymbolFromCode = (currencyCode: string) => {
+  try {
+    const parts = new Intl.NumberFormat('en', { style: 'currency', currency: currencyCode }).formatToParts(1);
+    const symbol = parts.find(part => part.type === 'currency')?.value;
+    return symbol || currencyCode;
+  } catch (e) {
+    return "";
+  }
+};
 
 export async function getGeneralSettings() {
   try {
@@ -17,7 +30,7 @@ export async function getGeneralSettings() {
 
 export async function updateGeneralSettings(formData: FormData) {
   try {
-    // 1. Basic Info
+    // 1. Basic Info (Including Store Email for Admin Notifications)
     const storeName = formData.get("storeName") as string;
     const storeEmail = formData.get("storeEmail") as string;
     const storePhone = formData.get("storePhone") as string;
@@ -32,13 +45,17 @@ export async function updateGeneralSettings(formData: FormData) {
     };
 
     // 3. Currency Options
+    const currencyCode = formData.get("curr_currency") as string;
     const currencyOptions = {
-        currency: formData.get("curr_currency"),
+        currency: currencyCode,
         currencyPosition: formData.get("curr_position"),
         thousandSeparator: formData.get("curr_thousand"),
         decimalSeparator: formData.get("curr_decimal"),
         numDecimals: parseInt(formData.get("curr_decimals") as string) || 2,
     };
+
+    // ✅ FIX: Currency Symbol Generated Automatically from Code
+    const currencySymbol = getSymbolFromCode(currencyCode);
 
     // 4. Configs
     const taxSettings = {
@@ -46,39 +63,53 @@ export async function updateGeneralSettings(formData: FormData) {
       pricesIncludeTax: formData.get("prices_include_tax") === "true",
     };
 
-    // ✅ FIX: Parse JSON arrays correctly safely
+    // JSON Parsing
     let sellingCountries = [];
     let shippingCountries = [];
-    
     try {
         const sellRaw = formData.get("conf_selling_countries") as string;
         const shipRaw = formData.get("conf_shipping_countries") as string;
         sellingCountries = sellRaw ? JSON.parse(sellRaw) : [];
         shippingCountries = shipRaw ? JSON.parse(shipRaw) : [];
-    } catch (e) {
-        console.error("JSON Parse Error", e);
-    }
+    } catch (e) { console.error("JSON Parse Error", e); }
 
     const generalConfig = {
       sellingLocation: formData.get("conf_selling_location"),
-      sellingCountries: sellingCountries, // Saved as Array
+      sellingCountries: sellingCountries,
       shippingLocation: formData.get("conf_shipping_location"),
-      shippingCountries: shippingCountries, // Saved as Array
+      shippingCountries: shippingCountries,
       defaultCustomerLocation: formData.get("conf_customer_location"),
       enableCoupons: formData.get("enable_coupons") === "true",
       calcCouponsSequentially: formData.get("calc_coupons_seq") === "true",
-      currencyOptions: currencyOptions // Save currency inside config too
+      enableReviews: formData.get("enable_reviews") === "true",
+      enableGuestCheckout: formData.get("enable_guest_checkout") === "true",
+      currencyOptions: currencyOptions 
     };
 
-    const currency = currencyOptions.currency as string;
-    const currencySymbol = ""; 
+    // ✅ 5. NEW FIELDS (Schema Compliance)
+    const weightUnit = formData.get("weightUnit") as string || "kg";
+    const dimensionUnit = formData.get("dimensionUnit") as string || "cm";
+    const maintenance = formData.get("maintenance") === "true";
 
-    // ✅ FIX: Single DB Call using UPSERT
+    const socialLinks = {
+        facebook: formData.get("social_facebook"),
+        instagram: formData.get("social_instagram"),
+        twitter: formData.get("social_twitter"),
+        youtube: formData.get("social_youtube"),
+        linkedin: formData.get("social_linkedin"),
+    };
+
+    // Database Update
     await db.storeSettings.upsert({
       where: { id: "settings" },
       update: {
         storeName, storeEmail, storePhone,
-        currency, currencySymbol,
+        currency: currencyCode, 
+        currencySymbol, // Symbol saved here
+        weightUnit, 
+        dimensionUnit,
+        maintenance,
+        socialLinks: socialLinks as any,
         storeAddress: storeAddress as any,
         taxSettings: taxSettings as any,
         generalConfig: generalConfig as any,
@@ -86,7 +117,12 @@ export async function updateGeneralSettings(formData: FormData) {
       create: {
         id: "settings",
         storeName, storeEmail, storePhone,
-        currency, currencySymbol,
+        currency: currencyCode, 
+        currencySymbol,
+        weightUnit, 
+        dimensionUnit,
+        maintenance,
+        socialLinks: socialLinks as any,
         storeAddress: storeAddress as any,
         taxSettings: taxSettings as any,
         generalConfig: generalConfig as any,

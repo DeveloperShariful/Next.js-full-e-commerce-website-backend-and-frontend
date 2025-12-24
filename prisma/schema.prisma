@@ -314,7 +314,12 @@ model Address {
   postcode     String
   country      String      
   phone        String
-  email        String?     
+  email        String?
+  
+  locationType String?    
+  transdirectLocationId String?
+  isResidential Boolean    @default(true)
+
   isDefault    Boolean     @default(false)
   taxZoneId    String?     
   isVerified   Boolean     @default(false) 
@@ -510,6 +515,11 @@ model Product {
   downloadFiles    DigitalFile[]
   downloadLimit    Int?          
   downloadExpiry   Int?          
+  
+  isDangerousGood    Boolean     @default(false)
+  dangerousGoodType  String?
+  hsCode             String?
+  countryOfManufacture String?
 
   bundleItems      BundleItem[]  @relation("BundleParent") 
   partOfBundles    BundleItem[]  @relation("BundleChild")  
@@ -794,6 +804,8 @@ model Order {
   taxTotal          Float             @default(0)
   surcharge         Float             @default(0)       
   total             Float             
+  paymentFee        Float             @default(0)
+  netAmount         Float             @default(0)
 
   refundedAmount    Float             @default(0)
   netTotal          Float             @default(0)       
@@ -824,8 +836,31 @@ model Order {
   pickupLocationId  String?
   pickupLocation    PickupLocation?   @relation(fields: [pickupLocationId], references: [id])
 
-  customerNote      String?
-  adminNote         String?
+  transdirectBookingId Int?
+  transdirectOrderStatus String?
+  transdirectQuoteId     String?
+  transdirectBookingRef  String?
+  
+  authorityToLeave     Boolean  @default(false)
+  tailgatePickup       Boolean  @default(false)
+  tailgateDelivery     Boolean  @default(false)
+  declaredValue        Float?
+  isInsured            Boolean  @default(false)
+  
+  selectedCourierCode  String?  
+  selectedCourierService String?
+  quoteTier            Int?     @default(1)
+  pickupDate           DateTime?
+  pickupReadyTime      String?
+  pickupCloseTime      String?
+  
+  transdirectLabelUrl  String?
+  transdirectInvoiceUrl String?
+
+  customerNote         String?
+  adminNote            String?
+  deliveryInstructions String?
+  estimatedTransitTime String?
 
   ipAddress         String?
   userAgent         String?
@@ -970,6 +1005,17 @@ model Shipment {
   items           Json     
   shippedDate     DateTime @default(now())
   deliveredDate   DateTime?
+
+  transdirectId      Int?     
+  connote            String?  
+  labelUrl           String?  
+  invoiceUrl         String?  
+  courierName        String?  
+  lastTrackingStatus String?
+  
+  courierJobId       String?
+  manifestId         String?
+  numberOfParcels    Int      @default(1)
 
   syncedToGateway Boolean  @default(false)
   syncError       String?
@@ -1299,7 +1345,7 @@ model StoreSettings {
 }
 
 // ==========================================
-// 12. TAX AREA
+// 12. TAX, SHIPPING & TRANSDIRECT
 // ==========================================
 
 model TaxRate {
@@ -1358,23 +1404,122 @@ model CarrierService {
   isSandbox   Boolean  @default(true) 
   settings    Json?    
   rates       ShippingRate[] 
+  
+  shippingPackages ShippingBox[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model TransdirectConfig {
+  id              String   @id @default("transdirect_config") 
+  isEnabled       Boolean  @default(false)
+  
+  email           String?  
+  password        String?  
+  apiKey          String?  
+
+  memberId        Int?     
+  creditLimit     Float?   
+  accountStatus   String?  
+
+  senderName      String?
+  senderCompany   String?
+  senderPhone     String?
+  senderAddress   String?
+  senderSuburb    String?
+  senderPostcode  String?
+  senderState     String?
+  senderCountry   String?  @default("AU")
+  senderType      String   @default("business") 
+
+  defaultTailgatePickup   Boolean @default(false) 
+  defaultTailgateDelivery Boolean @default(false) 
+  defaultDeclaredValue    Boolean @default(true) 
+  
+  defaultPickupReadyTime  String  @default("09:00")
+  defaultPickupCloseTime  String  @default("17:00")
+
+  useFrequentRates        Boolean @default(false) 
+  enableOrderBoxing       Boolean @default(false) 
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model TransdirectBox {
+  id          String   @id @default(uuid())
+  code        String?  
+  description String?  
+  length      Float    
+  width       Float    
+  height      Float    
+  maxWeight   Float?   
+  
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ShippingBox {
+  id          String   @id @default(uuid())
+  name        String   
+  
+  length      Float    
+  width       Float    
+  height      Float    
+  weight      Float?   
+  maxWeight   Float?   
+  
+  isEnabled   Boolean  @default(true)
+
+  carrierServiceId String?
+  carrierService   CarrierService? @relation(fields: [carrierServiceId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // ==========================================
-// 13. EMAIL & NOTIFICATION SYSTEM
+// 13. EMAIL & NOTIFICATION SYSTEM (UPDATED)
 // ==========================================
+
+model EmailConfiguration {
+  id             String   @id @default("email_config")
+  senderName     String   @default("GoBike")
+  senderEmail    String   @default("gobike@gobike.au") 
+  smtpHost       String?  
+  smtpPort       Int?     @default(587)
+  smtpUser       String? 
+  smtpPassword   String?  
+  encryption     String?  @default("tls") 
+  headerImage    String?  
+  footerText     String?  @default("© 2025 GoBike. All rights reserved.")
+  baseColor      String?  @default("#2271b1") 
+  backgroundColor String? @default("#F7F7F7") 
+  bodyBackgroundColor String? @default("#FFFFFF") 
+  
+  isActive       Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
+}
 
 model EmailTemplate {
   id          String   @id @default(uuid())
   slug        String   @unique 
+  triggerEvent String? @unique 
   name        String   
   subject     String   
   heading     String?  
   content     String   @db.Text 
   isEnabled   Boolean  @default(true)
-  recipients  String?  
+  
+  recipientType String @default("customer")
+  customRecipients String?
+  cc          String[] 
+  bcc         String[]
+  
+  attachments String[] 
 
   emailType   String   @default("html") 
   fromName    String?
@@ -1382,6 +1527,25 @@ model EmailTemplate {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model EmailLog {
+  id          String   @id @default(uuid())
+  recipient   String   
+  subject     String   
+  templateSlug String? 
+  status      String   
+  errorMessage String? 
+  metadata    Json?
+  
+  openedAt    DateTime? 
+  
+  orderId     String?  
+  userId      String?  
+
+  createdAt   DateTime @default(now())
+  @@index([recipient])
+  @@index([status])
 }
 
 model ActivityLog {

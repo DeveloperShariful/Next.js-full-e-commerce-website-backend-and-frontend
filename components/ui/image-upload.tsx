@@ -1,8 +1,10 @@
+// components/ui/image-upload.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { CldUploadWidget } from "next-cloudinary";
-import { ImagePlus, Trash, X } from "lucide-react";
+import { ImagePlus, X } from "lucide-react";
 import Image from "next/image";
 
 interface ImageUploadProps {
@@ -10,13 +12,15 @@ interface ImageUploadProps {
   onChange: (value: string) => void;
   onRemove: (value: string) => void;
   value: string[];
+  showPreview?: boolean; // 🔥 NEW PROP: To control preview visibility
 }
 
 export default function ImageUpload({
   disabled,
   onChange,
   onRemove,
-  value
+  value,
+  showPreview = true // Default is true
 }: ImageUploadProps) {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -25,7 +29,6 @@ export default function ImageUpload({
   }, []);
 
   const onUpload = (result: any) => {
-    // প্রতিটি ছবি আপলোড হওয়ার সাথে সাথে প্যারেন্টকে পাঠানো হচ্ছে
     onChange(result.info.secure_url);
   };
 
@@ -33,36 +36,37 @@ export default function ImageUpload({
 
   return (
     <div>
-      {/* ইমেজের প্রিভিউ এরিয়া */}
-      <div className="mb-4 flex items-center gap-4 flex-wrap">
-        {value.map((url, index) => (
-          <div key={url + index} className="relative w-[150px] h-[150px] rounded-md overflow-hidden border border-gray-200 group">
-            <div className="z-10 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
-              <button 
-                type="button" 
-                onClick={() => onRemove(url)} 
-                className="bg-red-500 text-white p-1 rounded-full shadow-sm hover:bg-red-600"
-              >
-                <X size={14} />
-              </button>
+      {/* 🔥 CONDITIONALLY RENDER PREVIEW */}
+      {showPreview && (
+        <div className="mb-4 flex items-center gap-4 flex-wrap">
+          {value.map((url, index) => (
+            <div key={url + index} className="relative w-[100px] h-[100px] rounded-md overflow-hidden border border-gray-200 group">
+              <div className="z-10 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
+                <button 
+                  type="button" 
+                  onClick={() => onRemove(url)} 
+                  className="bg-red-500 text-white p-1 rounded-full shadow-sm hover:bg-red-600"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <Image 
+                fill 
+                className="object-cover" 
+                alt="Image" 
+                src={url} 
+              />
             </div>
-            <Image 
-              fill 
-              className="object-cover" 
-              alt="Image" 
-              src={url} 
-            />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       
-      {/* Cloudinary বাটন */}
       <CldUploadWidget 
         onSuccess={onUpload} 
-        uploadPreset="my_shop_preset" // আপনার প্রিসেট নাম চেক করুন
+        uploadPreset="my_shop_preset" 
         options={{
-          multiple: true, // ✅ এই লাইনটি ৮-১০ টা ছবি একসাথে আপলোড করতে দিবে
-          maxFiles: 10
+          multiple: true,
+          maxFiles: 15
         }}
       >
         {({ open }) => {

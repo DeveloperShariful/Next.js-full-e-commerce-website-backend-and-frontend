@@ -114,3 +114,41 @@ export async function getAttributes() {
         return { success: false, data: [] };
     }
 }
+
+export async function searchProducts(query: string) {
+  if (!query || query.length < 2) return { success: true, data: [] };
+  
+  try {
+    const products = await db.product.findMany({
+      where: {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { sku: { contains: query, mode: 'insensitive' } },
+        ],
+        status: 'active', // Only show active products
+      },
+      take: 5, // Limit suggestions
+      select: { 
+        id: true, 
+        name: true, 
+        images: true, // Assuming you have an 'image' field or 'featuredImage'
+        featuredImage: true,
+        sku: true 
+      }
+    });
+    return { success: true, data: products };
+  } catch (error) {
+    return { success: false, data: [] };
+  }
+}
+
+export async function getTaxClasses() {
+  try {
+    const taxRates = await db.taxRate.findMany({
+      select: { id: true, name: true }
+    });
+    return { success: true, data: taxRates };
+  } catch (error) {
+    return { success: false, data: [] };
+  }
+}

@@ -457,6 +457,7 @@ model ShippingClass {
 
 model Product {
   id               String        @id @default(uuid())
+  productCode      Int    @unique @default(autoincrement())
   name             String
   slug             String        @unique
   description      String?       @db.Text
@@ -465,7 +466,7 @@ model Product {
   productType      ProductType   @default(SIMPLE)
   status           String        @default("draft") 
   isFeatured       Boolean       @default(false)
-
+  
   categoryId       String?
   category         Category?     @relation(fields: [categoryId], references: [id])
   brandId          String?

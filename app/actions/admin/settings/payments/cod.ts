@@ -2,7 +2,7 @@
 "use server"
 
 import { db } from "@/lib/db"
-import { CodSchema } from "@/app/admin/settings/payments/schemas"
+import { CodSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 

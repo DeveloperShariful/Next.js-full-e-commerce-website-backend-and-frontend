@@ -4,8 +4,18 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { ProductType, Prisma, TaxStatus } from "@prisma/client";
-import { generateSlug, parseJSON, cleanPrice } from "@/lib/product-utils";
+import { Prisma } from "@prisma/client";
+import { generateSlug } from "@/app/actions/admin/product/product-utils";
+
+// Import Helper Modules
+import { parseProductFormData } from "./product-data-parser";
+import { 
+    handleInventory, 
+    handleImages, 
+    handleDigitalFiles, 
+    handleAttributes, 
+    handleVariations 
+} from "./product-services";
 
 export type ProductFormState = {
   success: boolean;
@@ -22,92 +32,33 @@ export async function updateProduct(formData: FormData): Promise<ProductFormStat
   return await saveProduct(formData, "UPDATE");
 }
 
-// --- CORE LOGIC ---
+// --- MAIN ORCHESTRATOR ---
 
 async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promise<ProductFormState> {
-  const id = formData.get("id") as string;
-  
-  if (type === "UPDATE" && !id) {
+  // 1. Parse Data using Helper
+  const data = parseProductFormData(formData);
+
+  if (type === "UPDATE" && !data.id) {
     return { success: false, message: "Product ID is missing for update." };
   }
+  if (!data.name) return { success: false, message: "Product name is required." };
 
-  const name = formData.get("name") as string;
-  const rawSlug = formData.get("slug") as string;
-  
-  // Validation
-  if (!name) return { success: false, message: "Product name is required." };
-
-  // Slug Logic
-  let slug = rawSlug && rawSlug.trim() !== "" ? rawSlug : generateSlug(name);
+  // 2. Slug Validation
+  let slug = data.slug;
   const existingSlug = await db.product.findFirst({
     where: { 
       slug: slug, 
-      NOT: id ? { id } : undefined 
+      NOT: data.id ? { id: data.id } : undefined 
     }
   });
   if (existingSlug) {
     slug = `${slug}-${Date.now().toString().slice(-4)}`;
   }
 
-  // Basic Extraction
-  const description = formData.get("description") as string;
-  const shortDescription = formData.get("shortDescription") as string;
-  const productType = (formData.get("productType") as string || "SIMPLE").toUpperCase() as ProductType;
-  const status = formData.get("status") as string || "draft";
-  
-  const price = cleanPrice(formData.get("price") as string);
-  const salePrice = formData.get("salePrice") ? cleanPrice(formData.get("salePrice") as string) : null;
-  const costPerItem = formData.get("cost") ? cleanPrice(formData.get("cost") as string) : null;
-  
-  const sku = formData.get("sku") as string || null;
-  const barcode = formData.get("barcode") as string || null;
-  const trackQuantity = formData.get("trackQuantity") === "true";
-  const stock = parseInt(formData.get("stock") as string) || 0;
-  
-  const isVirtual = formData.get("isVirtual") === "true";
-  const isDownloadable = formData.get("isDownloadable") === "true";
-  
-  const weight = formData.get("weight") ? parseFloat(formData.get("weight") as string) : null;
-  const length = formData.get("length") ? parseFloat(formData.get("length") as string) : null;
-  const width = formData.get("width") ? parseFloat(formData.get("width") as string) : null;
-  const height = formData.get("height") ? parseFloat(formData.get("height") as string) : null;
-  
-  // Relations Data (Text)
-  const categoryName = formData.get("category") as string;
-  const vendorName = formData.get("vendor") as string;
-  
-  // Settings
-  const purchaseNote = formData.get("purchaseNote") as string;
-  const menuOrder = parseInt(formData.get("menuOrder") as string) || 0;
-  const enableReviews = formData.get("enableReviews") === "true";
-
-  // SEO
-  const metaTitle = formData.get("metaTitle") as string;
-  const metaDesc = formData.get("metaDesc") as string;
-  const seoCanonicalUrl = formData.get("seoCanonicalUrl") as string; // NEW
-
-  // Advanced IDs (Tax, Shipping)
-  const taxStatus = (formData.get("taxStatus") as string || "TAXABLE") as TaxStatus;
-  const taxRateId = formData.get("taxRateId") as string || null;
-  const shippingClassId = formData.get("shippingClassId") as string || null;
-
-  // JSON Data Parsing
-  const tagsList = parseJSON<string[]>(formData.get("tags") as string, []);
-  const collectionIds = parseJSON<string[]>(formData.get("collectionIds") as string, []); // NEW
-  const upsells = parseJSON<string[]>(formData.get("upsells") as string, []);
-  const crossSells = parseJSON<string[]>(formData.get("crossSells") as string, []);
-  
-  const galleryImages = parseJSON<string[]>(formData.get("galleryImages") as string, []);
-  const digitalFiles = parseJSON<any[]>(formData.get("digitalFiles") as string, []); // NEW
-  
-  const attributesData = parseJSON<any[]>(formData.get("attributes") as string, []);
-  const variationsData = parseJSON<any[]>(formData.get("variations") as string, []);
-  const featuredImage = formData.get("featuredImage") as string || null;
-
   try {
-    // 1. Ensure Default Location Exists
+    // 3. Ensure Default Location (For Inventory)
     let locationId = "";
-    if (trackQuantity) {
+    if (data.trackQuantity) {
         const loc = await db.location.findFirst({ where: { isDefault: true } });
         if (loc) {
             locationId = loc.id;
@@ -117,102 +68,118 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         }
     }
 
-    // 2. Prepare Relations (ConnectOrCreate)
-    let categoryConnect = {};
-    if (categoryName) {
-        const cSlug = generateSlug(categoryName);
-        categoryConnect = {
-            connectOrCreate: {
-                where: { slug: cSlug },
-                create: { name: categoryName, slug: cSlug }
-            }
-        };
-    }
-
-    let brandConnect = {};
-    if (vendorName) {
-        const bSlug = generateSlug(vendorName);
-        brandConnect = {
-            connectOrCreate: {
-                where: { slug: bSlug },
-                create: { name: vendorName, slug: bSlug }
-            }
-        };
-    }
-
-    // 3. Global Attribute Sync
-    for (const attr of attributesData) {
+    // 4. Global Attribute Sync
+    for (const attr of data.attributesData) {
         if (!attr.name) continue;
         const attrSlug = generateSlug(attr.name);
         const existingGlobal = await db.attribute.findUnique({ where: { slug: attrSlug } });
         
         if (existingGlobal) {
             const mergedValues = Array.from(new Set([...existingGlobal.values, ...attr.values]));
-            await db.attribute.update({
-                where: { id: existingGlobal.id },
-                data: { values: mergedValues }
-            });
+            await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
         } else {
-            await db.attribute.create({
-                data: { name: attr.name, slug: attrSlug, values: attr.values }
-            });
+            await db.attribute.create({ data: { name: attr.name, slug: attrSlug, values: attr.values } });
         }
     }
 
-    // 4. Database Transaction
+    // 5. Database Transaction
     await db.$transaction(async (tx) => {
         
-        // --- A. Prepare Main Product Data ---
+        // --- RELATION LOGIC (Cleaned Up) ---
+        const taxRateRelation = data.taxRateId ? { connect: { id: data.taxRateId } } : (type === "UPDATE" ? { disconnect: true } : undefined);
+        const shippingClassRelation = data.shippingClassId ? { connect: { id: data.shippingClassId } } : (type === "UPDATE" ? { disconnect: true } : undefined);
+        
+        const collectionsRelation = type === "CREATE" 
+            ? { connect: data.collectionIds.map(cid => ({ id: cid })) }
+            : { set: data.collectionIds.map(cid => ({ id: cid })) };
+
+        const categoryConnect = data.categoryName ? {
+            connectOrCreate: {
+                where: { slug: generateSlug(data.categoryName) },
+                create: { name: data.categoryName, slug: generateSlug(data.categoryName) }
+            }
+        } : undefined;
+
+        const brandConnect = data.vendorName ? {
+            connectOrCreate: {
+                where: { slug: generateSlug(data.vendorName) },
+                create: { name: data.vendorName, slug: generateSlug(data.vendorName) }
+            }
+        } : undefined;
+
+        // --- Prepare Main Product Data ---
         const productData: Prisma.ProductCreateInput | Prisma.ProductUpdateInput = {
-            name, slug, description, shortDescription, 
-            productType, status,
-            price, salePrice, costPerItem,
-            sku, barcode, trackQuantity,
-            weight, length, width, height,
-            isVirtual, isDownloadable,
-            featuredImage,
-            
-            // SEO & Settings
-            metaTitle, metaDesc, seoCanonicalUrl,
-            purchaseNote, menuOrder, enableReviews,
-            
-            // Tax & Shipping
-            taxStatus,
-            taxRate: taxRateId ? { connect: { id: taxRateId } } : { disconnect: true },
-            shippingClass: shippingClassId ? { connect: { id: shippingClassId } } : { disconnect: true },
+            name: data.name,
+            slug: slug,
+            description: data.description,
+            shortDescription: data.shortDescription,
+            productType: data.productType,
+            status: data.status,
+            price: data.price,
+            salePrice: data.salePrice,
+            costPerItem: data.costPerItem,
+            sku: data.sku,
+            barcode: data.barcode,
+            trackQuantity: data.trackQuantity,
+            weight: data.weight,
+            length: data.length,
+            width: data.width,
+            height: data.height,
+            isVirtual: data.isVirtual,
+            isDownloadable: data.isDownloadable,
+            featuredImage: data.featuredImage,
 
-            // Arrays
-            upsellIds: upsells,
-            crossSellIds: crossSells,
+            saleStart: data.saleStart ? new Date(data.saleStart) : null,
+            saleEnd: data.saleEnd ? new Date(data.saleEnd) : null,
+            
+            // যদি ভ্যালু না থাকে, তবে -1 (আনলিমিটেড) সেট হবে
+            downloadLimit: data.downloadLimit !== null ? data.downloadLimit : -1,
+            downloadExpiry: data.downloadExpiry !== null ? data.downloadExpiry : -1,
 
-            // Relations
+            // New Fields
+            lowStockThreshold: data.lowStockThreshold,
+            backorderStatus: data.backorderStatus,
+            soldIndividually: data.soldIndividually,
+            mpn: data.mpn,
+            hsCode: data.hsCode,
+            countryOfManufacture: data.countryOfManufacture,
+            isDangerousGood: data.isDangerousGood,
+            
+            metaTitle: data.metaTitle,
+            metaDesc: data.metaDesc,
+            seoCanonicalUrl: data.seoCanonicalUrl,
+            purchaseNote: data.purchaseNote,
+            menuOrder: data.menuOrder,
+            enableReviews: data.enableReviews,
+            
+            taxStatus: data.taxStatus,
+            taxRate: taxRateRelation,
+            shippingClass: shippingClassRelation,
+
+            upsellIds: data.upsells,
+            crossSellIds: data.crossSells,
+
             category: categoryConnect,
             brand: brandConnect,
             
             tags: {
-                connectOrCreate: tagsList.map(t => ({
+                connectOrCreate: data.tagsList.map(t => ({
                     where: { slug: generateSlug(t) },
                     create: { name: t, slug: generateSlug(t) }
                 }))
             },
             
-            // Collections (Many-to-Many)
-            collections: {
-                set: collectionIds.map(cid => ({ id: cid })) // Replaces existing connections with new list
-            }
+            collections: collectionsRelation
         };
 
         let product;
-        if (id) {
+        if (data.id) {
             // UPDATE
-             await tx.product.update({
-                where: { id },
-                data: { tags: { set: [] } } // Reset tags to handle removals
-            });
-
-            product = await tx.product.update({
-                where: { id },
-                data: productData
+             await tx.product.update({ where: { id: data.id }, data: { tags: { set: [] } } });
+             // Type cast to avoid TS issues with productCode (handled in prev steps)
+             product = await tx.product.update({
+                where: { id: data.id },
+                data: productData as Prisma.ProductUpdateInput
             });
         } else {
             // CREATE
@@ -221,132 +188,17 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             });
         }
 
-        // --- B. Inventory (Simple Product) ---
-        if (productType === 'SIMPLE' && trackQuantity && locationId) {
-            await tx.inventoryLevel.upsert({
-                where: {
-                    locationId_productId_variantId: {
-                        locationId,
-                        productId: product.id,
-                        variantId: "" 
-                    } as any 
-                },
-                update: { quantity: stock },
-                create: { quantity: stock, locationId, productId: product.id }
-            });
-            await tx.product.update({ where: { id: product.id }, data: { stock } });
-        }
-
-        // --- C. Images ---
-        await tx.productImage.deleteMany({ where: { productId: product.id } });
-        if (galleryImages.length > 0) {
-            await tx.productImage.createMany({
-                data: galleryImages.map((url, idx) => ({
-                    productId: product.id,
-                    url,
-                    position: idx
-                }))
-            });
-        }
-
-        // --- D. Digital Files (For Downloadable Products) ---
-        // Delete old files and recreate to sync state
-        await tx.digitalFile.deleteMany({ where: { productId: product.id } });
-        if (isDownloadable && digitalFiles.length > 0) {
-            await tx.digitalFile.createMany({
-                data: digitalFiles.map(file => ({
-                    productId: product.id,
-                    name: file.name,
-                    url: file.url
-                }))
-            });
-        }
-
-        // --- E. Product Attributes (Smart Sync) ---
-        const existingAttrs = await tx.productAttribute.findMany({ where: { productId: product.id } });
-        const existingAttrIds = existingAttrs.map(a => a.id);
-        const incomingAttrIds = attributesData.map(a => a.id).filter(id => id && !id.startsWith("temp_"));
-
-        const attrsToDelete = existingAttrIds.filter(id => !incomingAttrIds.includes(id));
-        if (attrsToDelete.length > 0) {
-            await tx.productAttribute.deleteMany({ where: { id: { in: attrsToDelete } } });
-        }
-
-        for (const attr of attributesData) {
-            const attrData = {
-                name: attr.name,
-                values: attr.values,
-                visible: attr.visible,
-                variation: attr.variation,
-                position: 0 
-            };
-
-            if (attr.id && !attr.id.toString().startsWith("temp_")) {
-                await tx.productAttribute.update({ where: { id: attr.id }, data: attrData });
-            } else {
-                await tx.productAttribute.create({ data: { ...attrData, productId: product.id } });
-            }
-        }
-
-        // --- F. Variations (Smart Sync) ---
-        if (productType === 'VARIABLE') {
-            const existingVars = await tx.productVariant.findMany({ where: { productId: product.id } });
-            const existingVarIds = existingVars.map(v => v.id);
-            const incomingVarIds = variationsData.map(v => v.id).filter(id => id && !id.startsWith("temp_"));
-
-            const varsToDelete = existingVarIds.filter(id => !incomingVarIds.includes(id));
-            if (varsToDelete.length > 0) {
-                await tx.productVariant.deleteMany({ where: { id: { in: varsToDelete } } });
-            }
-
-            let totalStock = 0;
-
-            for (const v of variationsData) {
-                const variantStock = parseInt(v.stock) || 0;
-                const variantPrice = cleanPrice(v.price);
-                
-                const variantData = {
-                    name: v.name || "Variation",
-                    sku: v.sku || null,
-                    price: variantPrice,
-                    stock: variantStock,
-                    attributes: v.attributes || {}, 
-                    trackQuantity: true
-                };
-
-                let variantId = v.id;
-
-                if (v.id && !v.id.toString().startsWith("temp_")) {
-                    await tx.productVariant.update({ where: { id: v.id }, data: variantData });
-                } else {
-                    const newVar = await tx.productVariant.create({ data: { ...variantData, productId: product.id } });
-                    variantId = newVar.id;
-                }
-
-                if (locationId) {
-                    await tx.inventoryLevel.upsert({
-                        where: {
-                            locationId_productId_variantId: {
-                                locationId,
-                                productId: product.id,
-                                variantId: variantId
-                            }
-                        },
-                        update: { quantity: variantStock },
-                        create: { quantity: variantStock, locationId, productId: product.id, variantId }
-                    });
-                }
-                
-                totalStock += variantStock;
-            }
-
-            await tx.product.update({ where: { id: product.id }, data: { stock: totalStock } });
-        }
+        // --- DELEGATE SUB-TASKS TO SERVICES ---
+        await handleInventory(tx, product, data, locationId);
+        await handleImages(tx, product.id, data.galleryImages);
+        await handleDigitalFiles(tx, product.id, data.isDownloadable, data.digitalFiles);
+        await handleAttributes(tx, product.id, data.attributesData);
+        await handleVariations(tx, product.id, data.variationsData, data.productType, locationId);
 
     }, { maxWait: 10000, timeout: 30000 });
 
     revalidatePath("/admin/products");
-    return { success: true, productId: id };
+    return { success: true, productId: data.id || "new" };
 
   } catch (error: any) {
     console.error("[SAVE_PRODUCT_ERROR]", error);

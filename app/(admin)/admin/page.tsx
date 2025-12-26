@@ -1,13 +1,13 @@
-//app/admin/page.tsx
+// app/admin/page.tsx
 
 import { db } from "@/lib/db";
 import { Overview } from "./_components/overview";
 import { 
   DollarSign, ShoppingBag, Package, Users, 
-  ArrowUpRight, AlertCircle 
+  ArrowUpRight, AlertCircle, Tag, Star 
 } from "lucide-react";
 import Link from "next/link"; 
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, ProductStatus, PaymentStatus } from "@prisma/client";
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat("en-BD", {
@@ -19,37 +19,54 @@ const formatPrice = (price: number) => {
 
 export default async function AdminDashboardPage() {
   
+  // 1. Total Revenue (Only Paid or Completed Orders)
   const revenueResult = await db.order.aggregate({
     _sum: { total: true },
     where: { 
-      status: { not: OrderStatus.CANCELLED } 
+      status: { not: OrderStatus.CANCELLED },
+      // Optional: Filter by payment status if needed
+      // paymentStatus: PaymentStatus.PAID 
     }
   });
   const totalRevenue = revenueResult._sum.total || 0;
 
+  // 2. Total Orders Count
   const totalOrders = await db.order.count();
   
+  // 3. Products Count (Active & Draft)
   const productsCount = await db.product.count({ 
-    where: { status: { not: 'archived' } } 
+    where: { 
+      status: { not: ProductStatus.ARCHIVED } 
+    } 
   }); 
   
-  const categoriesCount = await db.category.count();
+  // 4. Other Counts
   const customersCount = await db.user.count({ where: { role: 'CUSTOMER' } });
+  const brandsCount = await db.brand.count();
+  const reviewsCount = await db.review.count();
 
-  const lowStockVariants = await db.productVariant.findMany({
+  // 5. Low Stock Alert (Using InventoryLevel)
+  // Fetching inventory levels where quantity is 5 or less
+  const lowStockItems = await db.inventoryLevel.findMany({
     where: { 
-      stock: { lte: 5 }, 
-      product: { trackQuantity: true }
+      quantity: { lte: 5 }
     },
     take: 5,
     include: {
       product: {
         select: { name: true, featuredImage: true }
+      },
+      variant: {
+        select: { name: true }
+      },
+      location: {
+        select: { name: true }
       }
     },
-    orderBy: { stock: 'asc' }
+    orderBy: { quantity: 'asc' }
   });
 
+  // 6. Sales Graph Data (Current Year)
   const currentYear = new Date().getFullYear();
   const startOfYear = new Date(currentYear, 0, 1);
   const endOfYear = new Date(currentYear, 11, 31);
@@ -77,6 +94,7 @@ export default async function AdminDashboardPage() {
   return (
     <div className="p-4 font-sans text-slate-800 pb-10">
       
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
@@ -84,8 +102,10 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
+        {/* Total Sales */}
         <Link href="/admin/analytics" className="block group">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-200 transition duration-300">
             <div className="flex items-center justify-between mb-4">
@@ -101,6 +121,7 @@ export default async function AdminDashboardPage() {
           </div>
         </Link>
 
+        {/* Total Orders */}
         <Link href="/admin/orders" className="block group">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-200 transition duration-300">
             <div className="flex items-center justify-between mb-4">
@@ -116,6 +137,7 @@ export default async function AdminDashboardPage() {
           </div>
         </Link>
 
+        {/* Products */}
         <Link href="/admin/products" className="block group">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-200 transition duration-300">
             <div className="flex items-center justify-between mb-4">
@@ -124,26 +146,30 @@ export default async function AdminDashboardPage() {
             </div>
             <div>
                <h2 className="text-2xl font-bold text-slate-800">{productsCount}</h2>
-               <p className="text-xs text-slate-400 mt-1">Across {categoriesCount} categories</p>
+               <p className="text-xs text-slate-400 mt-1">{brandsCount} Brands</p>
             </div>
           </div>
         </Link>
 
+        {/* Customers */}
         <Link href="/admin/customers" className="block group">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-200 transition duration-300">
             <div className="flex items-center justify-between mb-4">
-               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-600 transition">Active Customers</h3>
+               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider group-hover:text-blue-600 transition">Customers</h3>
                <div className="p-2 bg-orange-50 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition"><Users size={20} /></div>
             </div>
             <div>
                <h2 className="text-2xl font-bold text-slate-800">{customersCount}</h2>
-               <p className="text-xs text-slate-400 mt-1">Registered users</p>
+               <p className="text-xs text-slate-400 mt-1">{reviewsCount} Reviews</p>
             </div>
           </div>
         </Link>
       </div>
 
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+        
+        {/* Sales Graph */}
         <div className="lg:col-span-4 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
            <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-lg text-slate-800">Sales Overview ({currentYear})</h3>
@@ -151,6 +177,7 @@ export default async function AdminDashboardPage() {
            <Overview data={graphData} />
         </div>
 
+        {/* Low Stock Alert */}
         <div className="lg:col-span-3 space-y-6">
            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-full flex flex-col">
               <div className="flex items-center gap-2 mb-4">
@@ -159,19 +186,23 @@ export default async function AdminDashboardPage() {
               </div>
               
               <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                {lowStockVariants.length === 0 ? (
+                {lowStockItems.length === 0 ? (
                    <div className="h-full flex items-center justify-center text-green-600 text-sm font-medium">
                       All stocks are healthy!
                    </div>
                 ) : (
-                   lowStockVariants.map((variant) => (
-                      <div key={variant.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 transition hover:bg-slate-100">
+                   lowStockItems.map((item) => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100 transition hover:bg-slate-100">
                          <div className="flex flex-col min-w-0 pr-4">
-                            <span className="text-sm font-bold text-slate-700 truncate">{variant.product.name}</span>
-                            <span className="text-xs text-slate-500 truncate">{variant.name}</span>
+                            <span className="text-sm font-bold text-slate-700 truncate">{item.product.name}</span>
+                            <div className="flex gap-1 text-xs text-slate-500 truncate">
+                                <span>{item.variant ? item.variant.name : 'Simple'}</span>
+                                <span>•</span>
+                                <span>{item.location.name}</span>
+                            </div>
                          </div>
                          <div className="flex flex-col items-end shrink-0">
-                            <span className="text-sm font-bold text-red-600">{variant.stock} left</span>
+                            <span className="text-sm font-bold text-red-600">{item.quantity} left</span>
                             <span className="text-[10px] text-slate-400">Stock</span>
                          </div>
                       </div>
@@ -184,7 +215,7 @@ export default async function AdminDashboardPage() {
                     href="/admin/inventory" 
                     className="block w-full text-center py-2 text-xs font-bold text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition uppercase tracking-wide"
                   >
-                      View Inventory
+                      View Full Inventory
                   </Link>
               </div>
            </div>

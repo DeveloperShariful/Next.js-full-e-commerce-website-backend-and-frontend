@@ -11,8 +11,8 @@ export default function Variations({ data, updateData }: ComponentProps) {
             return;
         }
         
-        // Unique ID fix
-        const newId = `var_${Date.now()}`;
+        // 🚀 FIX: Use 'temp_' prefix to match Server Action Logic for new items
+        const newId = `temp_${Date.now()}`;
         const defaultAttrs: Record<string, string> = {};
         varAttrs.forEach(a => defaultAttrs[a.name] = "");
 

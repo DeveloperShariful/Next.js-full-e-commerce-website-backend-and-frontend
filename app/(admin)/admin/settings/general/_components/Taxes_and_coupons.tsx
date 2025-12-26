@@ -1,3 +1,5 @@
+// File: app/admin/settings/general/_components/tax_and_coupons.tsx
+
 import { GeneralSettingsData } from "../page";
 
 interface Props {

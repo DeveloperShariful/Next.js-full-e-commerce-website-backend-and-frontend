@@ -5,13 +5,11 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { 
-  Search, Image as ImageIcon, Star
-} from "lucide-react";
-// Updated Imports from new separated file
+import { Search, Image as ImageIcon, Star } from "lucide-react";
 import { bulkProductAction, moveToTrash } from "@/app/actions/admin/product/product-list"; 
 import { duplicateProduct } from "@/app/actions/admin/product/duplicate-product"; 
 import { toast } from "react-hot-toast";
+import { useGlobalStore } from "@/app/providers/global-store-provider"; // 🚀 Hook Import
 
 interface ProductTableProps {
   products: any[];
@@ -25,14 +23,13 @@ export default function ProductTable({ products, categories, counts, statusFilte
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   
-  // Selection State
+  // 🚀 Use Global Formatter
+  const { formatPrice } = useGlobalStore();
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState("");
-  
-  // Search State
   const [query, setQuery] = useState(searchParams.get("query") || "");
 
-  // Handlers
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams(searchParams);
@@ -86,14 +83,10 @@ export default function ProductTable({ products, categories, counts, statusFilte
       });
   };
 
-  // Formatters
-  const formatPrice = (price: number) => new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', minimumFractionDigits: 0 }).format(price);
   const formatDate = (date: Date) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
 
   return (
     <div className="w-full">
-      
-      {/* STATUS TABS - Responsive (Wraps on small screens) */}
       <div className="flex flex-wrap gap-2 text-sm mb-4 text-slate-500">
          <Link href="/admin/products" className={`${!statusFilter ? 'font-bold text-black' : 'text-blue-600 hover:underline'}`}>
             All <span className="text-slate-400">({counts.all})</span>
@@ -112,12 +105,8 @@ export default function ProductTable({ products, categories, counts, statusFilte
          </Link>
       </div>
 
-      {/* TOOLBAR - Responsive (Stacks on Mobile) */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-        
-        {/* Actions & Filters */}
         <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-           {/* Bulk Actions */}
            <div className="flex gap-2 w-full sm:w-auto">
                <select 
                   value={bulkAction} 
@@ -147,7 +136,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
                </button>
            </div>
            
-           {/* Dropdown Filters */}
            <div className="flex gap-2 w-full sm:w-auto">
               <select onChange={(e) => handleFilter("category", e.target.value)} className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none w-full sm:w-40">
                  <option value="">Select a category</option>
@@ -163,7 +151,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
            </div>
         </div>
         
-        {/* Search */}
         <form onSubmit={handleSearch} className="relative w-full lg:w-auto">
            <input 
              value={query}
@@ -177,7 +164,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
         </form>
       </div>
 
-      {/* TABLE - Responsive (Horizontal Scroll & Hidden Columns on Mobile) */}
       <div className="bg-white border border-slate-300 shadow-sm overflow-x-auto rounded-sm">
         <table className="w-full text-left border-collapse text-sm min-w-[600px] md:min-w-full">
           <thead className="bg-white border-b border-slate-300 text-slate-700">
@@ -187,8 +173,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
               </th>
               <th className="p-3 w-16 text-center"><ImageIcon size={16} className="mx-auto text-slate-400" /></th>
               <th className="p-3 font-semibold text-blue-600 min-w-[200px]">Name</th>
-              
-              {/* Responsive Hidden Columns */}
               <th className="p-3 font-semibold hidden md:table-cell">SKU</th>
               <th className="p-3 font-semibold">Stock</th>
               <th className="p-3 font-semibold">Price</th>
@@ -212,7 +196,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
                     <td className="p-3 text-center">
                         <input type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelect(product.id)} className="rounded border-slate-400" />
                     </td>
-                    
                     <td className="p-3">
                        <div className="h-10 w-10 bg-slate-100 border border-slate-300 flex items-center justify-center overflow-hidden rounded-sm">
                           {displayImage ? (
@@ -222,16 +205,13 @@ export default function ProductTable({ products, categories, counts, statusFilte
                           )}
                        </div>
                     </td>
-
                     <td className="p-3">
                        <Link href={`/admin/products/create?id=${product.id}`} className="font-semibold text-blue-600 hover:underline block mb-1">
-                          {product.name} {product.status === 'draft' && <span className="text-slate-400 font-normal italic text-xs ml-1">— Draft</span>}
+                          {product.name} 
+                          {product.status === 'DRAFT' && <span className="text-slate-400 font-normal italic text-xs ml-1">— Draft</span>}
                        </Link>
-                       
-                       {/* Actions always visible */}
                        <div className="flex flex-wrap gap-1 text-[11px] text-slate-400 mt-1">
                           <span className="text-slate-500 font-bold bg-slate-100 px-1 rounded">ID: {product.productCode} | </span>
-                          
                           {statusFilter === 'archived' ? (
                              <>
                                 <button onClick={() => {
@@ -255,9 +235,7 @@ export default function ProductTable({ products, categories, counts, statusFilte
                           )}
                        </div>
                     </td>
-
                     <td className="p-3 text-slate-600 hidden md:table-cell">{product.sku || <span className="text-slate-400">–</span>}</td>
-
                     <td className="p-3">
                        {product.trackQuantity ? (
                           <span className={`text-xs font-bold ${stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -267,8 +245,8 @@ export default function ProductTable({ products, categories, counts, statusFilte
                           <span className="text-green-600 text-xs font-bold">In stock</span>
                        )}
                     </td>
-
                     <td className="p-3 whitespace-nowrap">
+                       {/* 🚀 Dynamic Price Formatting */}
                        {product.salePrice ? (
                           <div className="flex flex-col">
                              <span className="line-through text-slate-400 text-xs">{formatPrice(product.price)}</span>
@@ -278,30 +256,24 @@ export default function ProductTable({ products, categories, counts, statusFilte
                           <span className="font-medium text-slate-800">{formatPrice(product.price)}</span>
                        )}
                     </td>
-
                     <td className="p-3 text-blue-600 hover:underline cursor-pointer hidden lg:table-cell">
                        {product.category?.name || <span className="text-slate-400">–</span>}
                     </td>
-
                     <td className="p-3 text-slate-600 hidden xl:table-cell">
                         {product.brand?.name || <span className="text-slate-400">–</span>}
                     </td>
-
                     <td className="p-3 text-slate-600 hidden 2xl:table-cell">
                        {product.tags && product.tags.length > 0 
                          ? product.tags.map((t:any) => t.name).join(', ') 
                          : <span className="text-slate-400">–</span>}
                     </td>
-
                     <td className="p-3 text-center hidden sm:table-cell">
                        <Star size={16} className={`mx-auto cursor-pointer transition-colors ${product.isFeatured ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300 hover:text-yellow-400'}`} />
                     </td>
-
                     <td className="p-3 text-slate-500 text-xs hidden lg:table-cell">
-                       {product.status === 'active' ? 'Published' : 'Last Modified'} <br/>
+                       {product.status === 'ACTIVE' ? 'Published' : 'Last Modified'} <br/>
                        <span className="text-slate-700">{formatDate(product.updatedAt)}</span>
                     </td>
-
                   </tr>
                 );
               })

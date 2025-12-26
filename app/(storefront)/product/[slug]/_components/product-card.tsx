@@ -1,27 +1,31 @@
+// File: app/product/[slug]/_components/product-card.tsx
+
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { ShoppingCart, Eye, Star } from "lucide-react";
-import { Product, Category, ProductImage } from "@prisma/client";
 import { MouseEventHandler } from "react";
-import useCart from "@/app/actions/storeFont/use-cart"; 
+import useCart from "@/app/actions/storefront/use-cart"; 
+import { useGlobalStore } from "@/app/providers/global-store-provider"; // 🚀 Import Global Store
 
+// 🚀 Better Type Definition
 interface ProductCardProps {
-  data: Product & {
-    images: ProductImage[];
-    category: Category | null;
+  data: {
+    id: string;
+    name: string;
+    slug: string;
+    price: number;
+    salePrice: number | null;
+    featuredImage: string | null;
+    images: { url: string }[];
+    category: { name: string } | null;
   };
 }
 
 export default function ProductCard({ data }: ProductCardProps) {
   const cart = useCart();
-
-  const formatPrice = (amount: number) => {
-    return new Intl.NumberFormat('en-BD', {
-      style: 'currency', currency: 'BDT', minimumFractionDigits: 0
-    }).format(amount);
-  };
+  const { formatPrice } = useGlobalStore(); // 🚀 Use Global Formatter
 
   const price = Number(data.price);
   const salePrice = data.salePrice ? Number(data.salePrice) : null;
@@ -35,13 +39,12 @@ export default function ProductCard({ data }: ProductCardProps) {
     event.preventDefault(); 
     event.stopPropagation();
     
-    // [FIXED] Manually mapping fields to match CartItem type
     cart.addItem({
       id: data.id,
       name: data.name,
       price: finalPrice,
-      quantity: 1, // Default quantity
-      cartItemId: `${data.id}-base`, // Generate unique ID
+      quantity: 1, 
+      cartItemId: `${data.id}-base`,
       image: data.featuredImage || data.images?.[0]?.url || "",
       category: data.category ? { name: data.category.name } : undefined
     });

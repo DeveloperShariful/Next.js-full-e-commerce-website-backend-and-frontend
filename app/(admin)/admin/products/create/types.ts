@@ -30,16 +30,15 @@ export interface ProductFormData {
     description: string;
     shortDescription: string;
     productType: string;
-    status: string;
+    status: string; // UI তে স্ট্রিং হিসেবে হ্যান্ডেল করা সহজ
     isVirtual: boolean;
     isDownloadable: boolean;
-    // ... (আগের সব ফিল্ড)
+    
+    // Sale Schedule
+    saleStart: string; 
+    saleEnd: string;   
 
-    // 🔥 NEW: Sale Schedule
-    saleStart: string; // "YYYY-MM-DD"
-    saleEnd: string;   // "YYYY-MM-DD"
-
-    // 🔥 NEW: Download Settings
+    // Download Settings
     downloadLimit: number | "";
     downloadExpiry: number | "";
     
@@ -48,11 +47,10 @@ export interface ProductFormData {
     salePrice: number | "";
     costPerItem: number | "";
     
-    
     // Tax & Shipping
     taxStatus: string;
-    taxRateId: string;       // NEW: Selected Tax Rate ID
-    shippingClassId: string; // NEW: Selected Shipping Class ID
+    taxRateId: string;      
+    shippingClassId: string; 
     
     // Inventory
     sku: string;
@@ -60,9 +58,9 @@ export interface ProductFormData {
     trackQuantity: boolean;
     stock: number | "";
 
-    // Inventory Advanced (NEW)
+    // Inventory Advanced
     lowStockThreshold: number | "";
-    backorderStatus: string; // "DO_NOT_ALLOW" | "ALLOW" | "ALLOW_BUT_NOTIFY"
+    backorderStatus: string; 
     soldIndividually: boolean;
     mpn: string;
     
@@ -72,7 +70,7 @@ export interface ProductFormData {
     width: string;
     height: string;
     
-    // Shipping Advanced (NEW)
+    // Shipping Advanced
     hsCode: string;
     countryOfManufacture: string;
     isDangerousGood: boolean;
@@ -81,7 +79,7 @@ export interface ProductFormData {
     category: string;
     vendor: string;
     tags: string[];
-    collectionIds: string[]; // NEW: For Collections
+    collectionIds: string[]; 
     
     // Linked Products
     upsells: string[]; 
@@ -90,7 +88,7 @@ export interface ProductFormData {
     // Media
     featuredImage: string | null;
     galleryImages: string[];
-    digitalFiles: DigitalFile[]; // NEW: For Downloadable Products
+    digitalFiles: DigitalFile[]; 
     
     // Attributes & Variations
     attributes: Attribute[];
@@ -99,8 +97,7 @@ export interface ProductFormData {
     // SEO & Meta
     metaTitle: string;
     metaDesc: string;
-    seoCanonicalUrl: string; // NEW: Advanced SEO
-    // seoSchema: string;    // Optional: If you want to accept JSON string for Schema
+    seoCanonicalUrl: string; 
     
     purchaseNote: string;
     menuOrder: number;

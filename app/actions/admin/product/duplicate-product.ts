@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { ProductStatus } from "@prisma/client"; // 🚀 IMPORT ENUM
 
 export async function duplicateProduct(id: string) {
   try {
@@ -35,7 +36,7 @@ export async function duplicateProduct(id: string) {
         description: original.description,
         shortDescription: original.shortDescription,
         productType: original.productType,
-        status: 'draft', 
+        status: ProductStatus.DRAFT, // 🚀 FIX: Use Enum
         price: original.price,
         salePrice: original.salePrice,
         costPerItem: original.costPerItem,
@@ -49,7 +50,6 @@ export async function duplicateProduct(id: string) {
         isDownloadable: original.isDownloadable,
         featuredImage: original.featuredImage,
         
-        // Missing fields fix applied for consistency
         upsellIds: original.upsellIds,
         crossSellIds: original.crossSellIds,
         

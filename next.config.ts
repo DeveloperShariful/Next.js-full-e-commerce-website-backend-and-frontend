@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "placehold.co", // প্লেসহোল্ডার ইমেজের জন্য
       },
+      {
+        protocol: "https",
+        hostname: "img.clerk.com", // 🚀 এই লাইনটি অ্যাড করতে হবে
+      },
     ],
   },
 };

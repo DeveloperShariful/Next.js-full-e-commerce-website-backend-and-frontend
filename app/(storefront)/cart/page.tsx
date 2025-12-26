@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import useCart from "@/app/actions/storeFont/use-cart"; 
+import useCart from "@/app/actions/storefront/use-cart"; 
 import Link from "next/link";
 import Image from "next/image";
 import { 

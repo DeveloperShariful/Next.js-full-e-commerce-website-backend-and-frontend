@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { db } from '@/lib/db';
-import { ProductType } from '@prisma/client';
+import { ProductType, ProductStatus } from '@prisma/client'; // 🚀 Import ProductStatus
 import ProductTable from './_components/product-table';
 
 interface ProductsPageProps {
@@ -20,12 +20,25 @@ export default async function ProductListPage(props: ProductsPageProps) {
 
   const query = searchParams.query || "";
   const categoryFilter = searchParams.category || "";
-  const statusFilter = searchParams.status || "";
+  const statusFilter = searchParams.status || ""; // URL থেকে আসা স্ট্যাটাস (active, draft, archived)
   const typeFilter = searchParams.type || "";
   
   const page = Number(searchParams.page) || 1;
   const limit = 20; 
   const skip = (page - 1) * limit;
+
+  // 🚀 FIX: Status Filter Logic with Enum
+  let statusCondition = {};
+  if (statusFilter === 'archived') {
+      statusCondition = { status: ProductStatus.ARCHIVED };
+  } else if (statusFilter === 'active') {
+      statusCondition = { status: ProductStatus.ACTIVE };
+  } else if (statusFilter === 'draft') {
+      statusCondition = { status: ProductStatus.DRAFT };
+  } else {
+      // Show everything except archived
+      statusCondition = { status: { not: ProductStatus.ARCHIVED } };
+  }
 
   // Query Construction
   const whereCondition: any = {
@@ -36,13 +49,9 @@ export default async function ProductListPage(props: ProductsPageProps) {
           { sku: { contains: query, mode: 'insensitive' } },
         ]
       },
-      statusFilter === 'archived' 
-        ? { status: 'archived' } 
-        : statusFilter 
-            ? { status: statusFilter } 
-            : { status: { not: 'archived' } },
+      statusCondition, // 🚀 Applied corrected status logic
       
-      typeFilter ? { productType: typeFilter as ProductType } : {},
+      typeFilter ? { productType: typeFilter.toUpperCase() as ProductType } : {}, // Ensure Uppercase for Enum
       categoryFilter ? { category: { name: categoryFilter } } : {},
     ]
   };
@@ -84,11 +93,12 @@ export default async function ProductListPage(props: ProductsPageProps) {
 
   const totalPages = Math.ceil(totalProducts / limit);
 
+  // 🚀 FIX: Count Logic using Enum check
   const counts = {
-    all: statusCounts.filter(s => s.status !== 'archived').reduce((acc, curr) => acc + curr._count.status, 0),
-    active: statusCounts.find(s => s.status === 'active')?._count.status || 0,
-    draft: statusCounts.find(s => s.status === 'draft')?._count.status || 0,
-    archived: statusCounts.find(s => s.status === 'archived')?._count.status || 0,
+    all: statusCounts.filter(s => s.status !== ProductStatus.ARCHIVED).reduce((acc, curr) => acc + curr._count.status, 0),
+    active: statusCounts.find(s => s.status === ProductStatus.ACTIVE)?._count.status || 0,
+    draft: statusCounts.find(s => s.status === ProductStatus.DRAFT)?._count.status || 0,
+    archived: statusCounts.find(s => s.status === ProductStatus.ARCHIVED)?._count.status || 0,
   };
 
   return (

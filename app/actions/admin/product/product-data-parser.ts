@@ -1,6 +1,6 @@
 // app/actions/admin/product/helpers/product-data-parser.ts
 
-import { ProductType, TaxStatus } from "@prisma/client";
+import { ProductType, TaxStatus, ProductStatus } from "@prisma/client";
 import { generateSlug, parseJSON, cleanPrice } from "@/app/actions/admin/product/product-utils";
 
 export const parseProductFormData = (formData: FormData) => {
@@ -8,14 +8,25 @@ export const parseProductFormData = (formData: FormData) => {
     const rawSlug = formData.get("slug") as string;
     const slug = rawSlug && rawSlug.trim() !== "" ? rawSlug : generateSlug(name);
 
+    // Enum Conversions
+    const statusInput = (formData.get("status") as string || "DRAFT").toUpperCase();
+    const typeInput = (formData.get("productType") as string || "SIMPLE").toUpperCase();
+    
+    // 🚀 FIX: Map 'SHIPPING' to 'SHIPPING_ONLY'
+    let taxStatusInput = (formData.get("taxStatus") as string || "TAXABLE").toUpperCase();
+    if (taxStatusInput === "SHIPPING") {
+        taxStatusInput = "SHIPPING_ONLY";
+    }
+
     return {
         id: formData.get("id") as string,
         name,
         slug,
         description: formData.get("description") as string,
         shortDescription: formData.get("shortDescription") as string,
-        productType: (formData.get("productType") as string || "SIMPLE").toUpperCase() as ProductType,
-        status: formData.get("status") as string || "draft",
+        
+        productType: typeInput as ProductType,
+        status: statusInput as ProductStatus, 
 
         price: cleanPrice(formData.get("price") as string),
         salePrice: formData.get("salePrice") ? cleanPrice(formData.get("salePrice") as string) : null,
@@ -34,26 +45,21 @@ export const parseProductFormData = (formData: FormData) => {
         width: formData.get("width") ? parseFloat(formData.get("width") as string) : null,
         height: formData.get("height") ? parseFloat(formData.get("height") as string) : null,
 
-        // Relations Text
         categoryName: formData.get("category") as string,
         vendorName: formData.get("vendor") as string,
 
-        // Settings
         purchaseNote: formData.get("purchaseNote") as string,
         menuOrder: parseInt(formData.get("menuOrder") as string) || 0,
         enableReviews: formData.get("enableReviews") === "true",
 
-        // SEO
         metaTitle: formData.get("metaTitle") as string,
         metaDesc: formData.get("metaDesc") as string,
         seoCanonicalUrl: formData.get("seoCanonicalUrl") as string,
 
-        // Tax & Shipping IDs
-        taxStatus: (formData.get("taxStatus") as string || "TAXABLE").toUpperCase() as TaxStatus,
+        taxStatus: taxStatusInput as TaxStatus, // Now Correct Enum
         taxRateId: formData.get("taxRateId") as string,
         shippingClassId: formData.get("shippingClassId") as string,
 
-        // JSON Arrays
         tagsList: parseJSON<string[]>(formData.get("tags") as string, []),
         collectionIds: parseJSON<string[]>(formData.get("collectionIds") as string, []),
         upsells: parseJSON<string[]>(formData.get("upsells") as string, []),
@@ -66,7 +72,6 @@ export const parseProductFormData = (formData: FormData) => {
         variationsData: parseJSON<any[]>(formData.get("variations") as string, []),
         featuredImage: formData.get("featuredImage") as string || null,
 
-        // New Fields
         lowStockThreshold: parseInt(formData.get("lowStockThreshold") as string) || 2,
         backorderStatus: formData.get("backorderStatus") as any || "DO_NOT_ALLOW",
         soldIndividually: formData.get("soldIndividually") === "true",
@@ -75,7 +80,6 @@ export const parseProductFormData = (formData: FormData) => {
         countryOfManufacture: formData.get("countryOfManufacture") as string || null,
         isDangerousGood: formData.get("isDangerousGood") === "true",
 
-        // 🔥 NEW FIELDS PARSING
         saleStart: formData.get("saleStart") as string || null,
         saleEnd: formData.get("saleEnd") as string || null,
 

@@ -4,12 +4,16 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { ProductStatus } from "@prisma/client"; // 🚀 IMPORT ENUM
 
 export async function deleteProduct(id: string) {
   try {
     await db.product.update({
         where: { id },
-        data: { deletedAt: new Date(), status: 'archived' }
+        data: { 
+            deletedAt: new Date(), 
+            status: ProductStatus.ARCHIVED // 🚀 FIX: Use Enum
+        }
     });
     revalidatePath("/admin/products");
     return { success: true };
@@ -29,7 +33,7 @@ export async function bulkProductAction(formData: FormData) {
       case "trash":
         await db.product.updateMany({
           where: { id: { in: ids } },
-          data: { status: "archived" }
+          data: { status: ProductStatus.ARCHIVED } // 🚀 FIX
         });
         break;
       
@@ -43,21 +47,21 @@ export async function bulkProductAction(formData: FormData) {
       case "restore":
         await db.product.updateMany({
           where: { id: { in: ids } },
-          data: { status: "draft" } // Restore as draft for safety
+          data: { status: ProductStatus.DRAFT } // 🚀 FIX
         });
         break;
 
       case "publish":
         await db.product.updateMany({
           where: { id: { in: ids } },
-          data: { status: "active" }
+          data: { status: ProductStatus.ACTIVE } // 🚀 FIX
         });
         break;
 
       case "unpublish":
         await db.product.updateMany({
           where: { id: { in: ids } },
-          data: { status: "draft" }
+          data: { status: ProductStatus.DRAFT } // 🚀 FIX
         });
         break;
     }
@@ -73,7 +77,7 @@ export async function moveToTrash(id: string) {
     try {
         await db.product.update({
             where: { id },
-            data: { status: 'archived' }
+            data: { status: ProductStatus.ARCHIVED } // 🚀 FIX
         });
         revalidatePath("/admin/products");
     } catch (error) {

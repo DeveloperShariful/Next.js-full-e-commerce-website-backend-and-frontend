@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import useCart from "@/app/actions/storeFont/use-cart"; // গ্লোবাল স্টোর
+import useCart from "@/app/actions/storefront/use-cart"; // গ্লোবাল স্টোর
 import { ShoppingCart, X, Trash2, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

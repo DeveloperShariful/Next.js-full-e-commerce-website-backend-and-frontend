@@ -1,3 +1,5 @@
+// app/admin/products/create/_components/RichTecxEiditor.tsx
+
 "use client";
 
 import { useState, useMemo } from "react";

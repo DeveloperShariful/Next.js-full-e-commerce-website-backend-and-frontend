@@ -43,14 +43,13 @@ export default function CreateProductPage() {
     slug: "",
     description: "",
     shortDescription: "",
-    productType: "SIMPLE", // Lowercase handled in useEffect, keeping default uppercase consistent with Prisma enum if needed, or simple string
+    productType: "SIMPLE", 
     status: "draft",
     isVirtual: false,
     isDownloadable: false,
     price: "",
     salePrice: "",
     
-    // 🔥 FIX 1: Renamed 'cost' to 'costPerItem' to match types.ts
     costPerItem: "", 
     
     taxStatus: "taxable",
@@ -93,7 +92,7 @@ export default function CreateProductPage() {
     countryOfManufacture: "",
     isDangerousGood: false,
     
-    // 🔥 Sale & Download
+    // Sale & Download
     saleStart: "",
     saleEnd: "",
     downloadLimit: "",
@@ -121,17 +120,19 @@ export default function CreateProductPage() {
             slug: p.slug,
             description: p.description || "",
             shortDescription: p.shortDescription || "",
+            
+            // 🚀 FIX: Convert DB Uppercase Enum to Lowercase for UI
             productType: p.productType.toLowerCase(),
-            status: p.status,
+            status: p.status.toLowerCase(),
+            
             isVirtual: p.isVirtual,
             isDownloadable: p.isDownloadable,
             price: p.price,
             salePrice: p.salePrice || "",
             
-            // 🔥 FIX 2: Correct mapping for costPerItem
             costPerItem: p.costPerItem || "",
             
-            taxStatus: p.taxStatus || "taxable",
+            taxStatus: p.taxStatus ? p.taxStatus.toLowerCase() : "taxable",
             taxRateId: p.taxRateId || "",
             shippingClassId: p.shippingClassId || "",
             seoCanonicalUrl: p.seoCanonicalUrl || "",
@@ -164,7 +165,6 @@ export default function CreateProductPage() {
               id: v.id, name: v.name, price: v.price, stock: v.stock, sku: v.sku || "", attributes: v.attributes || {}
             })) : [],
             
-            // Advanced Fields
             lowStockThreshold: p.lowStockThreshold || 2,
             backorderStatus: p.backorderStatus || "DO_NOT_ALLOW",
             soldIndividually: p.soldIndividually || false,
@@ -173,11 +173,9 @@ export default function CreateProductPage() {
             countryOfManufacture: p.countryOfManufacture || "",
             isDangerousGood: p.isDangerousGood || false,
 
-            // 🔥 FIX 3: Fetching Logic for New Fields (Sale & Limits)
             saleStart: p.saleStart ? new Date(p.saleStart).toISOString().split('T')[0] : "",
             saleEnd: p.saleEnd ? new Date(p.saleEnd).toISOString().split('T')[0] : "",
             
-            // -1 means unlimited/never, so show empty string in UI
             downloadLimit: p.downloadLimit === -1 ? "" : p.downloadLimit,
             downloadExpiry: p.downloadExpiry === -1 ? "" : p.downloadExpiry,
           });
@@ -201,13 +199,10 @@ export default function CreateProductPage() {
         if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles'].includes(key)) {
             submitData.append(key, JSON.stringify(value));
         } else if (value !== null && value !== undefined) {
-            // Note: costPerItem will be appended as "costPerItem". 
-            // Ensure your parser reads "costPerItem" or "cost".
             submitData.append(key, String(value));
         }
     });
     
-    // Explicitly handle 'cost' mapping if parser expects 'cost'
     if(formData.costPerItem) {
         submitData.append('cost', String(formData.costPerItem));
     }

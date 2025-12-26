@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ShoppingCart, Search, Menu } from "lucide-react";
 // [FIX] Clerk এর কম্পোনেন্ট ইমপোর্ট করা হয়েছে
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import useCart from "@/app/actions/storeFont/use-cart"; 
+import useCart from "@/app/actions/storefront/use-cart"; 
 
 const Header = () => {
   const cart = useCart();

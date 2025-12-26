@@ -3,6 +3,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { ProductStatus } from "@prisma/client";
 
 // --- SINGLE PRODUCT READ ---
 export async function getProductById(id: string) {
@@ -12,11 +13,10 @@ export async function getProductById(id: string) {
       include: {
         category: true,
         brand: true,
-        // Update: Including new relations
         collections: true, 
         shippingClass: true,
         taxRate: true,
-        downloadFiles: true, // For digital products
+        downloadFiles: true,
         
         images: { orderBy: { position: 'asc' } },
         attributes: { orderBy: { position: 'asc' } },
@@ -38,7 +38,7 @@ export async function getProductById(id: string) {
   }
 }
 
-// --- HELPER READ ACTIONS (For Dropdowns) ---
+// --- HELPER READ ACTIONS ---
 
 export async function getBrands() {
   try {
@@ -102,7 +102,6 @@ export async function getShippingClasses() {
   }
 }
 
-// Existing attribute fetcher (if not in attribute.ts)
 export async function getAttributes() {
     try {
         const attributes = await db.attribute.findMany({
@@ -125,13 +124,13 @@ export async function searchProducts(query: string) {
           { name: { contains: query, mode: 'insensitive' } },
           { sku: { contains: query, mode: 'insensitive' } },
         ],
-        status: 'active', // Only show active products
+        status: ProductStatus.ACTIVE, // 🚀 FIX: Use Enum
       },
-      take: 5, // Limit suggestions
+      take: 5,
       select: { 
         id: true, 
         name: true, 
-        images: true, // Assuming you have an 'image' field or 'featuredImage'
+        images: true, 
         featuredImage: true,
         sku: true 
       }

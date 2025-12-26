@@ -4,18 +4,38 @@ import { generateSlug, cleanPrice } from "@/app/actions/admin/product/product-ut
 
 // ইনভেন্টরি হ্যান্ডেল করা
 export async function handleInventory(tx: any, product: any, data: any, locationId: string) {
+    // শুধুমাত্র সিম্পল প্রোডাক্টের জন্য মেইন ইনভেন্টরি আপডেট হবে
     if (data.productType === 'SIMPLE' && data.trackQuantity && locationId) {
-        await tx.inventoryLevel.upsert({
+        
+        // 🚀 FIX: upsert এর বদলে findFirst ব্যবহার করা হচ্ছে
+        // কারণ Prisma upsert composite key তে 'null' সাপোর্ট করে না
+        const existingInventory = await tx.inventoryLevel.findFirst({
             where: {
-                locationId_productId_variantId: {
+                locationId: locationId,
+                productId: product.id,
+                variantId: null // এখানে null দিলে সমস্যা নেই
+            }
+        });
+
+        if (existingInventory) {
+            // যদি আগে থেকেই থাকে, আপডেট করো
+            await tx.inventoryLevel.update({
+                where: { id: existingInventory.id },
+                data: { quantity: data.stock }
+            });
+        } else {
+            // না থাকলে নতুন তৈরি করো
+            await tx.inventoryLevel.create({
+                data: {
+                    quantity: data.stock,
                     locationId,
                     productId: product.id,
-                    variantId: "" 
-                } as any 
-            },
-            update: { quantity: data.stock },
-            create: { quantity: data.stock, locationId, productId: product.id }
-        });
+                    variantId: null
+                }
+            });
+        }
+        
+        // প্রোডাক্ট টেবিলেও টোটাল স্টক আপডেট রাখা
         await tx.product.update({ where: { id: product.id }, data: { stock: data.stock } });
     }
 }
@@ -48,7 +68,7 @@ export async function handleDigitalFiles(tx: any, productId: string, isDownloada
     }
 }
 
-// অ্যাট্রিবিউট সিঙ্ক করা
+// অ্যাট্রিবিউট সিঙ্ক করা (Optimized)
 export async function handleAttributes(tx: any, productId: string, attributesData: any[]) {
     const existingAttrs = await tx.productAttribute.findMany({ where: { productId } });
     const existingAttrIds = existingAttrs.map((a: any) => a.id);
@@ -59,7 +79,8 @@ export async function handleAttributes(tx: any, productId: string, attributesDat
         await tx.productAttribute.deleteMany({ where: { id: { in: attrsToDelete } } });
     }
 
-    for (const attr of attributesData) {
+    // Parallel processing for speed
+    await Promise.all(attributesData.map(async (attr) => {
         const attrData = {
             name: attr.name,
             values: attr.values,
@@ -69,16 +90,16 @@ export async function handleAttributes(tx: any, productId: string, attributesDat
         };
 
         if (attr.id && !attr.id.toString().startsWith("temp_")) {
-            await tx.productAttribute.update({ where: { id: attr.id }, data: attrData });
+            return tx.productAttribute.update({ where: { id: attr.id }, data: attrData });
         } else {
-            await tx.productAttribute.create({ data: { ...attrData, productId } });
+            return tx.productAttribute.create({ data: { ...attrData, productId } });
         }
-    }
+    }));
 }
 
-// ভেরিয়েশন সিঙ্ক করা
+// ভেরিয়েশন সিঙ্ক করা
 export async function handleVariations(tx: any, productId: string, variationsData: any[], productType: string, locationId: string) {
-    if (productType !== 'VARIABLE') return;
+    if (productType.toUpperCase() !== 'VARIABLE') return;
 
     const existingVars = await tx.productVariant.findMany({ where: { productId } });
     const existingVarIds = existingVars.map((v: any) => v.id);
@@ -114,6 +135,7 @@ export async function handleVariations(tx: any, productId: string, variationsDat
         }
 
         if (locationId) {
+            // ভেরিয়েশনের ক্ষেত্রে variantId কখনোই null থাকে না, তাই এখানে upsert কাজ করবে
             await tx.inventoryLevel.upsert({
                 where: {
                     locationId_productId_variantId: {

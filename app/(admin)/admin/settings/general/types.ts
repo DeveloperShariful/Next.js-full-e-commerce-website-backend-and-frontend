@@ -1,3 +1,5 @@
+// File: app/admin/settings/general/types.ts
+
 export interface GeneralSettingsData {
     storeName: string;
     storeEmail: string;

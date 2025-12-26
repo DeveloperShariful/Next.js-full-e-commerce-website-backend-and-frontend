@@ -59,7 +59,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
     // 3. Ensure Default Location (For Inventory)
     let locationId = "";
     if (data.trackQuantity) {
-        const loc = await db.location.findFirst({ where: { isDefault: true } });
+        // Performance: select only id
+        const loc = await db.location.findFirst({ where: { isDefault: true }, select: { id: true } });
         if (loc) {
             locationId = loc.id;
         } else {
@@ -68,24 +69,28 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         }
     }
 
-    // 4. Global Attribute Sync
-    for (const attr of data.attributesData) {
-        if (!attr.name) continue;
+    // 4. Global Attribute Sync (Optimized)
+    // Promise.all used to sync attributes in parallel
+    await Promise.all(data.attributesData.map(async (attr) => {
+        if (!attr.name) return;
         const attrSlug = generateSlug(attr.name);
         const existingGlobal = await db.attribute.findUnique({ where: { slug: attrSlug } });
         
         if (existingGlobal) {
             const mergedValues = Array.from(new Set([...existingGlobal.values, ...attr.values]));
-            await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
+            // Only update if values actually changed to save DB write
+            if (mergedValues.length !== existingGlobal.values.length) {
+                await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
+            }
         } else {
             await db.attribute.create({ data: { name: attr.name, slug: attrSlug, values: attr.values } });
         }
-    }
+    }));
 
     // 5. Database Transaction
     await db.$transaction(async (tx) => {
         
-        // --- RELATION LOGIC (Cleaned Up) ---
+        // --- RELATION LOGIC ---
         const taxRateRelation = data.taxRateId ? { connect: { id: data.taxRateId } } : (type === "UPDATE" ? { disconnect: true } : undefined);
         const shippingClassRelation = data.shippingClassId ? { connect: { id: data.shippingClassId } } : (type === "UPDATE" ? { disconnect: true } : undefined);
         
@@ -108,13 +113,14 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         } : undefined;
 
         // --- Prepare Main Product Data ---
-        const productData: Prisma.ProductCreateInput | Prisma.ProductUpdateInput = {
+        // 🚀 SCHEMA FIX: Cast types correctly for Prisma Enum
+        const productData: any = {
             name: data.name,
             slug: slug,
             description: data.description,
             shortDescription: data.shortDescription,
-            productType: data.productType,
-            status: data.status,
+            productType: data.productType, // Already uppercased in parser
+            status: data.status,           // Already uppercased in parser
             price: data.price,
             salePrice: data.salePrice,
             costPerItem: data.costPerItem,
@@ -132,11 +138,9 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             saleStart: data.saleStart ? new Date(data.saleStart) : null,
             saleEnd: data.saleEnd ? new Date(data.saleEnd) : null,
             
-            // যদি ভ্যালু না থাকে, তবে -1 (আনলিমিটেড) সেট হবে
             downloadLimit: data.downloadLimit !== null ? data.downloadLimit : -1,
             downloadExpiry: data.downloadExpiry !== null ? data.downloadExpiry : -1,
 
-            // New Fields
             lowStockThreshold: data.lowStockThreshold,
             backorderStatus: data.backorderStatus,
             soldIndividually: data.soldIndividually,
@@ -176,24 +180,26 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         if (data.id) {
             // UPDATE
              await tx.product.update({ where: { id: data.id }, data: { tags: { set: [] } } });
-             // Type cast to avoid TS issues with productCode (handled in prev steps)
              product = await tx.product.update({
                 where: { id: data.id },
-                data: productData as Prisma.ProductUpdateInput
+                data: productData
             });
         } else {
             // CREATE
             product = await tx.product.create({
-                data: productData as Prisma.ProductCreateInput
+                data: productData
             });
         }
 
-        // --- DELEGATE SUB-TASKS TO SERVICES ---
-        await handleInventory(tx, product, data, locationId);
-        await handleImages(tx, product.id, data.galleryImages);
-        await handleDigitalFiles(tx, product.id, data.isDownloadable, data.digitalFiles);
-        await handleAttributes(tx, product.id, data.attributesData);
-        await handleVariations(tx, product.id, data.variationsData, data.productType, locationId);
+        // --- 🚀 PERFORMANCE FIX: Use Promise.all for sub-tasks ---
+        // These tasks don't depend on each other, so we run them in parallel
+        await Promise.all([
+            handleInventory(tx, product, data, locationId),
+            handleImages(tx, product.id, data.galleryImages),
+            handleDigitalFiles(tx, product.id, data.isDownloadable, data.digitalFiles),
+            handleAttributes(tx, product.id, data.attributesData),
+            handleVariations(tx, product.id, data.variationsData, data.productType, locationId)
+        ]);
 
     }, { maxWait: 10000, timeout: 30000 });
 

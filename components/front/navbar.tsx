@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { ShoppingCart, Search, Menu } from "lucide-react";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import useCart from "@/app/actions/storefront/use-cart"; 
+import useCart from "@/app/actions/storefront/cart/use-cart"; 
 
 const Navbar = () => {
   const cart = useCart();

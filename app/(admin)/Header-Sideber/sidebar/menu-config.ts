@@ -1,17 +1,20 @@
+// File: app/(admin)/admin/Header-Sideber/sidebar/menu-config.ts
+
 import { 
   LayoutDashboard, ShoppingCart, Package, Users, 
-  TicketPercent, BarChart3, Settings, ListTree, 
-  Tag, Box, FileText, ShieldCheck, 
-  MessageSquare, ScrollText, Image as ImageIcon, 
-  Star, Undo2, Megaphone, Truck 
+  TicketPercent, BarChart3, Settings, 
+  FileText, ShieldCheck, MessageSquare, ScrollText, 
+  Undo2, Megaphone, Truck
 } from "lucide-react";
-import { Role } from "@prisma/client"; // Prisma Enum ব্যবহার করছি Type Safety এর জন্য
+import { Role } from "@prisma/client";
 
 export interface SidebarItem {
   name: string;
   href: string;
-  icon: any;
-  roles?: Role[]; 
+  icon?: any;
+  roles?: Role[];
+  // 🚀 New: Submenu support
+  submenu?: { name: string; href: string; icon?: any }[]; 
 }
 
 export interface SidebarGroup {
@@ -32,29 +35,34 @@ export const sidebarConfig: SidebarGroup[] = [
     ]
   },
   {
-    title: "Catalog",
+    title: "Management",
     items: [
-      { name: "Products", href: "/admin/products", icon: Package },
-      { name: "Categories", href: "/admin/categories", icon: ListTree },
-      { name: "Attributes", href: "/admin/attributes", icon: Tag },
-      { name: "Reviews", href: "/admin/reviews", icon: Star },
-      { name: "Inventory", href: "/admin/inventory", icon: Box },
-      { name: "Media", href: "/admin/media", icon: ImageIcon },
-    ]
-  },
-  {
-    title: "Sales",
-    items: [
+      { 
+        name: "Products", // Parent Item
+        href: "/admin/products",    // Double Click Link
+        icon: Package,
+        // 🚀 All Catalog Items are now children
+        submenu: [
+           { name: "All Products", href: "/admin/products" },
+           { name: "Categories", href: "/admin/categories" },
+           { name: "Brands", href: "/admin/brands" },
+           { name: "Attributes", href: "/admin/attributes" },
+           { name: "Tags", href: "/admin/tags" },
+           { name: "Reviews", href: "/admin/reviews" },
+           { name: "Inventory", href: "/admin/inventory" },
+           { name: "Media", href: "/admin/media" },
+        ]
+      },
       { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
-      { name: "Invoices", href: "/admin/invoices", icon: FileText },
-      { name: "Shipments", href: "/admin/shipments", icon: Truck }, // Lucide Icon used
-      { name: "Refunds", href: "/admin/refunds", icon: Undo2 },
+      { name: "Customers", href: "/admin/customers", icon: Users },
     ]
   },
   {
-    title: "Customers",
+    title: "Operations",
     items: [
-      { name: "All Customers", href: "/admin/customers", icon: Users },
+      { name: "Invoices", href: "/admin/invoices", icon: FileText },
+      { name: "Shipments", href: "/admin/shipments", icon: Truck },
+      { name: "Refunds", href: "/admin/refunds", icon: Undo2 },
       { name: "Support Ticket", href: "/admin/support", icon: MessageSquare },
     ]
   },
@@ -69,7 +77,7 @@ export const sidebarConfig: SidebarGroup[] = [
   {
     title: "System",
     items: [
-      { name: "Staff & Roles", href: "/admin/staff", icon: ShieldCheck, roles: [Role.SUPER_ADMIN] }, // Only Super Admin
+      { name: "Staff & Roles", href: "/admin/staff", icon: ShieldCheck, roles: [Role.SUPER_ADMIN] },
       { name: "Activity Logs", href: "/admin/logs", icon: ScrollText, roles: [Role.SUPER_ADMIN] },
       { name: "Settings", href: "/admin/settings", icon: Settings, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ]

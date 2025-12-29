@@ -14,8 +14,9 @@ import {
     handleImages, 
     handleDigitalFiles, 
     handleAttributes, 
-    handleVariations 
-} from "./product-services";
+    handleVariations,
+    handleBundleItems // 🔥 UPDATE: Imported
+} from "./product-services"; // Note: Ensure path is correct based on your folder structure
 
 export type ProductFormState = {
   success: boolean;
@@ -59,7 +60,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
     // 3. Ensure Default Location (For Inventory)
     let locationId = "";
     if (data.trackQuantity) {
-        // Performance: select only id
         const loc = await db.location.findFirst({ where: { isDefault: true }, select: { id: true } });
         if (loc) {
             locationId = loc.id;
@@ -69,8 +69,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         }
     }
 
-    // 4. Global Attribute Sync (Optimized)
-    // Promise.all used to sync attributes in parallel
+    // 4. Global Attribute Sync
     await Promise.all(data.attributesData.map(async (attr) => {
         if (!attr.name) return;
         const attrSlug = generateSlug(attr.name);
@@ -78,7 +77,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         
         if (existingGlobal) {
             const mergedValues = Array.from(new Set([...existingGlobal.values, ...attr.values]));
-            // Only update if values actually changed to save DB write
             if (mergedValues.length !== existingGlobal.values.length) {
                 await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
             }
@@ -113,14 +111,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         } : undefined;
 
         // --- Prepare Main Product Data ---
-        // 🚀 SCHEMA FIX: Cast types correctly for Prisma Enum
         const productData: any = {
             name: data.name,
             slug: slug,
             description: data.description,
             shortDescription: data.shortDescription,
-            productType: data.productType, // Already uppercased in parser
-            status: data.status,           // Already uppercased in parser
+            productType: data.productType, 
+            status: data.status,           
             price: data.price,
             salePrice: data.salePrice,
             costPerItem: data.costPerItem,
@@ -134,6 +131,17 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             isVirtual: data.isVirtual,
             isDownloadable: data.isDownloadable,
             featuredImage: data.featuredImage,
+
+            // Media & SEO
+            videoUrl: data.videoUrl,
+            videoThumbnail: data.videoThumbnail,
+            gender: data.gender,
+            ageGroup: data.ageGroup,
+            metafields: data.metafields || Prisma.DbNull,
+            seoSchema: data.seoSchema || Prisma.DbNull,
+            
+            // 🔥 NEW: Featured Flag
+            isFeatured: data.isFeatured || false,
 
             saleStart: data.saleStart ? new Date(data.saleStart) : null,
             saleEnd: data.saleEnd ? new Date(data.saleEnd) : null,
@@ -191,14 +199,14 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             });
         }
 
-        // --- 🚀 PERFORMANCE FIX: Use Promise.all for sub-tasks ---
-        // These tasks don't depend on each other, so we run them in parallel
+        // --- SUB TASKS ---
         await Promise.all([
             handleInventory(tx, product, data, locationId),
             handleImages(tx, product.id, data.galleryImages),
             handleDigitalFiles(tx, product.id, data.isDownloadable, data.digitalFiles),
             handleAttributes(tx, product.id, data.attributesData),
-            handleVariations(tx, product.id, data.variationsData, data.productType, locationId)
+            handleVariations(tx, product.id, data.variationsData, data.productType, locationId),
+            handleBundleItems(tx, product.id, data.productType, data.bundleItems) // 🔥 UPDATE: Added Bundle Handler
         ]);
 
     }, { maxWait: 10000, timeout: 30000 });

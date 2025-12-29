@@ -1,4 +1,4 @@
-// File: app/actions/transdirect/sync-order.ts
+// File: app/actions/order/transdirect-sync-order.ts
 
 "use server";
 
@@ -44,7 +44,7 @@ export async function syncOrderToTransdirect(orderId: string) {
             height,
             quantity: item.quantity,
             value: item.price,
-            type: "carton" // ✅ FIX: This is mandatory
+            type: "carton" // ✅ RESTORED: Mandatory field
         };
     });
 
@@ -63,7 +63,7 @@ export async function syncOrderToTransdirect(orderId: string) {
     const receiver = {
       name: `${shipping.firstName || 'Guest'} ${shipping.lastName || ''}`.trim(),
       address: shipping.address1 || "1 Main St",
-      suburb: cleanSuburb(shipping.city), // ✅ FIX: Clean Suburb
+      suburb: cleanSuburb(shipping.city), // ✅ RESTORED: Clean Suburb logic
       postcode: shipping.postcode || "2000",
       state: shipping.state || "NSW",
       country: "AU",
@@ -76,7 +76,7 @@ export async function syncOrderToTransdirect(orderId: string) {
       name: config.senderName || "Store Admin",
       company_name: config.senderCompany || "My Store",
       address: config.senderAddress || "123 Street",
-      suburb: cleanSuburb(config.senderSuburb || "Sydney"), // ✅ FIX: Clean Sender Suburb
+      suburb: cleanSuburb(config.senderSuburb || "Sydney"), // ✅ RESTORED: Clean Sender Suburb
       postcode: config.senderPostcode || "2000",
       state: config.senderState || "NSW",
       phone: (config.senderPhone || "0400000000").replace(/\s/g, ''),
@@ -114,14 +114,25 @@ export async function syncOrderToTransdirect(orderId: string) {
 
     if (!res.ok) {
       console.error("❌ TRANSDIRECT ERROR:", JSON.stringify(responseData));
-      // "No access to booking" বা "Duplicate" এরর হ্যান্ডলিং
       if (res.status === 500 && JSON.stringify(responseData).includes("No access")) {
           return { success: false, error: "Transdirect Error: Duplicate Order ID or Invalid Address format." };
       }
       return { success: false, error: `Transdirect Failed: ${JSON.stringify(responseData)}` };
     }
 
-    // ৫. সফল
+    // ৫. সফল - ডাটাবেস আপডেট (স্কিমার অ্যাডভান্সড ফিল্ড সহ)
+    // ✅ NEW: Booking ID, Label, Invoice URL সেভ করা হচ্ছে
+    await db.order.update({
+        where: { id: orderId },
+        data: {
+            transdirectBookingId: responseData.id,
+            transdirectOrderStatus: "booked",
+            transdirectLabelUrl: responseData.label_url || null, 
+            transdirectInvoiceUrl: responseData.invoice_url || null,
+            transdirectBookingRef: responseData.reference || null
+        }
+    });
+
     await db.orderNote.create({
       data: {
         orderId: order.id,

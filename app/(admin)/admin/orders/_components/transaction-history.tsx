@@ -1,17 +1,25 @@
 // File Location: app/admin/orders/_components/transaction-history.tsx
 
-"use client"
+"use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, History, RefreshCcw } from "lucide-react";
+import { Button } from "@/components/ui/button"; // ✅ NEW
+import { AlertTriangle, History, RefreshCcw, Settings } from "lucide-react";
 import { format } from "date-fns";
+import { ReturnModal } from "./return-modal"; // ✅ NEW IMPORTS
+import { DisputeModal } from "./dispute-modal"; // ✅ NEW IMPORTS
 
 export const TransactionHistory = ({ order }: { order: any }) => {
   const transactions = order.transactions || [];
   const disputes = order.disputes || [];
   const returns = order.returns || [];
+
+  // ✅ STATE FOR MODALS
+  const [selectedReturn, setSelectedReturn] = useState<any>(null);
+  const [selectedDispute, setSelectedDispute] = useState<any>(null);
 
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency || 'USD' }).format(amount);
@@ -20,19 +28,29 @@ export const TransactionHistory = ({ order }: { order: any }) => {
   return (
     <div className="space-y-6">
         
-        {/* 1. DISPUTE ALERT */}
+        {/* 1. DISPUTE ALERT & MANAGEMENT */}
         {disputes.length > 0 && (
              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm">
                 <div className="flex items-center gap-2 text-red-700 font-bold mb-1">
                     <AlertTriangle size={18} /> Payment Dispute Detected
                 </div>
                 <p className="text-sm text-red-600 mb-2">
-                    This order has an active dispute or chargeback. Please review the evidence immediately.
+                    This order has an active dispute. Please review immediately.
                 </p>
                 {disputes.map((dispute: any) => (
-                    <div key={dispute.id} className="text-xs bg-white p-2 rounded border border-red-100 flex justify-between">
-                        <span>Status: <span className="font-bold uppercase">{dispute.status}</span></span>
-                        <span className="font-mono">{formatMoney(dispute.amount)}</span>
+                    <div key={dispute.id} className="text-xs bg-white p-2 rounded border border-red-100 flex justify-between items-center mb-1">
+                        <div>
+                            <span>Status: <span className="font-bold uppercase">{dispute.status}</span></span>
+                            <span className="ml-2 font-mono text-slate-500">{formatMoney(dispute.amount)}</span>
+                        </div>
+                        <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            className="h-6 text-[10px]"
+                            onClick={() => setSelectedDispute(dispute)}
+                        >
+                            Update Status
+                        </Button>
                     </div>
                 ))}
              </div>
@@ -109,21 +127,50 @@ export const TransactionHistory = ({ order }: { order: any }) => {
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
                     {returns.map((ret: any) => (
-                        <div key={ret.id} className="flex justify-between items-start border border-slate-100 p-3 rounded-md bg-white">
+                        <div key={ret.id} className="flex justify-between items-center border border-slate-100 p-3 rounded-md bg-white hover:bg-slate-50 transition">
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <Badge variant="secondary" className="uppercase text-[10px]">{ret.status}</Badge>
+                                    <Badge variant="secondary" className={`uppercase text-[10px] ${
+                                        ret.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                                        ret.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                        {ret.status}
+                                    </Badge>
                                     <span className="text-xs text-slate-400">{format(new Date(ret.createdAt), "MMM d, yyyy")}</span>
                                 </div>
                                 <p className="text-sm text-slate-700 font-medium">Reason: {ret.reason}</p>
                             </div>
                             <div className="text-right">
-                                <span className="text-xs text-slate-400 italic">Action pending</span>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-7 text-xs gap-1"
+                                    onClick={() => setSelectedReturn(ret)}
+                                >
+                                    <Settings size={12}/> Manage
+                                </Button>
                             </div>
                         </div>
                     ))}
                 </CardContent>
              </Card>
+        )}
+
+        {/* ✅ Modals Render */}
+        {selectedReturn && (
+            <ReturnModal 
+                isOpen={!!selectedReturn} 
+                onClose={() => setSelectedReturn(null)} 
+                returnReq={selectedReturn} 
+            />
+        )}
+        
+        {selectedDispute && (
+            <DisputeModal 
+                isOpen={!!selectedDispute} 
+                onClose={() => setSelectedDispute(null)} 
+                dispute={selectedDispute} 
+            />
         )}
     </div>
   );

@@ -1,7 +1,9 @@
+// app/admin/products/create/_components/Publish.tsx
+
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ComponentProps } from "../types";
-import { ChevronUp, Trash2 } from "lucide-react"; // Icon updated
+import { ChevronUp, Trash2, Star } from "lucide-react"; 
 import { toast } from "react-hot-toast";
 import { moveToTrash } from "@/app/actions/admin/product/product-list";
 
@@ -15,7 +17,6 @@ export default function Publish({ data, updateData, loading, onSubmit }: Props) 
 
     const handleTrash = () => {
         if (!data.id) return;
-        
         const confirm = window.confirm("Are you sure you want to move this product to trash?");
         if (!confirm) return;
 
@@ -36,7 +37,8 @@ export default function Publish({ data, updateData, loading, onSubmit }: Props) 
                 <span>Publish</span>
                 <ChevronUp size={14} />
             </div>
-            <div className="p-3 space-y-3">
+            <div className="p-3 space-y-4">
+                {/* Status Select */}
                 <div className="flex justify-between items-center text-xs">
                     <span className="text-gray-600">Status:</span>
                     <select 
@@ -49,9 +51,25 @@ export default function Publish({ data, updateData, loading, onSubmit }: Props) 
                         <option value="archived">Archived</option>
                     </select>
                 </div>
+
+                {/* 🔥 NEW: Featured Checkbox */}
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                    <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none">
+                        <input 
+                            type="checkbox" 
+                            checked={data.isFeatured} 
+                            onChange={e => updateData('isFeatured', e.target.checked)} 
+                            className="rounded text-[#2271b1] focus:ring-[#2271b1]"
+                        />
+                        <span className="flex items-center gap-1">
+                            <Star size={12} className={data.isFeatured ? "fill-yellow-400 text-yellow-400" : "text-gray-400"}/>
+                            Featured Product
+                        </span>
+                    </label>
+                </div>
                 
+                {/* Actions Footer */}
                 <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                    {/* Trash Button Logic Added */}
                     {data.id ? (
                         <button 
                             type="button" 
@@ -59,10 +77,10 @@ export default function Publish({ data, updateData, loading, onSubmit }: Props) 
                             disabled={isPending || loading}
                             className="text-red-600 hover:underline text-xs flex items-center gap-1 disabled:opacity-50"
                         >
-                            {isPending ? "Moving..." : "Move to trash"}
+                            <Trash2 size={12}/> {isPending ? "Moving..." : "Trash"}
                         </button>
                     ) : (
-                        <div></div> // Empty div to keep layout consistent for new products
+                        <div></div> 
                     )}
 
                     <button 

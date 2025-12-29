@@ -1,52 +1,52 @@
-// app/admin/page.tsx
+// File: app/admin/page.tsx
 
 import { db } from "@/lib/db";
 import { Overview } from "./_components/overview";
 import { 
   DollarSign, ShoppingBag, Package, Users, 
-  ArrowUpRight, AlertCircle, Tag, Star 
+  ArrowUpRight, AlertCircle 
 } from "lucide-react";
 import Link from "next/link"; 
-import { OrderStatus, ProductStatus, PaymentStatus } from "@prisma/client";
-
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat("en-BD", {
-    style: "currency",
-    currency: "BDT",
-    minimumFractionDigits: 0,
-  }).format(price);
-};
+import { OrderStatus, ProductStatus } from "@prisma/client";
 
 export default async function AdminDashboardPage() {
   
-  // 1. Total Revenue (Only Paid or Completed Orders)
+  // 1. Fetch Global Settings for Currency
+  const settings = await db.storeSettings.findUnique({
+    where: { id: "settings" }
+  });
+
+  const currencyCode = settings?.currency || "USD"; // Default fallback if not set
+  const currencySymbol = settings?.currencySymbol || "$";
+
+  // Helper: Dynamic Price Formatter
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode,
+      minimumFractionDigits: 0,
+    }).format(price);
+  };
+
+  // 2. Total Revenue (Only Paid or Completed Orders)
   const revenueResult = await db.order.aggregate({
     _sum: { total: true },
     where: { 
-      status: { not: OrderStatus.CANCELLED },
-      // Optional: Filter by payment status if needed
-      // paymentStatus: PaymentStatus.PAID 
+      status: { not: OrderStatus.CANCELLED } 
     }
   });
   const totalRevenue = revenueResult._sum.total || 0;
 
-  // 2. Total Orders Count
+  // 3. Counts
   const totalOrders = await db.order.count();
-  
-  // 3. Products Count (Active & Draft)
   const productsCount = await db.product.count({ 
-    where: { 
-      status: { not: ProductStatus.ARCHIVED } 
-    } 
+    where: { status: { not: ProductStatus.ARCHIVED } } 
   }); 
-  
-  // 4. Other Counts
   const customersCount = await db.user.count({ where: { role: 'CUSTOMER' } });
   const brandsCount = await db.brand.count();
   const reviewsCount = await db.review.count();
 
-  // 5. Low Stock Alert (Using InventoryLevel)
-  // Fetching inventory levels where quantity is 5 or less
+  // 4. Low Stock Alert (Using InventoryLevel as per Schema)
   const lowStockItems = await db.inventoryLevel.findMany({
     where: { 
       quantity: { lte: 5 }
@@ -54,7 +54,7 @@ export default async function AdminDashboardPage() {
     take: 5,
     include: {
       product: {
-        select: { name: true, featuredImage: true }
+        select: { name: true }
       },
       variant: {
         select: { name: true }
@@ -66,7 +66,7 @@ export default async function AdminDashboardPage() {
     orderBy: { quantity: 'asc' }
   });
 
-  // 6. Sales Graph Data (Current Year)
+  // 5. Sales Graph Data (Current Year)
   const currentYear = new Date().getFullYear();
   const startOfYear = new Date(currentYear, 0, 1);
   const endOfYear = new Date(currentYear, 11, 31);
@@ -174,7 +174,8 @@ export default async function AdminDashboardPage() {
            <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-lg text-slate-800">Sales Overview ({currentYear})</h3>
            </div>
-           <Overview data={graphData} />
+           {/* 🚀 Passing Dynamic Currency Symbol */}
+           <Overview data={graphData} currencySymbol={currencySymbol} />
         </div>
 
         {/* Low Stock Alert */}

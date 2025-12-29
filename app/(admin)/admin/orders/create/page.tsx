@@ -15,6 +15,7 @@ import { CustomerSelector } from "./_components/customer-selector";
 import { OrderSummary } from "./_components/order-summary";
 import { Coupon } from "./_components/coupon"; 
 import { ShippingSelector } from "./_components/shipping-selector"; 
+import { GiftCardInput } from "./_components/gift-card-input"; // ✅ NEW IMPORT
 
 interface CartItem {
   productId: string;
@@ -41,29 +42,43 @@ export default function CreateOrderPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [shippingCost, setShippingCost] = useState(0);
   const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
+  const [appliedGiftCard, setAppliedGiftCard] = useState<any>(null); // ✅ NEW STATE
   
   const [pickupLocationId, setPickupLocationId] = useState<string | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [customerNote, setCustomerNote] = useState("");
+  const [transitTime, setTransitTime] = useState(""); // ✅ Transit Time State
 
   const totals = useMemo(() => {
     const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    
+    // Discount Calculation
     let discountAmount = 0;
     if (appliedDiscount) {
       discountAmount = appliedDiscount.type === "PERCENTAGE" 
         ? (subtotal * appliedDiscount.value) / 100 
         : appliedDiscount.value;
     }
+    
     const taxableAmount = Math.max(0, subtotal - discountAmount + shippingCost);
     const taxTotal = taxableAmount * 0.10; 
-    const finalTotal = taxableAmount + taxTotal;
+    
+    // Total before Gift Card
+    const grossTotal = taxableAmount + taxTotal;
 
-    return { subtotal, discountAmount, taxTotal, finalTotal };
-  }, [cartItems, appliedDiscount, shippingCost]);
+    // Gift Card Deduction
+    let giftCardDeduction = 0;
+    if (appliedGiftCard) {
+        giftCardDeduction = Math.min(appliedGiftCard.balance, grossTotal);
+    }
+
+    const finalTotal = Math.max(0, grossTotal - giftCardDeduction);
+
+    return { subtotal, discountAmount, taxTotal, grossTotal, finalTotal, giftCardDeduction };
+  }, [cartItems, appliedDiscount, shippingCost, appliedGiftCard]);
 
   const currentAddress = useMemo(() => {
       if (!selectedCustomer && !guestInputAddress) return null;
-      
       if (selectedCustomer?.addresses?.[0]) {
           return {
               city: selectedCustomer.addresses[0].city,
@@ -72,12 +87,7 @@ export default function CreateOrderPage() {
               country: selectedCustomer.addresses[0].country
           };
       }
-      
-      if (guestInputAddress) {
-          return guestInputAddress;
-      }
-      
-      return null;
+      return guestInputAddress;
   }, [selectedCustomer, guestInputAddress]);
 
   const addToCart = (product: any, variant?: any) => {
@@ -85,11 +95,6 @@ export default function CreateOrderPage() {
     const stock = variant ? variant.stock : product.stock;
     const name = variant ? `${product.name} - ${variant.name}` : product.name;
     const sku = variant ? variant.sku : product.sku;
-
-    const weight = Number(variant?.weight || product.weight || 1);
-    const length = Number(variant?.length || product.length || 10);
-    const width = Number(variant?.width || product.width || 10);
-    const height = Number(variant?.height || product.height || 10);
 
     const existing = cartItems.find(
       item => item.productId === product.id && item.variantId === (variant?.id || null)
@@ -116,10 +121,10 @@ export default function CreateOrderPage() {
         sku,
         image: product.featuredImage,
         maxStock: stock,
-        weight,
-        length,
-        width,
-        height
+        weight: Number(variant?.weight || product.weight || 1),
+        length: Number(variant?.length || product.length || 10),
+        width: Number(variant?.width || product.width || 10),
+        height: Number(variant?.height || product.height || 10)
       }]);
       toast.success("Added to order");
     }
@@ -146,17 +151,30 @@ export default function CreateOrderPage() {
       } : null,
       items: cartItems,
       shippingCost,
+      
       discountCode: appliedDiscount?.code || null,
       discountAmount: totals.discountAmount,
+      
+      // ✅ NEW: Gift Card Data
+      giftCardCode: appliedGiftCard?.code || null,
+      giftCardAmount: totals.giftCardDeduction,
+
       taxTotal: totals.taxTotal,
-      total: totals.finalTotal,
-      address: selectedCustomer.addresses?.[0] || null,
+      total: totals.finalTotal, // Final amount to be paid
+      
+      address: selectedCustomer.addresses?.[0] || guestInputAddress,
       pickupLocationId,
+      
+      // ✅ NEW: Transit Time
+      estimatedTransitTime: transitTime || null,
+
       adminNote,
       customerNote,
       currency: "AUD", 
+      
       status: "PENDING",
-      paymentStatus: "UNPAID"
+      // If Fully paid by Gift Card
+      paymentStatus: (totals.finalTotal === 0 && totals.grossTotal > 0) ? "PAID" : "UNPAID"
     };
 
     const res = await createManualOrder(orderData);
@@ -207,7 +225,6 @@ export default function CreateOrderPage() {
                 setSelectedCustomer(null);
                 setGuestInputAddress(null);
             }}
-            // ✅ FIX: No more TypeScript error here
             onAddressChange={(addr) => setGuestInputAddress(addr)}
           />
 
@@ -215,7 +232,6 @@ export default function CreateOrderPage() {
             onPickupLocationChange={setPickupLocationId}
             onAdminNoteChange={setAdminNote}
             onCustomerNoteChange={setCustomerNote}
-            // ✅ FIX: No more TypeScript error here
             onShippingCostChange={(cost) => setShippingCost(cost)}
             address={currentAddress}
             cartItems={cartItems}
@@ -226,21 +242,28 @@ export default function CreateOrderPage() {
             onApplyDiscount={(discount: any) => setAppliedDiscount(discount)}
           />
 
+          {/* ✅ NEW: Gift Card Input */}
+          <GiftCardInput 
+            onApply={setAppliedGiftCard}
+            onRemove={() => setAppliedGiftCard(null)}
+            appliedCard={appliedGiftCard}
+          />
+
           <OrderSummary 
             subtotal={totals.subtotal}
             shippingCost={shippingCost}
             discount={totals.discountAmount}
             tax={totals.taxTotal}
-            total={totals.finalTotal}
+            total={totals.finalTotal} // Final Payable
             currencySymbol="$"
             setShippingCost={setShippingCost}
           />
 
-          <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-            <p className="text-[11px] text-blue-700 leading-relaxed font-medium italic">
-              * AUD currency is used by default. Inventory will be deducted from the default location upon order creation.
-            </p>
-          </div>
+          {totals.giftCardDeduction > 0 && (
+             <div className="p-3 bg-purple-50 text-xs text-purple-800 rounded border border-purple-200">
+                Paid via Gift Card: <strong>-${totals.giftCardDeduction.toFixed(2)}</strong>
+             </div>
+          )}
 
         </div>
       </div>

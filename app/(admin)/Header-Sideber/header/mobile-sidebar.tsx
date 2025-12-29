@@ -1,9 +1,12 @@
+// File: app/(admin)/admin/Header-Sideber/header/mobile-sidebar.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
-import AdminSidebar from "../sidebar"; // আগের তৈরি করা সাইডবার ইমপোর্ট
 import { usePathname } from "next/navigation";
+// 🚀 Correct Import Path based on your image
+import AdminSidebar from "../sidebar"; 
 
 interface MobileSidebarProps {
   user: any;
@@ -13,12 +16,10 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
-  // রাউট চেঞ্জ হলে অটোমেটিক মেনু বন্ধ হবে
   useEffect(() => {
     setIsOpen(false);
   }, [pathname]);
 
-  // বডি স্ক্রল লক করা যখন মেনু ওপেন থাকবে
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -29,15 +30,13 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
 
   return (
     <>
-      {/* Mobile Trigger Button */}
       <button 
         onClick={() => setIsOpen(true)}
-        className="md:hidden p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-600"
+        className="md:hidden p-2 rounded-md hover:bg-slate-100 transition text-slate-600"
       >
         <Menu size={24} />
       </button>
 
-      {/* Overlay Backdrop */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm transition-opacity duration-300"
@@ -45,13 +44,11 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
         />
       )}
 
-      {/* Slide-in Drawer */}
       <div className={`
         fixed top-0 left-0 h-full w-72 bg-[#1e293b] z-50 shadow-2xl 
         transform transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
-        {/* Close Button */}
         <div className="absolute right-4 top-4 z-50">
            <button 
              onClick={() => setIsOpen(false)} 
@@ -61,14 +58,11 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
            </button>
         </div>
 
-        {/* Render the Sidebar Component Here */}
-        {/* আগের সাইডবারটি এখানে রি-ইউজ করছি, তবে hidden ক্লাসটি ওভাররাইড করতে হবে */}
         <div className="h-full sidebar-mobile-override">
             <AdminSidebar user={user} /> 
         </div>
       </div>
 
-      {/* CSS Hack to make the sidebar visible inside drawer */}
       <style jsx global>{`
         .sidebar-mobile-override aside {
           display: flex !important;

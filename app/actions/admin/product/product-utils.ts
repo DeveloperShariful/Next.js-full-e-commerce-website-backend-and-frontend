@@ -1,4 +1,4 @@
-//app/admin/product/product-utilis.ts 
+//app/actions/admin/product/product-utilis.ts 
 
 export function generateSlug(name: string): string {
   return name

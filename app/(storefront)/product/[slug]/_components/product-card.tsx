@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ShoppingCart, Eye, Star } from "lucide-react";
 import { MouseEventHandler } from "react";
-import useCart from "@/app/actions/storefront/use-cart"; 
+import useCart from "@/app/actions/storefront/cart/use-cart"; 
 import { useGlobalStore } from "@/app/providers/global-store-provider"; // 🚀 Import Global Store
 
 // 🚀 Better Type Definition

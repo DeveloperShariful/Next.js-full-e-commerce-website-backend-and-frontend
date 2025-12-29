@@ -1,12 +1,10 @@
-// app/actions/category.ts
+// app/actions/admin/product/category.ts
 "use server";
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 
-// --- STRONG TYPE DEFINITIONS ---
-// এই টাইপগুলো ফ্রন্টএন্ডে ব্যবহার করা হবে যাতে কোনো টাইপ এরর না আসে
 export type CategoryNode = {
   id: string;
   name: string;

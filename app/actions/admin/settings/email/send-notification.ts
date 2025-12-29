@@ -1,10 +1,10 @@
-// File: app/actions/utils/send-notification.ts
+// File: app/actions/admin/email/send-notification.ts
 
 "use server";
 
 import { db } from "@/lib/db";
 import nodemailer from "nodemailer";
-import { generateEmailHtml } from "./email-generator"; 
+import { generateEmailHtml } from "./email-generator"; // Ensure this path is correct relative to this file
 
 interface EmailPayload {
   trigger: string;
@@ -64,20 +64,28 @@ export async function sendNotification({ trigger, recipient, data, orderId }: Em
 
     // --- SENDING LOGIC ---
     
-    // ✅ FIX 1: Cast options to 'any' to solve 'host does not exist' error
     const transporter = nodemailer.createTransport({
       host: config.smtpHost || "smtp.gmail.com",
       port: config.smtpPort || 587,
       secure: config.encryption === 'ssl',
       auth: { user: config.smtpUser, pass: config.smtpPassword },
       tls: {
-        rejectUnauthorized: false // Helps with some self-signed cert issues
+        rejectUnauthorized: false
       }
     } as any);
 
     let finalRecipient = recipient;
+
+    // ✅ UPDATE: Admin Email Logic Added Here
+    // যদি টেমপ্লেট অ্যাডমিনের জন্য হয়, তাহলে StoreSettings থেকে মেইল আনবে
     if (template.recipientType === 'admin') {
-        finalRecipient = template.customRecipients || config.senderEmail;
+        const storeSettings = await db.storeSettings.findUnique({ 
+            where: { id: "settings" },
+            select: { storeEmail: true }
+        });
+        
+        // স্টোর ইমেইল না পেলে কনফিগারের সেন্ডার ইমেইল ব্যবহার হবে
+        finalRecipient = storeSettings?.storeEmail || config.senderEmail;
     }
 
     const info = await transporter.sendMail({
@@ -96,7 +104,6 @@ export async function sendNotification({ trigger, recipient, data, orderId }: Em
         templateSlug: template.slug,
         status: "SENT",
         orderId: orderId || null,
-        // ✅ FIX 2: Cast info to 'any' for Prisma Json field
         metadata: info as any 
       }
     });

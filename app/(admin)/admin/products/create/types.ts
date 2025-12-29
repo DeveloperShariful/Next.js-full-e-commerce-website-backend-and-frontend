@@ -6,6 +6,8 @@ export interface Attribute {
     values: string[];
     visible: boolean;
     variation: boolean;
+    // 🔥 NEW: Attribute Position (Schema: position)
+    position: number;
 }
 
 export interface Variation {
@@ -15,6 +17,15 @@ export interface Variation {
     stock: number;
     sku: string;
     attributes: Record<string, string>;
+    
+    // 🔥 NEW: Advanced Variant Details (Schema Supported)
+    barcode?: string;
+    costPerItem?: number;
+    weight?: number;
+    length?: number;
+    width?: number;
+    height?: number;
+    image?: string; // Specific image for variant
 }
 
 export interface DigitalFile {
@@ -30,10 +41,18 @@ export interface ProductFormData {
     description: string;
     shortDescription: string;
     productType: string;
-    status: string; // UI তে স্ট্রিং হিসেবে হ্যান্ডেল করা সহজ
+    status: string; 
     isVirtual: boolean;
     isDownloadable: boolean;
+    bundleItems: BundleItem[];
     
+    // 🔥 NEW: Media (Video)
+    videoUrl: string;
+    videoThumbnail: string;
+
+    // 🔥 NEW: Featured Product
+    isFeatured: boolean;
+
     // Sale Schedule
     saleStart: string; 
     saleEnd: string;   
@@ -75,6 +94,12 @@ export interface ProductFormData {
     countryOfManufacture: string;
     isDangerousGood: boolean;
 
+    // 🔥 NEW: Demographics & SEO (Schema Supported)
+    gender: string;      // e.g., Male, Female, Unisex
+    ageGroup: string;    // e.g., Adult, Kids
+    metafields: string;  // JSON string storage for custom fields
+    seoSchema: string;   // JSON string storage for Rich Snippets
+
     // Relations & Organization
     category: string;
     vendor: string;
@@ -109,4 +134,11 @@ export interface ComponentProps {
     updateData: (field: keyof ProductFormData, value: any) => void;
     loading?: boolean;
     onSubmit?: (e?: React.FormEvent) => void;
+}
+
+export interface BundleItem {
+    childProductId: string;
+    childProductName?: string; // UI এর জন্য
+    childProductImage?: string; // UI এর জন্য
+    quantity: number;
 }

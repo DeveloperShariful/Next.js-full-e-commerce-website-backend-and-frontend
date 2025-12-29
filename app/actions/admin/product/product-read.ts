@@ -20,6 +20,8 @@ export async function getProductById(id: string) {
         
         images: { orderBy: { position: 'asc' } },
         attributes: { orderBy: { position: 'asc' } },
+        
+        // 🔥 UPDATE: Include Inventory & Variants with sorting
         variants: {
           include: {
             inventoryLevels: true
@@ -28,12 +30,28 @@ export async function getProductById(id: string) {
         },
         inventoryLevels: true,
         tags: true,
+
+        // 🔥 UPDATE: Include Bundle Items with Child Product Details
+        bundleItems: {
+            include: {
+                childProduct: {
+                    select: {
+                        id: true,
+                        name: true,
+                        featuredImage: true,
+                        images: { take: 1, select: { url: true } }, // Fallback image
+                        sku: true
+                    }
+                }
+            }
+        }
       },
     });
     
     if (!product) return { success: false, error: "Product not found" };
     return { success: true, product };
   } catch (error) {
+    console.error("GET_PRODUCT_ERROR", error);
     return { success: false, error: "Database error" };
   }
 }
@@ -124,15 +142,16 @@ export async function searchProducts(query: string) {
           { name: { contains: query, mode: 'insensitive' } },
           { sku: { contains: query, mode: 'insensitive' } },
         ],
-        status: ProductStatus.ACTIVE, // 🚀 FIX: Use Enum
+        status: ProductStatus.ACTIVE, 
       },
-      take: 5,
+      take: 10, // Increased limit for better search experience
       select: { 
         id: true, 
         name: true, 
-        images: true, 
+        images: { take: 1, select: { url: true } }, 
         featuredImage: true,
-        sku: true 
+        sku: true,
+        price: true 
       }
     });
     return { success: true, data: products };

@@ -13,67 +13,55 @@ import { CustomerNote } from "../_components/customer-note";
 import { SecurityRisk } from "../_components/security-risk"; 
 import { TransactionHistory } from "../_components/transaction-history"; 
 import { TransdirectBooking } from "../_components/transdirect-booking"; 
-import { OrderActions } from "../_components/order-actions"; // ✅ NEW COMPONENT
+import { OrderActions } from "../_components/order-actions";
+import { EmailLogs } from "../_components/email-logs"; // ✅ NEW IMPORT
 
 export default async function OrderDetailsPage(props: { params: Promise<{ orderId: string }> }) {
   const params = await props.params;
   
-  // ১. অর্ডার ডাটা ফেচ করা
   const { data: order } = await getOrderDetails(params.orderId);
 
-  // ২. অর্ডার না পাওয়া গেলে 404
   if (!order) return notFound();
 
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto min-h-screen bg-[#F8F9FA] pb-20">
       
-      {/* 1. HEADER SECTION (Title, Status Badges, Invoice Button, Refund Button) */}
       <OrderHeader order={order} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
         {/* === LEFT COLUMN (Main Content) === */}
         <div className="xl:col-span-2 space-y-6">
-          
-          {/* A. Customer Note (যদি থাকে) */}
           <CustomerNote note={order.customerNote} />
-
-          {/* B. Order Items (Product List) */}
           <OrderItemsTable order={order} />
-
-          {/* C. Transaction Logs & Disputes */}
           <TransactionHistory order={order} />
-
-          {/* D. Payment & Fulfillment Info */}
           <PaymentFulfillment order={order} />
           
-          {/* E. Timeline Notes (Mobile View Only) */}
+          {/* Email Logs on Main Col for Mobile */}
+          <div className="block xl:hidden">
+             <EmailLogs orderId={order.id} />
+          </div>
+          
           <div className="block xl:hidden">
              <NotesTimeline order={order} />
           </div>
-
         </div>
 
         {/* === RIGHT COLUMN (Sidebar) === */}
         <div className="space-y-6">
-            
-            {/* F. Order Actions (Status Updates with Loading State) */}
             <OrderActions order={order} />
-
-            {/* G. Transdirect Integration (Manual Sync Button) */}
             <TransdirectBooking order={order} />
-
-            {/* H. Fraud Analysis (Risk Score) */}
             <SecurityRisk order={order} />
-
-            {/* I. Customer Information (Edit & View) */}
             <CustomerInfo order={order} />
+            
+            {/* ✅ NEW: Email Logs Component */}
+            <div className="hidden xl:block">
+                <EmailLogs orderId={order.id} />
+            </div>
 
-            {/* J. Timeline Notes (Desktop View) */}
             <div className="hidden xl:block h-auto">
                 <NotesTimeline order={order} />
             </div>
-
         </div>
       </div>
     </div>

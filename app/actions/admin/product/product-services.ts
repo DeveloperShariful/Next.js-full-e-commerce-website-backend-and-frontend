@@ -4,27 +4,22 @@ import { generateSlug, cleanPrice } from "@/app/actions/admin/product/product-ut
 
 // ইনভেন্টরি হ্যান্ডেল করা
 export async function handleInventory(tx: any, product: any, data: any, locationId: string) {
-    // শুধুমাত্র সিম্পল প্রোডাক্টের জন্য মেইন ইনভেন্টরি আপডেট হবে
     if (data.productType === 'SIMPLE' && data.trackQuantity && locationId) {
         
-        // 🚀 FIX: upsert এর বদলে findFirst ব্যবহার করা হচ্ছে
-        // কারণ Prisma upsert composite key তে 'null' সাপোর্ট করে না
         const existingInventory = await tx.inventoryLevel.findFirst({
             where: {
                 locationId: locationId,
                 productId: product.id,
-                variantId: null // এখানে null দিলে সমস্যা নেই
+                variantId: null 
             }
         });
 
         if (existingInventory) {
-            // যদি আগে থেকেই থাকে, আপডেট করো
             await tx.inventoryLevel.update({
                 where: { id: existingInventory.id },
                 data: { quantity: data.stock }
             });
         } else {
-            // না থাকলে নতুন তৈরি করো
             await tx.inventoryLevel.create({
                 data: {
                     quantity: data.stock,
@@ -35,7 +30,6 @@ export async function handleInventory(tx: any, product: any, data: any, location
             });
         }
         
-        // প্রোডাক্ট টেবিলেও টোটাল স্টক আপডেট রাখা
         await tx.product.update({ where: { id: product.id }, data: { stock: data.stock } });
     }
 }
@@ -68,7 +62,7 @@ export async function handleDigitalFiles(tx: any, productId: string, isDownloada
     }
 }
 
-// অ্যাট্রিবিউট সিঙ্ক করা (Optimized)
+// অ্যাট্রিবিউট সিঙ্ক করা
 export async function handleAttributes(tx: any, productId: string, attributesData: any[]) {
     const existingAttrs = await tx.productAttribute.findMany({ where: { productId } });
     const existingAttrIds = existingAttrs.map((a: any) => a.id);
@@ -79,14 +73,13 @@ export async function handleAttributes(tx: any, productId: string, attributesDat
         await tx.productAttribute.deleteMany({ where: { id: { in: attrsToDelete } } });
     }
 
-    // Parallel processing for speed
-    await Promise.all(attributesData.map(async (attr) => {
+    await Promise.all(attributesData.map(async (attr, index) => {
         const attrData = {
             name: attr.name,
             values: attr.values,
             visible: attr.visible,
             variation: attr.variation,
-            position: 0 
+            position: attr.position !== undefined ? attr.position : index // Updated: Save position
         };
 
         if (attr.id && !attr.id.toString().startsWith("temp_")) {
@@ -97,7 +90,7 @@ export async function handleAttributes(tx: any, productId: string, attributesDat
     }));
 }
 
-// ভেরিয়েশন সিঙ্ক করা
+// ভেরিয়েশন সিঙ্ক করা (Updated with Images & Details)
 export async function handleVariations(tx: any, productId: string, variationsData: any[], productType: string, locationId: string) {
     if (productType.toUpperCase() !== 'VARIABLE') return;
 
@@ -122,7 +115,16 @@ export async function handleVariations(tx: any, productId: string, variationsDat
             price: variantPrice,
             stock: variantStock,
             attributes: v.attributes || {}, 
-            trackQuantity: true
+            trackQuantity: true,
+            
+            // 🔥 UPDATE: Saving Advanced Variant Details & Image
+            barcode: v.barcode || null,
+            costPerItem: v.costPerItem ? cleanPrice(v.costPerItem) : null,
+            weight: v.weight ? parseFloat(v.weight) : null,
+            length: v.length ? parseFloat(v.length) : null,
+            width: v.width ? parseFloat(v.width) : null,
+            height: v.height ? parseFloat(v.height) : null,
+            image: v.image || null // Direct image field on ProductVariant
         };
 
         let variantId = v.id;
@@ -134,8 +136,8 @@ export async function handleVariations(tx: any, productId: string, variationsDat
             variantId = newVar.id;
         }
 
+        // Inventory Upsert for Variant
         if (locationId) {
-            // ভেরিয়েশনের ক্ষেত্রে variantId কখনোই null থাকে না, তাই এখানে upsert কাজ করবে
             await tx.inventoryLevel.upsert({
                 where: {
                     locationId_productId_variantId: {
@@ -153,4 +155,26 @@ export async function handleVariations(tx: any, productId: string, variationsDat
     }
 
     await tx.product.update({ where: { id: productId }, data: { stock: totalStock } });
+}
+
+// 🔥 NEW FUNCTION: বান্ডেল আইটেম হ্যান্ডেল করা
+export async function handleBundleItems(tx: any, productId: string, productType: string, bundleItems: any[]) {
+    // শুধুমাত্র বান্ডেল প্রোডাক্টের জন্য কাজ করবে
+    if (productType.toUpperCase() !== 'BUNDLE') return;
+
+    // ১. আগের বান্ডেল আইটেমগুলো ক্লিয়ার করে দিচ্ছি (Safe update method)
+    await tx.bundleItem.deleteMany({
+        where: { parentProductId: productId }
+    });
+
+    // ২. নতুন আইটেমগুলো তৈরি করছি
+    if (bundleItems && bundleItems.length > 0) {
+        await tx.bundleItem.createMany({
+            data: bundleItems.map((item: any) => ({
+                parentProductId: productId,
+                childProductId: item.childProductId,
+                quantity: parseInt(item.quantity) || 1
+            }))
+        });
+    }
 }

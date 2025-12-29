@@ -4,13 +4,12 @@ import { useEffect, useState } from "react";
 import { ComponentProps } from "../types";
 import { getTaxClasses } from "@/app/actions/admin/product/product-read";
 import { X } from "lucide-react";
-import { useGlobalStore } from "@/app/providers/global-store-provider"; // 🚀 Hook Import
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 export default function General({ data, updateData }: ComponentProps) {
     const [taxClasses, setTaxClasses] = useState<{id: string, name: string}[]>([]);
     const [showSchedule, setShowSchedule] = useState(!!data.saleStart);
     
-    // 🚀 Dynamic Currency Symbol from Global Settings
     const { symbol } = useGlobalStore(); 
 
     useEffect(() => {
@@ -33,9 +32,9 @@ export default function General({ data, updateData }: ComponentProps) {
     };
 
     return (
-        <div className="space-y-4 max-w-lg">
+        <div className="space-y-5 max-w-lg">
             
-            {/* Regular Price */}
+            {/* --- PRICING SECTION --- */}
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Regular price ({symbol})</label>
                 <input 
@@ -47,7 +46,6 @@ export default function General({ data, updateData }: ComponentProps) {
                 />
             </div>
 
-            {/* Sale Price & Schedule */}
             <div>
                 <div className="grid grid-cols-3 gap-4 items-center">
                     <label className="text-right font-medium text-xs">Sale price ({symbol})</label>
@@ -95,7 +93,6 @@ export default function General({ data, updateData }: ComponentProps) {
                 )}
             </div>
 
-            {/* Cost Per Item */}
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs text-gray-500">Cost per item</label>
                 <div className="col-span-2">
@@ -112,7 +109,65 @@ export default function General({ data, updateData }: ComponentProps) {
 
             <hr className="border-gray-200 my-4"/>
 
-            {/* Tax Section */}
+            {/* --- 🔥 NEW: MEDIA (VIDEO) --- */}
+            <h3 className="text-xs font-bold text-gray-700">Product Video</h3>
+            <div className="grid grid-cols-3 gap-4 items-center">
+                <label className="text-right font-medium text-xs">Video URL</label>
+                <input 
+                    type="text" 
+                    value={data.videoUrl} 
+                    onChange={e => updateData('videoUrl', e.target.value)} 
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                    placeholder="e.g. YouTube or Vimeo link"
+                />
+            </div>
+            <div className="grid grid-cols-3 gap-4 items-center">
+                <label className="text-right font-medium text-xs">Thumbnail URL</label>
+                <input 
+                    type="text" 
+                    value={data.videoThumbnail} 
+                    onChange={e => updateData('videoThumbnail', e.target.value)} 
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                    placeholder="Image URL for video cover"
+                />
+            </div>
+
+            <hr className="border-gray-200 my-4"/>
+
+            {/* --- 🔥 NEW: DEMOGRAPHICS --- */}
+            <h3 className="text-xs font-bold text-gray-700">Demographics</h3>
+            <div className="grid grid-cols-3 gap-4 items-center">
+                <label className="text-right font-medium text-xs">Gender</label>
+                <select 
+                    value={data.gender} 
+                    onChange={e => updateData('gender', e.target.value)}
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                >
+                    <option value="">Any / Unisex</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Kids">Kids</option>
+                </select>
+            </div>
+            <div className="grid grid-cols-3 gap-4 items-center">
+                <label className="text-right font-medium text-xs">Age Group</label>
+                <select 
+                    value={data.ageGroup} 
+                    onChange={e => updateData('ageGroup', e.target.value)}
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                >
+                    <option value="">All Ages</option>
+                    <option value="Adult">Adult</option>
+                    <option value="Teen">Teen</option>
+                    <option value="Kids">Kids</option>
+                    <option value="Toddler">Toddler</option>
+                    <option value="Infant">Infant</option>
+                </select>
+            </div>
+
+            <hr className="border-gray-200 my-4"/>
+
+            {/* --- TAX SECTION --- */}
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Tax status</label>
                 <select 
@@ -142,7 +197,7 @@ export default function General({ data, updateData }: ComponentProps) {
                 </div>
             )}
 
-            {/* Download Settings (Same as before) */}
+            {/* --- DOWNLOAD SETTINGS --- */}
             {data.isDownloadable && (
                 <div className="mt-6 border-t border-gray-200 pt-4 animate-in fade-in">
                     <h3 className="text-xs font-bold text-gray-700 mb-3 ml-1">Download Settings</h3>

@@ -1,38 +1,55 @@
+// File: app/(admin)/admin/Header-Sideber/header/notification.tsx
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bell, Check, Trash2, CheckSquare, Square, X } from "lucide-react";
+import { Bell, Check, Trash2, CheckSquare, Square, ShoppingBag, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { getSystemNotifications } from "@/app/actions/admin/header-sideber/get-notifications";
 
-// 1. ডামি ডাটা টাইপ এবং ইনিশিয়াল স্টেট
-interface Notification {
-  id: number;
+// লোকাল স্টেট এর জন্য ইন্টারফেস (সার্ভার ডাটার সাথে UI স্টেট মিক্স করা)
+interface NotificationState {
+  id: string;
   title: string;
   message: string;
   time: string;
+  type: "ORDER" | "STOCK" | "USER";
   isRead: boolean;
-  isSelected: boolean;
+  isSelected: boolean; // UI এর জন্য দরকারি
 }
-
-const initialNotifications: Notification[] = [
-  { id: 1, title: "New Order Received", message: "Order #1020 has been placed.", time: "2 mins ago", isRead: false, isSelected: false },
-  { id: 2, title: "Stock Alert", message: "Product XYZ is low on stock.", time: "1 hour ago", isRead: false, isSelected: false },
-  { id: 3, title: "New Customer", message: "John Doe registered an account.", time: "3 hours ago", isRead: true, isSelected: false },
-  { id: 4, title: "Payment Failed", message: "Order #1019 payment was declined.", time: "5 hours ago", isRead: false, isSelected: false },
-];
 
 export function Notifications() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationState[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Unread Count বের করা
+  // 1. সার্ভার থেকে ডাটা আনা এবং লোকাল স্টেটে সেট করা
+  useEffect(() => {
+    async function fetchNotes() {
+      const serverNotes = await getSystemNotifications();
+      
+      // সার্ভার ডাটার সাথে isSelected ডিফল্ট false যোগ করা
+      const formattedNotes: NotificationState[] = serverNotes.map(note => ({
+        ...note,
+        isSelected: false,
+        isRead: false // ডিফল্ট আনরিড রাখা হচ্ছে
+      }));
+
+      // যদি নোটিফিকেশন লিস্ট খালি থাকে তবেই নতুন ডাটা লোড হবে (যাতে ইউজার ডিলিট করলে আবার চলে না আসে)
+      setNotifications(prev => {
+        if (prev.length === 0) return formattedNotes;
+        return prev; 
+      });
+    }
+    fetchNotes();
+  }, []);
+
+  // ক্যালকুলেশন
   const unreadCount = notifications.filter(n => !n.isRead).length;
-  // Selected Count বের করা
   const selectedCount = notifications.filter(n => n.isSelected).length;
   const isAllSelected = notifications.length > 0 && selectedCount === notifications.length;
 
-  // Click outside to close
+  // ড্রপডাউন বন্ধ করার লজিক
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -43,10 +60,10 @@ export function Notifications() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- ACTIONS ---
+  // --- ACTIONS (আগের লজিকগুলো) ---
 
-  // 1. Toggle Selection (Single)
-  const toggleSelect = (id: number) => {
+  // 1. Toggle Single Selection
+  const toggleSelect = (id: string) => {
     setNotifications(prev => prev.map(n => 
       n.id === id ? { ...n, isSelected: !n.isSelected } : n
     ));
@@ -57,7 +74,7 @@ export function Notifications() {
     setNotifications(prev => prev.map(n => ({ ...n, isSelected: !isAllSelected })));
   };
 
-  // 3. Delete Selected
+  // 3. Delete Selected (Local UI remove)
   const deleteSelected = () => {
     setNotifications(prev => prev.filter(n => !n.isSelected));
   };
@@ -69,8 +86,8 @@ export function Notifications() {
     ));
   };
 
-  // 5. Mark Single as Read (Clicking on item)
-  const markAsRead = (id: number) => {
+  // 5. Mark Single as Read
+  const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => 
       n.id === id ? { ...n, isRead: true } : n
     ));
@@ -78,10 +95,10 @@ export function Notifications() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell Icon Trigger */}
+      {/* Bell Trigger */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full hover:bg-slate-100 transition text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        className="relative p-2 rounded-full hover:bg-slate-100 transition text-slate-600 focus:outline-none"
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -89,15 +106,13 @@ export function Notifications() {
         )}
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-lg shadow-xl shadow-slate-200/50 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
           
           {/* Header Area */}
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center h-12">
-            
             {selectedCount > 0 ? (
-               // --- ACTION MODE HEADER (When items selected) ---
+               // --- ACTION MODE ---
                <div className="flex items-center gap-3 w-full animate-in fade-in slide-in-from-top-1">
                   <div className="flex items-center gap-2">
                     <button onClick={toggleSelectAll} className="text-slate-600 hover:text-blue-600">
@@ -105,50 +120,31 @@ export function Notifications() {
                     </button>
                     <span className="text-xs font-semibold text-slate-600">{selectedCount} Selected</span>
                   </div>
-                  
                   <div className="ml-auto flex items-center gap-2">
-                    <button 
-                        onClick={markSelectedRead}
-                        className="p-1.5 hover:bg-white rounded-md text-slate-500 hover:text-blue-600 transition" 
-                        title="Mark as Read"
-                    >
-                        <Check size={16} />
-                    </button>
-                    <button 
-                        onClick={deleteSelected}
-                        className="p-1.5 hover:bg-white rounded-md text-slate-500 hover:text-red-500 transition" 
-                        title="Delete"
-                    >
-                        <Trash2 size={16} />
-                    </button>
+                    <button onClick={markSelectedRead} className="p-1.5 hover:bg-white rounded-md text-slate-500 hover:text-blue-600 transition" title="Mark Read"><Check size={16}/></button>
+                    <button onClick={deleteSelected} className="p-1.5 hover:bg-white rounded-md text-slate-500 hover:text-red-500 transition" title="Delete"><Trash2 size={16}/></button>
                   </div>
                </div>
             ) : (
-               // --- NORMAL HEADER ---
+               // --- NORMAL MODE ---
                <>
                  <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-sm text-slate-800">Notifications</h3>
-                    {unreadCount > 0 && (
-                        <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                            {unreadCount} New
-                        </span>
-                    )}
+                    {unreadCount > 0 && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{unreadCount} New</span>}
                  </div>
                  {notifications.length > 0 && (
-                    <button onClick={toggleSelectAll} className="text-xs text-slate-500 hover:text-blue-600 font-medium">
-                        Select All
-                    </button>
+                    <button onClick={toggleSelectAll} className="text-xs text-slate-500 hover:text-blue-600 font-medium">Select All</button>
                  )}
                </>
             )}
           </div>
           
           {/* List Area */}
-          <div className="max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200">
+          <div className="max-h-[350px] overflow-y-auto scrollbar-thin">
             {notifications.length === 0 ? (
                 <div className="py-10 text-center text-slate-400">
                     <Bell size={32} className="mx-auto mb-2 opacity-20" />
-                    <p className="text-xs">No notifications found</p>
+                    <p className="text-xs">No new notifications</p>
                 </div>
             ) : (
                 notifications.map((item) => (
@@ -162,36 +158,24 @@ export function Notifications() {
                     >
                         {/* Checkbox */}
                         <div className="pt-1">
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleSelect(item.id);
-                                }}
-                                className={`
-                                    w-4 h-4 rounded border flex items-center justify-center transition
-                                    ${item.isSelected 
-                                        ? "bg-blue-600 border-blue-600 text-white" 
-                                        : "border-slate-300 hover:border-blue-400 text-transparent"
-                                    }
-                                `}
-                            >
-                                <Check size={10} strokeWidth={3} />
-                            </button>
+                           <button 
+                             onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
+                             className={`w-4 h-4 rounded border flex items-center justify-center transition ${item.isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 hover:border-blue-400 text-transparent"}`}
+                           >
+                             <Check size={10} strokeWidth={3} />
+                           </button>
+                        </div>
+
+                        {/* Icon based on Type */}
+                        <div className={`mt-0.5 p-1.5 rounded-full shrink-0 ${item.type === 'ORDER' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                            {item.type === 'ORDER' ? <ShoppingBag size={14}/> : <AlertTriangle size={14}/>}
                         </div>
 
                         {/* Content */}
-                        <div 
-                            className="flex-1 cursor-pointer"
-                            onClick={() => markAsRead(item.id)}
-                        >
+                        <div className="flex-1 cursor-pointer" onClick={() => markAsRead(item.id)}>
                             <div className="flex justify-between items-start">
-                                <p className={`text-sm ${!item.isRead ? "font-bold text-slate-800" : "font-medium text-slate-600"}`}>
-                                    {item.title}
-                                </p>
-                                {/* Unread Dot */}
-                                {!item.isRead && (
-                                    <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1"></span>
-                                )}
+                                <p className={`text-sm ${!item.isRead ? "font-bold text-slate-800" : "font-medium text-slate-600"}`}>{item.title}</p>
+                                {!item.isRead && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1"></span>}
                             </div>
                             <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{item.message}</p>
                             <p className="text-[10px] text-slate-400 mt-1">{item.time}</p>
@@ -200,15 +184,11 @@ export function Notifications() {
                 ))
             )}
           </div>
-          
+
           {/* Footer */}
           <div className="p-2 border-t border-slate-100 bg-slate-50/50">
-             <Link 
-                href="/admin/logs"
-                onClick={() => setIsOpen(false)}
-                className="block w-full py-1.5 text-xs font-medium text-center text-blue-600 hover:text-blue-700 hover:underline transition"
-             >
-                View All Activity
+             <Link href="/admin/logs" className="block w-full py-1.5 text-xs font-medium text-center text-blue-600 hover:underline">
+               View All Activity
              </Link>
           </div>
         </div>

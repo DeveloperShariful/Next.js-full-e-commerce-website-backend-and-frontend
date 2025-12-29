@@ -12,7 +12,6 @@ export const parseProductFormData = (formData: FormData) => {
     const statusInput = (formData.get("status") as string || "DRAFT").toUpperCase();
     const typeInput = (formData.get("productType") as string || "SIMPLE").toUpperCase();
     
-    // 🚀 FIX: Map 'SHIPPING' to 'SHIPPING_ONLY'
     let taxStatusInput = (formData.get("taxStatus") as string || "TAXABLE").toUpperCase();
     if (taxStatusInput === "SHIPPING") {
         taxStatusInput = "SHIPPING_ONLY";
@@ -27,6 +26,22 @@ export const parseProductFormData = (formData: FormData) => {
         
         productType: typeInput as ProductType,
         status: statusInput as ProductStatus, 
+
+        // 🔥 NEW: Featured Flag Added
+        isFeatured: formData.get("isFeatured") === "true",
+
+        // 🔥 NEW: Bundle Items Added
+        bundleItems: parseJSON<any[]>(formData.get("bundleItems") as string, []),
+
+        // Media Fields
+        videoUrl: formData.get("videoUrl") as string || null,
+        videoThumbnail: formData.get("videoThumbnail") as string || null,
+
+        // Demographics & JSON Fields
+        gender: formData.get("gender") as string || null,
+        ageGroup: formData.get("ageGroup") as string || null,
+        metafields: parseJSON(formData.get("metafields") as string, null), 
+        seoSchema: parseJSON(formData.get("seoSchema") as string, null),   
 
         price: cleanPrice(formData.get("price") as string),
         salePrice: formData.get("salePrice") ? cleanPrice(formData.get("salePrice") as string) : null,
@@ -56,7 +71,7 @@ export const parseProductFormData = (formData: FormData) => {
         metaDesc: formData.get("metaDesc") as string,
         seoCanonicalUrl: formData.get("seoCanonicalUrl") as string,
 
-        taxStatus: taxStatusInput as TaxStatus, // Now Correct Enum
+        taxStatus: taxStatusInput as TaxStatus,
         taxRateId: formData.get("taxRateId") as string,
         shippingClassId: formData.get("shippingClassId") as string,
 

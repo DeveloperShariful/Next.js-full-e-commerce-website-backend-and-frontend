@@ -3,16 +3,12 @@
 import { useState, useEffect } from "react";
 import { getAttributes } from "@/app/actions/admin/product/product-read"; 
 import { ComponentProps } from "../types";
-import { X, Save } from "lucide-react"; // Import Save icon
+import { X, Save, ChevronUp, ChevronDown } from "lucide-react"; 
 
 export default function Attributes({ data, updateData, onSubmit, loading }: ComponentProps) {
-    // State to store fetched global attributes
     const [globalAttrs, setGlobalAttrs] = useState<{id: string, name: string, values: string[]}[]>([]);
-    
-    // State for the dropdown selection
     const [selectedAttr, setSelectedAttr] = useState("");
 
-    // Fetch attributes on mount
     useEffect(() => {
         getAttributes().then(res => {
             if(res.success) setGlobalAttrs(res.data as any || []);
@@ -20,36 +16,33 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
     }, []);
 
     const addAttribute = () => {
-        // Logic 1: Add Custom Attribute
         if (!selectedAttr) {
             updateData('attributes', [...data.attributes, { 
                 id: `temp_${Date.now()}`, 
                 name: "", 
                 values: [], 
                 visible: true, 
-                variation: true 
+                variation: true,
+                position: data.attributes.length 
             }]);
             return;
         }
 
-        // Logic 2: Add Global Attribute (Pre-fill name and values)
         const existingGlobal = globalAttrs.find(a => a.name === selectedAttr);
         if (existingGlobal) {
-            // Check if already added to avoid duplicates
             if (data.attributes.some(a => a.name === existingGlobal.name)) {
                 alert("Attribute already added!");
                 return;
             }
 
             updateData('attributes', [...data.attributes, { 
-                id: `temp_${Date.now()}`, // New temp ID
+                id: `temp_${Date.now()}`, 
                 name: existingGlobal.name, 
-                values: existingGlobal.values, // Pre-fill values
+                values: existingGlobal.values, 
                 visible: true, 
-                variation: true 
+                variation: true,
+                position: data.attributes.length
             }]);
-            
-            // Reset dropdown
             setSelectedAttr("");
         }
     };
@@ -64,9 +57,21 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
         updateData('attributes', data.attributes.filter((_, i) => i !== index));
     };
 
+    // 🔥 NEW: Function to reorder attributes
+    const moveAttr = (index: number, direction: 'up' | 'down') => {
+        const newAttrs = [...data.attributes];
+        if (direction === 'up' && index > 0) {
+            [newAttrs[index], newAttrs[index - 1]] = [newAttrs[index - 1], newAttrs[index]];
+        } else if (direction === 'down' && index < newAttrs.length - 1) {
+            [newAttrs[index], newAttrs[index + 1]] = [newAttrs[index + 1], newAttrs[index]];
+        }
+        // Update positions based on new index
+        newAttrs.forEach((attr, idx) => attr.position = idx);
+        updateData('attributes', newAttrs);
+    };
+
     return (
         <div>
-            {/* Header / Add Section */}
             <div className="flex gap-2 items-center mb-4">
                 <select 
                     className="border border-gray-400 px-3 py-1.5 text-sm rounded-sm outline-none focus:border-[#2271b1] bg-white text-[#3c434a]"
@@ -87,9 +92,7 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
                 </button>
             </div>
 
-            {/* Attributes List */}
             <div className="space-y-3">
-                {/* Datalist for autocomplete suggestion in Name field */}
                 <datalist id="global-attrs">
                     {globalAttrs.map(a => <option key={a.id} value={a.name} />)}
                 </datalist>
@@ -102,11 +105,16 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
                     <div key={attr.id} className="border border-gray-300 bg-gray-50 p-4 rounded-sm transition-all hover:shadow-sm">
                         <div className="flex justify-between mb-3 pb-2 border-b border-gray-200">
                              <span className="font-bold text-sm text-gray-700">{attr.name || `Attribute #${i + 1}`}</span>
-                             <button type="button" onClick={() => removeAttr(i)} className="text-red-600 hover:text-red-800 text-xs font-medium">Remove</button>
+                             <div className="flex items-center gap-2">
+                                {/* 🔥 NEW: Move Up/Down Buttons */}
+                                <button type="button" disabled={i === 0} onClick={() => moveAttr(i, 'up')} className="text-gray-500 hover:text-gray-800 disabled:opacity-30"><ChevronUp size={16}/></button>
+                                <button type="button" disabled={i === data.attributes.length - 1} onClick={() => moveAttr(i, 'down')} className="text-gray-500 hover:text-gray-800 disabled:opacity-30"><ChevronDown size={16}/></button>
+                                <span className="text-gray-300">|</span>
+                                <button type="button" onClick={() => removeAttr(i)} className="text-red-600 hover:text-red-800 text-xs font-medium">Remove</button>
+                             </div>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {/* Attribute Name */}
                             <div>
                                 <label className="block text-xs font-bold mb-1 text-[#3c434a]">Name</label>
                                 <input 
@@ -118,7 +126,6 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
                                 />
                             </div>
 
-                            {/* Attribute Values */}
                             <div>
                                 <label className="block text-xs font-bold mb-1 text-[#3c434a]">Values</label>
                                 <div className="bg-white border border-gray-400 p-1.5 rounded-sm flex flex-wrap gap-2 min-h-[36px] focus-within:border-[#2271b1] focus-within:ring-1 focus-within:ring-[#2271b1]">
@@ -142,7 +149,6 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
                                             if(e.key === 'Enter' && e.currentTarget.value.trim()) {
                                                 e.preventDefault();
                                                 const val = e.currentTarget.value.trim();
-                                                // Prevent duplicate values
                                                 if(!attr.values.includes(val)) {
                                                     updateAttr(i, 'values', [...attr.values, val]);
                                                 }
@@ -155,7 +161,6 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
                             </div>
                         </div>
 
-                        {/* Options */}
                         <div className="mt-3 flex gap-6">
                             <label className="flex items-center gap-1.5 text-xs text-gray-700 select-none cursor-pointer">
                                 <input type="checkbox" checked={attr.visible} onChange={() => updateAttr(i, 'visible', !attr.visible)} className="rounded text-[#2271b1] focus:ring-[#2271b1]" /> 
@@ -170,12 +175,11 @@ export default function Attributes({ data, updateData, onSubmit, loading }: Comp
                 ))}
             </div>
 
-            {/* Save Button (Requested Feature) */}
             {data.attributes.length > 0 && (
                 <div className="mt-5 border-t border-gray-200 pt-4 flex justify-end">
                     <button 
                         type="button"
-                        onClick={() => onSubmit && onSubmit()} // Triggers the main save function
+                        onClick={() => onSubmit && onSubmit()} 
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-[#2271b1] text-white font-bold rounded hover:bg-[#135e96] disabled:opacity-50 transition text-sm shadow-sm"
                     >

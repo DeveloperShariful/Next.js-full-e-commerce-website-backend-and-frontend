@@ -1,4 +1,4 @@
-// components/admin/sidebar/user-nav.tsx
+// File: app/(admin)/admin/Header-Sideber/sidebar/user-nav.tsx
 
 "use client";
 
@@ -21,7 +21,6 @@ export function UserNav() {
             }
           }}
         />
-        
         <div className="text-left overflow-hidden">
             <p className="text-sm font-bold text-white truncate">
               {user?.fullName || user?.username || "Admin"}

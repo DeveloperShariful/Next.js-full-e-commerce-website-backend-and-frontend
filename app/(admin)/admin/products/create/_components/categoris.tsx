@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ComponentProps } from "../types";
-import { getCategories } from "@/app/actions/admin/category";
+import { getCategories } from "@/app/actions/admin/product/category";
 import { ChevronUp } from "lucide-react";
 
 export default function Categories({ data, updateData }: ComponentProps) {

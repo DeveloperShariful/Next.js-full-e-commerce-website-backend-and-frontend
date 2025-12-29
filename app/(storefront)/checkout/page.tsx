@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import useCart from "@/app/actions/storefront/use-cart";
+import useCart from "@/app/actions/storefront/cart/use-cart";
 // [FIXED] 'placeOrder' এর বদলে 'processCheckout' হবে
 import { processCheckout } from "@/app/actions/storefront/checkout"; 
 import { useRouter } from "next/navigation";

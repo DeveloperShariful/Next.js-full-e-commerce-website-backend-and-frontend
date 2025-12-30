@@ -35,7 +35,10 @@ export function Overview({ data, currencySymbol }: OverviewProps) {
             cursor={{ fill: '#f8fafc' }}
             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
             // 🚀 Use dynamic symbol
-            formatter={(value: number) => [`${currencySymbol}${value}`, "Total"]}
+            formatter={(value: number | undefined) => [
+              `${currencySymbol}${value ?? 0}`, 
+              "Total"
+            ]}
         />
         <Bar 
             dataKey="total" 

@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { generateNextOrderNumber } from "@/app/actions/admin/create_order/generate-order-number";
 import { updateAnalytics, sendOrderEmail } from "@/app/actions/admin/order/order-utils";
 

@@ -1,6 +1,6 @@
 // File Location: app/actions/admin/order/order-utils.ts
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { sendNotification } from "@/app/actions/admin/settings/email/send-notification";
 
 // 1. ANALYTICS

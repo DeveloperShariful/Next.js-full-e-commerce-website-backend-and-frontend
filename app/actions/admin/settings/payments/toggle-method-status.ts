@@ -1,7 +1,7 @@
 // app/actions/settings/payments/toggle-method-status.ts
 "use server"
 
-import { db } from "@/lib/db"
+import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
 export async function togglePaymentMethodStatus(id: string, isEnabled: boolean) {

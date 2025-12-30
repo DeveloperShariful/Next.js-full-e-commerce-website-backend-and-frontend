@@ -1,6 +1,6 @@
 // File Location: app/admin/orders/[orderId]/invoice/page.tsx
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { InvoiceActions } from "./_components/invoice-actions"; // 👇 Updated Component

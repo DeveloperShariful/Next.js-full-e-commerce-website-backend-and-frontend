@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import nodemailer from "nodemailer";
 import { generateEmailHtml } from "./email-generator"; // Ensure this path is correct relative to this file
 

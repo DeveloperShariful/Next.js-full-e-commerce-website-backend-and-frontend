@@ -1,7 +1,7 @@
 // app/admin/products/page.tsx
 
 import Link from 'next/link';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import { ProductType, ProductStatus } from '@prisma/client'; // 🚀 Import ProductStatus
 import ProductTable from './_components/product-table';
 

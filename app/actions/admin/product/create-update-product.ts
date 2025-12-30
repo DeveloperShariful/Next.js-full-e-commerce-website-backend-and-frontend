@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { generateSlug } from "@/app/actions/admin/product/product-utils";

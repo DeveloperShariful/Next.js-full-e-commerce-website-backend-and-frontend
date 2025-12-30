@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 
 export async function searchProducts(query: string) {
   if (!query || query.length < 1) return [];

@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import AdminSidebar from "@/app/(admin)/Header-Sideber/sidebar";
 import AdminHeader from "@/app/(admin)/Header-Sideber/header";

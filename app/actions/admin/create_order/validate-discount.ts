@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 
 export async function validateDiscount(code: string, cartTotal: number) {
     const discount = await db.discount.findUnique({

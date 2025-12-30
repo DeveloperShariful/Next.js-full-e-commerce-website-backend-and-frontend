@@ -1,6 +1,6 @@
 // File: app/admin/page.tsx
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { Overview } from "./_components/overview";
 import { 
   DollarSign, ShoppingBag, Package, Users, 

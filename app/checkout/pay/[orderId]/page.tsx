@@ -1,6 +1,6 @@
 // File Location: app/checkout/pay/[orderId]/page.tsx
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

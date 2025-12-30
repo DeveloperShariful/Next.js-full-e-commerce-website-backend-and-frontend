@@ -1,7 +1,7 @@
 // app/actions/settings/payments/get-system-logs.ts
 "use server"
 
-import { db } from "@/lib/db"
+import { db } from "@/lib/prisma"
 
 export async function getPaymentSystemLogs(source?: string) {
   try {

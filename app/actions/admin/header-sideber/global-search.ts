@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { ProductStatus } from "@prisma/client"; // 🚀 1. Import Enum
 
 export async function getGlobalSearchResults(query: string) {

@@ -6,7 +6,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from '@clerk/nextjs';
 import NextTopLoader from 'nextjs-toploader';
-import { db } from "@/lib/db"; // 🚀 Import DB
+import { db } from "@/lib/prisma";
 import { GlobalStoreProvider } from "@/app/providers/global-store-provider"; // 🚀 Import Provider
 
 const geistSans = Geist({

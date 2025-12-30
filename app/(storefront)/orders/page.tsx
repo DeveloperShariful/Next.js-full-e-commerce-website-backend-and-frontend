@@ -1,7 +1,7 @@
 // app/(routes)/orders/page.tsx
 
 import { currentUser } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Package, Clock, CheckCircle2, XCircle, ChevronRight, ShoppingBag } from "lucide-react";

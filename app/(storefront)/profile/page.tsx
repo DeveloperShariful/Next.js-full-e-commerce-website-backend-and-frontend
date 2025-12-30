@@ -1,7 +1,7 @@
 // app/(routes)/profile/page.tsx
 
 import { currentUser } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { User, Mail, Phone, MapPin, Calendar, Edit2 } from "lucide-react";
 import Image from "next/image";

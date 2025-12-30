@@ -1,7 +1,7 @@
 // File: app/actions/admin/categories/fetch.ts
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { CategoryData } from "@/app/(admin)/admin/categories/types";
 
 // --- GET ALL CATEGORIES (Excluding Soft Deleted) ---

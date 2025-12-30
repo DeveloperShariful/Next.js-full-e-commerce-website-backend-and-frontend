@@ -1,7 +1,7 @@
 // app/actions/settings/payments/get-all-payments.ts
 "use server"
 
-import { db } from "@/lib/db"
+import { db } from "@/lib/prisma"
 
 export async function getAllPaymentMethods() {
   try {

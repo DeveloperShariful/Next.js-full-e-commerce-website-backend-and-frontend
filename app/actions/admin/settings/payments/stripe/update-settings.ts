@@ -1,7 +1,7 @@
 // app/actions/settings/payments/stripe/update-settings.ts
 "use server"
 
-import { db } from "@/lib/db"
+import { db } from "@/lib/prisma"
 import { StripeSettingsSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"

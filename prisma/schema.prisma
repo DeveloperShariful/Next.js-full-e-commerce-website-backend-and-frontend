@@ -1,14 +1,16 @@
 // ==========================================
-// 1. CONFIGURATION
+// 1. CONFIGURATION (PRISMA 7 OPTIMIZED)
 // ==========================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "fullTextSearchPostgres", "tracing"]
+  engineType      = "library"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  extensions = [pg_trgm, unaccent]
 }
 
 // ==========================================
@@ -185,47 +187,49 @@ enum DisputeStatus {
 // ==========================================
 
 model User {
-  id              String    @id @default(uuid())
-  clerkId         String?   @unique
-  name            String?
-  email           String    @unique
-  emailVerified   DateTime?
-  password        String?
-  phone           String?   @unique
-  image           String?
-  role            Role      @default(CUSTOMER)
-  isActive        Boolean   @default(true)
+  id                 String    @id @default(uuid())
+  clerkId            String?   @unique
+  name               String?
+  email              String    @unique
+  emailVerified      DateTime?
+  password           String?
+  phone              String?   @unique
+  image              String?
+  role               Role      @default(CUSTOMER)
+  isActive           Boolean   @default(true)
 
-  dateOfBirth     DateTime?
-  gender          String?
-  notes           String?
-  metafields      Json?
-  deletedAt       DateTime?
+  dateOfBirth        DateTime?
+  gender             String?
+  notes              String?
+  metafields         Json?
+  deletedAt          DateTime?
 
-  accounts        Account[]
-  sessions        Session[]
-  addresses       Address[]
-  paymentMethods  UserPaymentMethod[]
-  orders          Order[]
-  reviews         Review[]
-  wishlist        Wishlist[]
-  cart            Cart?
-  viewedProducts  RecentlyViewed[]
-  wallet          Wallet?
+  accounts           Account[]
+  sessions           Session[]
+  addresses          Address[]
+  paymentMethods     UserPaymentMethod[]
+  orders             Order[]
+  reviews            Review[]
+  wishlist           Wishlist[]
+  cart               Cart?
+  viewedProducts     RecentlyViewed[]
+  wallet             Wallet?
   abandonedCheckouts AbandonedCheckout[]
   
-  activityLogs    ActivityLog[]
-  blogPosts       BlogPost[]
-  notifications   Notification[]
+  activityLogs       ActivityLog[]
+  blogPosts          BlogPost[]
+  notifications      Notification[]
   
-  createdTickets  SupportTicket[] @relation("UserCreatedTickets")
-  assignedTickets SupportTicket[] @relation("StaffTickets")
+  createdTickets     SupportTicket[] @relation("UserCreatedTickets")
+  assignedTickets    SupportTicket[] @relation("StaffTickets")
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  @@index([email, phone])
-  @@index([role])
+  @@index([email])
+  @@index([phone])
+  @@index([role, createdAt(sort: Desc)])
+  @@index([clerkId])
 }
 
 model Account {
@@ -241,7 +245,7 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -255,6 +259,7 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([sessionToken])
 }
 
 model VerificationToken {
@@ -276,30 +281,30 @@ model PasswordResetToken {
 }
 
 model UserPaymentMethod {
-  id                String   @id @default(uuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  gateway           String   
-  type              String   
+  gateway            String   
+  type               String   
 
-  gatewayCustomerId String? 
-  paymentMethodId   String   
+  gatewayCustomerId  String? 
+  paymentMethodId    String   
   
-  fingerprint       String?
-  paypalEmail       String?
+  fingerprint        String?
+  paypalEmail        String?
   billingAgreementId String?
 
-  brand             String?  
-  last4             String?  
-  expiryMonth       Int?
-  expiryYear        Int?
+  brand              String?  
+  last4              String?  
+  expiryMonth        Int?
+  expiryYear         Int?
 
-  billingDetails    Json?    
-  isDefault         Boolean  @default(false)
+  billingDetails     Json?    
+  isDefault          Boolean  @default(false)
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([userId])
 }
@@ -334,6 +339,7 @@ model Address {
   updatedAt             DateTime    @updatedAt
 
   @@index([userId])
+  @@index([type])
 }
 
 model Wallet {
@@ -359,6 +365,7 @@ model WalletTransaction {
   createdAt   DateTime        @default(now())
 
   @@index([walletId])
+  @@index([createdAt(sort: Desc)])
 }
 
 // ==========================================
@@ -390,6 +397,7 @@ model Category {
   updatedAt   DateTime   @updatedAt
 
   @@index([parentId])
+  @@index([isActive, menuOrder(sort: Asc)])
 }
 
 model CategoryTranslation {
@@ -424,6 +432,8 @@ model Brand {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([name])
 }
 
 model Tag {
@@ -460,6 +470,8 @@ model Collection {
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([isActive])
 }
 
 model ShippingClass {
@@ -583,8 +595,12 @@ model Product {
   @@index([slug])
   @@index([categoryId, status])
   @@index([brandId, status])
-  @@index([status])
-  @@index([price])
+  @@index([status, isFeatured])
+  @@index([price(sort: Asc)])
+  @@index([name])
+  @@index([createdAt(sort: Desc)])
+  @@index([stock(sort: Asc), status])
+  @@index([metafields(ops: JsonbPathOps)], type: Gin)
 }
 
 model ProductTranslation {
@@ -615,6 +631,8 @@ model ProductImage {
 
   variantId String?
   variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([productId, position(sort: Asc)])
 }
 
 model DigitalFile {
@@ -627,6 +645,8 @@ model DigitalFile {
 
   accessCount Int    @default(0) 
   createdAt   DateTime @default(now())
+
+  @@index([productId])
 }
 
 model BundleItem {
@@ -636,6 +656,8 @@ model BundleItem {
   childProductId  String
   childProduct    Product @relation("BundleChild", fields: [childProductId], references: [id])
   quantity        Int     @default(1) 
+  
+  @@index([parentProductId])
 }
 
 // ==========================================
@@ -668,6 +690,7 @@ model ProductAttribute {
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
+  @@index([brandId])
 }
 
 model ProductVariant {
@@ -703,6 +726,7 @@ model ProductVariant {
 
   @@index([productId])
   @@index([sku])
+  @@index([attributes(ops: JsonbPathOps)], type: Gin)
 }
 
 // ==========================================
@@ -756,6 +780,7 @@ model InventoryLevel {
 
   @@unique([locationId, productId, variantId])
   @@index([productId, variantId])
+  @@index([locationId])
 }
 
 model Supplier {
@@ -785,6 +810,7 @@ model PurchaseOrder {
   updatedAt   DateTime @updatedAt
 
   @@index([supplierId])
+  @@index([status])
 }
 
 model StockTransfer {
@@ -799,6 +825,8 @@ model StockTransfer {
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([status])
 }
 
 // ==========================================
@@ -911,10 +939,11 @@ model Order {
   updatedAt          DateTime          @updatedAt
 
   @@index([userId, status])
-  @@index([createdAt, status])
-  @@index([status])
-  @@index([paymentId])
+  @@index([createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@index([paymentStatus, createdAt])
   @@index([orderNumber])
+  @@index([paymentId])
   @@index([orderDate])
 }
 
@@ -940,7 +969,8 @@ model OrderItem {
   metadata     Json?    
 
   @@index([orderId])
-  @@index([productId, variantId])
+  @@index([productId])
+  @@index([variantId])
 }
 
 model OrderTransaction {
@@ -969,7 +999,7 @@ model OrderTransaction {
   metadata      Json?    
   createdAt     DateTime @default(now())
 
-  @@index([orderId])
+  @@index([orderId, status])
   @@index([transactionId])
 }
 
@@ -1062,6 +1092,7 @@ model ReturnRequest {
   updatedAt    DateTime @updatedAt
 
   @@index([orderId])
+  @@index([status])
 }
 
 model Refund {
@@ -1089,6 +1120,8 @@ model OrderNote {
   isSystem  Boolean  @default(false) 
   notify    Boolean  @default(false) 
   createdAt DateTime @default(now())
+  
+  @@index([orderId])
 }
 
 // ==========================================
@@ -1106,6 +1139,7 @@ model Cart {
   updatedAt       DateTime    @updatedAt
 
   @@index([sessionId])
+  @@index([userId])
 }
 
 model CartItem {
@@ -1148,6 +1182,7 @@ model AbandonedCheckout {
   @@index([email])
   @@index([isRecovered])
   @@index([userId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Wishlist {
@@ -1178,7 +1213,7 @@ model RecentlyViewed {
 
   viewedAt  DateTime        @default(now())
 
-  @@index([userId])
+  @@index([userId, viewedAt(sort: Desc)])
 }
 
 // ==========================================
@@ -1217,6 +1252,7 @@ model Discount {
 
   @@index([code])
   @@index([startDate, endDate])
+  @@index([isActive])
 }
 
 model GiftCard {
@@ -1229,6 +1265,8 @@ model GiftCard {
   expiresAt      DateTime?
   isEnabled      Boolean  @default(true)
   createdAt      DateTime @default(now())
+  
+  @@index([code])
 }
 
 model Newsletter {
@@ -1259,6 +1297,7 @@ model BlogPost {
   updatedAt   DateTime @updatedAt
 
   @@index([slug])
+  @@index([isPublished, createdAt(sort: Desc)])
 }
 
 model Page {
@@ -1272,6 +1311,8 @@ model Page {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  @@index([slug])
 }
 
 model Menu {
@@ -1305,6 +1346,7 @@ model Review {
 
   @@index([productId])
   @@index([status])
+  @@index([rating])
 }
 
 model QuestionAnswer {
@@ -1341,6 +1383,7 @@ model SupportTicket {
   @@index([userId])
   @@index([status])
   @@index([assignedToId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model TicketMessage {
@@ -1351,6 +1394,8 @@ model TicketMessage {
   message    String   @db.Text
   attachment String?  
   createdAt  DateTime @default(now())
+  
+  @@index([ticketId, createdAt(sort: Asc)])
 }
 
 // ==========================================
@@ -1429,6 +1474,8 @@ model ShippingRate {
   carrierService   CarrierService? @relation(fields: [carrierServiceId], references: [id]) 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@index([zoneId])
 }
 
 model CarrierService {
@@ -1583,6 +1630,7 @@ model EmailLog {
   createdAt   DateTime @default(now())
   @@index([recipient])
   @@index([status])
+  @@index([createdAt(sort: Desc)])
 }
 
 model ActivityLog {
@@ -1595,6 +1643,8 @@ model ActivityLog {
   details     Json?    
   ipAddress   String?
   createdAt   DateTime @default(now())
+  
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Notification {
@@ -1608,7 +1658,8 @@ model Notification {
   type      String?  
   createdAt DateTime @default(now())
 
-  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Analytics {
@@ -1630,6 +1681,8 @@ model MediaFolder {
   files     Media[] 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@index([parentId])
 }
 
 model Media {
@@ -1652,6 +1705,9 @@ model Media {
   updatedAt   DateTime @updatedAt
 
   productImages ProductImage[] 
+  
+  @@index([folderId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model UrlRedirect {
@@ -1734,6 +1790,8 @@ model Banner {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@index([isActive, position(sort: Asc)])
 }
 
 model SystemLog {
@@ -1745,7 +1803,7 @@ model SystemLog {
   createdAt DateTime @default(now())
 
   @@index([source])
-  @@index([createdAt])
+  @@index([createdAt(sort: Desc)])
 }
 
 // ==========================================
@@ -1781,6 +1839,8 @@ model PaymentMethodConfig {
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  
+  @@index([isEnabled, displayOrder(sort: Asc)])
 }
 
 model StripeConfig {

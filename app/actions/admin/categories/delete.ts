@@ -1,7 +1,7 @@
 // File: app/actions/admin/categories/delete.ts
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 export async function deleteCategory(id: string) {

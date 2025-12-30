@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/db";
+import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from "@prisma/client";
 import { restockInventory, updateAnalytics } from "./order-utils"; 

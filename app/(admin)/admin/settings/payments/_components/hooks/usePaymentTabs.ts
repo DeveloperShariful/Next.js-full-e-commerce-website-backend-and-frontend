@@ -1,7 +1,19 @@
 // app/admin/settings/payments/_components/hooks/usePaymentTabs.ts
+
 import { useState } from "react"
 
-export type TabType = "general" | "methods" | "express" | "advanced" | "webhooks" | "danger"
+// সব ধরণের ট্যাবের নাম এখানে ডিফাইন করা হলো
+export type TabType = 
+  | "general" 
+  | "methods" 
+  | "express" 
+  | "advanced" 
+  | "webhooks" 
+  | "danger" 
+  | "paylater" // PayPal এর জন্য
+  | "cheque"   // Offline methods এর জন্য
+  | "cod"
+  | "bank"
 
 export function usePaymentTabs(defaultTab: TabType = "general") {
   const [activeTab, setActiveTab] = useState<TabType>(defaultTab)

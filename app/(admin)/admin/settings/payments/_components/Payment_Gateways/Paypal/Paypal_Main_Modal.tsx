@@ -8,14 +8,17 @@ import { Settings, CreditCard, Sliders, Activity, Palette, MessageSquare, AlertT
 import { PaymentMethodWithConfig } from "@/app/(admin)/admin/settings/payments/types"
 import { cn } from "@/lib/utils"
 
-import { usePaymentTabs } from "../../hooks/usePaymentTabs"
+// Hook & Type Import
+import { usePaymentTabs, TabType } from "../../hooks/usePaymentTabs"
+
+// Components Import
 import { Paypal_General_Form } from "./Paypal_General_Form"
 import { Paypal_Connection_Tabs } from "./Paypal_Connection_Tabs"
 import { Paypal_SmartButtons } from "./Paypal_SmartButtons"
 import { Paypal_PayLater } from "./Paypal_PayLater"
 import { Paypal_Advanced } from "./Paypal_Advanced"
 import { Paypal_Danger_Zone } from "./Paypal_Danger_Zone"
-import { Paypal_Webhook_Tab } from "./Paypal_Webhook_Tab" // 👈 New Import
+import { Paypal_Webhook_Tab } from "./Paypal_Webhook_Tab"
 
 interface PaypalMainModalProps {
   method: PaymentMethodWithConfig
@@ -23,20 +26,18 @@ interface PaypalMainModalProps {
 
 export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
   const [open, setOpen] = useState(false)
-  
-  // ট্যাব হুক ইনিশিয়াল করা
   const { activeTab, changeTab, isTabActive } = usePaymentTabs("general")
+  
   const paypalConfig = method.paypalConfig
-
   if (!paypalConfig) return null
 
-  // 👇 Updated Tabs Structure
-  const tabs = [
+  // 🛠️ Typed Tabs Array (Clean Code)
+  const tabs: { id: TabType; label: string; icon: any; variant?: "default" | "destructive" }[] = [
     { id: "general", label: "General", icon: Sliders },
     { id: "methods", label: "Connection", icon: CreditCard },
-    { id: "webhooks", label: "Webhooks", icon: Webhook }, // 👈 New Webhook Tab
+    { id: "webhooks", label: "Webhooks", icon: Webhook },
     { id: "express", label: "Button Style", icon: Palette },
-    { id: "paylater", label: "Pay Later", icon: MessageSquare }, // 👈 Renamed ID from 'webhooks' to 'paylater'
+    { id: "paylater", label: "Pay Later", icon: MessageSquare },
     { id: "advanced", label: "Advanced", icon: Activity },
     { id: "danger", label: "Danger Zone", icon: AlertTriangle, variant: "destructive" },
   ]
@@ -51,7 +52,6 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
       </DialogTrigger>
       
       <DialogContent className="sm:max-w-[1100px] w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden flex flex-col bg-white">
-        
         <DialogHeader className="px-6 py-4 border-b flex-shrink-0 bg-gray-50/50">
           <DialogTitle className="text-xl flex items-center gap-2">
             <span className="font-bold text-[#003087]">PayPal</span> Configuration
@@ -64,11 +64,9 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                // @ts-ignore - Temporary fix for TS enum mismatch
-                onClick={() => changeTab(tab.id as any)}
+                onClick={() => changeTab(tab.id)}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-all whitespace-nowrap md:whitespace-normal",
-                  // @ts-ignore
                   isTabActive(tab.id) 
                     ? tab.variant === "destructive" 
                       ? "bg-red-50 text-red-900 border border-red-200" 
@@ -79,7 +77,6 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
                 )}
               >
                 <tab.icon className={cn("h-4 w-4 flex-shrink-0", 
-                  // @ts-ignore
                   isTabActive(tab.id) && tab.variant !== "destructive" ? "text-[#003087]" : ""
                 )} />
                 {tab.label}
@@ -109,7 +106,6 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
                 </div>
               )}
 
-              {/* 👇 New Webhook Tab Render */}
               {isTabActive("webhooks") && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                   <div className="mb-6 pb-4 border-b">
@@ -128,8 +124,7 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
                 </div>
               )}
 
-              {/* 👇 Updated Check: 'paylater' instead of 'webhooks' */}
-              {isTabActive("paylater" as any) && (
+              {isTabActive("paylater") && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                   <div className="mb-6 pb-4 border-b">
                     <h2 className="text-lg font-semibold">Pay Later Messaging</h2>

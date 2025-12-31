@@ -1,9 +1,9 @@
-//app/actions/settings/payments/stripe/test_connection.ts
-
+// app/actions/settings/payments/stripe/test-connection.ts
 "use server"
 
 import { db } from "@/lib/prisma"
 import Stripe from "stripe"
+import { decrypt } from "../crypto" 
 
 export async function testStripeConnection(paymentMethodId: string) {
   try {
@@ -15,34 +15,42 @@ export async function testStripeConnection(paymentMethodId: string) {
       return { success: false, error: "Configuration not found." }
     }
 
-    const secretKey = config.testMode ? config.testSecretKey : config.liveSecretKey
+    // 1. Get the correct encrypted key based on mode
+    const encryptedKey = config.testMode ? config.testSecretKey : config.liveSecretKey
 
-    if (!secretKey) {
+    if (!encryptedKey) {
       return { success: false, error: "No API Key found." }
     }
 
+    // 2. Decrypt the key before using it
+    const secretKey = decrypt(encryptedKey)
+
+    if (!secretKey) {
+        return { success: false, error: "Invalid API Key format." }
+    }
+
+    // 3. Initialize Stripe
     const stripe = new Stripe(secretKey, {
-      apiVersion: "2025-01-27.acacia" as any, // বা তোমার ভার্সন
+      apiVersion: "2025-01-27.acacia" as any, 
       typescript: true,
     })
 
-    // ১. একই সাথে ব্যালেন্স এবং অ্যাকাউন্টের তথ্য আনা
+    // 4. Test API Call
     const [balance, account] = await Promise.all([
       stripe.balance.retrieve(),
       stripe.accounts.retrieve()
     ]);
 
-    // ২. সফল হলে সব তথ্য রিটার্ন করা
     return { 
       success: true, 
       message: "Verified",
       data: {
         mode: balance.livemode ? 'Live' : 'Test',
         currency: balance.available[0]?.currency.toUpperCase(),
-        account_email: account.email || "N/A", // স্ট্রাইপ অ্যাকাউন্টের ইমেইল
-        account_id: account.id, // যেমন: acct_1Hq...
-        payouts_enabled: account.payouts_enabled, // টাকা তোলা যাবে কি না
-        charges_enabled: account.charges_enabled, // পেমেন্ট নেওয়া যাবে কি না
+        account_email: account.email || "N/A",
+        account_id: account.id,
+        payouts_enabled: account.payouts_enabled,
+        charges_enabled: account.charges_enabled,
         country: account.country
       }
     }

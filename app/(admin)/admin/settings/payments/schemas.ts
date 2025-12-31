@@ -1,4 +1,5 @@
 // app/admin/settings/payments/schemas.ts
+
 import * as z from "zod"
 import { PaymentIntent, PaymentMode, PayPalButtonColor, PayPalButtonLabel, PayPalButtonLayout, PayPalButtonShape, PayPalLandingPage } from "@prisma/client"
 
@@ -17,15 +18,27 @@ export const StripeSettingsSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: stringField,
   
-  livePublishableKey: stringField,
-  liveSecretKey: stringField,
-  liveWebhookSecret: stringField,
-  testPublishableKey: stringField,
-  testSecretKey: stringField,
+  // 👇 Regex Validation Added for Security
+  livePublishableKey: z.string().optional().refine(val => !val || val.startsWith('pk_live_'), {
+    message: "Live Public Key must start with 'pk_live_'"
+  }),
+  liveSecretKey: z.string().optional().refine(val => !val || val.startsWith('sk_live_'), {
+    message: "Live Secret Key must start with 'sk_live_'"
+  }),
+  liveWebhookSecret: z.string().optional().refine(val => !val || val.startsWith('whsec_'), {
+    message: "Webhook Secret usually starts with 'whsec_'"
+  }),
+
+  testPublishableKey: z.string().optional().refine(val => !val || val.startsWith('pk_test_'), {
+    message: "Test Public Key must start with 'pk_test_'"
+  }),
+  testSecretKey: z.string().optional().refine(val => !val || val.startsWith('sk_test_'), {
+    message: "Test Secret Key must start with 'sk_test_'"
+  }),
   testWebhookSecret: stringField,
 
   paymentAction: z.nativeEnum(PaymentIntent).optional(),
-  statementDescriptor: stringField,
+  statementDescriptor: z.string().max(22, "Max 22 characters allowed").nullable().optional(),
   shortStatementDescriptor: stringField,
   addOrderNumberToStatement: booleanField,
   
@@ -40,12 +53,12 @@ export const StripeSettingsSchema = z.object({
 })
 
 export const PaypalSettingsSchema = z.object({
-  isEnabled: booleanField, // 👈 NEW: Enable/Disable Toggle
+  isEnabled: booleanField, 
   sandbox: booleanField,
-  liveEmail: stringField,
+  liveEmail: z.string().email().optional().or(z.literal('')),
   liveClientId: stringField,
   liveClientSecret: stringField,
-  sandboxEmail: stringField,
+  sandboxEmail: z.string().email().optional().or(z.literal('')),
   sandboxClientId: stringField,
   sandboxClientSecret: stringField,
   
@@ -76,7 +89,7 @@ export const PaypalSettingsSchema = z.object({
   payLaterMessaging: booleanField,
   payLaterMessageTheme: stringField,
   
-  subtotalMismatchBehavior: stringField, // 👈 Added for completeness
+  subtotalMismatchBehavior: stringField,
   invoicePrefix: stringField,
   debugLog: booleanField
 })

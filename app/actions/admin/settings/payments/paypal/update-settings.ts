@@ -5,6 +5,7 @@ import { db } from "@/lib/prisma"
 import { PaypalSettingsSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
+import { encrypt } from "../crypto" // 👈 Encryption Import
 
 export async function updatePaypalSettings(
   paymentMethodId: string,
@@ -13,12 +14,16 @@ export async function updatePaypalSettings(
   try {
     const validated = PaypalSettingsSchema.parse(values)
 
+    // 🔒 সিক্রেট কি গুলো এনক্রিপ্ট করছি (যদি ইউজার নতুন ভ্যালু দিয়ে থাকে)
+    const liveClientSecret = validated.liveClientSecret ? encrypt(validated.liveClientSecret) : undefined
+    const sandboxClientSecret = validated.sandboxClientSecret ? encrypt(validated.sandboxClientSecret) : undefined
+
     await db.$transaction(async (tx) => {
-      // 1. Update Parent Config (Enable/Disable handled here)
+      // 1. Update Parent Config
       await tx.paymentMethodConfig.update({
         where: { id: paymentMethodId },
         data: {
-          isEnabled: validated.isEnabled ?? false, // 👈 NEW: Updating status
+          isEnabled: validated.isEnabled ?? false,
           name: validated.title,
           description: validated.description ?? "",
           mode: validated.sandbox ? "TEST" : "LIVE",
@@ -26,18 +31,20 @@ export async function updatePaypalSettings(
       })
 
       // 2. Update PayPal Specific Config
+      // Prisma তে undefined পাঠালে সেই ফিল্ড আপডেট হয় না (যা আমরা চাই)
       await tx.paypalConfig.update({
         where: { paymentMethodId },
         data: {
           sandbox: validated.sandbox ?? false,
           
-          // Credentials
+          // Credentials (Encrypted)
           liveEmail: validated.liveEmail ?? null,
           liveClientId: validated.liveClientId ?? null,
-          liveClientSecret: validated.liveClientSecret ?? null,
+          liveClientSecret: liveClientSecret, // 🔒 Encrypted or undefined
+          
           sandboxEmail: validated.sandboxEmail ?? null,
           sandboxClientId: validated.sandboxClientId ?? null,
-          sandboxClientSecret: validated.sandboxClientSecret ?? null,
+          sandboxClientSecret: sandboxClientSecret, // 🔒 Encrypted or undefined
 
           // General Settings
           title: validated.title,

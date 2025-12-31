@@ -21,7 +21,7 @@ export async function getProductById(id: string) {
         images: { orderBy: { position: 'asc' } },
         attributes: { orderBy: { position: 'asc' } },
         
-        // 🔥 UPDATE: Include Inventory & Variants with sorting
+        // Include Inventory & Variants with sorting
         variants: {
           include: {
             inventoryLevels: true
@@ -31,7 +31,7 @@ export async function getProductById(id: string) {
         inventoryLevels: true,
         tags: true,
 
-        // 🔥 UPDATE: Include Bundle Items with Child Product Details
+        // Include Bundle Items with Child Product Details
         bundleItems: {
             include: {
                 childProduct: {
@@ -132,6 +132,7 @@ export async function getAttributes() {
     }
 }
 
+// 🔥 UPDATE: High Performance Search Logic
 export async function searchProducts(query: string) {
   if (!query || query.length < 2) return { success: true, data: [] };
   
@@ -139,16 +140,26 @@ export async function searchProducts(query: string) {
     const products = await db.product.findMany({
       where: {
         OR: [
+          // 1. Full Text Search (Fastest for word match)
+          { name: { search: query.split(" ").join(" & ") } },
+          // 2. Partial Match (Fallback)
           { name: { contains: query, mode: 'insensitive' } },
           { sku: { contains: query, mode: 'insensitive' } },
         ],
         status: ProductStatus.ACTIVE, 
       },
-      take: 10, // Increased limit for better search experience
+      take: 20, // Increased limit slightly
+      orderBy: {
+        _relevance: { // Sort by relevance
+          fields: ['name'],
+          search: query.split(" ").join(" & "),
+          sort: 'desc'
+        }
+      },
       select: { 
         id: true, 
         name: true, 
-        images: { take: 1, select: { url: true } }, 
+        images: { take: 1, select: { url: true }, orderBy: { position: 'asc' } }, 
         featuredImage: true,
         sku: true,
         price: true 
@@ -156,7 +167,20 @@ export async function searchProducts(query: string) {
     });
     return { success: true, data: products };
   } catch (error) {
-    return { success: false, data: [] };
+    // Fallback if Full Text Search syntax fails
+    try {
+        const fallbackData = await db.product.findMany({
+            where: {
+                name: { contains: query, mode: 'insensitive' },
+                status: ProductStatus.ACTIVE, 
+            },
+            take: 10,
+            select: { id: true, name: true, featuredImage: true, sku: true, price: true }
+        });
+        return { success: true, data: fallbackData };
+    } catch(e) {
+        return { success: false, data: [] };
+    }
   }
 }
 

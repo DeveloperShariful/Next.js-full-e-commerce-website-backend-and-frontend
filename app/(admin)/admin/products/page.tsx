@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { db } from '@/lib/prisma';
-import { ProductType, ProductStatus } from '@prisma/client'; // 🚀 Import ProductStatus
+import { ProductType, ProductStatus, Prisma } from '@prisma/client';
 import ProductTable from './_components/product-table';
 
 interface ProductsPageProps {
@@ -20,45 +20,44 @@ export default async function ProductListPage(props: ProductsPageProps) {
 
   const query = searchParams.query || "";
   const categoryFilter = searchParams.category || "";
-  const statusFilter = searchParams.status || ""; // URL থেকে আসা স্ট্যাটাস (active, draft, archived)
+  const statusFilter = searchParams.status || "";
   const typeFilter = searchParams.type || "";
   
   const page = Number(searchParams.page) || 1;
   const limit = 20; 
   const skip = (page - 1) * limit;
 
-  // 🚀 FIX: Status Filter Logic with Enum
-  let statusCondition = {};
-  if (statusFilter === 'archived') {
-      statusCondition = { status: ProductStatus.ARCHIVED };
-  } else if (statusFilter === 'active') {
-      statusCondition = { status: ProductStatus.ACTIVE };
-  } else if (statusFilter === 'draft') {
-      statusCondition = { status: ProductStatus.DRAFT };
-  } else {
-      // Show everything except archived
-      statusCondition = { status: { not: ProductStatus.ARCHIVED } };
-  }
-
-  // Query Construction
-  const whereCondition: any = {
+  // --- OPTIMIZED FILTER LOGIC ---
+  const whereCondition: Prisma.ProductWhereInput = {
     AND: [
-      {
+      // 1. Search Optimization (Full Text Search priority, fallback to contains)
+      query ? {
         OR: [
+          // 'search' uses Postgres Full Text Search (Faster for words)
+          { name: { search: query.split(" ").join(" & ") } }, 
+          // 'contains' handles partial matches (substrings)
           { name: { contains: query, mode: 'insensitive' } },
           { sku: { contains: query, mode: 'insensitive' } },
         ]
-      },
-      statusCondition, // 🚀 Applied corrected status logic
-      
-      typeFilter ? { productType: typeFilter.toUpperCase() as ProductType } : {}, // Ensure Uppercase for Enum
+      } : {},
+
+      // 2. Optimized Status Filtering
+      statusFilter === 'archived' ? { status: ProductStatus.ARCHIVED } :
+      statusFilter === 'draft' ? { status: ProductStatus.DRAFT } :
+      statusFilter === 'active' ? { status: ProductStatus.ACTIVE } :
+      { status: { not: ProductStatus.ARCHIVED } }, // Default: Show all except trash
+
+      // 3. Other Filters
+      typeFilter ? { productType: typeFilter.toUpperCase() as ProductType } : {},
       categoryFilter ? { category: { name: categoryFilter } } : {},
     ]
   };
 
+  // --- PARALLEL DATA FETCHING (FASTEST) ---
   const [products, totalProducts, categories, statusCounts] = await Promise.all([
     db.product.findMany({
       where: whereCondition,
+      // Selective Query: Only fetching what is needed for the table
       select: {
         id: true,
         productCode: true,
@@ -76,15 +75,16 @@ export default async function ProductListPage(props: ProductsPageProps) {
         category: { select: { name: true } },
         brand: { select: { name: true } },
         tags: { select: { name: true } },
-        images: { take: 1, select: { url: true } },
+        images: { take: 1, select: { url: true }, orderBy: { position: 'asc' } },
+        // Optimized Inventory Count
         inventoryLevels: { select: { quantity: true } }
       },
-      skip: skip,
+      skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
     }),
     db.product.count({ where: whereCondition }),
-    db.category.findMany({ select: { name: true } }),
+    db.category.findMany({ select: { name: true }, orderBy: { name: 'asc' } }),
     db.product.groupBy({
       by: ['status'],
       _count: { status: true }
@@ -93,7 +93,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
 
   const totalPages = Math.ceil(totalProducts / limit);
 
-  // 🚀 FIX: Count Logic using Enum check
+  // Status Counts Logic
   const counts = {
     all: statusCounts.filter(s => s.status !== ProductStatus.ARCHIVED).reduce((acc, curr) => acc + curr._count.status, 0),
     active: statusCounts.find(s => s.status === ProductStatus.ACTIVE)?._count.status || 0,
@@ -102,11 +102,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
   };
 
   return (
-    // FIX: Responsive Negative Margin applied (-m-4 for mobile, -m-6 for desktop)
-    // This matches the parent layout padding exactly to prevent overflow scrollbar
     <div className="p-4 md:p-3 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
-      
-      {/* HEADER - RESPONSIVE */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-normal text-slate-800">Products</h1>
@@ -116,7 +112,6 @@ export default async function ProductListPage(props: ProductsPageProps) {
         </div>
       </div>
 
-      {/* CLIENT TABLE COMPONENT */}
       <ProductTable 
         products={products}
         categories={categories}
@@ -124,20 +119,19 @@ export default async function ProductListPage(props: ProductsPageProps) {
         statusFilter={statusFilter}
       />
 
-      {/* PAGINATION - RESPONSIVE */}
       {totalProducts > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-sm text-slate-600 gap-4 sm:gap-0 pb-4">
           <div>{totalProducts} items</div>
           <div className="flex gap-1">
             <Link 
-               href={`/admin/products?page=${page > 1 ? page - 1 : 1}`} 
+               href={`/admin/products?page=${page > 1 ? page - 1 : 1}&query=${query}&status=${statusFilter}`} 
                className={`px-3 py-1 border border-slate-300 bg-white rounded hover:bg-slate-50 ${page <= 1 ? 'pointer-events-none opacity-50' : ''}`}
             >
                &laquo;
             </Link>
             <div className="px-3 py-1 border border-slate-300 bg-white rounded font-bold">{page}</div>
             <Link 
-               href={`/admin/products?page=${page < totalPages ? page + 1 : totalPages}`} 
+               href={`/admin/products?page=${page < totalPages ? page + 1 : totalPages}&query=${query}&status=${statusFilter}`} 
                className={`px-3 py-1 border border-slate-300 bg-white rounded hover:bg-slate-50 ${page >= totalPages ? 'pointer-events-none opacity-50' : ''}`}
             >
                &raquo;

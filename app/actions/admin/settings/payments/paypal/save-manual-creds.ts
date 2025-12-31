@@ -3,6 +3,7 @@
 
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { encrypt } from "../crypto" // 👈 Encryption Import
 
 export async function savePaypalManualCreds(
   paymentMethodId: string,
@@ -15,14 +16,14 @@ export async function savePaypalManualCreds(
   }
 ) {
   try {
-    // ১. PayPal ক্রেডেনশিয়াল ভেরিফাই করা (সাথে এরর মেসেজ ধরা)
+    // ১. PayPal ক্রেডেনশিয়াল ভেরিফাই করা (প্লেইন টেক্সট দিয়ে)
+    // ভেরিফিকেশনের জন্য এনক্রিপ্ট করার দরকার নেই, কারণ এটি লাইভ PayPal API তে যাচ্ছে
     const verification = await verifyPaypalCredentials(
       data.sandbox, 
       data.clientId, 
       data.clientSecret
     )
 
-    // যদি ভেরিফিকেশন ফেইল করে, তাহলে নির্দিষ্ট কারণসহ এরর রিটার্ন করব
     if (!verification.success) {
       return { 
         success: false, 
@@ -30,24 +31,27 @@ export async function savePaypalManualCreds(
       }
     }
 
-    // ২. ডাটা প্রস্তুত করা (Prepare Data)
+    // ২. সিক্রেট কি এনক্রিপ্ট করা (ডাটাবেসের জন্য)
+    const encryptedSecret = encrypt(data.clientSecret)
+
+    // ৩. ডাটা প্রস্তুত করা
     const updateData = data.sandbox
       ? {
           sandbox: true,
-          sandboxClientId: data.clientId,
-          sandboxClientSecret: data.clientSecret,
+          sandboxClientId: data.clientId, // Client ID পাবলিক, তাই এনক্রিপ্ট জরুরি না
+          sandboxClientSecret: encryptedSecret, // 🔒 Encrypted
           sandboxEmail: data.email,
           merchantId: data.merchantId,
         }
       : {
           sandbox: false,
           liveClientId: data.clientId,
-          liveClientSecret: data.clientSecret,
+          liveClientSecret: encryptedSecret, // 🔒 Encrypted
           liveEmail: data.email,
           merchantId: data.merchantId,
         }
 
-    // ৩. ডাটাবেসে সেভ করা
+    // ৪. ডাটাবেসে সেভ করা
     await db.paypalConfig.upsert({
       where: { paymentMethodId },
       create: {
@@ -62,7 +66,7 @@ export async function savePaypalManualCreds(
       }
     })
 
-    // ৪. মেথড এনাবল করা
+    // ৫. মেথড এনাবল করা
     await db.paymentMethodConfig.update({
       where: { id: paymentMethodId },
       data: {
@@ -79,7 +83,7 @@ export async function savePaypalManualCreds(
   }
 }
 
-// 👇 আপডেটেড হেল্পার ফাংশন: এখন কারণসহ রেজাল্ট রিটার্ন করবে
+// ভেরিফিকেশন হেল্পার (প্লেইন টেক্সট কি ব্যবহার করবে)
 async function verifyPaypalCredentials(isSandbox: boolean, clientId: string, clientSecret: string) {
   const baseUrl = isSandbox 
     ? "https://api-m.sandbox.paypal.com" 
@@ -103,7 +107,6 @@ async function verifyPaypalCredentials(isSandbox: boolean, clientId: string, cli
     if (response.ok && data.access_token) {
       return { success: true }
     } else {
-      // PayPal এরর ডেসক্রিপশন ধরছি
       const errorMessage = data.error_description || data.error || "Authentication failed with PayPal."
       return { success: false, message: errorMessage }
     }

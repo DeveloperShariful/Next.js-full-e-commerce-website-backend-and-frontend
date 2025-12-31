@@ -15,8 +15,8 @@ import {
     handleDigitalFiles, 
     handleAttributes, 
     handleVariations,
-    handleBundleItems // 🔥 UPDATE: Imported
-} from "./product-services"; // Note: Ensure path is correct based on your folder structure
+    handleBundleItems 
+} from "./product-services"; 
 
 export type ProductFormState = {
   success: boolean;
@@ -24,6 +24,27 @@ export type ProductFormState = {
   errors?: Record<string, string[]>;
   productId?: string;
 };
+
+// 🔥 NEW: Robust Slug Generator (Prevents Duplicate Errors)
+async function ensureUniqueSlug(slug: string, productId?: string): Promise<string> {
+    let uniqueSlug = slug;
+    let count = 0;
+    while (true) {
+        const existing = await db.product.findFirst({
+            where: { 
+                slug: uniqueSlug,
+                NOT: productId ? { id: productId } : undefined
+            },
+            select: { id: true }
+        });
+        
+        if (!existing) break;
+        
+        count++;
+        uniqueSlug = `${slug}-${count}-${Math.floor(Math.random() * 1000)}`;
+    }
+    return uniqueSlug;
+}
 
 export async function createProduct(formData: FormData): Promise<ProductFormState> {
   return await saveProduct(formData, "CREATE");
@@ -44,20 +65,11 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
   }
   if (!data.name) return { success: false, message: "Product name is required." };
 
-  // 2. Slug Validation
-  let slug = data.slug;
-  const existingSlug = await db.product.findFirst({
-    where: { 
-      slug: slug, 
-      NOT: data.id ? { id: data.id } : undefined 
-    }
-  });
-  if (existingSlug) {
-    slug = `${slug}-${Date.now().toString().slice(-4)}`;
-  }
+  // 2. Slug Validation with Retry Logic
+  const finalSlug = await ensureUniqueSlug(data.slug, data.id);
 
   try {
-    // 3. Ensure Default Location (For Inventory)
+    // 3. Ensure Default Location (For Inventory) - Optimized
     let locationId = "";
     if (data.trackQuantity) {
         const loc = await db.location.findFirst({ where: { isDefault: true }, select: { id: true } });
@@ -69,7 +81,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         }
     }
 
-    // 4. Global Attribute Sync
+    // 4. Global Attribute Sync (Parallel)
     await Promise.all(data.attributesData.map(async (attr) => {
         if (!attr.name) return;
         const attrSlug = generateSlug(attr.name);
@@ -77,7 +89,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         
         if (existingGlobal) {
             const mergedValues = Array.from(new Set([...existingGlobal.values, ...attr.values]));
-            if (mergedValues.length !== existingGlobal.values.length) {
+            if (mergedValues.length > existingGlobal.values.length) {
                 await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
             }
         } else {
@@ -113,7 +125,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         // --- Prepare Main Product Data ---
         const productData: any = {
             name: data.name,
-            slug: slug,
+            slug: finalSlug, // Using the safe slug
             description: data.description,
             shortDescription: data.shortDescription,
             productType: data.productType, 
@@ -140,7 +152,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             metafields: data.metafields || Prisma.DbNull,
             seoSchema: data.seoSchema || Prisma.DbNull,
             
-            // 🔥 NEW: Featured Flag
+            // Featured Flag
             isFeatured: data.isFeatured || false,
 
             saleStart: data.saleStart ? new Date(data.saleStart) : null,
@@ -187,6 +199,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         let product;
         if (data.id) {
             // UPDATE
+             // Reset tags first to handle potential unique conflicts if using set
              await tx.product.update({ where: { id: data.id }, data: { tags: { set: [] } } });
              product = await tx.product.update({
                 where: { id: data.id },
@@ -199,14 +212,14 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             });
         }
 
-        // --- SUB TASKS ---
+        // --- SUB TASKS (Running in Parallel for Performance) ---
         await Promise.all([
             handleInventory(tx, product, data, locationId),
             handleImages(tx, product.id, data.galleryImages),
             handleDigitalFiles(tx, product.id, data.isDownloadable, data.digitalFiles),
             handleAttributes(tx, product.id, data.attributesData),
             handleVariations(tx, product.id, data.variationsData, data.productType, locationId),
-            handleBundleItems(tx, product.id, data.productType, data.bundleItems) // 🔥 UPDATE: Added Bundle Handler
+            handleBundleItems(tx, product.id, data.productType, data.bundleItems) 
         ]);
 
     }, { maxWait: 10000, timeout: 30000 });

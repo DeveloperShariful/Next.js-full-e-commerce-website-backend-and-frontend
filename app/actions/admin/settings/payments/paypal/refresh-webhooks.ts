@@ -1,7 +1,9 @@
+// app/actions/settings/payments/paypal/refresh-webhook.ts
 "use server"
 
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { decrypt } from "../crypto" // 
 
 export async function refreshPaypalWebhook(paymentMethodId: string) {
   try {
@@ -10,7 +12,8 @@ export async function refreshPaypalWebhook(paymentMethodId: string) {
 
     const isSandbox = config.sandbox
     const clientId = isSandbox ? config.sandboxClientId : config.liveClientId
-    const clientSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret
+    const encryptedSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret
+    const clientSecret = decrypt(encryptedSecret ?? "")
 
     if (!clientId || !clientSecret) return { success: false, error: "Missing credentials" }
 
@@ -24,13 +27,16 @@ export async function refreshPaypalWebhook(paymentMethodId: string) {
       headers: { "Authorization": `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" }
     })
     const tokenData = await tokenRes.json()
-    if (!tokenData.access_token) return { success: false, error: "Authentication failed" }
+    if (!tokenData.access_token) return { success: false, error: "Authentication failed. Check Client ID/Secret." }
 
-    // ২. URL বানানো
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const webhookUrl = `${appUrl}/api/webhooks/paypal`
+    const envUrl = process.env.NEXT_PUBLIC_APP_URL || "";
 
-    // ৩. নতুন ওয়েবুক তৈরির চেষ্টা
+    if (!envUrl.startsWith("http")) {
+       return { success: false, error: "NEXT_PUBLIC_APP_URL is not set correctly in .env" }
+    }
+    
+    const webhookUrl = `${envUrl}/api/webhooks/paypal`
+
     const createRes = await fetch(`${baseUrl}/v1/notifications/webhooks`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
@@ -47,28 +53,23 @@ export async function refreshPaypalWebhook(paymentMethodId: string) {
 
     const createData = await createRes.json()
     let finalWebhookId = createData.id
-
-    // ৪. যদি আগে থেকেই থাকে (Already Exists), তবে লিস্ট থেকে খুঁজে বের করো (Reconnect Logic)
+    
     if (createData.name === "WEBHOOK_URL_ALREADY_EXISTS") {
-        console.log("Webhook exists, fetching list to reconnect...")
-        
         const listRes = await fetch(`${baseUrl}/v1/notifications/webhooks`, {
             method: "GET",
             headers: { "Authorization": `Bearer ${tokenData.access_token}` }
         })
         const listData = await listRes.json()
-        
-        // আমাদের URL এর সাথে মিলে এমন ওয়েবুক খুঁজছি
         const existingHook = listData.webhooks.find((w: any) => w.url === webhookUrl)
         
         if (existingHook) {
             finalWebhookId = existingHook.id
         } else {
-            return { success: false, error: "Webhook exists but could not be found. Please delete manually from PayPal." }
+            return { success: false, error: "Webhook URL exists on PayPal but couldn't be retrieved." }
         }
     }
 
-    // ৫. ডাটাবেস আপডেট (Save/Sync)
+    // ৫. ডাটাবেস আপডেট
     if (finalWebhookId) {
       await db.paypalConfig.update({
         where: { paymentMethodId },

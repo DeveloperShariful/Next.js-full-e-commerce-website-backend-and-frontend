@@ -6,8 +6,6 @@ import { db } from "@/lib/prisma"
 
 export async function getStripeLogs() {
   try {
-    // ডাটাবেস থেকে শেষ ১০টি লগ নিয়ে আসছি যেখানে source = 'STRIPE'
-    // তোমার Prisma Schema তে SystemLog বা Log নামে মডেল থাকতে হবে
     const logs = await db.systemLog.findMany({
       where: {
         source: "STRIPE" 

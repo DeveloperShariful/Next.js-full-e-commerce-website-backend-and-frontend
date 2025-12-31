@@ -6,6 +6,7 @@ import { StripeSettingsSchema } from "@/app/(admin)/admin/settings/payments/sche
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import Stripe from "stripe"
+import { encrypt } from "../crypto" 
 
 export async function updateStripeSettings(
   paymentMethodId: string,
@@ -14,6 +15,8 @@ export async function updateStripeSettings(
   try {
     const validated = StripeSettingsSchema.parse(values)
 
+    // 1. Real-time Verification (Optional but recommended)
+    // আমরা এনক্রিপ্ট করার আগেই একবার চেক করে নিচ্ছি কি-টা ভ্যালিড কি না
     if (validated.enableStripe) {
       const secretKeyToCheck = validated.testMode 
         ? validated.testSecretKey 
@@ -28,12 +31,9 @@ export async function updateStripeSettings(
           apiVersion: "2025-01-27.acacia" as any, 
           typescript: true,
         })
-
         await stripe.balance.retrieve() 
-        
       } catch (error: any) {
-        console.error("Stripe Real-time Verification Failed:", error.message)
-
+        console.error("Stripe Verification Failed:", error.message)
         return { 
           success: false, 
           error: `Authentication Failed: ${error.message}` 
@@ -41,7 +41,17 @@ export async function updateStripeSettings(
       }
     }
 
+    // 2. Encrypt Sensitive Data
+    // যদি ভ্যালু থাকে তবেই এনক্রিপ্ট হবে, নাল বা এম্পটি স্ট্রিং হলে যা আছে তাই থাকবে
+    const liveSecretKey = validated.liveSecretKey ? encrypt(validated.liveSecretKey) : ""
+    const liveWebhookSecret = validated.liveWebhookSecret ? encrypt(validated.liveWebhookSecret) : ""
+    
+    const testSecretKey = validated.testSecretKey ? encrypt(validated.testSecretKey) : ""
+    const testWebhookSecret = validated.testWebhookSecret ? encrypt(validated.testWebhookSecret) : ""
+
+    // 3. Save to Database
     await db.$transaction(async (tx) => {
+      // Update Parent Config
       await tx.paymentMethodConfig.update({
         where: { id: paymentMethodId },
         data: {
@@ -51,6 +61,8 @@ export async function updateStripeSettings(
           isEnabled: validated.enableStripe ?? false
         }
       })
+
+      // Update Stripe Config
       await tx.stripeConfig.upsert({
         where: { paymentMethodId },
         create: {
@@ -60,12 +72,12 @@ export async function updateStripeSettings(
           description: validated.description ?? "",
           
           livePublishableKey: validated.livePublishableKey ?? "",
-          liveSecretKey: validated.liveSecretKey ?? "",
-          liveWebhookSecret: validated.liveWebhookSecret ?? "",
+          liveSecretKey,       // 🔒 Encrypted
+          liveWebhookSecret,   // 🔒 Encrypted
           
           testPublishableKey: validated.testPublishableKey ?? "",
-          testSecretKey: validated.testSecretKey ?? "",
-          testWebhookSecret: validated.testWebhookSecret ?? "",
+          testSecretKey,       // 🔒 Encrypted
+          testWebhookSecret,   // 🔒 Encrypted
 
           paymentAction: validated.paymentAction ?? "CAPTURE",
           statementDescriptor: validated.statementDescriptor ?? "",
@@ -88,12 +100,12 @@ export async function updateStripeSettings(
           description: validated.description ?? "",
           
           livePublishableKey: validated.livePublishableKey ?? "",
-          liveSecretKey: validated.liveSecretKey ?? "",
-          liveWebhookSecret: validated.liveWebhookSecret ?? "",
+          liveSecretKey,       // 🔒 Encrypted
+          liveWebhookSecret,   // 🔒 Encrypted
           
           testPublishableKey: validated.testPublishableKey ?? "",
-          testSecretKey: validated.testSecretKey ?? "",
-          testWebhookSecret: validated.testWebhookSecret ?? "",
+          testSecretKey,       // 🔒 Encrypted
+          testWebhookSecret,   // 🔒 Encrypted
 
           paymentAction: validated.paymentAction ?? "CAPTURE",
           statementDescriptor: validated.statementDescriptor ?? "",

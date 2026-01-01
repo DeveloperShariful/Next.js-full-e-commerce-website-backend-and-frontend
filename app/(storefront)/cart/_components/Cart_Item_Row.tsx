@@ -13,14 +13,13 @@ import { toast } from "sonner";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface ItemProps {
-  item: any; // Prisma CartItem with includes
+  item: any; 
 }
 
 export const Cart_Item_Row = ({ item }: ItemProps) => {
   const { formatPrice } = useGlobalStore();
   const [isPending, startTransition] = useTransition();
 
-  // 1. দাম এবং ইমেজ নির্ধারণ (ভেরিয়েন্ট বা মেইন প্রোডাক্ট)
   const product = item.product;
   const variant = item.variant;
 
@@ -33,103 +32,91 @@ export const Cart_Item_Row = ({ item }: ItemProps) => {
   const subName = variant ? variant.name : null;
   const productLink = `/products/${product.slug}`;
 
-  // 2. কোয়ান্টিটি আপডেট হ্যান্ডলার
+  // Quantity Handler
   const handleQuantity = (newQty: number) => {
     if (newQty < 1) return;
-    
     startTransition(async () => {
       const res = await updateItemQuantity(item.id, newQty);
-      if (!res.success) {
-        toast.error(res.message);
-      }
+      if (!res.success) toast.error(res.message);
     });
   };
 
-  // 3. ডিলিট হ্যান্ডলার
+  // Remove Handler
   const handleRemove = () => {
     if (!confirm("Remove this item?")) return;
-    
     startTransition(async () => {
       const res = await removeCartItem(item.id);
-      if (res.success) {
-        toast.success("Item removed");
-      } else {
-        toast.error(res.message);
-      }
+      if (res.success) toast.success("Item removed");
+      else toast.error(res.message);
     });
   };
 
   return (
-    <div className="group relative flex flex-col md:grid md:grid-cols-12 gap-4 p-4 md:items-center bg-white transition-colors hover:bg-gray-50/50">
+    // ✅ FIX: "md:" ক্লাসগুলো সরিয়ে শুধু flex-col রাখা হয়েছে (মোবাইল স্টাইল)
+    <div className="group relative flex flex-col gap-4 p-4 bg-white transition-colors hover:bg-gray-50/50">
       
-      {/* Product Info (Mobile: Full Width, Desktop: col-span-6) */}
-      <div className="flex items-center gap-4 md:col-span-6">
+      {/* 1. TOP SECTION: Image + Info + Unit Price */}
+      <div className="flex items-start gap-4">
+        {/* Image */}
         <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border bg-gray-100">
-          <Image 
-            src={image} 
-            alt={name} 
-            fill 
-            className="object-cover object-center"
-          />
+          <Image src={image} alt={name} fill className="object-cover object-center" />
         </div>
+        
+        {/* Info */}
         <div className="flex-1 min-w-0">
           <Link href={productLink} className="text-sm font-medium text-gray-900 hover:underline line-clamp-2">
             {name}
           </Link>
-          {subName && (
-            <p className="text-xs text-muted-foreground mt-1">Variant: {subName}</p>
-          )}
-          {/* Mobile Price View */}
-          <div className="md:hidden mt-1 font-semibold text-sm">
+          {subName && <p className="text-xs text-muted-foreground mt-1">Variant: {subName}</p>}
+          
+          {/* Unit Price (Always visible now) */}
+          <div className="mt-1 font-semibold text-sm text-gray-600">
             {formatPrice(price)}
           </div>
         </div>
       </div>
 
-      {/* Quantity Control (Desktop: col-span-2) */}
-      <div className="flex items-center justify-between md:justify-center md:col-span-2">
-        <span className="text-sm text-gray-500 md:hidden">Qty:</span>
-        <div className="flex items-center border rounded-md bg-white shadow-sm">
+      {/* 2. BOTTOM SECTION: Controls + Total Price */}
+      <div className="flex items-center justify-between border-t pt-4 mt-2">
+        
+        {/* Quantity Controls */}
+        <div className="flex items-center border rounded-md bg-white shadow-sm h-9">
           <button
             onClick={() => handleQuantity(item.quantity - 1)}
             disabled={isPending || item.quantity <= 1}
-            className="p-2 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+            className="w-9 h-full flex items-center justify-center hover:bg-gray-100 disabled:opacity-50 transition-colors border-r"
           >
-            <Minus className="h-3 w-3" />
+            <Minus className="h-3.5 w-3.5" />
           </button>
-          <span className="w-8 text-center text-sm font-medium tabular-nums">
+          <span className="w-10 text-center text-sm font-medium tabular-nums">
             {isPending ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : item.quantity}
           </span>
           <button
             onClick={() => handleQuantity(item.quantity + 1)}
             disabled={isPending}
-            className="p-2 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+            className="w-9 h-full flex items-center justify-center hover:bg-gray-100 disabled:opacity-50 transition-colors border-l"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
-      </div>
 
-      {/* Unit Price (Desktop Only: col-span-2) */}
-      <div className="hidden md:flex justify-end col-span-2 text-sm text-gray-600">
-        {formatPrice(price)}
-      </div>
+        {/* Total Price & Delete */}
+        <div className="flex items-center gap-4">
+          <span className="font-bold text-gray-900 text-lg">
+            {formatPrice(price * item.quantity)}
+          </span>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRemove}
+            disabled={isPending}
+            className="text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors h-9 w-9"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
 
-      {/* Total & Remove (Desktop: col-span-2) */}
-      <div className="flex items-center justify-between md:justify-end gap-4 md:col-span-2 mt-2 md:mt-0 pt-2 md:pt-0 border-t md:border-t-0">
-        <span className="font-bold text-gray-900 md:text-right">
-          {formatPrice(price * item.quantity)}
-        </span>
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleRemove}
-          disabled={isPending}
-          className="text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
       </div>
 
     </div>

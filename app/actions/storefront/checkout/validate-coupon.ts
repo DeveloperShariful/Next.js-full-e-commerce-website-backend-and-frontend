@@ -1,66 +1,62 @@
-// app/actions/storefront/checkout/validate-coupon.ts
-"use server"
+// File: app/actions/storefront/checkout/validate-coupon.ts
+"use server";
 
-import { db } from "@/lib/prisma"
-import { getCartCalculation } from "./get-cart-calculation"
+import { db } from "@/lib/prisma";
+import { getCartCalculation } from "./get-cart-calculation";
 
 export async function validateCoupon(code: string, cartId: string) {
   try {
-    // ১. কুপন কোড ডাটাবেসে খোঁজা
+    if (!code) return { success: false, error: "Please enter a code" };
+
+    // ১. কুপন চেক
     const discount = await db.discount.findUnique({
-      where: { code: code.toUpperCase() }, // Case insensitive
-    })
+      where: { code: code.toUpperCase() }, 
+    });
 
     if (!discount || !discount.isActive) {
-      return { success: false, error: "Invalid or expired coupon code." }
+      return { success: false, error: "Invalid coupon code." };
     }
 
-    // ২. শর্ত চেক করা (Validity Checks)
-    const now = new Date()
+    // ২. ডেট ভ্যালিডেশন
+    const now = new Date();
     if (discount.startDate > now || (discount.endDate && discount.endDate < now)) {
-      return { success: false, error: "This coupon is expired." }
+      return { success: false, error: "Coupon expired." };
     }
 
+    // ৩. লিমিট চেক
     if (discount.usageLimit && discount.usedCount >= discount.usageLimit) {
-      return { success: false, error: "Coupon usage limit reached." }
+      return { success: false, error: "Coupon usage limit reached." };
     }
 
-    // ৩. কার্ট টোটাল চেক করা (Min Spend)
-    const cartData = await getCartCalculation(cartId)
+    // ৪. কার্ট টোটাল চেক
+    const cartData = await getCartCalculation(cartId);
     if (!cartData.success || !cartData.total) {
-      return { success: false, error: "Could not validate cart total." }
+      return { success: false, error: "Cart error." };
     }
 
     if (discount.minSpend && cartData.total < discount.minSpend) {
-      return { success: false, error: `Minimum spend of $${discount.minSpend} required.` }
+      return { success: false, error: `Min spend $${discount.minSpend} required.` };
     }
 
-    // ৪. ডিসকাউন্ট অ্যামাউন্ট হিসাব করা
-    let discountAmount = 0
+    // ৫. ডিসকাউন্ট ক্যালকুলেশন
+    let discountAmount = 0;
     if (discount.type === "PERCENTAGE") {
-      discountAmount = (cartData.total * discount.value) / 100
-    } else if (discount.type === "FIXED_CART" || discount.type === "FIXED_AMOUNT") {
-      discountAmount = discount.value
+      discountAmount = (cartData.total * discount.value) / 100;
+    } else {
+      discountAmount = discount.value;
     }
 
-    // টোটালের চেয়ে ডিসকাউন্ট বেশি হতে পারবে না
-    if (discountAmount > cartData.total) {
-      discountAmount = cartData.total
-    }
-
-    const newTotal = cartData.total - discountAmount
+    // টোটালের বেশি ডিসকাউন্ট হতে পারবে না
+    if (discountAmount > cartData.total) discountAmount = cartData.total;
 
     return {
       success: true,
-      discountId: discount.id,
       code: discount.code,
-      discountAmount: discountAmount,
-      newTotal: newTotal,
-      message: "Coupon applied successfully!"
-    }
+      discountAmount,
+      message: "Coupon applied!"
+    };
 
   } catch (error) {
-    console.error("Coupon Validation Error:", error)
-    return { success: false, error: "Failed to apply coupon." }
+    return { success: false, error: "Validation failed." };
   }
 }

@@ -2,14 +2,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Image from "next/image";
-import useCart from "@/app/actions/storefront/cart/use-cart"; 
-import { ShoppingCart, Heart, Minus, Plus, CheckCircle2, PackageX, AlertCircle } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { addToCart } from "@/app/actions/storefront/product/add-to-cart"; 
+import { ShoppingCart, Heart, Minus, Plus, CheckCircle2, PackageX, AlertCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner"; 
 import { useGlobalStore } from "@/app/providers/global-store-provider"; 
 
-// 🚀 Updated Interface based on Schema
 interface ProductViewProps {
   product: {
     id: string;
@@ -24,15 +23,17 @@ interface ProductViewProps {
     brand: { name: string } | null;
     sku: string | null;
     
-    // Inventory Fields
+    // Inventory
     stock: number;
     trackQuantity: boolean;
     backorderStatus: "DO_NOT_ALLOW" | "ALLOW" | "ALLOW_BUT_NOTIFY";
     
+    // Variants
     variants: { 
       id: string; 
       name: string; 
-      price: number | null; 
+      price: number | null;
+      salePrice: number | null;
       stock: number; 
       trackQuantity: boolean; 
     }[];
@@ -40,8 +41,8 @@ interface ProductViewProps {
 }
 
 export default function ProductView({ product }: ProductViewProps) {
-  const cart = useCart();
   const { formatPrice } = useGlobalStore();
+  const [isPending, startTransition] = useTransition();
   
   // States
   const [selectedImage, setSelectedImage] = useState(product.featuredImage || product.images[0]?.url || "");
@@ -49,26 +50,21 @@ export default function ProductView({ product }: ProductViewProps) {
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false); 
 
-  // Helper: Get Current Active Variant Object
   const currentVariant = product.variants.find(v => v.id === selectedVariantId);
 
-  // 🚀 SMART STOCK LOGIC
+  // Stock Logic
   const getStockStatus = () => {
-    // 1. Determine which stock to check (Variant or Main Product)
     const stockLevel = currentVariant ? currentVariant.stock : product.stock;
     const shouldTrack = currentVariant ? currentVariant.trackQuantity : product.trackQuantity;
     
-    // 2. If tracking is disabled, it's always in stock
     if (!shouldTrack) return { available: true, label: "In Stock", color: "text-green-600", icon: CheckCircle2 };
 
-    // 3. Check Backorder Status
     const backorder = product.backorderStatus;
 
     if (stockLevel > 0) {
       if (stockLevel < 5) return { available: true, label: `Only ${stockLevel} left!`, color: "text-orange-600", icon: AlertCircle };
       return { available: true, label: "In Stock", color: "text-green-600", icon: CheckCircle2 };
     } else {
-      // Stock is 0 or less
       if (backorder === "ALLOW" || backorder === "ALLOW_BUT_NOTIFY") {
         return { available: true, label: "Available on Backorder", color: "text-blue-600", icon: AlertCircle };
       }
@@ -78,35 +74,58 @@ export default function ProductView({ product }: ProductViewProps) {
 
   const { available, label, color, icon: StockIcon } = getStockStatus();
 
-  // Price Calculation
-  const displayPrice = currentVariant?.price ? Number(currentVariant.price) : (product.salePrice ?? product.price);
-  const originalPrice = currentVariant?.price ? null : (product.salePrice ? product.price : null);
+  // Price Logic
+  const displayPrice = currentVariant 
+    ? (currentVariant.salePrice || currentVariant.price || product.price) 
+    : (product.salePrice || product.price);
 
+  const originalPrice = currentVariant
+    ? (currentVariant.salePrice ? currentVariant.price : null) 
+    : (product.salePrice ? product.price : null); 
+
+  // 🛒 Add to Cart Handler (DEBUGGED)
   const onAddToCart = () => {
-    // Validation
+    console.log("🔵 [CLIENT] Add to Cart Clicked"); // ১. বাটন ক্লিক চেক
+
+    // Validation Logs
     if (product.variants.length > 0 && !selectedVariantId) {
+      console.log("❌ [CLIENT] Variant not selected");
       toast.error("Please select an option first!");
       return;
     }
 
     if (!available) {
+      console.log("❌ [CLIENT] Product out of stock");
       toast.error("Sorry, this item is out of stock.");
       return;
     }
 
-    cart.addItem({
-      id: product.id,
-      name: product.name,
-      price: displayPrice,
-      quantity: quantity,
-      image: selectedImage,
-      cartItemId: `${product.id}-${selectedVariantId || 'base'}`,
-      variantId: selectedVariantId || undefined,
-      selectedVariantName: currentVariant?.name,
-      category: product.category ? { name: product.category.name } : undefined
+    console.log("🚀 [CLIENT] Calling Server Action...", {
+        productId: product.id,
+        quantity: quantity,
+        variantId: selectedVariantId
     });
-    
-    toast.success("Added to cart!");
+
+    startTransition(async () => {
+      try {
+        const res = await addToCart({
+            productId: product.id,
+            quantity: quantity,
+            variantId: selectedVariantId || undefined
+        });
+
+        console.log("🟢 [CLIENT] Server Response:", res); // ৩. সার্ভার রেসপন্স চেক
+
+        if (res.success) {
+            toast.success("Added to cart successfully!");
+        } else {
+            toast.error(res.message);
+        }
+      } catch (error) {
+        console.error("🔥 [CLIENT] Error calling server action:", error);
+        toast.error("Something went wrong");
+      }
+    });
   };
 
   return (
@@ -122,15 +141,13 @@ export default function ProductView({ product }: ProductViewProps) {
              className="object-cover transition-transform duration-500 group-hover:scale-105"
              priority
            />
-           {/* Sale Badge */}
-           {product.salePrice && !currentVariant && (
+           {(product.salePrice || (currentVariant && currentVariant.salePrice)) && (
              <span className="absolute top-4 left-4 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md z-10">
                SALE
              </span>
            )}
         </div>
         
-        {/* Thumbnails */}
         {product.images.length > 1 && (
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
              {product.images.map((img, i) => (
@@ -151,7 +168,6 @@ export default function ProductView({ product }: ProductViewProps) {
       {/* --- RIGHT: PRODUCT INFO --- */}
       <div className="flex flex-col h-full">
          
-         {/* Brand Name */}
          {product.brand && (
             <span className="text-sm font-semibold text-blue-600 mb-2 uppercase tracking-wider">
               {product.brand.name}
@@ -162,14 +178,12 @@ export default function ProductView({ product }: ProductViewProps) {
            {product.name}
          </h1>
 
-         {/* 🚀 Short Description */}
          {product.shortDescription && (
            <div className="text-slate-500 text-base leading-relaxed mb-6 border-b border-gray-100 pb-6"
                 dangerouslySetInnerHTML={{ __html: product.shortDescription }} 
            />
          )}
 
-         {/* Price & Stock Status */}
          <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
                <span className="text-3xl font-bold text-slate-900">{formatPrice(displayPrice)}</span>
@@ -180,7 +194,6 @@ export default function ProductView({ product }: ProductViewProps) {
                )}
             </div>
 
-            {/* 🚀 Stock Label */}
             <div className={`flex items-center gap-1.5 text-sm font-bold ${color} bg-gray-50 px-3 py-1.5 rounded-lg border border-slate-100`}>
                <StockIcon size={16}/>
                {label}
@@ -196,8 +209,6 @@ export default function ProductView({ product }: ProductViewProps) {
                </label>
                <div className="flex flex-wrap gap-3">
                   {product.variants.map((v) => {
-                     // Check stock per variant for visual styling
-                     // Logic: If tracking on AND stock <= 0 AND No Backorder = Disable
                      const isVariantOOS = v.trackQuantity && v.stock <= 0 && product.backorderStatus === 'DO_NOT_ALLOW';
                      
                      return (
@@ -228,14 +239,16 @@ export default function ProductView({ product }: ProductViewProps) {
             <div className="flex items-center border border-slate-300 rounded-xl h-12">
                <button 
                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                 className="px-4 h-full hover:bg-slate-50 transition text-slate-600 rounded-l-xl"
+                 className="px-4 h-full hover:bg-slate-50 transition text-slate-600 rounded-l-xl disabled:opacity-50"
+                 disabled={isPending}
                >
                   <Minus size={16}/>
                </button>
-               <span className="w-10 text-center font-bold text-slate-800">{quantity}</span>
+               <span className="w-10 text-center font-bold text-slate-800 tabular-nums">{quantity}</span>
                <button 
                  onClick={() => setQuantity(quantity + 1)}
-                 className="px-4 h-full hover:bg-slate-50 transition text-slate-600 rounded-r-xl"
+                 className="px-4 h-full hover:bg-slate-50 transition text-slate-600 rounded-r-xl disabled:opacity-50"
+                 disabled={isPending}
                >
                   <Plus size={16}/>
                </button>
@@ -243,16 +256,18 @@ export default function ProductView({ product }: ProductViewProps) {
 
             <button 
                onClick={onAddToCart}
-               disabled={!available}
+               disabled={!available || isPending}
                className={`
                  flex-1 h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95
-                 ${available 
+                 ${available && !isPending
                     ? "bg-slate-900 hover:bg-slate-800 hover:shadow-xl" 
                     : "bg-gray-400 cursor-not-allowed shadow-none"
                  }
                `}
             >
-               {available ? (
+               {isPending ? (
+                 <Loader2 className="animate-spin h-5 w-5" />
+               ) : available ? (
                  <> <ShoppingCart size={20}/> Add to Cart </>
                ) : (
                  "Out of Stock"
@@ -273,7 +288,7 @@ export default function ProductView({ product }: ProductViewProps) {
          <div className="flex items-center gap-6 mt-6 text-xs text-slate-400 font-medium border-t border-slate-50 pt-4">
             <div className="flex items-center gap-2">
                <span className="text-slate-300">SKU:</span>
-               <span className="text-slate-600">{product.sku || "N/A"}</span>
+               <span className="text-slate-600">{currentVariant?.id ? "N/A (Var)" : product.sku || "N/A"}</span>
             </div>
             <div className="flex items-center gap-2">
                <span className="text-slate-300">Category:</span>

@@ -1,17 +1,39 @@
-// components/front/navbar.tsx
-
-"use client";
+// app/actions/storefront/header-footer/header.tsx
 
 import Link from "next/link";
-import { ShoppingCart, Search, Menu } from "lucide-react";
+import { Search, Menu } from "lucide-react";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import useCart from "@/app/actions/storefront/cart/use-cart"; 
+import { Cart_Icon } from "./Cart_Icon"; 
+import { db } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
-const Navbar = () => {
-  const cart = useCart();
+async function getCartCount() {
+  try {
+    const cookieStore = await cookies();
+    const cartId = cookieStore.get("cartId")?.value;
+    
+    // Debug Log
+    // console.log("[HEADER] Checking Cart Count for ID:", cartId);
+    
+    if (!cartId) return 0;
+
+    const count = await db.cartItem.count({
+      where: { cartId }
+    });
+    
+    // console.log("[HEADER] Count:", count);
+    return count;
+  } catch (error) {
+    console.error("[HEADER] Error:", error);
+    return 0;
+  }
+}
+
+const Header = async () => {
+  const cartCount = await getCartCount();
 
   return (
-    <div className="border-b sticky top-0 z-50 bg-white/80 backdrop-blur-md">
+    <header className="border-b sticky top-0 z-50 bg-white/80 backdrop-blur-md">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         
         {/* Mobile Menu & Logo */}
@@ -36,25 +58,15 @@ const Navbar = () => {
 
         {/* Actions & Auth */}
         <div className="flex items-center gap-4">
-          
-          {/* Search Icon */}
           <button className="text-slate-600 hover:text-blue-600 transition">
             <Search size={20} />
           </button>
 
           {/* Cart Icon */}
-          <Link href="/cart" className="relative text-slate-600 hover:text-blue-600 transition">
-            <ShoppingCart size={20} />
-            {cart.items.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
-                {cart.items.length}
-              </span>
-            )}
-          </Link>
+          <Cart_Icon initialCount={cartCount} />
 
-          {/* Clerk Authentication */}
+          {/* Auth */}
           <div className="flex items-center gap-2 ml-2 pl-4 border-l border-slate-200">
-            
             <SignedOut>
               <SignInButton mode="modal">
                 <button className="text-sm font-bold px-4 py-2 border border-slate-300 rounded-full hover:bg-slate-50 transition text-slate-700">
@@ -82,13 +94,12 @@ const Navbar = () => {
                 }}
               />
             </SignedIn>
-
           </div>
         </div>
 
       </div>
-    </div>
+    </header>
   );
 };
 
-export default Navbar;
+export default Header;

@@ -1,18 +1,28 @@
-// components/front/header.tsx
-
-"use client";
+// app/actions/storefront/header-footer/navbar.tsx
 
 import Link from "next/link";
-import { ShoppingCart, Search, Menu } from "lucide-react";
-// [FIX] Clerk এর কম্পোনেন্ট ইমপোর্ট করা হয়েছে
+import { Search, Menu } from "lucide-react";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
-import useCart from "@/app/actions/storefront/cart/use-cart"; 
+import { Cart_Icon } from "./Cart_Icon";
+import { db } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
-const Header = () => {
-  const cart = useCart();
+async function getCartCount() {
+  try {
+    const cookieStore = await cookies();
+    const cartId = cookieStore.get("cartId")?.value;
+    if (!cartId) return 0;
+    return await db.cartItem.count({ where: { cartId } });
+  } catch (error) {
+    return 0;
+  }
+}
+
+const Navbar = async () => {
+  const cartCount = await getCartCount();
 
   return (
-    <header className="border-b sticky top-0 z-50 bg-white/80 backdrop-blur-md">
+    <div className="border-b sticky top-0 z-50 bg-white/80 backdrop-blur-md">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         
         {/* Mobile Menu & Logo */}
@@ -42,19 +52,9 @@ const Header = () => {
             <Search size={20} />
           </button>
 
-          <Link href="/cart" className="relative text-slate-600 hover:text-blue-600 transition">
-            <ShoppingCart size={20} />
-            {cart.items.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
-                {cart.items.length}
-              </span>
-            )}
-          </Link>
+          <Cart_Icon initialCount={cartCount} />
 
-          {/* Clerk Authentication Logic */}
           <div className="flex items-center gap-2 ml-2 pl-4 border-l border-slate-200">
-            
-            {/* যদি লগইন না থাকে */}
             <SignedOut>
               <SignInButton mode="modal">
                 <button className="text-sm font-bold px-4 py-2 border border-slate-300 rounded-full hover:bg-slate-50 transition text-slate-700">
@@ -68,28 +68,26 @@ const Header = () => {
               </SignUpButton>
             </SignedOut>
 
-            {/* যদি লগইন থাকে */}
             <SignedIn>
               <Link href="/admin" className="text-xs font-bold text-slate-500 hover:text-blue-600 mr-2 hidden md:block">
                 Dashboard
               </Link>
-              {/* Clerk এর ডিফল্ট ইউজার মেনু */}
               <UserButton 
                 afterSignOutUrl="/"
                 appearance={{
                   elements: {
-                    avatarBox: "w-9 h-9 border border-slate-200"
+                    avatarBox: "w-9 h-9 border border-slate-200",
+                    userButtonPopoverFooter: "hidden" 
                   }
                 }}
               />
             </SignedIn>
-
           </div>
         </div>
 
       </div>
-    </header>
+    </div>
   );
 };
 
-export default Header;
+export default Navbar;

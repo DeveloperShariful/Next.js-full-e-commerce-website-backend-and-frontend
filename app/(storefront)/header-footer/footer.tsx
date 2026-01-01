@@ -1,4 +1,4 @@
-// components/front/footer.tsx
+// app/actions/storefront/header-footer/footer.tsx
 
 import Link from "next/link";
 import { Facebook, Twitter, Instagram, Youtube, Mail, MapPin, Phone } from "lucide-react";

@@ -1,4 +1,4 @@
-// File: app/actions/settings/shipping/transdirect-locations.ts
+// File: app/actions/storefront/checkout/transdirect-locations.ts
 
 "use server";
 

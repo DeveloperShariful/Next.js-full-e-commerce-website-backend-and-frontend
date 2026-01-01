@@ -1,5 +1,5 @@
-import Header from "@/components/front/header";
-import Footer from "@/components/front/footer"; // ✅ Import Footer
+import Header from "@/app/(storefront)/header-footer/header";
+import Footer from "@/app/(storefront)/header-footer/footer"; // ✅ Import Footer
 
 export default function FrontLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -1,3 +1,5 @@
+// File: app/(storefront)/product/[slug]/_components/product-details-tab.tsx
+
 "use client";
 
 import { useState } from "react";

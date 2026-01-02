@@ -3,8 +3,10 @@
 
 import { db } from "@/lib/prisma";
 import { getCartCalculation } from "./get-cart-calculation";
+import { cookies } from "next/headers"; 
 
-export async function validateCoupon(code: string, cartId: string) {
+// 👇 এখানে shouldSetCookie প্যারামিটার যোগ করা হয়েছে (ডিফল্ট true)
+export async function validateCoupon(code: string, cartId: string, shouldSetCookie = true) {
   try {
     if (!code) return { success: false, error: "Please enter a code" };
 
@@ -46,8 +48,17 @@ export async function validateCoupon(code: string, cartId: string) {
       discountAmount = discount.value;
     }
 
-    // টোটালের বেশি ডিসকাউন্ট হতে পারবে না
     if (discountAmount > cartData.total) discountAmount = cartData.total;
+
+    // ✅ FIX: শুধুমাত্র যদি shouldSetCookie = true হয়, তবেই কুকি সেট করব
+    if (shouldSetCookie) {
+        const cookieStore = await cookies();
+        cookieStore.set("coupon", discount.code, { 
+            path: "/",
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax" 
+        });
+    }
 
     return {
       success: true,
@@ -57,6 +68,8 @@ export async function validateCoupon(code: string, cartId: string) {
     };
 
   } catch (error) {
+    // ডিবাগিংয়ের জন্য এরর লগ দেখতে পারেন
+    console.error("Coupon Validate Error:", error);
     return { success: false, error: "Validation failed." };
   }
 }

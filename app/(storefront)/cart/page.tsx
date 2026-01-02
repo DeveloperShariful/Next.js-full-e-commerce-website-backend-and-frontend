@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { getCartDetails } from "@/app/actions/storefront/cart/get-cart-details";
+// import { mergeCart } from ... (সরিয়ে ফেলা হয়েছে)
 import { Cart_Client_Wrapper } from "./_components/Cart_Client_Wrapper";
 import { Empty_Cart_State } from "./_components/Empty_Cart_State";
 
@@ -11,21 +12,27 @@ export const metadata = {
 };
 
 export default async function CartPage() {
+  // ❌ REMOVED: await mergeCart(); 
+  // এটি এখন ক্লায়েন্ট সাইড থেকে কল হবে
+
   const cookieStore = await cookies();
   const cartId = cookieStore.get("cartId")?.value;
 
-  const { success, data } = await getCartDetails(cartId);
+  const { success, data, appliedCoupon } = await getCartDetails(cartId);
 
-  // ১. যদি কার্ট না থাকে বা আইটেম না থাকে -> Empty State
-  if (!success || !data || data.items.length === 0) {
+  // কার্ট খালি চেক
+  const isEmpty = !success || !data || !data.items || data.items.length === 0;
+
+  if (isEmpty) {
     return (
       <div className="container max-w-7xl mx-auto px-4 min-h-[60vh]">
-        <Empty_Cart_State />
+        {/* Empty State এর ভেতরেও আমরা Wrapper কল করব যাতে মার্জ লজিক রান হতে পারে */}
+        <Empty_Cart_State /> 
+        {/* অথবা আপনি চাইলে এখানেও Cart_Client_Wrapper কল করতে পারেন যদি এম্পটি কার্টেও মার্জিং দরকার হয় */}
       </div>
     );
   }
 
-  // ২. ডাটা থাকলে -> Client Wrapper
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
       <div className="container max-w-7xl mx-auto px-4 py-8 lg:py-12">
@@ -33,7 +40,7 @@ export default async function CartPage() {
           Shopping Cart ({data.items.length})
         </h1>
         
-        <Cart_Client_Wrapper cart={data} />
+        <Cart_Client_Wrapper cart={data} initialCoupon={appliedCoupon} />
       </div>
     </div>
   );

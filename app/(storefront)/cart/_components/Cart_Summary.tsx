@@ -2,8 +2,9 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -11,30 +12,38 @@ import { Input } from "@/components/ui/input";
 import { ArrowRight, ShieldCheck, Tag, Loader2, X } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { validateCoupon } from "@/app/actions/storefront/checkout/validate-coupon";
+// 👇 আপনার তৈরি করা remove-coupon ফাইলটি ব্যবহার হচ্ছে
+import { removeCoupon } from "@/app/actions/storefront/checkout/remove-coupon";
 import { toast } from "sonner";
 
 interface SummaryProps {
   cart: any; 
+  initialCoupon?: any; // ✅ ADDED
 }
 
-export const Cart_Summary = ({ cart }: SummaryProps) => {
+export const Cart_Summary = ({ cart, initialCoupon }: SummaryProps) => {
   const { formatPrice } = useGlobalStore();
+  const router = useRouter();
   
-  // State for Coupon
   const [couponCode, setCouponCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; amount: number } | null>(null);
+  
+  // ✅ STATE INIT: সার্ভার ডাটা থেকে স্টেট শুরু
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; amount: number } | null>(initialCoupon || null);
 
-  // ১. সাবটোটাল ক্যালকুলেশন
+  // সার্ভার ডাটা পাল্টালে স্টেট আপডেট (Sync)
+  useEffect(() => {
+    setAppliedCoupon(initialCoupon || null);
+  }, [initialCoupon]);
+
   const subtotal = cart.items.reduce((acc: number, item: any) => {
     const price = item.variant 
       ? (item.variant.salePrice || item.variant.price) 
       : (item.product.salePrice || item.product.price);
-    
     return acc + (price * item.quantity);
   }, 0);
 
-  // ২. কুপন অ্যাপ্লাই হ্যান্ডলার
+  // APPLY HANDLER
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
     setLoading(true);
@@ -44,7 +53,8 @@ export const Cart_Summary = ({ cart }: SummaryProps) => {
     if (res.success) {
       setAppliedCoupon({ code: res.code!, amount: res.discountAmount! });
       toast.success(res.message);
-      setCouponCode(""); // ইনপুট ক্লিয়ার
+      setCouponCode(""); 
+      router.refresh(); // ✅ পেজ রিফ্রেশ করে কুকি সিঙ্ক
     } else {
       toast.error(res.error);
       setAppliedCoupon(null);
@@ -52,16 +62,18 @@ export const Cart_Summary = ({ cart }: SummaryProps) => {
     setLoading(false);
   };
 
-  // ৩. কুপন রিমুভ হ্যান্ডলার
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    toast.info("Coupon removed");
+  // REMOVE HANDLER
+  const handleRemoveCoupon = async () => {
+    const res = await removeCoupon(); // ✅ সার্ভার অ্যাকশন কল
+    if(res.success) {
+        setAppliedCoupon(null);
+        toast.info("Coupon removed");
+        router.refresh(); // কুকি রিমুভ আপডেট
+    }
   };
 
-  // ৪. ফাইনাল টোটাল
   const total = subtotal - (appliedCoupon?.amount || 0);
 
-  // ৫. চেকআউট লিংক (কুপন কোড পাস করা হচ্ছে)
   const checkoutUrl = appliedCoupon 
     ? `/checkout?coupon=${appliedCoupon.code}` 
     : "/checkout";
@@ -73,13 +85,11 @@ export const Cart_Summary = ({ cart }: SummaryProps) => {
       </CardHeader>
       
       <CardContent className="p-6 space-y-4">
-        {/* Subtotal */}
         <div className="flex justify-between text-base">
           <span className="text-muted-foreground">Subtotal</span>
           <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
         </div>
         
-        {/* Shipping & Tax Info */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Shipping</span>
@@ -91,7 +101,7 @@ export const Cart_Summary = ({ cart }: SummaryProps) => {
           </div>
         </div>
 
-        {/* ✅ COUPON INPUT SECTION */}
+        {/* Coupon Input */}
         {!appliedCoupon ? (
             <div className="flex gap-2 pt-2">
                 <Input 
@@ -121,7 +131,7 @@ export const Cart_Summary = ({ cart }: SummaryProps) => {
             </div>
         )}
 
-        {/* Discount Row (Only visible if coupon applied) */}
+        {/* Discount Row */}
         {appliedCoupon && (
             <div className="flex justify-between text-sm font-medium text-green-600 animate-in slide-in-from-left-2">
                 <span>Discount</span>
@@ -131,7 +141,6 @@ export const Cart_Summary = ({ cart }: SummaryProps) => {
 
         <Separator />
 
-        {/* Total */}
         <div className="flex justify-between items-center pt-2">
           <span className="text-lg font-bold text-gray-900">Total</span>
           <div className="text-right">

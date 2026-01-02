@@ -1,4 +1,4 @@
-// app/actions/admin/product/helpers/product-data-parser.ts
+// app/actions/admin/product/product-data-parser.ts
 
 import { ProductType, TaxStatus, ProductStatus } from "@prisma/client";
 import { generateSlug, parseJSON, cleanPrice } from "@/app/actions/admin/product/product-utils";

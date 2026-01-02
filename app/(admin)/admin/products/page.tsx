@@ -1,9 +1,11 @@
-// app/admin/products/page.tsx
+// File: app/admin/products/page.tsx
 
 import Link from 'next/link';
 import { db } from '@/lib/prisma';
 import { ProductType, ProductStatus, Prisma } from '@prisma/client';
 import ProductTable from './_components/product-table';
+// 🔥 NEW IMPORT: লগ দেখার কম্পোনেন্ট
+import ProductLogViewer from './_components/ProductLogViewer';
 
 interface ProductsPageProps {
   searchParams: Promise<{
@@ -106,9 +108,16 @@ export default async function ProductListPage(props: ProductsPageProps) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-normal text-slate-800">Products</h1>
-          <Link href="/admin/products/create" className="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-600 rounded hover:bg-blue-50 transition">
-            Add New
-          </Link>
+          
+          {/* 🔥 UPDATE: বাটন গ্রুপ এরিয়া */}
+          <div className="flex items-center gap-2">
+            <Link href="/admin/products/create" className="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-600 bg-white rounded hover:bg-blue-50 transition">
+              Add New
+            </Link>
+            
+            {/* এখানে আমাদের নতুন লগ বাটন কম্পোনেন্ট বসানো হয়েছে */}
+            <ProductLogViewer />
+          </div>
         </div>
       </div>
 

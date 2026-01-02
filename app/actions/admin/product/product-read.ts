@@ -1,4 +1,4 @@
-// app/actions/admin/product/product-read.ts
+// File: app/actions/admin/product/product-read.ts
 
 "use server";
 
@@ -18,20 +18,25 @@ export async function getProductById(id: string) {
         taxRate: true,
         downloadFiles: true,
         
-        images: { orderBy: { position: 'asc' } },
+        // Main Product Images (Where variantId is null)
+        images: { 
+            where: { variantId: null },
+            orderBy: { position: 'asc' } 
+        },
         attributes: { orderBy: { position: 'asc' } },
         
-        // Include Inventory & Variants with sorting
+        // 🔥 UPDATE: Include 'images' for variants
         variants: {
           include: {
-            inventoryLevels: true
+            inventoryLevels: true,
+            images: { orderBy: { position: 'asc' }, select: { url: true } } // Fetch variant images
           },
           orderBy: { id: 'asc' }
         },
         inventoryLevels: true,
         tags: true,
 
-        // Include Bundle Items with Child Product Details
+        // Bundle Items
         bundleItems: {
             include: {
                 childProduct: {
@@ -39,7 +44,7 @@ export async function getProductById(id: string) {
                         id: true,
                         name: true,
                         featuredImage: true,
-                        images: { take: 1, select: { url: true } }, // Fallback image
+                        images: { take: 1, select: { url: true } }, 
                         sku: true
                     }
                 }
@@ -56,68 +61,70 @@ export async function getProductById(id: string) {
   }
 }
 
-// --- HELPER READ ACTIONS ---
+// ... Rest of the helper functions remain unchanged (getBrands, getCategories etc.)
+// You can keep the existing helper functions as they were in the previous version.
+// ... 
 
 export async function getBrands() {
-  try {
-    const brands = await db.brand.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true }
-    });
-    return { success: true, data: brands };
-  } catch (error) {
-    return { success: false, data: [] };
-  }
+    try {
+        const brands = await db.brand.findMany({
+            orderBy: { name: "asc" },
+            select: { id: true, name: true }
+        });
+        return { success: true, data: brands };
+    } catch (error) {
+        return { success: false, data: [] };
+    }
 }
 
 export async function getCategories() {
-  try {
-    const categories = await db.category.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true }
-    });
-    return { success: true, data: categories };
-  } catch (error) {
-    return { success: false, data: [] };
-  }
+    try {
+        const categories = await db.category.findMany({
+            orderBy: { name: "asc" },
+            select: { id: true, name: true }
+        });
+        return { success: true, data: categories };
+    } catch (error) {
+        return { success: false, data: [] };
+    }
 }
 
 export async function getCollections() {
-  try {
-    const collections = await db.collection.findMany({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true }
-    });
-    return { success: true, data: collections };
-  } catch (error) {
-    return { success: false, data: [] };
-  }
+    try {
+        const collections = await db.collection.findMany({
+            where: { isActive: true },
+            orderBy: { name: "asc" },
+            select: { id: true, name: true }
+        });
+        return { success: true, data: collections };
+    } catch (error) {
+        return { success: false, data: [] };
+    }
 }
 
 export async function getTaxRates() {
-  try {
-    const rates = await db.taxRate.findMany({
-      where: { isActive: true },
-      orderBy: { priority: "asc" },
-      select: { id: true, name: true, rate: true }
-    });
-    return { success: true, data: rates };
-  } catch (error) {
-    return { success: false, data: [] };
-  }
+    try {
+        const rates = await db.taxRate.findMany({
+            where: { isActive: true },
+            orderBy: { priority: "asc" },
+            select: { id: true, name: true, rate: true }
+        });
+        return { success: true, data: rates };
+    } catch (error) {
+        return { success: false, data: [] };
+    }
 }
 
 export async function getShippingClasses() {
-  try {
-    const classes = await db.shippingClass.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true }
-    });
-    return { success: true, data: classes };
-  } catch (error) {
-    return { success: false, data: [] };
-  }
+    try {
+        const classes = await db.shippingClass.findMany({
+            orderBy: { name: "asc" },
+            select: { id: true, name: true }
+        });
+        return { success: true, data: classes };
+    } catch (error) {
+        return { success: false, data: [] };
+    }
 }
 
 export async function getAttributes() {
@@ -132,7 +139,6 @@ export async function getAttributes() {
     }
 }
 
-// 🔥 UPDATE: High Performance Search Logic
 export async function searchProducts(query: string) {
   if (!query || query.length < 2) return { success: true, data: [] };
   
@@ -140,17 +146,15 @@ export async function searchProducts(query: string) {
     const products = await db.product.findMany({
       where: {
         OR: [
-          // 1. Full Text Search (Fastest for word match)
           { name: { search: query.split(" ").join(" & ") } },
-          // 2. Partial Match (Fallback)
           { name: { contains: query, mode: 'insensitive' } },
           { sku: { contains: query, mode: 'insensitive' } },
         ],
         status: ProductStatus.ACTIVE, 
       },
-      take: 20, // Increased limit slightly
+      take: 20, 
       orderBy: {
-        _relevance: { // Sort by relevance
+        _relevance: { 
           fields: ['name'],
           search: query.split(" ").join(" & "),
           sort: 'desc'
@@ -167,7 +171,6 @@ export async function searchProducts(query: string) {
     });
     return { success: true, data: products };
   } catch (error) {
-    // Fallback if Full Text Search syntax fails
     try {
         const fallbackData = await db.product.findMany({
             where: {
@@ -185,12 +188,12 @@ export async function searchProducts(query: string) {
 }
 
 export async function getTaxClasses() {
-  try {
-    const taxRates = await db.taxRate.findMany({
-      select: { id: true, name: true }
-    });
-    return { success: true, data: taxRates };
-  } catch (error) {
-    return { success: false, data: [] };
-  }
+    try {
+        const taxRates = await db.taxRate.findMany({
+            select: { id: true, name: true }
+        });
+        return { success: true, data: taxRates };
+    } catch (error) {
+        return { success: false, data: [] };
+    }
 }

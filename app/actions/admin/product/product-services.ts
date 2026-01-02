@@ -1,60 +1,51 @@
-// app/actions/admin/product/helpers/product-services.ts
+// File: app/actions/admin/product/product-services.ts
 
 import { generateSlug, cleanPrice } from "@/app/actions/admin/product/product-utils";
 
 export async function handleInventory(tx: any, product: any, data: any, locationId: string) {
     if (data.productType === 'SIMPLE' && data.trackQuantity && locationId) {
-        await tx.inventoryLevel.upsert({
-            where: {
-                locationId_productId_variantId: {
-                    locationId: locationId,
-                    productId: product.id,
-                    variantId: "null_variant" 
-                } as any 
-            },
-            update: { quantity: data.stock },
-            create: {
+
+        await tx.inventoryLevel.deleteMany({
+            where: { 
+                productId: product.id, 
+                variantId: null 
+            }
+        });
+
+        await tx.inventoryLevel.create({
+            data: {
                 quantity: data.stock,
                 locationId,
                 productId: product.id,
                 variantId: null
             }
-        }).catch(async () => {
-            const existingInventory = await tx.inventoryLevel.findFirst({
-                where: { locationId, productId: product.id, variantId: null }
-            });
-
-            if (existingInventory) {
-                await tx.inventoryLevel.update({
-                    where: { id: existingInventory.id },
-                    data: { quantity: data.stock }
-                });
-            } else {
-                await tx.inventoryLevel.create({
-                    data: { quantity: data.stock, locationId, productId: product.id, variantId: null }
-                });
-            }
         });
         
-        await tx.product.update({ where: { id: product.id }, data: { stock: data.stock } });
+        await tx.product.update({ 
+            where: { id: product.id }, 
+            data: { stock: data.stock } 
+        });
     }
 }
 
-// 2. গ্যালারি ইমেজ হ্যান্ডেল করা (No changes needed, already efficient)
 export async function handleImages(tx: any, productId: string, images: string[]) {
-    await tx.productImage.deleteMany({ where: { productId } });
+    await tx.productImage.deleteMany({ 
+        where: { productId, variantId: null } 
+    });
+    
     if (images.length > 0) {
         await tx.productImage.createMany({
             data: images.map((url, idx) => ({
                 productId,
                 url,
-                position: idx
+                position: idx,
+                variantId: null
             }))
         });
     }
 }
 
-// 3. ডিজিটাল ফাইল হ্যান্ডেল করা (No changes needed)
+// 3. Digital Files Helper (Previous Logic)
 export async function handleDigitalFiles(tx: any, productId: string, isDownloadable: boolean, files: any[]) {
     await tx.digitalFile.deleteMany({ where: { productId } });
     if (isDownloadable && files.length > 0) {
@@ -68,7 +59,7 @@ export async function handleDigitalFiles(tx: any, productId: string, isDownloada
     }
 }
 
-// 4. অ্যাট্রিবিউট সিঙ্ক করা (Updated: ID Preservation logic kept intact)
+// 4. Attributes Helper (Previous Logic)
 export async function handleAttributes(tx: any, productId: string, attributesData: any[]) {
     const existingAttrs = await tx.productAttribute.findMany({ where: { productId } });
     const existingAttrIds = existingAttrs.map((a: any) => a.id);
@@ -79,7 +70,6 @@ export async function handleAttributes(tx: any, productId: string, attributesDat
         await tx.productAttribute.deleteMany({ where: { id: { in: attrsToDelete } } });
     }
 
-    // Using Promise.all to run updates in parallel (High Performance)
     await Promise.all(attributesData.map(async (attr, index) => {
         const attrData = {
             name: attr.name,
@@ -97,7 +87,6 @@ export async function handleAttributes(tx: any, productId: string, attributesDat
     }));
 }
 
-// 5. ভেরিয়েশন সিঙ্ক করা (Major Update: Serial Loop -> Parallel Processing)
 export async function handleVariations(tx: any, productId: string, variationsData: any[], productType: string, locationId: string) {
     if (productType.toUpperCase() !== 'VARIABLE') return;
 
@@ -110,38 +99,31 @@ export async function handleVariations(tx: any, productId: string, variationsDat
         await tx.productVariant.deleteMany({ where: { id: { in: varsToDelete } } });
     }
 
-    let totalStock = 0;
+    let totalStock = 0; // Reset total stock
 
-    // 🔥 HIGH PERFORMANCE UPDATE: 'for' loop কে 'Promise.all' এ কনভার্ট করা হয়েছে।
-    // এতে করে ৫০টা ভেরিয়েশন থাকলে ৫০টা কুয়েরি একসাথেই রান হবে, একটার পর একটা নয়।
     await Promise.all(variationsData.map(async (v) => {
         const variantStock = parseInt(v.stock) || 0;
         const variantPrice = cleanPrice(v.price);
         
-        // Summing stock safely inside map (Variables inside map scope are safe)
         totalStock += variantStock;
 
         const variantData = {
             name: v.name || "Variation",
             sku: v.sku || null,
             price: variantPrice,
-            stock: variantStock,
+            stock: variantStock, // Set exact value
             attributes: v.attributes || {}, 
             trackQuantity: true,
-            
-            // Advanced Details kept intact
             barcode: v.barcode || null,
             costPerItem: v.costPerItem ? cleanPrice(v.costPerItem) : null,
             weight: v.weight ? parseFloat(v.weight) : null,
             length: v.length ? parseFloat(v.length) : null,
             width: v.width ? parseFloat(v.width) : null,
             height: v.height ? parseFloat(v.height) : null,
-            image: v.image || null 
         };
 
         let variantId = v.id;
 
-        // ID Preservation Logic Kept Intact
         if (v.id && !v.id.toString().startsWith("temp_")) {
             await tx.productVariant.update({ where: { id: v.id }, data: variantData });
         } else {
@@ -149,7 +131,19 @@ export async function handleVariations(tx: any, productId: string, variationsDat
             variantId = newVar.id;
         }
 
-        // Inventory Update (Optimized with Upsert)
+        // Handle Images
+        await tx.productImage.deleteMany({ where: { variantId } });
+        if (v.images && Array.isArray(v.images) && v.images.length > 0) {
+            await tx.productImage.createMany({
+                data: v.images.map((url: string, idx: number) => ({
+                    productId: productId,
+                    variantId: variantId,
+                    url: url,
+                    position: idx
+                }))
+            });
+        }
+
         if (locationId) {
             await tx.inventoryLevel.upsert({
                 where: {
@@ -159,17 +153,19 @@ export async function handleVariations(tx: any, productId: string, variationsDat
                         variantId: variantId
                     } as any
                 },
-                update: { quantity: variantStock },
+                update: { quantity: variantStock }, 
                 create: { quantity: variantStock, locationId, productId, variantId }
             });
         }
     }));
 
-    // Finally update total stock
-    await tx.product.update({ where: { id: productId }, data: { stock: totalStock } });
+    await tx.product.update({ 
+        where: { id: productId }, 
+        data: { stock: totalStock } 
+    });
 }
 
-// 6. বান্ডেল আইটেম হ্যান্ডেল করা (No changes needed, clean logic)
+// 6. Bundle Helper (Previous Logic)
 export async function handleBundleItems(tx: any, productId: string, productType: string, bundleItems: any[]) {
     if (productType.toUpperCase() !== 'BUNDLE') return;
 

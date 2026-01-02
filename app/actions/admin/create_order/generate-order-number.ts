@@ -1,4 +1,4 @@
-// File: app/actions/utils/generate-order-number.ts
+// File: app/actions/create-order/generate-order-number.ts
 
 "use server";
 

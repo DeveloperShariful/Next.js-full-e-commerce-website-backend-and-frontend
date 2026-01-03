@@ -1,11 +1,12 @@
 // app/actions/settings/payments/paypal/update-settings.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
 import { PaypalSettingsSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
-import { encrypt } from "../crypto" // 👈 Encryption Import
+import { encrypt } from "../crypto"
 
 export async function updatePaypalSettings(
   paymentMethodId: string,
@@ -14,12 +15,10 @@ export async function updatePaypalSettings(
   try {
     const validated = PaypalSettingsSchema.parse(values)
 
-    // 🔒 সিক্রেট কি গুলো এনক্রিপ্ট করছি (যদি ইউজার নতুন ভ্যালু দিয়ে থাকে)
     const liveClientSecret = validated.liveClientSecret ? encrypt(validated.liveClientSecret) : undefined
     const sandboxClientSecret = validated.sandboxClientSecret ? encrypt(validated.sandboxClientSecret) : undefined
 
     await db.$transaction(async (tx) => {
-      // 1. Update Parent Config
       await tx.paymentMethodConfig.update({
         where: { id: paymentMethodId },
         data: {
@@ -27,26 +26,29 @@ export async function updatePaypalSettings(
           name: validated.title,
           description: validated.description ?? "",
           mode: validated.sandbox ? "TEST" : "LIVE",
+
+          minOrderAmount: validated.minOrderAmount,
+          maxOrderAmount: validated.maxOrderAmount,
+          surchargeEnabled: validated.surchargeEnabled ?? false,
+          surchargeType: validated.surchargeType,
+          surchargeAmount: validated.surchargeAmount ?? 0,
+          taxableSurcharge: validated.taxableSurcharge ?? false
         }
       })
 
-      // 2. Update PayPal Specific Config
-      // Prisma তে undefined পাঠালে সেই ফিল্ড আপডেট হয় না (যা আমরা চাই)
       await tx.paypalConfig.update({
         where: { paymentMethodId },
         data: {
           sandbox: validated.sandbox ?? false,
           
-          // Credentials (Encrypted)
           liveEmail: validated.liveEmail ?? null,
           liveClientId: validated.liveClientId ?? null,
-          liveClientSecret: liveClientSecret, // 🔒 Encrypted or undefined
+          liveClientSecret: liveClientSecret,
           
           sandboxEmail: validated.sandboxEmail ?? null,
           sandboxClientId: validated.sandboxClientId ?? null,
-          sandboxClientSecret: sandboxClientSecret, // 🔒 Encrypted or undefined
+          sandboxClientSecret: sandboxClientSecret,
 
-          // General Settings
           title: validated.title,
           description: validated.description ?? "",
           intent: validated.intent ?? "CAPTURE",
@@ -55,12 +57,10 @@ export async function updatePaypalSettings(
           landingPage: validated.landingPage ?? "LOGIN",
           disableFunding: validated.disableFunding ?? [],
 
-          // Advanced Card
           advancedCardEnabled: validated.advancedCardEnabled ?? false,
           advancedCardTitle: validated.advancedCardTitle ?? "Debit & Credit Cards",
           vaultingEnabled: validated.vaultingEnabled ?? false,
 
-          // Smart Button Styles
           smartButtonLocations: validated.smartButtonLocations ?? [],
           requireFinalConfirmation: validated.requireFinalConfirmation ?? true,
           buttonLabel: validated.buttonLabel ?? "PAYPAL",
@@ -68,13 +68,11 @@ export async function updatePaypalSettings(
           buttonColor: validated.buttonColor ?? "GOLD",
           buttonShape: validated.buttonShape ?? "RECT",
 
-          // Pay Later
           payLaterEnabled: validated.payLaterEnabled ?? true,
           payLaterLocations: validated.payLaterLocations ?? [],
           payLaterMessaging: validated.payLaterMessaging ?? true,
           payLaterMessageTheme: validated.payLaterMessageTheme ?? "light",
 
-          // Advanced / Debug
           subtotalMismatchBehavior: validated.subtotalMismatchBehavior ?? "add_line_item",
           invoicePrefix: validated.invoicePrefix ?? null,
           debugLog: validated.debugLog ?? false,

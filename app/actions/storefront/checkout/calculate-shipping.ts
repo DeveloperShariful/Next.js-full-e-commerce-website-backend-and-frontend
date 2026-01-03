@@ -12,7 +12,7 @@ interface ShippingParams {
     state: string;
     country: string;
   };
-}
+} 
 
 export async function calculateShippingRates({ cartId, address }: ShippingParams) {
   try {
@@ -24,8 +24,6 @@ export async function calculateShippingRates({ cartId, address }: ShippingParams
 
     if (!cart) return { success: false, rates: [] };
 
-    // ২. লোকাল রেট চেক করা (ShippingZone)
-    // লজিক: প্রথমে দেখব ডাটাবেসে এই জোন (Zone) এর জন্য কোনো রেট সেট করা আছে কি না
     const zones = await db.shippingZone.findMany({
       where: { countries: { has: address.country } },
       include: { rates: true }

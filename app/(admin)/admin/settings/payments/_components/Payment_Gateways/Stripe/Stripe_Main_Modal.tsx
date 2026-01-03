@@ -8,7 +8,6 @@ import { Settings, CreditCard, Sliders, Activity, Webhook } from "lucide-react"
 import { PaymentMethodWithConfig } from "@/app/(admin)/admin/settings/payments/types"
 import { cn } from "@/lib/utils"
 
-// Use Hook
 import { usePaymentTabs, TabType } from "../../hooks/usePaymentTabs"
 
 // Components

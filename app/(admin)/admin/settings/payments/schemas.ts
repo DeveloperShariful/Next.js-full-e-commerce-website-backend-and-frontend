@@ -3,22 +3,30 @@
 import * as z from "zod"
 import { PaymentIntent, PaymentMode, PayPalButtonColor, PayPalButtonLabel, PayPalButtonLayout, PayPalButtonShape, PayPalLandingPage } from "@prisma/client"
 
-// Helper to handle nulls from DB
 const booleanField = z.boolean().nullable().optional()
 const stringField = z.string().nullable().optional()
+const numberField = z.coerce.number().min(0).nullable().optional()
+
+const LimitsAndSurchargeSchema = z.object({
+  minOrderAmount: numberField,
+  maxOrderAmount: numberField,
+  surchargeEnabled: booleanField,
+  surchargeType: z.enum(["fixed", "percentage"]).default("fixed"),
+  surchargeAmount: numberField,
+  taxableSurcharge: booleanField
+})
 
 export const PaymentStatusSchema = z.object({
   isEnabled: z.boolean(),
   mode: z.nativeEnum(PaymentMode).optional()
 })
 
-export const StripeSettingsSchema = z.object({
+export const StripeSettingsSchema = LimitsAndSurchargeSchema.extend({
   enableStripe: booleanField,
   testMode: booleanField,
   title: z.string().min(1, "Title is required"),
   description: stringField,
   
-  // 👇 Regex Validation Added for Security
   livePublishableKey: z.string().optional().refine(val => !val || val.startsWith('pk_live_'), {
     message: "Live Public Key must start with 'pk_live_'"
   }),
@@ -52,7 +60,7 @@ export const StripeSettingsSchema = z.object({
   debugLog: booleanField
 })
 
-export const PaypalSettingsSchema = z.object({
+export const PaypalSettingsSchema = LimitsAndSurchargeSchema.extend({
   isEnabled: booleanField, 
   sandbox: booleanField,
   liveEmail: z.string().email().optional().or(z.literal('')),
@@ -94,7 +102,7 @@ export const PaypalSettingsSchema = z.object({
   debugLog: booleanField
 })
 
-export const BankTransferSchema = z.object({
+export const BankTransferSchema = LimitsAndSurchargeSchema.extend({
   name: z.string().min(1, "Method name is required"),
   description: stringField,
   instructions: stringField,
@@ -108,7 +116,7 @@ export const BankTransferSchema = z.object({
   })).optional()
 })
 
-export const ChequeSchema = z.object({
+export const ChequeSchema = LimitsAndSurchargeSchema.extend({
   name: z.string().min(1, "Method name is required"),
   description: stringField,
   instructions: stringField,
@@ -116,7 +124,7 @@ export const ChequeSchema = z.object({
   addressInfo: z.string().min(1, "Address is required")
 })
 
-export const CodSchema = z.object({
+export const CodSchema = LimitsAndSurchargeSchema.extend({
   name: z.string().min(1, "Method name is required"),
   description: stringField,
   instructions: stringField,

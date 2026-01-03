@@ -12,9 +12,6 @@ export const metadata = {
 };
 
 export default async function CartPage() {
-  // ❌ REMOVED: await mergeCart(); 
-  // এটি এখন ক্লায়েন্ট সাইড থেকে কল হবে
-
   const cookieStore = await cookies();
   const cartId = cookieStore.get("cartId")?.value;
 
@@ -26,9 +23,9 @@ export default async function CartPage() {
   if (isEmpty) {
     return (
       <div className="container max-w-7xl mx-auto px-4 min-h-[60vh]">
-        {/* Empty State এর ভেতরেও আমরা Wrapper কল করব যাতে মার্জ লজিক রান হতে পারে */}
+      
         <Empty_Cart_State /> 
-        {/* অথবা আপনি চাইলে এখানেও Cart_Client_Wrapper কল করতে পারেন যদি এম্পটি কার্টেও মার্জিং দরকার হয় */}
+        
       </div>
     );
   }

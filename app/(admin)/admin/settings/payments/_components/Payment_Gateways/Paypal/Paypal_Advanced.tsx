@@ -9,7 +9,7 @@ import { updatePaypalSettings } from "@/app/actions/admin/settings/payments/payp
 import { PaymentMethodWithConfig, PaypalConfigType } from "@/app/(admin)/admin/settings/payments/types"
 import { z } from "zod"
 import { toast } from "sonner"
-import { RefreshCw } from "lucide-react" // 👈 Import Refresh Icon
+import { RefreshCw } from "lucide-react" 
 
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -32,7 +32,7 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
   // 👇 State to force refresh the logs
   const [logRefreshKey, setLogRefreshKey] = useState(0)
 
-  const form = useForm<z.infer<typeof PaypalSettingsSchema>>({
+  const form = useForm({
     resolver: zodResolver(PaypalSettingsSchema),
     defaultValues: {
       invoicePrefix: config.invoicePrefix || "WC-",

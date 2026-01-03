@@ -1,3 +1,5 @@
+// File: app/admin/settings/email/_components/email-log-table.tsx
+
 "use client";
 
 import { useState } from "react";

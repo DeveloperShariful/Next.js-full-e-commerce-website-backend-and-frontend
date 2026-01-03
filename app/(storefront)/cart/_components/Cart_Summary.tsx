@@ -11,9 +11,9 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, ShieldCheck, Tag, Loader2, X } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { validateCoupon } from "@/app/actions/storefront/checkout/validate-coupon";
+import { validateCoupon } from "@/app/actions/storefront/cart/validate-coupon";
 // 👇 আপনার তৈরি করা remove-coupon ফাইলটি ব্যবহার হচ্ছে
-import { removeCoupon } from "@/app/actions/storefront/checkout/remove-coupon";
+import { removeCoupon } from "@/app/actions/storefront/cart/remove-coupon";
 import { toast } from "sonner";
 
 interface SummaryProps {

@@ -1,4 +1,5 @@
 // app/admin/settings/payments/_components/Payment_Gateways/Paypal/Paypal_General_Form.tsx
+
 "use client"
 
 import { useTransition } from "react"
@@ -16,9 +17,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Card, CardContent } from "@/components/ui/card"
-
-// Custom Components
 import { Paypal_Save_Sticky_Bar } from "./Components/Paypal_Save_Sticky_Bar"
+import { Payment_Limits_Surcharge } from "../../Payment_Limits_Surcharge"
 
 interface GeneralFormProps {
   method: PaymentMethodWithConfig
@@ -28,10 +28,10 @@ interface GeneralFormProps {
 export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
   const [isPending, startTransition] = useTransition()
 
-  const form = useForm<z.infer<typeof PaypalSettingsSchema>>({
+  const form = useForm({
     resolver: zodResolver(PaypalSettingsSchema),
     defaultValues: {
-      isEnabled: method.isEnabled, // 👈 NEW: Initial value from parent
+      isEnabled: method.isEnabled,
       sandbox: !!config.sandbox,
       title: method.name || "PayPal",
       description: method.description || "",
@@ -40,7 +40,6 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
       landingPage: config.landingPage || PayPalLandingPage.LOGIN,
       instantPayments: !!config.instantPayments,
       
-      // Pass through other required fields to satisfy schema
       liveEmail: config.liveEmail || "",
       liveClientId: config.liveClientId || "",
       liveClientSecret: config.liveClientSecret || "",
@@ -64,6 +63,13 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
       subtotalMismatchBehavior: config.subtotalMismatchBehavior || "add_line_item",
       invoicePrefix: config.invoicePrefix || "",
       debugLog: !!config.debugLog,
+
+      minOrderAmount: method.minOrderAmount ?? null,
+      maxOrderAmount: method.maxOrderAmount ?? null,
+      surchargeEnabled: method.surchargeEnabled ?? false,
+      surchargeType: (method.surchargeType as "fixed" | "percentage" | null) ?? "fixed",
+      surchargeAmount: method.surchargeAmount ?? 0,
+      taxableSurcharge: method.taxableSurcharge ?? false
     }
   })
 
@@ -86,7 +92,6 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
         <Card>
           <CardContent className="pt-6 space-y-4">
             
-            {/* 1. ENABLE / DISABLE SWITCH (NEW) */}
             <FormField
               control={form.control}
               name="isEnabled"
@@ -105,7 +110,6 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
               )}
             />
 
-            {/* 2. SANDBOX SWITCH */}
             <FormField
               control={form.control}
               name="sandbox"
@@ -124,7 +128,6 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
               )}
             />
 
-            {/* 3. TITLE & DESCRIPTION */}
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -149,7 +152,7 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
                     <FormControl>
                       <Input {...field} value={field.value || ""} placeholder="Your Store Name" />
                     </FormControl>
-                     <FormDescription>Overrides business name on PayPal page.</FormDescription>
+                      <FormDescription>Overrides business name on PayPal page.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -173,6 +176,8 @@ export const Paypal_General_Form = ({ method, config }: GeneralFormProps) => {
 
           </CardContent>
         </Card>
+
+        <Payment_Limits_Surcharge form={form} />
 
         <Paypal_Save_Sticky_Bar onSave={form.handleSubmit(onSubmit)} isPending={isPending} />
       </form>

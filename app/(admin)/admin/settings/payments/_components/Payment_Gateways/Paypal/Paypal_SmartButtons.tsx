@@ -32,8 +32,6 @@ const locations = [
   { id: "ministore", label: "Mini Cart / Drawer" },
 ] as const
 
-// 2. Funding Sources List (PayPal এর ভিতরের পেমেন্ট মেথডগুলো)
-// এই লিস্টটি PayPal SDK এর অফিসিয়াল 'funding' সোর্স থেকে নেওয়া
 const fundingSources = [
   { id: "CREDIT", label: "PayPal Credit (Pay Later)", desc: "Allow customers to pay with PayPal Credit." },
   { id: "CARD", label: "Credit/Debit Cards", desc: "Allow guest checkout with Visa, Mastercard, etc." },
@@ -50,7 +48,7 @@ const fundingSources = [
 export const Paypal_SmartButtons = ({ method, config }: SmartButtonsProps) => {
   const [isPending, startTransition] = useTransition()
 
-  const form = useForm<z.infer<typeof PaypalSettingsSchema>>({
+  const form = useForm({
     resolver: zodResolver(PaypalSettingsSchema),
     defaultValues: {
       buttonLabel: config.buttonLabel || PayPalButtonLabel.PAYPAL,

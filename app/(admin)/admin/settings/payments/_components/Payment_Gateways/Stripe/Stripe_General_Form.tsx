@@ -1,4 +1,5 @@
 // app/admin/settings/payments/_components/Payment_Gateways/Stripe/Stripe_General_Form.tsx
+
 "use client"
 
 import { useTransition, useState } from "react"
@@ -20,6 +21,8 @@ import { Stripe_Save_Sticky_Bar } from "./Components/Stripe_Save_Sticky_Bar"
 import { Eye, EyeOff, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+import { Payment_Limits_Surcharge } from "../../Payment_Limits_Surcharge"
+
 interface GeneralFormProps {
   method: PaymentMethodWithConfig
   config: StripeConfigType
@@ -29,13 +32,13 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
   const [isPending, startTransition] = useTransition()
   const [showSecret, setShowSecret] = useState(false)
 
-  const form = useForm<z.infer<typeof StripeSettingsSchema>>({
+  // Use explicit generic type for useForm
+  const form = useForm({
     resolver: zodResolver(StripeSettingsSchema),
     defaultValues: {
       enableStripe: !!method.isEnabled,
       testMode: !!config.testMode,
       title: method.name || "Credit Card / Debit Card",
-      // 👇 Fix: Fallback to empty string if null
       description: method.description || "",
       
       livePublishableKey: config.livePublishableKey || "",
@@ -56,6 +59,14 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
       paymentRequestButtons: config.paymentRequestButtons ?? true,
       buttonTheme: config.buttonTheme || "dark",
       debugLog: !!config.debugLog,
+
+      // Handle potential nulls from DB by nullish coalescing
+      minOrderAmount: method.minOrderAmount ?? null,
+      maxOrderAmount: method.maxOrderAmount ?? null,
+      surchargeEnabled: method.surchargeEnabled ?? false,
+      surchargeType: (method.surchargeType as "fixed" | "percentage" | null) ?? "fixed",
+      surchargeAmount: method.surchargeAmount ?? 0,
+      taxableSurcharge: method.taxableSurcharge ?? false
     }
   })
 
@@ -78,7 +89,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
         
-        {/* Status Card */}
         <Card>
           <CardContent className="pt-6 space-y-4">
             <FormField
@@ -119,7 +129,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
           </CardContent>
         </Card>
 
-        {/* API Credentials Card */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -140,7 +149,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                     <FormItem>
                       <FormLabel>Test Publishable Key</FormLabel>
                       <FormControl>
-                        {/* 👇 FIX: Added value={field.value ?? ""} */}
                         <Input {...field} value={field.value ?? ""} placeholder="pk_test_..." className="font-mono" />
                       </FormControl>
                       <FormMessage />
@@ -155,7 +163,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                       <FormLabel>Test Secret Key</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
-                          {/* 👇 FIX: Added value={field.value ?? ""} */}
                           <Input 
                             {...field} 
                             value={field.value ?? ""}
@@ -190,7 +197,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                     <FormItem>
                       <FormLabel>Live Publishable Key</FormLabel>
                       <FormControl>
-                        {/* 👇 FIX: Added value={field.value ?? ""} */}
                         <Input {...field} value={field.value ?? ""} placeholder="pk_live_..." className="font-mono" />
                       </FormControl>
                       <FormMessage />
@@ -205,7 +211,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                       <FormLabel>Live Secret Key</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
-                          {/* 👇 FIX: Added value={field.value ?? ""} */}
                           <Input 
                             {...field} 
                             value={field.value ?? ""}
@@ -235,7 +240,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
           </CardContent>
         </Card>
 
-        {/* Display Settings */}
         <Card>
           <CardHeader>
             <CardTitle>Display Settings</CardTitle>
@@ -248,7 +252,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                 <FormItem>
                   <FormLabel>Title</FormLabel>
                   <FormControl>
-                    {/* 👇 FIX: Added value={field.value ?? ""} */}
                     <Input {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormDescription>Payment method name shown to customers.</FormDescription>
@@ -263,7 +266,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    {/* 👇 FIX: Added value={field.value ?? ""} */}
                     <Textarea {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormDescription>Payment method description shown to customers.</FormDescription>
@@ -273,6 +275,8 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
             />
           </CardContent>
         </Card>
+
+        <Payment_Limits_Surcharge form={form} />
 
         <Stripe_Save_Sticky_Bar onSave={form.handleSubmit(onSubmit)} isPending={isPending} />
       </form>

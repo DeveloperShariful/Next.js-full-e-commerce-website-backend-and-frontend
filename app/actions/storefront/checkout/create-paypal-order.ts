@@ -1,12 +1,25 @@
-// app/actions/storefront/checkout/create-paypal-order.ts
+// File: app/actions/storefront/checkout/create-paypal-order.ts
 "use server"
 
 import { db } from "@/lib/prisma"
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
-import { getCartCalculation } from "./get-cart-calculation"
+import { getCheckoutSummary } from "./get-checkout-summary" // 🔥 Secure Calculation
 
-export async function createPaypalOrder(cartId: string) {
+interface PayPalOrderParams {
+  cartId: string;
+  shippingMethodId?: string;
+  couponCode?: string;
+  address: {
+    country: string;
+    state: string;
+    postcode: string;
+    suburb: string;
+  };
+}
+
+export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, address }: PayPalOrderParams) {
   try {
+    // ১. পেমেন্ট মেথড কনফিগ চেক
     const methodConfig = await db.paymentMethodConfig.findUnique({
       where: { identifier: "paypal" },
       include: { paypalConfig: true }
@@ -18,7 +31,23 @@ export async function createPaypalOrder(cartId: string) {
 
     const config = methodConfig.paypalConfig
     
-    // Decrypt Keys
+    // ২. সার্ভার সাইড ক্যালকুলেশন (Security 🔒)
+    // ফ্রন্টএন্ডের টোটাল না নিয়ে আমরা নিজেরা হিসাব করছি
+    const summary = await getCheckoutSummary({ 
+        cartId, 
+        shippingAddress: address, 
+        shippingMethodId, 
+        couponCode 
+    });
+
+    if (!summary.success || !summary.breakdown) {
+      return { success: false, error: "Failed to calculate order total." };
+    }
+
+    const finalAmount = summary.breakdown.total.toFixed(2);
+    const currencyCode = (summary.currency || "AUD").toUpperCase();
+
+    // ৩. ক্রেডেনশিয়াল ডিক্রিপ্ট
     const isSandbox = config.sandbox
     const clientId = isSandbox ? config.sandboxClientId : config.liveClientId
     const encryptedSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret
@@ -28,7 +57,7 @@ export async function createPaypalOrder(cartId: string) {
       return { success: false, error: "PayPal credentials missing." }
     }
 
-    // Auth Token
+    // ৪. Auth Token জেনারেট
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com"
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
@@ -43,13 +72,7 @@ export async function createPaypalOrder(cartId: string) {
       return { success: false, error: "Could not authenticate with PayPal." }
     }
 
-    // Cart Data
-    const cartData = await getCartCalculation(cartId)
-    if (!cartData.success || !cartData.total) {
-      return { success: false, error: "Invalid cart amount." }
-    }
-
-    // Create Order
+    // ৫. পেপ্যাল অর্ডার তৈরি
     const orderRes = await fetch(`${baseUrl}/v2/checkout/orders`, {
       method: "POST",
       headers: {
@@ -59,16 +82,18 @@ export async function createPaypalOrder(cartId: string) {
       body: JSON.stringify({
         intent: config.intent || "CAPTURE",
         purchase_units: [{
-          reference_id: cartId,
+          reference_id: cartId, // কার্ট আইডি রেফারেন্স হিসেবে রাখলাম
           amount: {
-            currency_code: cartData.currency || "AUD", // Dynamic Currency
-            value: cartData.total.toFixed(2) 
-          }
+            currency_code: currencyCode,
+            value: finalAmount
+          },
+          description: `Order from GoBike Store`
         }],
         application_context: {
             brand_name: config.brandName || "GoBike Store",
             landing_page: config.landingPage || "LOGIN",
-            user_action: "PAY_NOW"
+            user_action: "PAY_NOW",
+            shipping_preference: "SET_PROVIDED_ADDRESS" // আমরা শিপিং এড্রেস হ্যান্ডেল করছি
         }
       })
     })

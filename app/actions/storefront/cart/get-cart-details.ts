@@ -3,7 +3,7 @@
 
 import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import { validateCoupon } from "../checkout/validate-coupon"; 
+import { validateCoupon } from "./validate-coupon"; 
 
 export async function getCartDetails(cartId: string | undefined) {
   try {

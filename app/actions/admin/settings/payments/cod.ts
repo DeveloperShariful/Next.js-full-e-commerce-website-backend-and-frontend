@@ -1,4 +1,5 @@
 // app/actions/settings/payments/cod.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
@@ -20,6 +21,13 @@ export async function updateCodSettings(
           name: validated.name,
           description: validated.description,
           instructions: validated.instructions,
+
+          minOrderAmount: validated.minOrderAmount,
+          maxOrderAmount: validated.maxOrderAmount,
+          surchargeEnabled: validated.surchargeEnabled ?? false,
+          surchargeType: validated.surchargeType,
+          surchargeAmount: validated.surchargeAmount ?? 0,
+          taxableSurcharge: validated.taxableSurcharge ?? false
         },
       })
 

@@ -1,21 +1,27 @@
 // app/admin/settings/payments/_components/Payment_Gateways/Stripe/Stripe_Advanced.tsx
+
 "use client"
 
-import { useTransition } from "react"
+import { useTransition, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { StripeSettingsSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { updateStripeSettings } from "@/app/actions/admin/settings/payments/stripe/update-settings"
 import { PaymentMethodWithConfig, StripeConfigType } from "@/app/(admin)/admin/settings/payments/types"
+import { verifyApplePayDomain } from "@/app/actions/admin/settings/payments/stripe/verify-apple-pay-domain"
 import { z } from "zod"
 import { toast } from "sonner"
 import { PaymentIntent } from "@prisma/client"
 
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox" // 👈 Checkbox Import
+import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react"
+
 import { Stripe_Save_Sticky_Bar } from "./Components/Stripe_Save_Sticky_Bar"
 
 interface AdvancedProps {
@@ -23,7 +29,6 @@ interface AdvancedProps {
   config: StripeConfigType
 }
 
-// 👇 Payment Features List
 const paymentFeatures = [
   { 
     id: "savedCards", 
@@ -54,8 +59,9 @@ const paymentFeatures = [
 
 export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
   const [isPending, startTransition] = useTransition()
+  const [verifyingDomain, setVerifyingDomain] = useState(false)
 
-  const form = useForm<z.infer<typeof StripeSettingsSchema>>({
+  const form = useForm({
     resolver: zodResolver(StripeSettingsSchema),
     defaultValues: {
       enableStripe: !!method.isEnabled,
@@ -76,13 +82,19 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
       testSecretKey: config.testSecretKey || "",
       testWebhookSecret: config.testWebhookSecret || "",
       
-      // Feature Flags
       savedCards: config.savedCards ?? true,
       inlineCreditCardForm: config.inlineCreditCardForm ?? true,
       applePayEnabled: config.applePayEnabled ?? true,
       googlePayEnabled: config.googlePayEnabled ?? true,
       paymentRequestButtons: config.paymentRequestButtons ?? true,
       buttonTheme: config.buttonTheme || "dark",
+
+      minOrderAmount: method.minOrderAmount ?? null,
+      maxOrderAmount: method.maxOrderAmount ?? null,
+      surchargeEnabled: method.surchargeEnabled ?? false,
+      surchargeType: (method.surchargeType as "fixed" | "percentage" | null) ?? "fixed",
+      surchargeAmount: method.surchargeAmount ?? 0,
+      taxableSurcharge: method.taxableSurcharge ?? false
     }
   })
 
@@ -99,11 +111,27 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
     })
   }
 
+  const handleDomainVerification = async () => {
+    setVerifyingDomain(true)
+    try {
+        const res = await verifyApplePayDomain(method.id)
+        if(res.success) {
+          toast.success("Domain verified", { description: res.message })
+        } else {
+          toast.error("Verification failed", { description: res.error })
+        }
+    } catch (e) {
+        toast.error("Failed to connect to server")
+    }
+    setVerifyingDomain(false)
+  }
+
+  const isApplePayEnabled = form.watch("applePayEnabled")
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
         
-        {/* 1. Payment Action Settings */}
         <Card>
           <CardHeader>
             <CardTitle>Processing Logic</CardTitle>
@@ -142,8 +170,7 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
                   <FormItem>
                     <FormLabel>Statement Descriptor</FormLabel>
                     <FormControl>
-                      <input 
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      <Input 
                         placeholder="GOBIKESTORE"
                         {...field} 
                         value={field.value ?? ""} 
@@ -151,7 +178,7 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
                       />
                     </FormControl>
                     <FormDescription>
-                      This text will appear on your customer's bank statement (Max 22 chars).
+                      Appears on customer's bank statement (Max 22 chars).
                     </FormDescription>
                   </FormItem>
                 )}
@@ -176,7 +203,6 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
           </CardContent>
         </Card>
 
-        {/* 2. Payment Features (APM Control) */}
         <Card>
           <CardHeader>
             <CardTitle>Wallets & Features</CardTitle>
@@ -212,8 +238,35 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
                 />
               ))}
             </div>
-            <div className="mt-4 p-3 bg-blue-50 text-blue-800 text-xs rounded-md border border-blue-100">
-               <strong>Note:</strong> Other local payment methods (iDEAL, Klarna, Alipay) are managed automatically by Stripe based on your Dashboard settings and customer location.
+
+            {isApplePayEnabled && (
+               <div className="mt-4 p-4 border rounded-md bg-blue-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                 <div className="space-y-1">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                       <CheckCircle2 className="h-4 w-4 text-green-600" /> Apple Pay Domain Verification
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                       Stripe requires you to verify your domain to process Apple Pay.
+                    </p>
+                 </div>
+                 <Button 
+                   type="button" 
+                   size="sm" 
+                   variant="outline"
+                   onClick={handleDomainVerification}
+                   disabled={verifyingDomain}
+                 >
+                    {verifyingDomain && <Loader2 className="mr-2 h-3 w-3 animate-spin"/>}
+                    Verify Domain
+                 </Button>
+               </div>
+            )}
+
+            <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 text-xs rounded-md border border-yellow-100 flex items-start gap-2">
+               <AlertTriangle className="h-4 w-4 shrink-0" />
+               <span>
+                  <strong>Note:</strong> Other local payment methods (iDEAL, Klarna, Alipay) are managed automatically by Stripe based on your Dashboard settings and customer location.
+               </span>
             </div>
           </CardContent>
         </Card>

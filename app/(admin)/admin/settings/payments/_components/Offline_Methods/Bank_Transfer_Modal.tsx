@@ -1,4 +1,5 @@
 // app/admin/settings/payments/_components/Offline_Methods/Bank_Transfer_Modal.tsx
+
 "use client"
 
 import { useState, useTransition } from "react"
@@ -29,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2, Loader2, Settings } from "lucide-react"
+import { Payment_Limits_Surcharge } from "../Payment_Limits_Surcharge"
 
 interface BankModalProps {
   methodId: string
@@ -40,16 +42,22 @@ export const Bank_Transfer_Modal = ({ methodId, config, offlineConfig }: BankMod
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const form = useForm<z.infer<typeof BankTransferSchema>>({
+  const form = useForm({
     resolver: zodResolver(BankTransferSchema),
     defaultValues: {
       name: config.name || "Direct Bank Transfer",
       description: config.description || "",
       instructions: config.instructions || "",
-      // Fix: Ensure bankDetails is always an array, never null
       bankDetails: offlineConfig?.bankDetails && offlineConfig.bankDetails.length > 0 
         ? offlineConfig.bankDetails 
-        : [{ accountName: "", accountNumber: "", bankName: "", sortCode: "", iban: "", bic: "" }]
+        : [{ accountName: "", accountNumber: "", bankName: "", sortCode: "", iban: "", bic: "" }],
+      
+      minOrderAmount: config.minOrderAmount ?? null,
+      maxOrderAmount: config.maxOrderAmount ?? null,
+      surchargeEnabled: config.surchargeEnabled ?? false,
+      surchargeType: (config.surchargeType as "fixed" | "percentage" | null) ?? "fixed",
+      surchargeAmount: config.surchargeAmount ?? 0,
+      taxableSurcharge: config.taxableSurcharge ?? false
     }
   })
 
@@ -221,6 +229,8 @@ export const Bank_Transfer_Modal = ({ methodId, config, offlineConfig }: BankMod
                 </div>
               ))}
             </div>
+
+            <Payment_Limits_Surcharge form={form} />
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

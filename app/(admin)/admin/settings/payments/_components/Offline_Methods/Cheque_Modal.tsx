@@ -1,4 +1,5 @@
 // app/admin/settings/payments/_components/Offline_Methods/Cheque_Modal.tsx
+
 "use client"
 
 import { useState, useTransition } from "react"
@@ -29,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Loader2, Settings } from "lucide-react"
+import { Payment_Limits_Surcharge } from "../Payment_Limits_Surcharge"
 
 interface ChequeModalProps {
   methodId: string
@@ -40,14 +42,21 @@ export const Cheque_Modal = ({ methodId, config, offlineConfig }: ChequeModalPro
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const form = useForm<z.infer<typeof ChequeSchema>>({
+  const form = useForm({
     resolver: zodResolver(ChequeSchema),
     defaultValues: {
       name: config.name || "Cheque Payment",
       description: config.description || "",
       instructions: config.instructions || "",
       chequePayTo: offlineConfig?.chequePayTo || "",
-      addressInfo: offlineConfig?.addressInfo || ""
+      addressInfo: offlineConfig?.addressInfo || "",
+
+      minOrderAmount: config.minOrderAmount ?? null,
+      maxOrderAmount: config.maxOrderAmount ?? null,
+      surchargeEnabled: config.surchargeEnabled ?? false,
+      surchargeType: (config.surchargeType as "fixed" | "percentage" | null) ?? "fixed",
+      surchargeAmount: config.surchargeAmount ?? 0,
+      taxableSurcharge: config.taxableSurcharge ?? false
     }
   })
 
@@ -151,6 +160,8 @@ export const Cheque_Modal = ({ methodId, config, offlineConfig }: ChequeModalPro
                 </FormItem>
               )}
             />
+
+            <Payment_Limits_Surcharge form={form} />
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

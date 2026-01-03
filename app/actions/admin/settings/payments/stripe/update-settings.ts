@@ -1,4 +1,5 @@
 // app/actions/settings/payments/stripe/update-settings.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
@@ -15,8 +16,6 @@ export async function updateStripeSettings(
   try {
     const validated = StripeSettingsSchema.parse(values)
 
-    // 1. Real-time Verification (Optional but recommended)
-    // আমরা এনক্রিপ্ট করার আগেই একবার চেক করে নিচ্ছি কি-টা ভ্যালিড কি না
     if (validated.enableStripe) {
       const secretKeyToCheck = validated.testMode 
         ? validated.testSecretKey 
@@ -41,28 +40,30 @@ export async function updateStripeSettings(
       }
     }
 
-    // 2. Encrypt Sensitive Data
-    // যদি ভ্যালু থাকে তবেই এনক্রিপ্ট হবে, নাল বা এম্পটি স্ট্রিং হলে যা আছে তাই থাকবে
     const liveSecretKey = validated.liveSecretKey ? encrypt(validated.liveSecretKey) : ""
     const liveWebhookSecret = validated.liveWebhookSecret ? encrypt(validated.liveWebhookSecret) : ""
     
     const testSecretKey = validated.testSecretKey ? encrypt(validated.testSecretKey) : ""
     const testWebhookSecret = validated.testWebhookSecret ? encrypt(validated.testWebhookSecret) : ""
 
-    // 3. Save to Database
     await db.$transaction(async (tx) => {
-      // Update Parent Config
       await tx.paymentMethodConfig.update({
         where: { id: paymentMethodId },
         data: {
           name: validated.title,
           description: validated.description ?? "",
           mode: validated.testMode ? "TEST" : "LIVE",
-          isEnabled: validated.enableStripe ?? false
+          isEnabled: validated.enableStripe ?? false,
+          
+          minOrderAmount: validated.minOrderAmount,
+          maxOrderAmount: validated.maxOrderAmount,
+          surchargeEnabled: validated.surchargeEnabled ?? false,
+          surchargeType: validated.surchargeType,
+          surchargeAmount: validated.surchargeAmount ?? 0,
+          taxableSurcharge: validated.taxableSurcharge ?? false
         }
       })
 
-      // Update Stripe Config
       await tx.stripeConfig.upsert({
         where: { paymentMethodId },
         create: {
@@ -72,12 +73,12 @@ export async function updateStripeSettings(
           description: validated.description ?? "",
           
           livePublishableKey: validated.livePublishableKey ?? "",
-          liveSecretKey,       // 🔒 Encrypted
-          liveWebhookSecret,   // 🔒 Encrypted
+          liveSecretKey,
+          liveWebhookSecret,
           
           testPublishableKey: validated.testPublishableKey ?? "",
-          testSecretKey,       // 🔒 Encrypted
-          testWebhookSecret,   // 🔒 Encrypted
+          testSecretKey,
+          testWebhookSecret,
 
           paymentAction: validated.paymentAction ?? "CAPTURE",
           statementDescriptor: validated.statementDescriptor ?? "",
@@ -100,12 +101,12 @@ export async function updateStripeSettings(
           description: validated.description ?? "",
           
           livePublishableKey: validated.livePublishableKey ?? "",
-          liveSecretKey,       // 🔒 Encrypted
-          liveWebhookSecret,   // 🔒 Encrypted
+          liveSecretKey,
+          liveWebhookSecret,
           
           testPublishableKey: validated.testPublishableKey ?? "",
-          testSecretKey,       // 🔒 Encrypted
-          testWebhookSecret,   // 🔒 Encrypted
+          testSecretKey,
+          testWebhookSecret,
 
           paymentAction: validated.paymentAction ?? "CAPTURE",
           statementDescriptor: validated.statementDescriptor ?? "",

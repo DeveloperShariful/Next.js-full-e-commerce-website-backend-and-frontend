@@ -1,4 +1,5 @@
 // app/actions/settings/payments/bank.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
@@ -14,17 +15,22 @@ export async function updateBankTransferSettings(
     const validated = BankTransferSchema.parse(values)
 
     await db.$transaction(async (tx) => {
-      // Update the main config (Name, Description)
       await tx.paymentMethodConfig.update({
         where: { id },
         data: {
           name: validated.name,
           description: validated.description,
           instructions: validated.instructions,
+          
+          minOrderAmount: validated.minOrderAmount,
+          maxOrderAmount: validated.maxOrderAmount,
+          surchargeEnabled: validated.surchargeEnabled ?? false,
+          surchargeType: validated.surchargeType,
+          surchargeAmount: validated.surchargeAmount ?? 0,
+          taxableSurcharge: validated.taxableSurcharge ?? false
         },
       })
 
-      // Update the offline specific config (Bank Details JSON)
       await tx.offlinePaymentConfig.update({
         where: { paymentMethodId: id },
         data: {

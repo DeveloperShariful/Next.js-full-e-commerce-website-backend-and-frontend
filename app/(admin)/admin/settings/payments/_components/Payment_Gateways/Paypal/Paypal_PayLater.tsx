@@ -24,7 +24,7 @@ interface PayLaterProps {
 export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
   const [isPending, startTransition] = useTransition()
 
-  const form = useForm<z.infer<typeof PaypalSettingsSchema>>({
+  const form = useForm({
     resolver: zodResolver(PaypalSettingsSchema),
     defaultValues: {
       payLaterEnabled: config.payLaterEnabled ?? true,
@@ -106,7 +106,7 @@ export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
                 )}
               />
 
-              {/* Enable Messaging */}
+              {/* Enable Messaging*/}
               <FormField
                 control={form.control}
                 name="payLaterMessaging"

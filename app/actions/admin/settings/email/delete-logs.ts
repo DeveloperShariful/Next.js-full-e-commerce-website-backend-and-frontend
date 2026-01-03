@@ -1,3 +1,5 @@
+// File: app/actions/settings/email/email-log.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";

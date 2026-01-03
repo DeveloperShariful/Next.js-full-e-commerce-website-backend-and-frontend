@@ -1,34 +1,54 @@
-// File: app/(storefront)/page.tsx
+// File: app/page.tsx
+"use client";
 
-// Actions
+import HeroSlider from './_components/HeroSlider';
+import TrustBadges from './_components/TrustBadges';
+import ProductCollection from './_components/ProductCollection';
+import OurStory from './_components/OurStory';
+import SmarterChoice from './_components/SmarterChoice';
+import DifferenceSection from './_components/DifferenceSection';
+import CommunitySection from './_components/CommunitySection';
+import VideoReviews from './_components/VideoReviews';
+import FaqSection from './_components/FaqSection';
 import { getNewArrivals } from "@/app/actions/storefront/home/get-new-arrivals";
 
-// Components
-import HeroSection from "./_components/hero-section";
-import FeaturesSection from "./_components/features-section";
-import NewArrivals from "./_components/new-arrivals";
-import PromoBanner from "./_components/promo-banner";
 
-export default async function HomePage() {
-  
-  // 1. Fetch New Arrivals
-  const newArrivals = await getNewArrivals();
+
+// Components
+
+
+
+import NewArrivals from "./_components/new-arrivals";
+
+
+export default function HomePageClient() {
+  const Divider = () => (
+    <div className="max-w-[1500px] mx-auto px-4">
+      <hr className="border-t border-gray-200 my-4" />
+    </div>
+  );
 
   return (
-    <div className="bg-white font-sans text-slate-800">
-      
-      {/* 1. Hero Section */}
-      <HeroSection />
+    <>
+      <HeroSlider />
+      <TrustBadges />
+      <Divider />
+      <ProductCollection />
+      <Divider />
+      <OurStory />
+      <Divider />
+      <SmarterChoice />
+      <Divider />
 
-      {/* 2. Features Grid */}
-      <FeaturesSection />
-
-      {/* 3. New Arrivals List */}
-      <NewArrivals products={newArrivals} />
-
-      {/* 4. Promo Banner */}
-      <PromoBanner />
-
-    </div>
+      <Divider />
+      <DifferenceSection />
+      <CommunitySection />
+      <Divider />
+      <Divider />
+      <VideoReviews />
+      <Divider />
+      <FaqSection />
+      <Divider />
+    </>
   );
 }

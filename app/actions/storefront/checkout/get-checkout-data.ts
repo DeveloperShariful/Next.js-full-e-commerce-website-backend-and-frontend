@@ -1,132 +1,85 @@
-// File: app/actions/storefront/checkout/get-checkout-data.ts
-"use server"
+// app/actions/storefront/checkout/get-checkout-data.ts
+"use server";
 
-import { db } from "@/lib/prisma"
-import { decrypt } from "@/app/actions/admin/settings/payments/crypto" 
-import { cookies } from "next/headers"
+import { db } from "@/lib/prisma";
+import { currentUser } from "@clerk/nextjs/server";
 
-export async function getCheckoutData() {
+export async function getCheckoutData(cartId: string | undefined) {
   try {
-    const cookieStore = await cookies()
-    const cartId = cookieStore.get("cartId")?.value
-    const userId = cookieStore.get("userId")?.value 
+    const user = await currentUser();
+    
+    // ১. ইউজার ডাটা (Clerk Sync)
+    let dbUser = null;
+    if (user?.id) {
+      dbUser = await db.user.findUnique({
+        where: { clerkId: user.id },
+        include: { addresses: true }
+      });
+    }
 
-    // 1. Fetch Cart
-    let cart = null
-    if (cartId) {
-      cart = await db.cart.findUnique({
+    // ২. প্যারালাল ডাটা ফেচিং
+    const [cart, paymentMethods, storeSettings] = await Promise.all([
+      // A. Cart
+      cartId ? db.cart.findUnique({
         where: { id: cartId },
         include: {
           items: {
             include: {
-              product: {
-                select: {
-                  name: true,
-                  price: true,
-                  salePrice: true,
-                  weight: true,
-                  length: true,
-                  width: true,
-                  height: true,
-                  featuredImage: true,
-                  slug: true
-                }
-              },
-              variant: {
-                select: {
-                  name: true,
-                  price: true,
-                  salePrice: true,
-                  weight: true,
-                  image: true,
-                  attributes: true
-                }
-              }
+              product: { include: { images: true } },
+              variant: { include: { images: true } }
+            },
+            orderBy: { productId: 'asc' }
+          }
+        }
+      }) : null,
+
+      // B. Payment Methods (Filter enabled only)
+      db.paymentMethodConfig.findMany({
+        where: { isEnabled: true },
+        orderBy: { displayOrder: 'asc' },
+        select: {
+          id: true, identifier: true, name: true, description: true, icon: true, instructions: true,
+          mode: true,
+          offlineConfig: {
+            select: { 
+              bankDetails: true, 
+              chequePayTo: true, 
+              addressInfo: true,
+              enableForShippingMethods: true // 👈 ADDED: For Conditional Logic
             }
           }
         }
+      }),
+
+      // C. Store Settings
+      db.storeSettings.findUnique({
+        where: { id: "settings" },
+        select: {
+          currency: true,
+          currencySymbol: true,
+          taxSettings: true,
+          weightUnit: true
+        }
       })
+    ]);
+
+    if (!cart || cart.items.length === 0) {
+      return { success: false, error: "Your cart is empty." };
     }
 
-    // 2. Fetch Active Payment Methods
-    const paymentMethods = await db.paymentMethodConfig.findMany({
-      where: { isEnabled: true },
-      include: {
-        stripeConfig: true,
-        paypalConfig: true,
-        offlineConfig: true
-      },
-      orderBy: { displayOrder: "asc" }
-    })
-
-    // 3. Process Payment Keys (Decrypt Public Keys only)
-    const processedMethods = paymentMethods.map(method => {
-      const publicData: any = {
-        id: method.id,
-        identifier: method.identifier,
-        name: method.name,
-        description: method.description,
-        surchargeEnabled: method.surchargeEnabled,
-        surchargeType: method.surchargeType,
-        surchargeAmount: method.surchargeAmount,
-        minOrderAmount: method.minOrderAmount,
-        maxOrderAmount: method.maxOrderAmount,
-        mode: method.mode
+    return {
+      success: true,
+      data: {
+        cart,
+        user: dbUser,
+        savedAddresses: dbUser?.addresses || [],
+        paymentMethods,
+        settings: storeSettings
       }
-
-      if (method.identifier === 'stripe' && method.stripeConfig) {
-        publicData.config = {
-          publishableKey: method.mode === 'TEST' 
-            ? method.stripeConfig.testPublishableKey 
-            : method.stripeConfig.livePublishableKey,
-          inlineCard: method.stripeConfig.inlineCreditCardForm,
-          applePay: method.stripeConfig.applePayEnabled,
-          googlePay: method.stripeConfig.googlePayEnabled,
-          savedCards: method.stripeConfig.savedCards
-        }
-      }
-
-      if (method.identifier === 'paypal' && method.paypalConfig) {
-        publicData.config = {
-          clientId: method.mode === 'TEST' 
-            ? method.paypalConfig.sandboxClientId 
-            : method.paypalConfig.liveClientId,
-          intent: method.paypalConfig.intent,
-          color: method.paypalConfig.buttonColor,
-          label: method.paypalConfig.buttonLabel,
-          shape: method.paypalConfig.buttonShape,
-          layout: method.paypalConfig.buttonLayout,
-          payLater: method.paypalConfig.payLaterEnabled
-        }
-      }
-
-      if (['bank_transfer', 'cheque', 'cod'].includes(method.identifier) && method.offlineConfig) {
-        publicData.config = {
-          instructions: method.instructions,
-          details: method.offlineConfig
-        }
-      }
-
-      return publicData
-    })
-
-    // 4. Fetch User Saved Address
-    let savedAddress = null
-    if (userId) {
-      savedAddress = await db.address.findFirst({
-        where: { userId, isDefault: true }
-      })
-    }
-
-    return { 
-      success: true, 
-      cart, 
-      paymentMethods: processedMethods, 
-      savedAddress 
-    }
+    };
 
   } catch (error) {
-    console.error("Get Checkout Data Error:", error)
-    return { success: false, error: "Failed to load checkout data" }
+    console.error("Checkout Data Load Error:", error);
+    return { success: false, error: "Failed to load checkout." };
   }
 }

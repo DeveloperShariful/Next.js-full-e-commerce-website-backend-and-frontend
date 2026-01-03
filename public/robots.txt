@@ -1,0 +1,7 @@
+# ===============================================================
+# robots.txt for GoBike Australia (gobike.au)
+# ===============================================================
+
+# Allow all friendly search engine crawlers to access the entire site
+User-agent: *
+Disallow: /

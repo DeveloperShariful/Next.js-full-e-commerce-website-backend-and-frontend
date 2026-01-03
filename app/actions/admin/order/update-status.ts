@@ -8,7 +8,7 @@ import { OrderStatus, PaymentStatus, FulfillmentStatus } from "@prisma/client";
 import { restockInventory, updateAnalytics } from "./order-utils"; 
 
 // ✅ FIX: Correct Import Path
-import { sendNotification } from "@/app/actions//admin/settings/email/send-notification"; 
+import { sendNotification } from "@/app/api/email/send-notification"; 
 
 export async function updateOrderStatus(formData: FormData) {
   try {

@@ -1,4 +1,4 @@
-// File: app/actions/settings/email/email-log.ts
+// File: app/actions/settings/email/delete-logs.ts
 
 "use server";
 

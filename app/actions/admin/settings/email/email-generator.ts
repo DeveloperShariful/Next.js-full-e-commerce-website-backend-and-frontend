@@ -20,13 +20,12 @@ const getReadablePaymentMethod = (method: string | null) => {
     "cheque": "Cheque Payment"
   };
 
-  // যদি ম্যাপে থাকে তবে সেটা দেখাবে, না হলে _ সরিয়ে ক্যাপিটাল করে দেখাবে
   return formattedMap[method] || method.replace(/_/g, " ").toUpperCase();
 };
 
 export const generateEmailHtml = ({ order, config, template }: EmailGeneratorProps) => {
   // 1. Basic Settings & Colors
-  const baseColor = config.baseColor || "#7f54b3"; // WooCommerce Purple Default
+  const baseColor = config.baseColor || "#7f54b3"; 
   const bgColor = config.backgroundColor || "#f7f7f7";
   const bodyColor = config.bodyBackgroundColor || "#ffffff";
   const currency = order.currency || "$";
@@ -36,16 +35,14 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount).replace('USD', currency);
   };
 
-  // ✅ FIX: রিডেবল পেমেন্ট মেথড জেনারেট করা
-  // আপনার অর্ডারে field টি হলো 'paymentMethod', 'paymentGateway' নয়
   const paymentMethodName = getReadablePaymentMethod(order.paymentMethod);
 
   // 2. Process Template Variables (Replace {customer_name}, etc.)
   let introText = template.content
-    .replace(/{customer_name}/g, order.user?.name || order.guestEmail || "Customer") // guestEmail fallback added
+    .replace(/{customer_name}/g, order.user?.name || order.guestEmail || "Customer") 
     .replace(/{order_number}/g, order.orderNumber)
     .replace(/{total_amount}/g, formatMoney(order.total))
-    .replace(/{payment_method}/g, paymentMethodName) // ✅ ADDED: Template variable replacement
+    .replace(/{payment_method}/g, paymentMethodName) 
     .replace(/{tracking_number}/g, order.shippingTrackingNumber || "N/A")
     .replace(/{courier}/g, order.shippingProvider || "Courier");
 

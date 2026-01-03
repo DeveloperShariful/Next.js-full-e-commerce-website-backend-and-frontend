@@ -1,7 +1,8 @@
 // File Location: app/actions/admin/order/order-utils.ts
 
 import { db } from "@/lib/prisma";
-import { sendNotification } from "@/app/actions/admin/settings/email/send-notification";
+// ✅ FIX: সঠিক ইমপোর্ট পাথ (আপনার ফাইল লোকেশন অনুযায়ী)
+import { sendNotification } from "@/app/api/email/send-notification";
 
 // 1. ANALYTICS
 export async function updateAnalytics(amount: number) {
@@ -44,7 +45,7 @@ export async function restockInventory(orderId: string) {
     }
 }
 
-// 3. EMAIL TRIGGER (LOGS ADDED)
+// 3. EMAIL TRIGGER (UPDATED: Customer + Admin)
 export async function sendOrderEmail(orderId: string, eventType: string) {
     console.log(`📩 [1/3] sendOrderEmail Called. Event: ${eventType}, OrderID: ${orderId}`);
 
@@ -67,15 +68,25 @@ export async function sendOrderEmail(orderId: string, eventType: string) {
             return;
         }
 
-        // মেইল পাঠানোর প্রসেস শুরু
+        // ✅ ১. কাস্টমারকে মেইল পাঠানো (Queue তে জমা হবে)
         await sendNotification({
             trigger: eventType,
             recipient: recipientEmail,
             orderId: orderId, 
             data: {}
         });
+
+        // ✅ ২. অ্যাডমিনকে মেইল পাঠানো (Queue তে জমা হবে)
+        // লজিক: ইভেন্টের নামের আগে 'ADMIN_' যোগ করা হলো (যেমন: ADMIN_ORDER_PLACED)
+        // recipient: "" ফাঁকা রাখা হলো, যাতে Worker স্টোর সেটিংস থেকে মেইল নেয়।
+        await sendNotification({
+            trigger: `${eventType}_ADMIN`,
+            recipient: "admin", 
+            orderId: orderId,
+            data: {}
+        });
         
-        console.log("📩 [3/3] sendNotification function executed.");
+        console.log("📩 [3/3] Notifications queued for both Customer & Admin.");
 
     } catch (error) {
         console.error("🔥 EMAIL_TRIGGER_ERROR:", error);

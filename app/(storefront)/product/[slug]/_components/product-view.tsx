@@ -83,28 +83,17 @@ export default function ProductView({ product }: ProductViewProps) {
     ? (currentVariant.salePrice ? currentVariant.price : null) 
     : (product.salePrice ? product.price : null); 
 
-  // 🛒 Add to Cart Handler (DEBUGGED)
+  // 🛒 Add to Cart Handler
   const onAddToCart = () => {
-    console.log("🔵 [CLIENT] Add to Cart Clicked"); // ১. বাটন ক্লিক চেক
-
-    // Validation Logs
     if (product.variants.length > 0 && !selectedVariantId) {
-      console.log("❌ [CLIENT] Variant not selected");
       toast.error("Please select an option first!");
       return;
     }
 
     if (!available) {
-      console.log("❌ [CLIENT] Product out of stock");
       toast.error("Sorry, this item is out of stock.");
       return;
     }
-
-    console.log("🚀 [CLIENT] Calling Server Action...", {
-        productId: product.id,
-        quantity: quantity,
-        variantId: selectedVariantId
-    });
 
     startTransition(async () => {
       try {
@@ -114,15 +103,13 @@ export default function ProductView({ product }: ProductViewProps) {
             variantId: selectedVariantId || undefined
         });
 
-        console.log("🟢 [CLIENT] Server Response:", res); // ৩. সার্ভার রেসপন্স চেক
-
         if (res.success) {
             toast.success("Added to cart successfully!");
         } else {
             toast.error(res.message);
         }
       } catch (error) {
-        console.error("🔥 [CLIENT] Error calling server action:", error);
+        console.error("Error calling server action:", error);
         toast.error("Something went wrong");
       }
     });
@@ -234,54 +221,60 @@ export default function ProductView({ product }: ProductViewProps) {
             </div>
          )}
 
-         {/* Quantity & Actions */}
-         <div className="flex items-center gap-4 pt-4 border-t border-slate-100 mt-auto">
-            <div className="flex items-center border border-slate-300 rounded-xl h-12">
+         {/* --- UPDATED RESPONSIVE QUANTITY & ACTIONS SECTION --- */}
+         <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-100 mt-auto">
+            
+            {/* Quantity Selector - Mobile Full Width */}
+            <div className="flex w-full sm:w-32 items-center border border-slate-300 rounded-xl h-12">
                <button 
                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                 className="px-4 h-full hover:bg-slate-50 transition text-slate-600 rounded-l-xl disabled:opacity-50"
+                 className="flex-1 sm:flex-none w-auto sm:w-10 h-full flex items-center justify-center hover:bg-slate-50 transition text-slate-600 rounded-l-xl disabled:opacity-50"
                  disabled={isPending}
                >
                   <Minus size={16}/>
                </button>
-               <span className="w-10 text-center font-bold text-slate-800 tabular-nums">{quantity}</span>
+               <span className="flex-1 text-center font-bold text-slate-800 tabular-nums">{quantity}</span>
                <button 
                  onClick={() => setQuantity(quantity + 1)}
-                 className="px-4 h-full hover:bg-slate-50 transition text-slate-600 rounded-r-xl disabled:opacity-50"
+                 className="flex-1 sm:flex-none w-auto sm:w-10 h-full flex items-center justify-center hover:bg-slate-50 transition text-slate-600 rounded-r-xl disabled:opacity-50"
                  disabled={isPending}
                >
                   <Plus size={16}/>
                </button>
             </div>
 
-            <button 
-               onClick={onAddToCart}
-               disabled={!available || isPending}
-               className={`
-                 flex-1 h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95
-                 ${available && !isPending
-                    ? "bg-slate-900 hover:bg-slate-800 hover:shadow-xl" 
-                    : "bg-gray-400 cursor-not-allowed shadow-none"
-                 }
-               `}
-            >
-               {isPending ? (
-                 <Loader2 className="animate-spin h-5 w-5" />
-               ) : available ? (
-                 <> <ShoppingCart size={20}/> Add to Cart </>
-               ) : (
-                 "Out of Stock"
-               )}
-            </button>
+            {/* Action Buttons Wrapper - Mobile Stacked below, Desktop Side-by-Side */}
+            <div className="flex w-full gap-4 sm:flex-1">
+                <button 
+                   onClick={onAddToCart}
+                   disabled={!available || isPending}
+                   className={`
+                     flex-1 h-12 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 whitespace-nowrap
+                     ${available && !isPending
+                       ? "bg-slate-900 hover:bg-slate-800 hover:shadow-xl" 
+                       : "bg-gray-400 cursor-not-allowed shadow-none"
+                     }
+                   `}
+                >
+                   {isPending ? (
+                     <Loader2 className="animate-spin h-5 w-5" />
+                   ) : available ? (
+                     <> <ShoppingCart size={20}/> Add to Cart </>
+                   ) : (
+                     "Out of Stock"
+                   )}
+                </button>
 
-            <button 
-              onClick={() => setIsWishlisted(!isWishlisted)}
-              className={`h-12 w-12 border rounded-xl flex items-center justify-center transition-colors ${
-                isWishlisted ? "bg-red-50 border-red-200 text-red-500" : "border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-slate-600"
-              }`}
-            >
-               <Heart size={22} fill={isWishlisted ? "currentColor" : "none"}/>
-            </button>
+                <button 
+                  onClick={() => setIsWishlisted(!isWishlisted)}
+                  className={`h-12 w-12 border rounded-xl flex items-center justify-center transition-colors flex-shrink-0 ${
+                    isWishlisted ? "bg-red-50 border-red-200 text-red-500" : "border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                   <Heart size={22} fill={isWishlisted ? "currentColor" : "none"}/>
+                </button>
+            </div>
+
          </div>
 
          {/* Footer Meta */}

@@ -1,4 +1,4 @@
-// File: app/actions/admin/email/send-notification.ts
+// File: app/api/email/send-notification.ts
 
 "use server";
 

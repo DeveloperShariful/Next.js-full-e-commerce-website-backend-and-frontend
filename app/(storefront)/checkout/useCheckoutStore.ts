@@ -1,4 +1,4 @@
-// File: app/(storefront)/checkout/_store/useCheckoutStore.ts
+// File: app/(storefront)/checkout/useCheckoutStore.ts
 
 import { create } from "zustand";
 import { getCheckoutSummary } from "@/app/actions/storefront/checkout/get-checkout-summary";
@@ -11,12 +11,20 @@ interface CheckoutState {
   settings: any | null;
   
   // State
+  guestEmail: string;
   shippingAddress: any;
   billingAddress: any;
   isSameBilling: boolean;
-  customerNote: string; // ✅ New: Order Notes
+  customerNote: string;
   
-  selectedShippingMethod: { id: string; price: number; name: string; type: string } | null;
+  // Selected Method (Typed correctly)
+  selectedShippingMethod: { 
+      id: string; 
+      price: number; 
+      name: string; 
+      type: string;
+      carrier?: string;
+  } | null;
   
   selectedPaymentMethod: string | null;
   couponCode: string | null;
@@ -33,10 +41,11 @@ interface CheckoutState {
 
   // Actions
   initialize: (data: any) => void;
+  setGuestEmail: (email: string) => void;
   setShippingAddress: (address: any) => void;
   setBillingAddress: (address: any) => void;
   toggleSameBilling: (val: boolean) => void;
-  setCustomerNote: (note: string) => void; // ✅ New
+  setCustomerNote: (note: string) => void;
   setShippingMethod: (method: any) => void;
   setPaymentMethod: (method: string) => void;
   applyCoupon: (code: string) => Promise<void>;
@@ -45,11 +54,13 @@ interface CheckoutState {
 }
 
 export const useCheckoutStore = create<CheckoutState>((set, get) => ({
+  // --- Initial State ---
   cartId: null,
   cart: null,
   user: null,
   settings: null,
 
+  guestEmail: "",
   shippingAddress: {},
   billingAddress: {},
   isSameBilling: true,
@@ -69,8 +80,9 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
 
   isProcessing: false,
 
+  // --- Actions ---
+
   initialize: (data) => {
-    // 🔥 FIX: Payment Methods কে সেটিংসের ভেতর মার্জ করা হচ্ছে
     const combinedSettings = {
         ...data.settings,
         paymentMethods: data.paymentMethods || [] 
@@ -80,9 +92,10 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
       cartId: data.cart.id,
       cart: data.cart,
       user: data.user,
+      guestEmail: data.user?.email || "", 
       settings: combinedSettings,
       
-      // কার্টের সাবটোটাল ইনিশিয়াল ক্যালকুলেশন
+      // Calculate initial subtotal
       totals: {
         subtotal: data.cart.items.reduce((acc: number, item: any) => {
              const price = item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price);
@@ -91,17 +104,25 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
         shipping: 0,
         tax: 0,
         discount: 0,
-        total: 0 // updateTotals() এটি ঠিক করবে
+        total: 0 
       }
     });
     
-    // ইনিশিয়াল ডাটা লোড হওয়ার পর ক্যালকুলেশন কল
+    // Trigger initial calculation
     get().updateTotals();
   },
 
+  setGuestEmail: (email) => set({ guestEmail: email }),
+
   setShippingAddress: (address) => {
+    const currentAddress = get().shippingAddress;
+
+    // ✅ FIX: Prevent redundant updates / Infinite Loop
+    if (JSON.stringify(currentAddress) === JSON.stringify(address)) return;
+
     set({ shippingAddress: address });
-    // কান্ট্রি বা পোস্টকোড চেঞ্জ হলে টোটাল আপডেট হবে
+
+    // Only trigger calculation if minimal required fields are present
     if (address.country && address.postcode) {
         get().updateTotals();
     }
@@ -114,6 +135,11 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
   setCustomerNote: (note) => set({ customerNote: note }),
 
   setShippingMethod: (method) => {
+    const currentMethod = get().selectedShippingMethod;
+
+    // ✅ FIX: Prevent update loop if same method is set
+    if (currentMethod?.id === method.id) return;
+
     set({ selectedShippingMethod: method });
     get().updateTotals();
   },
@@ -138,30 +164,37 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
 
     set({ isProcessing: true });
 
-    const res = await getCheckoutSummary({
-        cartId,
-        shippingAddress: {
-            country: shippingAddress.country || "AU",
-            state: shippingAddress.state || "",
-            postcode: shippingAddress.postcode || "",
-            suburb: shippingAddress.suburb || ""
-        },
-        shippingMethodId: selectedShippingMethod?.id,
-        couponCode: couponCode || undefined
-    });
-
-    if (res.success && res.breakdown) {
-        set({
-            totals: {
-                subtotal: res.breakdown.subtotal,
-                shipping: res.breakdown.shipping,
-                tax: res.breakdown.tax,
-                discount: res.breakdown.discount,
-                total: res.breakdown.total
-            }
+    try {
+        const res = await getCheckoutSummary({
+            cartId,
+            shippingAddress: {
+                country: shippingAddress.country || "AU",
+                state: shippingAddress.state || "",
+                postcode: shippingAddress.postcode || "",
+                // ✅ FIX: Ensure 'city' from form is passed as 'suburb' for backend logic
+                suburb: shippingAddress.suburb || shippingAddress.city || "" 
+            },
+            shippingMethodId: selectedShippingMethod?.id,
+            // ✅ FIX: Pass selected price to avoid re-fetching rates on server
+            shippingCost: selectedShippingMethod?.price,
+            couponCode: couponCode || undefined
         });
-    }
 
-    set({ isProcessing: false });
+        if (res.success && res.breakdown) {
+            set({
+                totals: {
+                    subtotal: res.breakdown.subtotal,
+                    shipping: res.breakdown.shipping,
+                    tax: res.breakdown.tax,
+                    discount: res.breakdown.discount,
+                    total: res.breakdown.total
+                }
+            });
+        }
+    } catch (error) {
+        console.error("Failed to update totals:", error);
+    } finally {
+        set({ isProcessing: false });
+    }
   }
 }));

@@ -3,7 +3,7 @@
 
 import { db } from "@/lib/prisma"
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
-import { getCheckoutSummary } from "./get-checkout-summary" // 🔥 Secure Calculation
+import { getCheckoutSummary } from "./get-checkout-summary" 
 
 interface PayPalOrderParams {
   cartId: string;
@@ -14,16 +14,24 @@ interface PayPalOrderParams {
     state: string;
     postcode: string;
     suburb: string;
+    address1: string; // ✅ Added address lines
+    city: string;
   };
 }
 
 export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, address }: PayPalOrderParams) {
   try {
-    // ১. পেমেন্ট মেথড কনফিগ চেক
-    const methodConfig = await db.paymentMethodConfig.findUnique({
-      where: { identifier: "paypal" },
-      include: { paypalConfig: true }
-    })
+    // 1. Config Check
+    const [methodConfig, storeSettings] = await Promise.all([
+        db.paymentMethodConfig.findUnique({
+            where: { identifier: "paypal" },
+            include: { paypalConfig: true }
+        }),
+        db.storeSettings.findUnique({
+            where: { id: "settings" },
+            select: { currency: true }
+        })
+    ]);
 
     if (!methodConfig?.isEnabled || !methodConfig.paypalConfig) {
       return { success: false, error: "PayPal is disabled." }
@@ -31,8 +39,7 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
 
     const config = methodConfig.paypalConfig
     
-    // ২. সার্ভার সাইড ক্যালকুলেশন (Security 🔒)
-    // ফ্রন্টএন্ডের টোটাল না নিয়ে আমরা নিজেরা হিসাব করছি
+    // 2. Calculate Total
     const summary = await getCheckoutSummary({ 
         cartId, 
         shippingAddress: address, 
@@ -45,9 +52,10 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
     }
 
     const finalAmount = summary.breakdown.total.toFixed(2);
-    const currencyCode = (summary.currency || "AUD").toUpperCase();
+    // ✅ FIX: Use Store Currency
+    const currencyCode = (storeSettings?.currency || "AUD").toUpperCase();
 
-    // ৩. ক্রেডেনশিয়াল ডিক্রিপ্ট
+    // 3. Decrypt Credentials
     const isSandbox = config.sandbox
     const clientId = isSandbox ? config.sandboxClientId : config.liveClientId
     const encryptedSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret
@@ -57,7 +65,7 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
       return { success: false, error: "PayPal credentials missing." }
     }
 
-    // ৪. Auth Token জেনারেট
+    // 4. Get Auth Token
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com"
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
@@ -72,7 +80,7 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
       return { success: false, error: "Could not authenticate with PayPal." }
     }
 
-    // ৫. পেপ্যাল অর্ডার তৈরি
+    // 5. Create Order
     const orderRes = await fetch(`${baseUrl}/v2/checkout/orders`, {
       method: "POST",
       headers: {
@@ -82,18 +90,28 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
       body: JSON.stringify({
         intent: config.intent || "CAPTURE",
         purchase_units: [{
-          reference_id: cartId, // কার্ট আইডি রেফারেন্স হিসেবে রাখলাম
+          reference_id: cartId,
           amount: {
             currency_code: currencyCode,
             value: finalAmount
           },
-          description: `Order from GoBike Store`
+          description: `Order from Store`,
+          // ✅ FIX: Pass Shipping Address to PayPal
+          shipping: {
+            address: {
+                address_line_1: address.address1,
+                admin_area_2: address.suburb, // City/Suburb
+                admin_area_1: address.state,  // State
+                postal_code: address.postcode,
+                country_code: address.country
+            }
+          }
         }],
         application_context: {
-            brand_name: config.brandName || "GoBike Store",
+            brand_name: config.brandName || "Store",
             landing_page: config.landingPage || "LOGIN",
             user_action: "PAY_NOW",
-            shipping_preference: "SET_PROVIDED_ADDRESS" // আমরা শিপিং এড্রেস হ্যান্ডেল করছি
+            shipping_preference: "SET_PROVIDED_ADDRESS" 
         }
       })
     })

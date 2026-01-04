@@ -1,7 +1,5 @@
-// File Location: app/actions/admin/order/order-utils.ts
-
 import { db } from "@/lib/prisma";
-// ✅ FIX: সঠিক ইমপোর্ট পাথ (আপনার ফাইল লোকেশন অনুযায়ী)
+// ✅ FIX: আপনার নির্দেশ অনুযায়ী সঠিক পাথ
 import { sendNotification } from "@/app/api/email/send-notification";
 
 // 1. ANALYTICS
@@ -45,48 +43,74 @@ export async function restockInventory(orderId: string) {
     }
 }
 
-// 3. EMAIL TRIGGER (UPDATED: Customer + Admin)
+// 3. EMAIL TRIGGER (UPDATED)
 export async function sendOrderEmail(orderId: string, eventType: string) {
     console.log(`📩 [1/3] sendOrderEmail Called. Event: ${eventType}, OrderID: ${orderId}`);
 
     try {
-        const order = await db.order.findUnique({
-            where: { id: orderId },
-            select: { user: true, guestEmail: true }
-        });
+        // ১. অর্ডার এবং সেটিংস (Admin Email) একসাথে খোঁজা
+        const [order, settings, emailConfig] = await Promise.all([
+            db.order.findUnique({
+                where: { id: orderId },
+                select: { user: true, guestEmail: true, orderNumber: true }
+            }),
+            db.storeSettings.findUnique({
+                where: { id: "settings" },
+                select: { storeEmail: true }
+            }),
+            db.emailConfiguration.findUnique({
+                where: { id: "email_config" },
+                select: { senderEmail: true }
+            })
+        ]);
 
         if (!order) {
             console.error("❌ Order not found for email.");
             return;
         }
 
-        const recipientEmail = order.user?.email || order.guestEmail;
-        console.log(`📩 [2/3] Recipient Found: ${recipientEmail}`);
+        // কাস্টমার ইমেইল
+        const customerEmail = order.user?.email || order.guestEmail;
 
-        if (!recipientEmail) {
-            console.error("❌ No recipient email found.");
-            return;
+        // ✅ অ্যাডমিন ইমেইল লজিক:
+        // প্রথমে Store Settings এর মেইল দেখবে, না পেলে Email Config এর Sender Email দেখবে।
+        const adminEmail = settings?.storeEmail || emailConfig?.senderEmail;
+
+        // ============================================================
+        // 📧 CUSTOMER EMAIL SENDING
+        // ============================================================
+        if (customerEmail) {
+            await sendNotification({
+                trigger: eventType, // যেমন: ORDER_PLACED
+                recipient: customerEmail,
+                orderId: orderId, 
+                data: {}
+            });
+            console.log(`✅ Customer email queued for: ${customerEmail}`);
         }
 
-        // ✅ ১. কাস্টমারকে মেইল পাঠানো (Queue তে জমা হবে)
-        await sendNotification({
-            trigger: eventType,
-            recipient: recipientEmail,
-            orderId: orderId, 
-            data: {}
-        });
+        // ============================================================
+        // 👮 ADMIN EMAIL SENDING (Explicitly Set)
+        // ============================================================
+        if (adminEmail) {
+            // অ্যাডমিন ট্রিগার নাম সেট করা (যেমন: ADMIN_ORDER_PLACED)
+            let adminTrigger = `ADMIN_${eventType}`;
+            
+            if (eventType === "ORDER_CREATED") {
+                adminTrigger = "ORDER_CREATED_ADMIN";
+            }
 
-        // ✅ ২. অ্যাডমিনকে মেইল পাঠানো (Queue তে জমা হবে)
-        // লজিক: ইভেন্টের নামের আগে 'ADMIN_' যোগ করা হলো (যেমন: ADMIN_ORDER_PLACED)
-        // recipient: "" ফাঁকা রাখা হলো, যাতে Worker স্টোর সেটিংস থেকে মেইল নেয়।
-        await sendNotification({
-            trigger: `${eventType}_ADMIN`,
-            recipient: "admin", 
-            orderId: orderId,
-            data: {}
-        });
-        
-        console.log("📩 [3/3] Notifications queued for both Customer & Admin.");
+            // ✅ এখানে সরাসরি Admin Email বসিয়ে দিলাম (আর ফাঁকা স্ট্রিং নয়)
+            await sendNotification({
+                trigger: adminTrigger,
+                recipient: adminEmail, 
+                orderId: orderId,
+                data: {}
+            });
+            console.log(`✅ Admin email queued for: ${adminEmail}`);
+        } else {
+            console.warn("⚠️ No Admin email found in Store Settings or Email Config.");
+        }
 
     } catch (error) {
         console.error("🔥 EMAIL_TRIGGER_ERROR:", error);

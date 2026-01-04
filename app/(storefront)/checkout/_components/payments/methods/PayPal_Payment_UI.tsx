@@ -1,47 +1,59 @@
-// File: app/(storefront)/checkout/_components/payments/PayPal_Button.tsx
+// File: app/(storefront)/checkout/_components/payments/methods/PayPal_Payment_UI.tsx
 
 "use client";
 
 import { useEffect, useState } from "react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
-import { useCheckoutStore } from "../../_store/useCheckoutStore";
+import { useCheckoutStore } from "../../../useCheckoutStore";
 import { createPaypalOrder } from "@/app/actions/storefront/checkout/create-paypal-order";
 import { processCheckout } from "@/app/actions/storefront/checkout/process-checkout";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Loader2, AlertCircle } from "lucide-react";
 
-export const PayPal_Button = ({ methodConfig }: { methodConfig: any }) => {
+export const PayPal_Payment_UI = ({ methodConfig }: { methodConfig: any }) => {
   const { cartId, shippingAddress, billingAddress, selectedShippingMethod, couponCode, totals, settings, customerNote } = useCheckoutStore();
   const [isReady, setIsReady] = useState(false);
   const router = useRouter();
 
   const config = methodConfig.paypalConfig;
   const currency = settings?.currency || "AUD";
-
-  // ক্লায়েন্ট আইডি ডিটেকশন (Sandbox vs Live)
   const clientId = config?.sandbox ? config?.sandboxClientId : config?.liveClientId;
 
-  // বাটন লোড হওয়ার আগে চেক করা সব ডাটা আছে কি না
+  // Validation: Ensure shipping info is present before rendering buttons
   useEffect(() => {
-    if (clientId && selectedShippingMethod && shippingAddress.postcode && totals.total > 0) {
-        setIsReady(true);
-    } else {
-        setIsReady(false);
-    }
-  }, [clientId, selectedShippingMethod, shippingAddress, totals.total]);
+    const hasShipping = Boolean(shippingAddress?.postcode && selectedShippingMethod);
+    setIsReady(!!clientId && hasShipping && totals.total > 0);
+  }, [clientId, shippingAddress, selectedShippingMethod, totals.total]);
 
   if (!isReady) {
-    return <div className="p-4 text-center text-sm text-gray-500">Please complete shipping details first.</div>;
+    return (
+        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
+            <AlertCircle className="h-6 w-6 text-gray-400 mb-2" />
+            <p className="text-sm text-gray-500 font-medium">Please enter shipping address to pay with PayPal.</p>
+        </div>
+    );
   }
 
   return (
-    <div className="w-full relative z-0 pt-2">
+    <div className="w-full relative z-0 animate-in fade-in zoom-in-95">
         <PayPalScriptProvider options={{ 
             clientId: clientId,
             currency: currency,
             intent: config?.intent?.toLowerCase() || "capture",
-            components: "buttons" // ✅ FIX: এই লাইনটি যোগ করা হয়েছে যা এরর ফিক্স করবে
+            components: "buttons,messages" // Added messages for Pay Later
         }}>
+            {/* Pay Later Message */}
+            {config?.payLaterMessaging && (
+                <div className="mb-4">
+                    {/* @ts-ignore - PayPal types issue workaround */}
+                    <paypal-messages 
+                        amount={totals.total.toString()} 
+                        style={{ layout: "text", logo: { type: "primary" } }} 
+                    />
+                </div>
+            )}
+
             <PayPalButtons 
                 style={{ 
                     layout: config?.buttonLayout?.toLowerCase() || "vertical",
@@ -50,7 +62,7 @@ export const PayPal_Button = ({ methodConfig }: { methodConfig: any }) => {
                     label: config?.buttonLabel?.toLowerCase() || "paypal"
                 }}
                 
-                // ১. অর্ডার তৈরি (Server Action কল করবে)
+                // 1. Create Order on Server
                 createOrder={async (data, actions) => {
                     const res = await createPaypalOrder({
                         cartId: cartId!,
@@ -60,24 +72,23 @@ export const PayPal_Button = ({ methodConfig }: { methodConfig: any }) => {
                     });
 
                     if (res.success && res.orderId) {
-                        return res.orderId; // PayPal Order ID
+                        return res.orderId;
                     } else {
-                        toast.error(res.error || "Failed to init PayPal");
+                        toast.error(res.error || "Failed to initialize PayPal");
                         throw new Error("PayPal Init Failed");
                     }
                 }}
 
-                // ২. পেমেন্ট সফল হলে (Capture & Save to DB)
+                // 2. Capture & Finalize
                 onApprove={async (data, actions) => {
-                    toast.loading("Processing order...");
+                    const toastId = toast.loading("Processing your order...");
                     
-                    // PayPal পেমেন্ট হয়ে গেছে, এখন আমাদের ডাটাবেসে অর্ডার সেভ করতে হবে
                     const res = await processCheckout({
                         cartId: cartId!,
                         shippingAddress,
                         billingAddress,
                         paymentMethod: "paypal",
-                        paymentId: data.orderID, // PayPal Transaction ID
+                        paymentId: data.orderID,
                         shippingData: {
                             method: selectedShippingMethod!.type,
                             carrier: selectedShippingMethod!.name,
@@ -85,23 +96,21 @@ export const PayPal_Button = ({ methodConfig }: { methodConfig: any }) => {
                             methodId: selectedShippingMethod!.id
                         },
                         couponCode: couponCode || undefined,
-                       // customerNote: customerNote,
                         totals: { ...totals }
                     });
 
+                    toast.dismiss(toastId);
+
                     if (res.success) {
-                        toast.dismiss();
-                        toast.success("Payment successful!");
                         router.push(`/checkout/success/${res.orderId}`);
                     } else {
-                        toast.dismiss();
-                        toast.error("Payment received but order creation failed. Contact support.");
+                        toast.error("Payment received but order creation failed. Please contact support.");
                     }
                 }}
 
                 onError={(err) => {
                     console.error("PayPal Error:", err);
-                    toast.error("Payment could not be processed.");
+                    toast.error("Payment could not be processed. Please try again.");
                 }}
             />
         </PayPalScriptProvider>

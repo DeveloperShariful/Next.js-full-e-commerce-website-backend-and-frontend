@@ -15,9 +15,12 @@ export async function getOrderSuccess(orderId: string) {
         subtotal: true,
         shippingTotal: true,
         discountTotal: true,
+        taxTotal: true,
         createdAt: true,
         paymentMethod: true,
         shippingAddress: true,
+        billingAddress: true,
+        shippingMethod: true,
         items: {
           include: {
             product: {

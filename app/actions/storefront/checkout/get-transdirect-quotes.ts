@@ -1,99 +1,143 @@
 // File: app/actions/storefront/checkout/get-transdirect-quotes.ts
-"use server"
+"use server";
 
-import { db } from "@/lib/prisma"
-import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
+import { db } from "@/lib/prisma";
+import { decrypt } from "@/app/actions/admin/settings/payments/crypto"; // Decrypt যদি লাগে
 
-interface ShippingItem {
-  weight: number
-  length: number
-  width: number
-  height: number
-  quantity: number
+interface QuoteParams {
+  items: any[];
+  receiver: {
+    postcode: string;
+    suburb: string;
+    state: string;
+    type?: string;
+  };
 }
 
-interface ReceiverDetails {
-  postcode: string
-  suburb: string
-  state: string
-  country: string
-  type: string // "residential" | "business"
-}
+export async function getTransdirectQuotes({ items, receiver }: QuoteParams) {
+  console.log("\n🚀 [START] Transdirect Quote Request");
 
-export async function getTransdirectQuotes(items: ShippingItem[], receiver: ReceiverDetails) {
   try {
-    // 1. Get Config
     const config = await db.transdirectConfig.findUnique({
       where: { id: "transdirect_config" }
-    })
+    });
 
-    if (!config || !config.isEnabled) {
-      return { success: false, error: "Shipping calculation disabled" }
+    // ১. কনফিগারেশন এবং API কী চেক
+    if (!config || !config.isEnabled || !config.apiKey) {
+      console.error("❌ ERROR: Transdirect API Key Missing or Disabled");
+      return { success: false, quotes: [] };
+    }
+    
+    // নোট: আপনার অ্যাডমিন প্যানেল যদি প্লেইন টেক্সট সেভ করে থাকে, তাহলে decrypt বাদ দিন।
+    // আর যদি এনক্রিপ্ট করে থাকে, তাহলে নিচের লাইনটি আনকমেন্ট করুন:
+    // const apiKey = decrypt(config.apiKey);
+    const apiKey = config.apiKey; 
+
+    // ২. আইটেম প্রস্তুত করা (FIXED)
+    const formattedItems = items.map(item => {
+        // ভ্যালু ভ্যালিডেশন (যাতে নেগেটিভ বা ০ না যায়)
+        const weight = Number(item.weight) > 0 ? Number(item.weight) : 0.5;
+        const length = Number(item.length) > 0 ? Number(item.length) : 10;
+        const width = Number(item.width) > 0 ? Number(item.width) : 10;
+        const height = Number(item.height) > 0 ? Number(item.height) : 10;
+
+        return {
+            weight,
+            length,
+            width,
+            height,
+            quantity: Number(item.quantity) || 1,
+            // ✅ FIX: Transdirect expects specific packaging type
+            description: "carton", 
+            type: "carton" 
+        };
+    });
+
+    // ৩. সেন্ডার ডাটা ক্লিন করা
+    let cleanSenderSuburb = config.senderSuburb || "Sydney";
+    if (cleanSenderSuburb.includes(",")) {
+        cleanSenderSuburb = cleanSenderSuburb.split(",")[0].trim();
     }
 
-    const apiKey = decrypt(config.apiKey || "")
-    if (!apiKey) return { success: false, error: "Shipping configuration error" }
+    const sender = {
+      country: "AU",
+      postcode: config.senderPostcode || "2000",
+      suburb: cleanSenderSuburb, 
+      type: config.senderType || "business"
+    };
 
-    // 2. Prepare Payload
+    // ৪. রিসিভার ডাটা
+    const receiverData = {
+      country: "AU",
+      postcode: receiver.postcode,
+      suburb: receiver.suburb,
+      type: receiver.type || "residential"
+    };
+
     const payload = {
-      declared_value: config.defaultDeclaredValue ? "100.00" : "0.00", 
-      sender: {
-        postcode: config.senderPostcode,
-        suburb: config.senderSuburb,
-        state: config.senderState,
-        country: "AU",
-        type: config.senderType
-      },
-      receiver: {
-        postcode: receiver.postcode,
-        suburb: receiver.suburb,
-        state: receiver.state,
-        country: "AU",
-        type: receiver.type || "residential"
-      },
-      items: items.map(item => ({
-        weight: item.weight,
-        length: item.length,
-        width: item.width,
-        height: item.height,
-        quantity: item.quantity,
-        description: "Bicycle Parts/Accessories" 
-      }))
-    }
+      declared_value: config.defaultDeclaredValue ? "100" : "10", 
+      items: formattedItems,
+      sender,
+      receiver: receiverData
+    };
 
-    // 3. Call API
-    const response = await fetch("https://www.transdirect.com.au/api/bookings/v4/quotes", {
+    console.log("📤 PAYLOAD SENT:", JSON.stringify(payload, null, 2));
+
+    // ৫. API কল (/api/quotes)
+    const res = await fetch("https://www.transdirect.com.au/api/quotes", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Api-Key": apiKey
+        "Api-Key": apiKey,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify(payload),
+      cache: "no-store",
       next: { revalidate: 0 }
-    })
+    });
 
-    if (!response.ok) {
-      const err = await response.json()
-      console.error("Transdirect API Error:", err)
-      return { success: false, error: "Unable to fetch shipping rates" }
+    console.log(`📡 API STATUS: ${res.status}`);
+
+    const textResponse = await res.text(); 
+    
+    if (!res.ok) {
+        console.error("❌ ERROR RESPONSE:", textResponse);
+        return { success: false, quotes: [] };
     }
 
-    const data = await response.json()
+    // ৬. Parse Response
+    let data;
+    try {
+        data = JSON.parse(textResponse);
+    } catch (e) {
+        console.error("❌ JSON PARSE ERROR");
+        return { success: false, quotes: [] };
+    }
 
-    // 4. Map Response
-    const quotes = data.quotes.map((q: any) => ({
-      id: q.id, // Store this to book later
-      courier: q.service_name,
-      service: q.service_type,
-      cost: parseFloat(q.total),
-      transit_time: q.transit_time,
-      price_insurance_ex: q.price_insurance_ex
-    })).sort((a: any, b: any) => a.cost - b.cost)
+    const quotesObj = data.quotes || {};
+    
+    // ৭. কোট ফরম্যাটিং
+    const quotesList = Object.keys(quotesObj).map(key => {
+        const q = quotesObj[key];
+        return {
+            id: `transdirect_${key}`,
+            name: q.service_name || key, 
+            carrier: q.service_name, // Carrier name for UI
+            price: Number(q.total),
+            transit_time: q.transit_time,
+            type: "transdirect",
+            service_code: key,
+            meta: {
+                carrier_id: q.carrier_id,
+                service_type: key
+            }
+        };
+    }).sort((a, b) => a.price - b.price); // কম দাম আগে দেখাবে
 
-    return { success: true, quotes }
+    console.log(`✅ SUCCESS: Received ${quotesList.length} quotes`);
+    return { success: true, quotes: quotesList };
 
   } catch (error) {
-    console.error("Transdirect Error:", error)
-    return { success: false, error: "System error calculating shipping" }
+    console.error("🔥 FATAL ERROR:", error);
+    return { success: false, quotes: [] };
   }
 }

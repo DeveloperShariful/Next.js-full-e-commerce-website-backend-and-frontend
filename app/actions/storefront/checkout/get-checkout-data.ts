@@ -1,4 +1,4 @@
-// app/actions/storefront/checkout/get-checkout-data.ts
+// File: app/actions/storefront/checkout/get-checkout-data.ts
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -9,17 +9,18 @@ export async function getCheckoutData(cartId: string | undefined) {
     const user = await currentUser();
     
     // ১. ইউজার ডাটা (Clerk Sync)
+    // ✅ FIX: Phone Number Fetching Added
     let dbUser = null;
     if (user?.id) {
       dbUser = await db.user.findUnique({
         where: { clerkId: user.id },
-        include: { addresses: true }
+        include: { addresses: true }, // Saved addresses
       });
     }
 
     // ২. প্যারালাল ডাটা ফেচিং
     const [cart, paymentMethods, storeSettings] = await Promise.all([
-      // A. Cart
+      // A. Cart Data
       cartId ? db.cart.findUnique({
         where: { id: cartId },
         include: {
@@ -33,7 +34,7 @@ export async function getCheckoutData(cartId: string | undefined) {
         }
       }) : null,
 
-      // B. Payment Methods (Filter enabled only)
+      // B. Payment Methods (Only Enabled)
       db.paymentMethodConfig.findMany({
         where: { isEnabled: true },
         orderBy: { displayOrder: 'asc' },
@@ -45,20 +46,22 @@ export async function getCheckoutData(cartId: string | undefined) {
               bankDetails: true, 
               chequePayTo: true, 
               addressInfo: true,
-              enableForShippingMethods: true // 👈 ADDED: For Conditional Logic
+              enableForShippingMethods: true
             }
-          }
+          },
+          // Stripe/PayPal configs are not needed on frontend load, handled via server actions
         }
       }),
 
-      // C. Store Settings
+      // C. Store Settings (Currency, Tax, Weight)
       db.storeSettings.findUnique({
         where: { id: "settings" },
         select: {
           currency: true,
           currencySymbol: true,
           taxSettings: true,
-          weightUnit: true
+          weightUnit: true,
+          dimensionUnit: true
         }
       })
     ]);
@@ -71,7 +74,11 @@ export async function getCheckoutData(cartId: string | undefined) {
       success: true,
       data: {
         cart,
-        user: dbUser,
+        user: {
+            ...dbUser,
+            email: dbUser?.email || user?.emailAddresses[0]?.emailAddress, // Fallback to Clerk Email
+            phone: dbUser?.phone || user?.phoneNumbers[0]?.phoneNumber // Fallback to Clerk Phone
+        },
         savedAddresses: dbUser?.addresses || [],
         paymentMethods,
         settings: storeSettings
@@ -80,6 +87,6 @@ export async function getCheckoutData(cartId: string | undefined) {
 
   } catch (error) {
     console.error("Checkout Data Load Error:", error);
-    return { success: false, error: "Failed to load checkout." };
+    return { success: false, error: "Failed to load checkout data." };
   }
 }

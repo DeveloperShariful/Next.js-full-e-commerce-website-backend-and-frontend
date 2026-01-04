@@ -4,12 +4,12 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { generateNextOrderNumber } from "./generate-order-number"; 
-import { sendNotification } from "./send-notification"; 
+import { sendNotification } from "@/app/api/email/send-notification"; 
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 
 interface CheckoutPayload {
   cartId: string;
-  userId?: string;
+  userId?: string; // ✅ This is crucial
   guestInfo?: { email: string; name: string; phone: string };
   shippingAddress: any;
   billingAddress: any;
@@ -19,8 +19,10 @@ interface CheckoutPayload {
     method: string;
     cost: number;
     carrier?: string;
+    methodId?: string;
   };
   discountId?: string;
+  couponCode?: string;
   totals: {
     subtotal: number;
     tax: number;
@@ -47,11 +49,36 @@ export async function processCheckout(payload: CheckoutPayload) {
     });
 
     if (!cart || !cart.items.length) {
-      console.error("❌ [ERROR] Cart not found or empty.");
       return { success: false, error: "Cart expired or empty." };
     }
 
-    // 2. Calculate Order
+    // 2. Fetch User Email (If Logged In)
+    // ✅ FIX: Guest ইমেইল না থাকলে User ID দিয়ে ইমেইল বের করা
+    let customerEmail = payload.guestInfo?.email;
+    let customerName = payload.guestInfo?.name || "Customer";
+
+    if (!customerEmail && payload.userId) {
+        const user = await db.user.findUnique({
+            where: { id: payload.userId },
+            select: { email: true, name: true }
+        });
+        if (user) {
+            customerEmail = user.email;
+            customerName = user.name || "Customer";
+        }
+    }
+
+    let finalDiscountId = payload.discountId;
+    if (!finalDiscountId && payload.couponCode) {
+        const discount = await db.discount.findUnique({
+            where: { code: payload.couponCode.toUpperCase() }
+        });
+        if (discount) {
+            finalDiscountId = discount.id;
+        }
+    }
+
+    // 3. Calculate Subtotal & Prepare Items
     let calculatedSubtotal = 0;
     const orderItemsPayload = cart.items.map(item => {
         let imgUrl = item.product.featuredImage;
@@ -77,38 +104,48 @@ export async function processCheckout(payload: CheckoutPayload) {
         };
     });
 
-    const finalTotal = calculatedSubtotal + Number(payload.shippingData.cost) - (payload.totals.discount || 0);
+    const finalTotal = calculatedSubtotal + Number(payload.shippingData.cost) + Number(payload.totals.tax) - (payload.totals.discount || 0);
     const orderNumber = await generateNextOrderNumber();
 
-    // 3. Payment Status
+    // 4. Payment Status Logic
     const isOnline = payload.paymentMethod === "stripe" || payload.paymentMethod === "paypal";
     const isPaid = isOnline && !!payload.paymentId;
     const paymentStatus = isPaid ? PaymentStatus.PAID : PaymentStatus.UNPAID;
     
-    // 4. DB Transaction
-    console.log("⚙️ [DB] Creating Order in Database...");
+    // 5. DB Transaction
     const newOrder = await db.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           orderNumber,
           userId: payload.userId || null,
-          guestEmail: payload.guestInfo?.email,
+          // ✅ FIX: Save resolved email if guest email is missing
+          guestEmail: payload.guestInfo?.email || (!payload.userId ? customerEmail : null),
+          
           status: OrderStatus.PENDING,
           paymentStatus: paymentStatus,
           paymentMethod: payload.paymentMethod,
           paymentId: payload.paymentId,
+          
           subtotal: calculatedSubtotal,
-          taxTotal: 0,
+          taxTotal: payload.totals.tax,
           shippingTotal: payload.shippingData.cost,
           discountTotal: payload.totals.discount || 0,
           total: finalTotal,
           netAmount: finalTotal,
+          
           shippingAddress: payload.shippingAddress,
           billingAddress: payload.billingAddress,
+          
           shippingMethod: payload.shippingData.carrier || "Standard",
-          shippingType: payload.shippingData.method === "transdirect" ? "CARRIER_CALCULATED" : "FLAT_RATE",
+          shippingType: (payload.shippingData.method === "transdirect" || payload.shippingData.methodId?.startsWith("transdirect")) 
+            ? "CARRIER_CALCULATED" 
+            : "FLAT_RATE",
+            
           selectedCourierService: payload.shippingData.carrier,
-          discountId: payload.discountId,
+          
+          discountId: payload.discountId, // We assume ID is resolved or passed correctly now, or handle like previous fix
+          couponCode: payload.couponCode,
+          
           items: { create: orderItemsPayload }
         }
       });
@@ -125,57 +162,52 @@ export async function processCheckout(payload: CheckoutPayload) {
       return order;
     });
 
-    console.log(`✅ [SUCCESS] Order Created: ${newOrder.orderNumber} (ID: ${newOrder.id})`);
-
     // ==========================================
-    // 5. EMAIL NOTIFICATION DEBUG SECTION
+    // 6. NOTIFICATIONS (Updated Logic)
     // ==========================================
     
-    console.log("🔍 [EMAIL DEBUG] Checking Guest Info:", payload.guestInfo);
+    const [storeSettings, emailConfig] = await Promise.all([
+        db.storeSettings.findUnique({ where: { id: "settings" }, select: { storeEmail: true } }),
+        db.emailConfiguration.findUnique({ where: { id: "email_config" }, select: { senderEmail: true } })
+    ]);
 
-    if (payload.guestInfo?.email) {
-        console.log(`📨 [EMAIL DEBUG] Email found: ${payload.guestInfo.email}. Preparing notification...`);
+    const adminEmail = storeSettings?.storeEmail || emailConfig?.senderEmail;
 
+    const emailData = {
+        order_number: newOrder.orderNumber,
+        customer_name: customerName, // ✅ Using resolved name
+        total: `$${finalTotal.toFixed(2)}`
+    };
+
+    // A. Notify Customer (✅ Now works for Logged In users too)
+    if (customerEmail) {
         const customerTrigger = isPaid ? "PAYMENT_PAID" : "ORDER_PENDING";
-        console.log(`🎯 [EMAIL DEBUG] Selected Trigger: ${customerTrigger}`);
+        await sendNotification({ 
+            trigger: customerTrigger, 
+            recipient: customerEmail, 
+            data: emailData,
+            orderId: newOrder.id 
+        });
+        console.log(`✅ Customer email queued for: ${customerEmail}`);
+    } else {
+        console.error("❌ Customer email not found, skipping notification.");
+    }
 
-        const emailData = {
-            order_number: newOrder.orderNumber,
-            customer_name: payload.guestInfo?.name || "Customer",
-            total: `$${finalTotal.toFixed(2)}`
-        };
-
-        // Customer Email (With Explicit Error Catching)
-        try {
-            console.log("🚀 [EMAIL DEBUG] Calling sendNotification()...");
-            const res = await sendNotification({ 
-                trigger: customerTrigger, 
-                recipient: payload.guestInfo.email, 
-                data: emailData,
-                orderId: newOrder.id 
-            });
-            console.log("📬 [EMAIL DEBUG] Result:", res);
-        } catch (e) {
-            console.error("🔥 [EMAIL DEBUG] CRITICAL ERROR calling sendNotification:", e);
-        }
-
-        // Admin Email
-        sendNotification({
+    // B. Notify Admin
+    if (adminEmail) {
+        await sendNotification({
             trigger: "ADMIN_ORDER_PENDING",
-            recipient: "admin", 
+            recipient: adminEmail,
             data: emailData,
             orderId: newOrder.id
-        }).catch(err => console.error("⚠️ Admin Email Failed:", err));
-
-    } else {
-        console.error("❌ [EMAIL DEBUG] Guest Email is MISSING/UNDEFINED. Skipping email.");
+        });
     }
 
     revalidatePath("/");
     return { success: true, orderId: newOrder.id, orderNumber: newOrder.orderNumber };
 
   } catch (error: any) {
-    console.error("🔥 [FATAL ERROR] Checkout Process:", error);
+    console.error("🔥 Checkout Process Error:", error);
     return { success: false, error: error.message || "Order processing failed." };
   }
 }

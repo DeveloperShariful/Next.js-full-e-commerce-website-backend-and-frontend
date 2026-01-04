@@ -7,16 +7,17 @@ export async function searchTransdirectLocations(query: string) {
   try {
     if (!query || query.trim().length < 2) return [];
 
-    // ১. কনফিগারেশন চেক
+    // 1. Config Check
     const config = await db.transdirectConfig.findUnique({
-      where: { id: "transdirect_config" }
+      where: { id: "transdirect_config" },
+      select: { apiKey: true, isEnabled: true }
     });
 
     if (!config || !config.apiKey || !config.isEnabled) {
       return [];
     }
 
-    // ২. API কল
+    // 2. API Call (Transdirect Autocomplete)
     const res = await fetch(`https://www.transdirect.com.au/api/locations?q=${encodeURIComponent(query)}`, {
       method: "GET",
       headers: {
@@ -24,7 +25,8 @@ export async function searchTransdirectLocations(query: string) {
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      next: { revalidate: 0 } // Cache results for 1 hour for performance
+      // ✅ Cache results for 1 hour to reduce API hits on high traffic
+      next: { revalidate: 3600 } 
     });
 
     if (!res.ok) return [];
@@ -32,16 +34,16 @@ export async function searchTransdirectLocations(query: string) {
     const data = await res.json();
     let locations = [];
 
-    // ৩. ডাটা হ্যান্ডলিং
+    // 3. Data Normalization
     if (Array.isArray(data)) {
         locations = data;
     } else if (data.locations && Array.isArray(data.locations)) {
         locations = data.locations;
     }
 
-    // ৪. ফরম্যাটিং (React-Select এর জন্য)
-    return locations.slice(0, 50).map((loc: any) => ({
-        value: `${loc.locality}, ${loc.state} ${loc.postcode}`,
+    // 4. Format for React Select
+    return locations.slice(0, 20).map((loc: any) => ({
+        value: `${loc.postcode}`, // Using postcode as key part
         label: `${loc.locality}, ${loc.state} ${loc.postcode}`,
         suburb: loc.locality,
         postcode: loc.postcode,

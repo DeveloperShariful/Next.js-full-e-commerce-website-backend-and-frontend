@@ -1,82 +1,88 @@
 // File: app/(storefront)/checkout/_components/Checkout_Layout_Grid.tsx
+
 "use client";
 
-import { useCheckoutStore } from "../_store/useCheckoutStore";
+import { useCheckoutStore } from "./../useCheckoutStore";
+
+// Left Side Components
 import { Contact_Info } from "./forms/Contact_Info";
 import { Shipping_Address } from "./forms/Shipping_Address";
 import { Billing_Address } from "./forms/Billing_Address";
-import { Shipping_Method } from "./forms/Shipping_Method";
 import { Order_Notes } from "./forms/Order_Notes";
-import { Payment_Selector } from "./payments/Payment_Selector";
-import { Express_Checkouts } from "./payments/Express_Checkouts";
-import { Order_Summary_Card } from "./summary/Order_Summary_Card";
+
+// Right Side Components
+import { Order_Summary_Wrapper } from "./summary/Order_Summary_Wrapper";
+import { Payment_Container } from "./payments/Payment_Container";
 
 export const Checkout_Layout_Grid = () => {
   const { isProcessing } = useCheckoutStore();
 
   return (
-    <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 relative ${isProcessing ? "opacity-50 pointer-events-none" : ""}`}>
+    <div className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 relative pb-20 ${isProcessing ? "opacity-60 pointer-events-none cursor-wait" : ""}`}>
       
-      {/* LEFT COLUMN: FORMS */}
-      <div className="lg:col-span-7 space-y-8">
+      {/* =========================================
+          LEFT COLUMN: FORMS (Contact, Address, Notes)
+          Span: 7/12
+      ========================================= */}
+      <div className="lg:col-span-7 space-y-10">
         
-        {/* Express Checkout (Apple/Google Pay) */}
-        <section>
-             <Express_Checkouts />
-             <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-200" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-gray-50 px-2 text-gray-500">Or continue below</span></div>
-             </div>
-        </section>
-
-        {/* 1. Contact */}
-        <section>
-            <h2 className="text-lg font-semibold mb-4 text-gray-900">Contact Information</h2>
+        {/* 1. Contact Info */}
+        <section className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                1. Contact Information
+            </h2>
             <Contact_Info />
         </section>
 
-        {/* 2. Shipping Address (With Autocomplete) */}
-        <section>
-            <h2 className="text-lg font-semibold mb-4 text-gray-900">Shipping Address</h2>
+        {/* 2. Shipping Address */}
+        <section className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                2. Shipping Address
+            </h2>
             <Shipping_Address />
         </section>
 
         {/* 3. Billing Address */}
-        <section>
-            <h2 className="text-lg font-semibold mb-4 text-gray-900">Billing Address</h2>
+        <section className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                3. Billing Address
+            </h2>
             <Billing_Address />
         </section>
-
-        {/* 4. Shipping Method */}
-        <section>
-            <h2 className="text-lg font-semibold mb-4 text-gray-900">Shipping Method</h2>
-            <Shipping_Method />
-        </section>
         
-        {/* 5. Order Notes (New) */}
-        <section>
+        {/* 4. Order Notes */}
+        <section className="space-y-4 pt-4 border-t border-gray-100">
             <Order_Notes />
-        </section>
-
-        {/* 6. Payment */}
-        <section>
-            <h2 className="text-lg font-semibold mb-4 text-gray-900">Payment</h2>
-            <Payment_Selector />
         </section>
 
       </div>
 
-      {/* RIGHT COLUMN: SUMMARY (Sticky) */}
+      {/* =========================================
+          RIGHT COLUMN: SUMMARY & PAYMENT
+          Span: 5/12 (Sticky Sidebar)
+      ========================================= */}
       <div className="lg:col-span-5">
-        <div className="sticky top-8 space-y-6">
-            <Order_Summary_Card />
+        <div className="sticky top-24 space-y-6">
+            
+            {/* Upper Block: Order Summary (Products, Coupon, Shipping Selector, Totals) */}
+            <Order_Summary_Wrapper />
+
+            {/* Lower Block: Payment Section (Methods & Place Order Button) */}
+            <Payment_Container />
             
             {/* Trust Badges / Info */}
-            <div className="grid grid-cols-3 gap-4 text-center text-xs text-gray-500 pt-4">
-                <div>🔒 SSL Secure</div>
-                <div>🛡️ Buyer Protection</div>
-                <div>↩️ Easy Returns</div>
+            <div className="grid grid-cols-3 gap-4 text-center text-xs text-gray-400 pt-2">
+                <div className="flex flex-col items-center gap-1">
+                    <span>🔒</span> SSL Secure
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                    <span>🛡️</span> Buyer Protection
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                    <span>⚡</span> Fast Checkout
+                </div>
             </div>
+
         </div>
       </div>
 

@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useCheckoutStore } from "../_store/useCheckoutStore";
+import { useCheckoutStore } from "../useCheckoutStore";
 import { Checkout_Layout_Grid } from "./Checkout_Layout_Grid";
 import { Loader2 } from "lucide-react";
 
@@ -17,12 +17,14 @@ export const Checkout_Client_Wrapper = ({ initialData, cartId }: WrapperProps) =
   const isInitialized = useRef(false);
 
   useEffect(() => {
-    if (!isInitialized.current) {
+    // ডাটা স্টোরে ইনিশিয়ালাইজ করা (একবারই হবে)
+    if (!isInitialized.current && initialData) {
       initialize({ ...initialData, cart: { ...initialData.cart, id: cartId } });
       isInitialized.current = true;
     }
   }, [initialData, cartId, initialize]);
 
+  // লোডিং স্টেট (যদি ডাটা না থাকে)
   if (!initialData) {
     return (
         <div className="flex h-[50vh] items-center justify-center">

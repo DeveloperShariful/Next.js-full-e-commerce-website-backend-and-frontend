@@ -1,10 +1,11 @@
-// File: app/(storefront)/checkout/_components/summary/Price_Breakdown.tsx
+// File: app/(storefront)/checkout/_components/summary/Totals_Display.tsx
+
 "use client";
 
-import { useCheckoutStore } from "../../_store/useCheckoutStore";
+import { useCheckoutStore } from "../../useCheckoutStore";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Price_Breakdown = () => {
+export const Totals_Display = () => {
   const { totals, isProcessing, selectedShippingMethod } = useCheckoutStore();
 
   return (
@@ -26,13 +27,13 @@ export const Price_Breakdown = () => {
                 {totals.shipping === 0 ? "Free" : `$${totals.shipping.toFixed(2)}`}
             </span>
         ) : (
-            <span className="text-xs text-gray-400 italic">Calculated next step</span>
+            <span className="text-xs text-gray-400 italic">Enter address</span>
         )}
       </div>
 
       {/* Tax */}
       <div className="flex justify-between text-gray-600">
-        <span>Estimated GST (10%)</span>
+        <span className="flex items-center gap-1">Estimated Tax</span>
         {isProcessing ? (
             <Skeleton className="h-4 w-12" />
         ) : (
@@ -42,7 +43,7 @@ export const Price_Breakdown = () => {
 
       {/* Discount */}
       {totals.discount > 0 && (
-        <div className="flex justify-between text-green-600 font-medium">
+        <div className="flex justify-between text-green-600 font-medium animate-in slide-in-from-right-2">
           <span>Discount</span>
           <span>-${totals.discount.toFixed(2)}</span>
         </div>
@@ -54,12 +55,14 @@ export const Price_Breakdown = () => {
       {/* Total */}
       <div className="flex justify-between items-center">
         <span className="text-base font-bold text-gray-900">Total</span>
-        <div className="text-right">
-            <span className="text-xs text-gray-500 mr-2 font-normal">AUD</span>
+        <div className="text-right flex items-baseline gap-1">
+            <span className="text-xs text-gray-500 font-normal">AUD</span>
             {isProcessing ? (
-                <Skeleton className="h-6 w-24 inline-block align-middle" />
+                <Skeleton className="h-7 w-24 inline-block align-middle" />
             ) : (
-                <span className="text-xl font-extrabold text-gray-900">${totals.total.toFixed(2)}</span>
+                <span className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                    ${totals.total.toFixed(2)}
+                </span>
             )}
         </div>
       </div>

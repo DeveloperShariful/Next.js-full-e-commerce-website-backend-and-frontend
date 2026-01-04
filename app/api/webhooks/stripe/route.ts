@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
-import { sendNotification } from "@/app/actions/storefront/checkout/send-notification";
+import { sendNotification } from "@/app/api/email/send-notification";
 import Stripe from "stripe";
 
 export async function POST(req: Request) {

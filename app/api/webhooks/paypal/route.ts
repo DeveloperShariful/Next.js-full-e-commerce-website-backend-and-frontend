@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { sendNotification } from "@/app/actions/storefront/checkout/send-notification";
+import { sendNotification } from "@/app/api/email/send-notification";
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
 
 // PayPal Token Helper

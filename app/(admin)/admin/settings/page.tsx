@@ -1,3 +1,4 @@
+// File: app/(admin)/admin/settings/page.tsx
 
 import Link from "next/link";
 import { 
@@ -8,7 +9,8 @@ import {
   Settings,
   ShieldCheck,
   Globe,
-  Mail // ✅ NEW ICON IMPORT
+  Mail,
+  Megaphone // ✅ NEW ICON IMPORT FOR MARKETING
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -38,7 +40,6 @@ export default function SettingsDashboard() {
       color: "text-green-600",
       bgColor: "bg-green-50",
     },
-    // ✅ NEW EMAIL MODULE ADDED HERE
     {
       title: "Email & Notifications",
       description: "Configure SMTP, customize email templates, and view logs.",
@@ -46,6 +47,15 @@ export default function SettingsDashboard() {
       href: "/admin/settings/email",
       color: "text-purple-600",
       bgColor: "bg-purple-50",
+    },
+    // ✅ NEW MARKETING MODULE ADDED HERE
+    {
+      title: "Integrations & Marketing",
+      description: "Connect Google GTM, Facebook Pixel, and Klaviyo settings.",
+      icon: Megaphone,
+      href: "/admin/settings/marketing-settings",
+      color: "text-pink-600",
+      bgColor: "bg-pink-50",
     },
   ];
 

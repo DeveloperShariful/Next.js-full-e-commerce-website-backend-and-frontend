@@ -115,15 +115,7 @@ export const Shipping_Selector = () => {
   }
 
   if (!loading && (rates.length === 0 || error)) {
-    return (
-        <div className="p-4 border border-red-100 bg-red-50 rounded-md text-red-600 text-xs flex flex-col items-center text-center gap-1">
-            <div className="flex items-center gap-2 font-semibold">
-                <AlertCircle className="h-4 w-4" />
-                {error || "No delivery options available."}
-            </div>
-            <p className="opacity-80">Please check your postcode and suburb.</p>
-        </div>
-    );
+    return 
   }
 
   return (

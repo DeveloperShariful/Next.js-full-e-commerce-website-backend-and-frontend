@@ -1647,6 +1647,7 @@ model MarketingIntegration {
   klaviyoListIds            Json?
   klaviyoTrackViewedProduct Boolean  @default(true)
   klaviyoTrackAddedToCart   Boolean  @default(true)
+  verificationStatus        Json?    @default("{}")
   updatedAt                 DateTime @updatedAt
 }
 

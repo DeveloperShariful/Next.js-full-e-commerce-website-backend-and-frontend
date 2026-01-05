@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, CreditCard } from "lucide-react";
 import Link from "next/link";
-import { getActivePaymentMethods } from "@/app/actions/admin/create_order/get-payment-methods";
+import { getActivePaymentMethods } from "@/app/actions/admin/order/create_order/get-payment-methods";
 import { PaymentGateways } from "./_components/payment-gateways"; // 👈 Component Import
 
 export default async function PublicPaymentPage(props: { params: Promise<{ orderId: string }> }) {

@@ -7,7 +7,15 @@ import { content_v2_1 } from "googleapis";
 
 export async function syncProductsToGoogle() {
   try {
-    const { content, merchantId, config } = await getGoogleContentClient();
+    // ❌ config এখান থেকে সরানো হয়েছে কারণ এটি রিটার্ন হচ্ছে না
+    const { content, merchantId } = await getGoogleContentClient();
+
+    // ✅ FIX: এখানে কনফিগারেশন ম্যানুয়ালি সেট করুন অথবা ডাটাবেস থেকে আনুন
+    // যদি আপনার ডাটাবেসে সেটিংস থাকে, তবে এখানে কল করুন: const settings = await db.marketingSetting.findFirst();
+    const config = {
+        gmcLanguage: "en",      // অথবা settings?.gmcLanguage
+        gmcTargetCountry: "AU"  // অথবা settings?.gmcTargetCountry
+    };
 
     // 1. Fetch Products from Database
     const products = await db.product.findMany({
@@ -23,14 +31,12 @@ export async function syncProductsToGoogle() {
 
     // 2. Prepare Batch Request
     const entries = products.map((product, index) => {
-        // ✅ FIX: Use 'product.slug' if available, logic kept same
         const productUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://gobike.au'}/products/${product.slug}`; 
         
         const imageUrl = product.images && product.images.length > 0 
             ? product.images[0].url 
             : "https://gobike.au/placeholder.jpg";
 
-        // ✅ FIX: Changed 'product.title' to 'product.name' based on your Prisma Schema error
         const productName = product.name; 
         const productDesc = product.description || productName;
 
@@ -40,13 +46,13 @@ export async function syncProductsToGoogle() {
             method: "insert",
             product: {
                 offerId: product.id,
-                title: productName,     // ✅ Fixed
-                description: productDesc, // ✅ Fixed
+                title: productName,
+                description: productDesc,
                 link: productUrl,
                 imageLink: imageUrl,
-                contentLanguage: config.gmcLanguage || "en",
-                targetCountry: config.gmcTargetCountry || "AU",
-                feedLabel: config.gmcTargetCountry || "AU",
+                contentLanguage: config.gmcLanguage,     // ✅ এখন এটি কাজ করবে
+                targetCountry: config.gmcTargetCountry,  // ✅ এখন এটি কাজ করবে
+                feedLabel: config.gmcTargetCountry,
                 channel: "online",
                 availability: "in stock",
                 condition: "new",
@@ -67,7 +73,6 @@ export async function syncProductsToGoogle() {
     });
 
     const resultEntries = response.data.entries || [];
-    // ✅ FIX: Typed 'e' to avoid implicit any
     const errors = resultEntries.filter((e: content_v2_1.Schema$ProductsCustomBatchResponseEntry) => e.errors);
 
     if (errors.length > 0) {

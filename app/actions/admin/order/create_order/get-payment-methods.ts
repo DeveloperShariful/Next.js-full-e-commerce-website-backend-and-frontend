@@ -1,4 +1,4 @@
-// File Location: app/actions/create-order/get-payment-methods.ts
+// File Location: app/actions/order/create-order/get-payment-methods.ts
 
 "use server";
 

@@ -1,9 +1,9 @@
-// File Location: app/actions/create_order/create-manual-order.ts
+// File Location: app/actions/order/create_order/create-manual-order.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { generateNextOrderNumber } from "@/app/actions/admin/create_order/generate-order-number";
+import { generateNextOrderNumber } from "@/app/actions/admin/order/create_order/generate-order-number";
 import { updateAnalytics, sendOrderEmail } from "@/app/actions/admin/order/order-utils";
 
 export async function createManualOrder(data: any) {

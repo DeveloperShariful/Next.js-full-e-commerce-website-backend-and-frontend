@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { validateGiftCard } from "@/app/actions/admin/create_order/validate-gift-card";
+import { validateGiftCard } from "@/app/actions/admin/order/create_order/validate-gift-card";
 import { toast } from "sonner";
 import { Gift, Loader2, X } from "lucide-react";
 

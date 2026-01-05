@@ -1,4 +1,4 @@
-// File Location: app/actions/create_order/search-resources.ts
+// File Location: app/actions/order/create_order/search-resources.ts
 
 "use server";
 

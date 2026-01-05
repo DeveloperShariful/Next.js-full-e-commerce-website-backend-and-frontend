@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2 } from "lucide-react"; // Loader আইকন যোগ করুন
-import { searchProducts } from "@/app/actions/admin/create_order/search-resources";
+import { searchProducts } from "@/app/actions/admin/order/create_order/search-resources";
 
 interface ProductSearchProps {
     onAddProduct: (product: any, variant?: any) => void;

@@ -1,4 +1,4 @@
-// app/actions/coupon.ts
+// app/actions/admin/coupon.ts
 
 "use server";
 
@@ -23,7 +23,7 @@ export interface CouponData {
 export async function getCoupons() {
   try {
     const coupons = await db.discount.findMany({
-      // ✅ FIX: 'createdAt' নেই, তাই 'startDate' দিয়ে সর্ট করা হলো
+      
       orderBy: { startDate: 'desc' } 
     });
     return { success: true, data: coupons };

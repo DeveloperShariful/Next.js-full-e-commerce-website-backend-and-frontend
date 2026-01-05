@@ -1,4 +1,4 @@
-// File Location: app/actions/create_order/validate-gift-card.ts
+// File Location: app/actions/order/create_order/validate-gift-card.ts
 
 "use server";
 

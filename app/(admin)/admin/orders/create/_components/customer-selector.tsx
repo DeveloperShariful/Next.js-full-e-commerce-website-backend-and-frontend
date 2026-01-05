@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, User, Trash2, UserPlus, MapPin, Loader2 } from "lucide-react"; 
-import { searchCustomers } from "@/app/actions/admin/create_order/search-resources";
+import { searchCustomers } from "@/app/actions/admin/order/create_order/search-resources";
 import { searchTransdirectLocations } from "@/app/actions/admin/order/transdirect-locations"; 
 import { toast } from "sonner";
 

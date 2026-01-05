@@ -1,4 +1,4 @@
-// File: app/actions/create_order/get-shipping-resources.ts
+// File: app/actions/order/create_order/get-shipping-resources.ts
 
 "use server";
 

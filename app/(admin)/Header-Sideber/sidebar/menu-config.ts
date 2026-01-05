@@ -54,7 +54,7 @@ export const sidebarConfig: SidebarGroup[] = [
         ]
       },
       { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
-      { name: "Customers", href: "/admin/customers", icon: Users },
+      
     ]
   },
   {
@@ -78,6 +78,7 @@ export const sidebarConfig: SidebarGroup[] = [
     title: "System",
     items: [
       { name: "Staff & Roles", href: "/admin/staff", icon: ShieldCheck, roles: [Role.SUPER_ADMIN] },
+      { name: "Customers", href: "/admin/customers", icon: Users },
       { name: "Activity Logs", href: "/admin/logs", icon: ScrollText, roles: [Role.SUPER_ADMIN] },
       { name: "Settings", href: "/admin/settings", icon: Settings, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ]

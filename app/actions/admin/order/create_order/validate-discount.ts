@@ -1,4 +1,4 @@
-// File Location: app/actions/create_order/validate-discount.ts
+// File Location: app/actions/order/create_order/validate-discount.ts
 
 "use server";
 

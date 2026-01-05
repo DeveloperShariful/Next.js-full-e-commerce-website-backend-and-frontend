@@ -4,32 +4,49 @@
 import { google } from "googleapis";
 import { db } from "@/lib/prisma";
 
-export async function getGoogleContentClient() {
-  // 1. Get Config from DB
-  const config = await db.marketingIntegration.findUnique({
-    where: { id: "marketing_config" },
-  });
-
-  if (!config?.gmcContentApiEnabled || !config?.gscServiceAccountJson || !config?.gmcMerchantId) {
-    throw new Error("Merchant Center or Service Account not configured.");
-  }
-
-  // 2. Parse Service Account JSON
+// Allow passing explicit credentials for testing
+export async function getGoogleContentClient(explicitJson?: string, explicitMerchantId?: string) {
   let credentials;
-  try {
-    credentials = JSON.parse(config.gscServiceAccountJson);
-  } catch (e) {
-    throw new Error("Invalid Service Account JSON.");
+  let merchantId = explicitMerchantId;
+
+  // Case A: Testing with new input (Before Saving)
+  if (explicitJson) {
+    try {
+      credentials = JSON.parse(explicitJson);
+    } catch (e) {
+      throw new Error("Invalid JSON format provided.");
+    }
+  } 
+  // Case B: Normal usage (Load from DB)
+  else {
+    const config = await db.marketingIntegration.findUnique({
+      where: { id: "marketing_config" },
+    });
+
+    if (!config?.gscServiceAccountJson || !config?.gmcMerchantId) {
+      throw new Error("Merchant Center or Service Account not configured.");
+    }
+
+    try {
+      credentials = JSON.parse(config.gscServiceAccountJson);
+    } catch (e) {
+      throw new Error("Invalid Service Account JSON in database.");
+    }
+    
+    merchantId = config.gmcMerchantId;
   }
 
-  // 3. Create Auth Client
+  if (!merchantId) {
+     throw new Error("Merchant ID is missing.");
+  }
+
+  // Create Auth Client
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: ["https://www.googleapis.com/auth/content"],
   });
 
-  // 4. Return Content API Client
   const content = google.content({ version: "v2.1", auth });
   
-  return { content, merchantId: config.gmcMerchantId, config };
+  return { content, merchantId };
 }

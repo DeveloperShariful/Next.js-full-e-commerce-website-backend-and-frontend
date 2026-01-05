@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/marketing-settings/_components/gtm-integration-card.tsx
+// File: app/(admin)/admin/settings/marketing-settings/_components/gtm/gtm-integration-card.tsx
 "use client";
 
 import { useFormContext } from "react-hook-form";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge } from "../status-badge";
 
 export function GtmIntegrationCard() {
   const form = useFormContext();

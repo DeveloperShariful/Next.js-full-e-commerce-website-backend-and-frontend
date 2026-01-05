@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/marketing-settings/_components/profiles-table.tsx
+// File: app/(admin)/admin/settings/marketing-settings/_components/klaviyo/profiles-table.tsx
 "use client";
 
 import { useState, useEffect, useTransition } from "react";

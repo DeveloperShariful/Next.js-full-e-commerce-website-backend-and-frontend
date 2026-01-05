@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/marketing-settings/_components/search-console-card.tsx
+// File: app/(admin)/admin/settings/marketing-settings/_components/search-console/search-console-card.tsx
 "use client";
 
 import { useFormContext } from "react-hook-form";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormField, FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge } from "../status-badge";
 
 export function SearchConsoleCard() {
   const form = useFormContext();

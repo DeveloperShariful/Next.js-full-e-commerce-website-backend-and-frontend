@@ -11,41 +11,78 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export const Offline_Payment_UI = ({ methodConfig }: { methodConfig: any }) => {
-  const { cartId, shippingAddress, billingAddress, selectedShippingMethod, couponCode, totals } = useCheckoutStore();
+  const { 
+    cartId, 
+    shippingAddress, 
+    billingAddress, 
+    isSameBilling, // ✅ 1. Get toggle state
+    selectedShippingMethod, 
+    couponCode, 
+    totals, 
+    user, 
+    guestEmail 
+  } = useCheckoutStore();
+  
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handlePlaceOrder = async () => {
     setLoading(true);
 
-    // Validation
+    // ✅ 2. Determine Final Billing Address
+    // যদি 'Same as shipping' টিক দেওয়া থাকে, তবে শিপিং অ্যাড্রেসকেই বিলিং হিসেবে ধরব
+    const finalBillingAddress = isSameBilling ? shippingAddress : billingAddress;
+
+    // ৩. ভ্যালিডেশন (Validation)
     if (!shippingAddress.firstName || !shippingAddress.address1) {
-        toast.error("Please fill in all shipping details.");
+        toast.error("Please fill in shipping address.");
         setLoading(false);
         return;
     }
+
+    // বিলিং অ্যাড্রেস ভ্যালিডেশন (যদি আলাদা হয়)
+    if (!isSameBilling && (!finalBillingAddress.firstName || !finalBillingAddress.address1)) {
+        toast.error("Please fill in billing address.");
+        setLoading(false);
+        return;
+    }
+
     if (!selectedShippingMethod) {
         toast.error("Please select a shipping method.");
         setLoading(false);
         return;
     }
+    
+    // গেস্ট ইনফো তৈরি করা
+    const guestInfo = !user ? {
+        email: guestEmail, 
+        name: `${shippingAddress.firstName} ${shippingAddress.lastName}`,
+        phone: shippingAddress.phone
+    } : undefined;
 
-    // Process
+    // ৪. সার্ভার অ্যাকশন কল (Process Checkout)
     const res = await processCheckout({
         cartId: cartId!,
+        userId: user?.id, 
+        guestInfo: guestInfo,
+        
         shippingAddress,
-        billingAddress,
+        billingAddress: finalBillingAddress, // ✅ Sending correct billing address
+        
         paymentMethod: methodConfig.identifier,
+        
         shippingData: {
             method: selectedShippingMethod.type,
             carrier: selectedShippingMethod.name,
             cost: selectedShippingMethod.price,
-            methodId: selectedShippingMethod.id
+            methodId: selectedShippingMethod.id 
         },
+        
         couponCode: couponCode || undefined,
         totals: { ...totals }
     });
 
+    // ৫. রেসপন্স হ্যান্ডলিং
     if (res.success) {
         toast.success("Order placed successfully!");
         router.push(`/checkout/success/${res.orderId}`);
@@ -63,7 +100,7 @@ export const Offline_Payment_UI = ({ methodConfig }: { methodConfig: any }) => {
          <h4 className="font-semibold text-gray-900 mb-2">{methodConfig.name} Instructions:</h4>
          <div dangerouslySetInnerHTML={{ __html: methodConfig.instructions || "Please follow the instructions to complete your payment." }} />
          
-         {/* Bank Details Table (Only for Bank Transfer) */}
+         {/* Bank Details Table */}
          {methodConfig.identifier === "bank_transfer" && methodConfig.offlineConfig?.bankDetails && (
             <div className="mt-4 bg-white border rounded overflow-hidden">
                 {methodConfig.offlineConfig.bankDetails.map((bank: any, i: number) => (

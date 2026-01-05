@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/marketing-settings/_components/klaviyo-integration-card.tsx
+// File: app/(admin)/admin/settings/marketing-settings/_components/klaviyo/klaviyo-integration-card.tsx
 "use client";
 
 import { useFormContext } from "react-hook-form";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge } from "../status-badge";
 
 export function KlaviyoIntegrationCard() {
   const form = useFormContext();

@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/marketing-settings/_components/facebook-pixel-card.tsx
+// File: app/(admin)/admin/settings/marketing-settings/_components/facebook/facebook-pixel-card.tsx
 "use client";
 
 import { useFormContext } from "react-hook-form";
@@ -7,7 +7,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessa
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge } from "../status-badge";
 
 export function FacebookPixelCard() {
   const form = useFormContext();

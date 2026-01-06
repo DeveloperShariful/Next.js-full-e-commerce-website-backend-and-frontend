@@ -1,24 +1,30 @@
 // app/admin/products/create/_components/categoris.tsx
 
 import { useState, useEffect } from "react";
-import { ComponentProps } from "../types";
-import { getCategories } from "@/app/actions/admin/product/category";
+import { useFormContext } from "react-hook-form";
 import { ChevronUp } from "lucide-react";
+import { getCategories } from "@/app/actions/admin/product/category";
+import { ProductFormData } from "../types";
 
-export default function Categories({ data, updateData }: ComponentProps) {
+export default function Categories() {
+    const { watch, setValue } = useFormContext<ProductFormData>();
+    const currentCategory = watch("category");
+    
     const [dbCategories, setDbCategories] = useState<{id: string, name: string}[]>([]);
     const [input, setInput] = useState("");
 
     useEffect(() => {
-        getCategories().then(res => { if(res.success) setDbCategories(res.data as any) });
+        getCategories().then(res => {
+            if(res.success) setDbCategories(res.data as any);
+        });
     }, []);
 
     const addCategory = () => {
         if(!input.trim()) return;
-        // Fix for duplicate key: use timestamp
+        
         const newCat = { id: `temp_${Date.now()}`, name: input.trim() };
         setDbCategories([...dbCategories, newCat]);
-        updateData('category', newCat.name);
+        setValue("category", newCat.name, { shouldDirty: true, shouldValidate: true });
         setInput("");
     };
 
@@ -34,8 +40,8 @@ export default function Categories({ data, updateData }: ComponentProps) {
                         <label key={cat.id} className="flex items-center gap-2 mb-1 select-none text-xs">
                             <input 
                                 type="radio" 
-                                checked={data.category === cat.name} 
-                                onChange={() => updateData('category', cat.name)}
+                                checked={currentCategory === cat.name} 
+                                onChange={() => setValue("category", cat.name, { shouldDirty: true, shouldValidate: true })}
                                 className="text-[#2271b1]"
                             />
                             <span>{cat.name}</span>

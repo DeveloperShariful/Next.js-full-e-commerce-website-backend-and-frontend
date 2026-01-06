@@ -76,9 +76,11 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
     const finalSlug = await ensureUniqueSlug(data.slug, data.id);
 
     try {
-        // 3. Ensure Default Location
+        // 3. Ensure Default Location (UPDATED LOGIC)
+        // Variable product er jonno Location ID must lagbe, otherwise variations stock save hobe na
         let locationId = "";
-        if (data.trackQuantity) {
+        
+        if (data.trackQuantity || data.productType === 'VARIABLE') {
             const loc = await db.location.findFirst({ where: { isDefault: true }, select: { id: true } });
             if (loc) {
                 locationId = loc.id;
@@ -95,11 +97,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             const existingGlobal = await db.attribute.findUnique({ where: { slug: attrSlug } });
             
             if (existingGlobal) {
+                // Merge new values with existing ones
                 const mergedValues = Array.from(new Set([...existingGlobal.values, ...attr.values]));
                 if (mergedValues.length > existingGlobal.values.length) {
                     await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
                 }
             } else {
+                // Create new global attribute if it doesn't exist
                 await db.attribute.create({ data: { name: attr.name, slug: attrSlug, values: attr.values } });
             }
         }));
@@ -201,6 +205,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
             let product;
             if (data.id) {
+                 // Clear tags first to allow proper sync
                  await tx.product.update({ where: { id: data.id }, data: { tags: { set: [] } } });
                  product = await tx.product.update({
                     where: { id: data.id },
@@ -212,6 +217,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 });
             }
 
+            // Execute Helpers
             await Promise.all([
                 handleInventory(tx, product, data, locationId),
                 handleImages(tx, product.id, data.galleryImages),
@@ -221,7 +227,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 handleBundleItems(tx, product.id, data.productType, data.bundleItems) 
             ]);
 
-            // 🔥 Log Activity
+            // Log Activity
             await tx.activityLog.create({
                 data: {
                     userId: dbUser.id,

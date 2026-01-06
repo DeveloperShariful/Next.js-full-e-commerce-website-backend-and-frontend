@@ -1,9 +1,11 @@
+//app/(admin)/admin/media/_components/upload-model.tsx
+
 "use client";
 
 import { useState } from "react";
-import { saveMedia } from "@/app/actions/admin/media";
-import { X, Loader2 } from "lucide-react";
-import ImageUpload from "@/components/ui/image-upload"; // Ensure this path is correct
+import { saveMedia } from "@/app/actions/admin/media/media-create";
+import { X, CheckCircle, FileCheck } from "lucide-react";
+import ImageUpload from "@/components/ui/image-upload";
 import { toast } from "react-hot-toast";
 
 interface UploadModalProps {
@@ -12,63 +14,99 @@ interface UploadModalProps {
 }
 
 export function UploadModal({ onClose, onSuccess }: UploadModalProps) {
-  const [uploading, setUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [processing, setProcessing] = useState(false);
 
-  const handleUpload = async (url: string) => {
-    setUploading(true);
-    // Mock metadata - in real case, get this from upload response
-    const mockMeta = {
-      filename: url.split('/').pop() || "uploaded.jpg",
-      size: 1024 * 50, 
-      mimeType: "image/jpeg"
-    };
+  const handleUploadSuccess = async (result: any) => {
+    setProcessing(true);
+    const info = result.info;
 
-    const res = await saveMedia({
-      url,
-      ...mockMeta
-    });
-    
-    setUploading(false);
+    try {
+        const fileData = {
+            url: info.secure_url,
+            publicId: info.public_id,
+            originalName: info.original_filename,
+            filename: `${info.original_filename}.${info.format}`,
+            mimeType: `${info.resource_type}/${info.format}`,
+            size: info.bytes,
+            width: info.width || 0,
+            height: info.height || 0
+        };
 
-    if (res.success) {
-      toast.success("File uploaded successfully");
-      onSuccess();
-      onClose();
-    } else {
-      toast.error("Database save failed");
+        const res = await saveMedia(fileData);
+        
+        if (res.success) {
+            // লিস্টে যোগ করছি (যাতে ইউজার দেখে কয়টা আপলোড হলো)
+            setUploadedFiles((prev) => [...prev, fileData.filename]);
+            toast.success(`Uploaded: ${fileData.originalName}`);
+        } else {
+            toast.error(`Failed: ${fileData.originalName}`);
+        }
+
+    } catch (error) {
+        console.error("Upload Error", error);
+    } finally {
+        setProcessing(false);
+        // ❌ আমরা এখানে onSuccess() কল করব না, যাতে মডাল বন্ধ না হয়ে যায়।
     }
+  };
+
+  const handleFinish = () => {
+      onSuccess(); // রিফ্রেশ লিস্ট
+      onClose();   // মডাল বন্ধ
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm p-4 animate-in fade-in">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
+        
+        {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
            <h3 className="font-bold text-slate-800">Upload Media</h3>
            <button onClick={onClose}><X className="text-slate-400 hover:text-red-500 transition"/></button>
         </div>
         
         <div className="p-8">
-           {uploading ? (
-              <div className="py-12 flex flex-col items-center gap-4 text-center">
-                 <Loader2 className="animate-spin text-indigo-600" size={48}/>
-                 <div>
-                    <p className="text-sm font-bold text-slate-700">Processing file...</p>
-                    <p className="text-xs text-slate-500">Optimizing and saving to library</p>
-                 </div>
-              </div>
-           ) : (
-              <div className="w-full">
-                 <ImageUpload 
-                    value={[]} 
-                    disabled={uploading}
-                    onChange={handleUpload}
-                    onRemove={() => {}}
-                 />
-                 <p className="text-center text-xs text-slate-400 mt-4">
-                    Supports JPG, PNG, WEBP, PDF (Max 10MB)
-                 </p>
-              </div>
+           {/* Upload Widget */}
+           <div className="w-full mb-6">
+              <ImageUpload 
+                 value={[]} 
+                 onChange={() => {}} 
+                 onRemove={() => {}} 
+                 onUploadSuccess={handleUploadSuccess} 
+                 showPreview={false} 
+              />
+           </div>
+
+           {/* Uploaded List Status */}
+           {uploadedFiles.length > 0 && (
+               <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-4">
+                   <div className="flex items-center gap-2 mb-2 text-green-700 font-bold text-sm">
+                       <CheckCircle size={16}/>
+                       <span>{uploadedFiles.length} Files Uploaded Successfully</span>
+                   </div>
+                   <ul className="text-xs text-green-600 space-y-1 max-h-32 overflow-y-auto pl-6 list-disc">
+                       {uploadedFiles.map((fname, i) => (
+                           <li key={i}>{fname}</li>
+                       ))}
+                   </ul>
+               </div>
            )}
+
+           {processing && (
+               <p className="text-center text-xs text-indigo-600 animate-pulse font-medium mb-4">
+                   Processing latest file...
+               </p>
+           )}
+
+           {/* Finish Button */}
+           <button 
+             onClick={handleFinish}
+             className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition shadow-sm"
+           >
+             {uploadedFiles.length > 0 ? "Done & Refresh Library" : "Close"}
+           </button>
+
         </div>
       </div>
     </div>

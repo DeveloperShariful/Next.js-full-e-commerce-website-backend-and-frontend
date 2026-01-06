@@ -1,11 +1,17 @@
 // app/admin/products/create/_components/Shipping.tsx
 
 import { useEffect, useState } from "react";
-import { ComponentProps } from "../types";
+import { useFormContext } from "react-hook-form";
 import { getShippingClasses } from "@/app/actions/admin/product/product-read";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { ProductFormData } from "../types";
 
-export default function Shipping({ data, updateData }: ComponentProps) {
+export default function Shipping() {
+    const { register, watch, setValue } = useFormContext<ProductFormData>();
+    const data = watch();
     const [classes, setClasses] = useState<{id: string, name: string}[]>([]);
+    
+    const { weightUnit, dimensionUnit } = useGlobalStore();
 
     useEffect(() => {
         getShippingClasses().then(res => { if(res.success) setClasses(res.data as any) });
@@ -13,23 +19,49 @@ export default function Shipping({ data, updateData }: ComponentProps) {
 
     return (
         <div className="space-y-4 max-w-lg">
-            {/* Existing Weight/Dimensions */}
             <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Weight (kg)</label>
-                <input type="number" value={data.weight} onChange={e => updateData('weight', e.target.value)} className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" placeholder="0" />
+                <label className="text-right font-medium text-xs">Weight ({weightUnit})</label>
+                <input 
+                    type="number" 
+                    step="0.01"
+                    {...register("weight")}
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                    placeholder="0" 
+                />
             </div>
             <div className="grid grid-cols-3 gap-4 items-start">
-                <label className="text-right font-medium text-xs pt-2">Dimensions (cm)</label>
+                <label className="text-right font-medium text-xs pt-2">Dimensions ({dimensionUnit})</label>
                 <div className="col-span-2 flex gap-2">
-                    <input type="number" placeholder="L" value={data.length} onChange={e => updateData('length', e.target.value)} className="w-1/3 border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" />
-                    <input type="number" placeholder="W" value={data.width} onChange={e => updateData('width', e.target.value)} className="w-1/3 border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" />
-                    <input type="number" placeholder="H" value={data.height} onChange={e => updateData('height', e.target.value)} className="w-1/3 border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" />
+                    <input 
+                        type="number" 
+                        placeholder="L" 
+                        step="0.01"
+                        {...register("length")}
+                        className="w-1/3 border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                    />
+                    <input 
+                        type="number" 
+                        placeholder="W" 
+                        step="0.01"
+                        {...register("width")}
+                        className="w-1/3 border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                    />
+                    <input 
+                        type="number" 
+                        placeholder="H" 
+                        step="0.01"
+                        {...register("height")}
+                        className="w-1/3 border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                    />
                 </div>
             </div>
             
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Shipping class</label>
-                <select value={data.shippingClassId} onChange={e => updateData('shippingClassId', e.target.value)} className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm">
+                <select 
+                    {...register("shippingClassId")}
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                >
                     <option value="">No shipping class</option>
                     {classes.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -40,23 +72,31 @@ export default function Shipping({ data, updateData }: ComponentProps) {
             <hr className="border-gray-200" />
             <h3 className="text-xs font-bold text-gray-700">International / Customs</h3>
 
-            {/* 🔥 NEW: Country of Manufacture */}
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Country of Origin</label>
-                <input value={data.countryOfManufacture} onChange={e => updateData('countryOfManufacture', e.target.value)} className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" placeholder="e.g. Bangladesh" />
+                <input 
+                    {...register("countryOfManufacture")}
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                    placeholder="e.g. Bangladesh" 
+                />
             </div>
 
-            {/* 🔥 NEW: HS Code */}
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">HS Code</label>
-                <input value={data.hsCode} onChange={e => updateData('hsCode', e.target.value)} className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" placeholder="Harmonized System Code" />
+                <input 
+                    {...register("hsCode")}
+                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                    placeholder="Harmonized System Code" 
+                />
             </div>
 
-            {/* 🔥 NEW: Dangerous Goods */}
             <div className="grid grid-cols-3 gap-4 items-center">
                 <div className="col-start-2 col-span-2">
                     <label className="flex items-center gap-2 text-xs select-none">
-                        <input type="checkbox" checked={data.isDangerousGood} onChange={e => updateData('isDangerousGood', e.target.checked)} />
+                        <input 
+                            type="checkbox" 
+                            {...register("isDangerousGood")}
+                        />
                         This is a dangerous good (e.g. Battery, Chemical)
                     </label>
                 </div>

@@ -1,4 +1,4 @@
-// File Location: app/admin/orders/_components/email-logs.tsx
+// File Location: app/admin/orders/[orderId]/_components/email-logs.tsx
 
 "use client";
 

@@ -1,26 +1,31 @@
-// File: app/admin/products/create/_components/Collections.tsx
+// app/admin/products/create/_components/Collections.tsx
 
 import { useState, useEffect } from "react";
-import { getCollections } from "@/app/actions/admin/product/product-read"; 
-import { ComponentProps } from "../types";
+import { useFormContext } from "react-hook-form";
 import { ChevronUp, Search, Check } from "lucide-react";
+import { getCollections } from "@/app/actions/admin/product/product-read";
+import { ProductFormData } from "../types";
 
-export default function Collections({ data, updateData }: ComponentProps) {
+export default function Collections() {
+    const { watch, setValue } = useFormContext<ProductFormData>();
+    const selectedIds = watch("collectionIds") || [];
+
     const [dbCollections, setDbCollections] = useState<{id: string, name: string}[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
-        getCollections().then(res => { if(res.success) setDbCollections(res.data as any) });
+        getCollections().then(res => { 
+            if(res.success) setDbCollections(res.data as any);
+        });
     }, []);
 
     const toggleCollection = (id: string) => {
-        const newIds = data.collectionIds.includes(id)
-            ? data.collectionIds.filter(c => c !== id)
-            : [...data.collectionIds, id];
-        updateData('collectionIds', newIds);
+        const newIds = selectedIds.includes(id)
+            ? selectedIds.filter(c => c !== id)
+            : [...selectedIds, id];
+        setValue("collectionIds", newIds, { shouldDirty: true, shouldValidate: true });
     };
 
-    // 🔥 Dynamic Filtering based on Search
     const filteredCollections = dbCollections.filter(col => 
         col.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -33,7 +38,6 @@ export default function Collections({ data, updateData }: ComponentProps) {
             </div>
             
             <div className="p-3">
-                {/* Search Input */}
                 <div className="relative mb-2">
                     <input 
                         type="text" 
@@ -45,22 +49,20 @@ export default function Collections({ data, updateData }: ComponentProps) {
                     <Search size={12} className="absolute left-2 top-2 text-gray-400"/>
                 </div>
 
-                {/* List */}
                 <div className="max-h-[150px] overflow-y-auto border border-gray-200 p-2 bg-gray-50 mb-2 rounded-sm custom-scrollbar">
                     {filteredCollections.length > 0 ? filteredCollections.map(col => (
                         <label key={col.id} className="flex items-center gap-2 mb-1.5 select-none text-xs cursor-pointer hover:bg-gray-100 p-1 rounded transition">
-                            <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center transition-colors ${data.collectionIds.includes(col.id) ? 'bg-[#2271b1] border-[#2271b1]' : 'border-gray-400 bg-white'}`}>
-                                {data.collectionIds.includes(col.id) && <Check size={10} className="text-white"/>}
+                            <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center transition-colors ${selectedIds.includes(col.id) ? 'bg-[#2271b1] border-[#2271b1]' : 'border-gray-400 bg-white'}`}>
+                                {selectedIds.includes(col.id) && <Check size={10} className="text-white"/>}
                             </div>
                             
-                            {/* Hidden real checkbox for accessibility */}
                             <input 
                                 type="checkbox" 
-                                checked={data.collectionIds.includes(col.id)} 
+                                checked={selectedIds.includes(col.id)} 
                                 onChange={() => toggleCollection(col.id)}
                                 className="hidden"
                             />
-                            <span className={data.collectionIds.includes(col.id) ? 'font-medium text-[#2271b1]' : 'text-gray-700'}>{col.name}</span>
+                            <span className={selectedIds.includes(col.id) ? 'font-medium text-[#2271b1]' : 'text-gray-700'}>{col.name}</span>
                         </label>
                     )) : (
                         <div className="text-xs text-gray-400 text-center py-2">

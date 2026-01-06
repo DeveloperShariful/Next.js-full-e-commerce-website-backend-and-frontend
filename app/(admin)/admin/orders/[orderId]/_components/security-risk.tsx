@@ -1,4 +1,4 @@
-// File Location: app/admin/orders/_components/security-risk.tsx
+// File Location: app/admin/orders/[orderId]/_components/security-risk.tsx
 
 "use client"
 

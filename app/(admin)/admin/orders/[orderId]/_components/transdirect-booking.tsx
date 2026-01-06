@@ -1,4 +1,4 @@
-// File Location: app/admin/orders/_components/transdirect-booking.tsx
+// File Location: app/admin/orders/[orderId]/_components/transdirect-booking.tsx
 
 "use client";
 

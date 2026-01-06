@@ -1,15 +1,20 @@
 // app/admin/products/create/_components/Brand.tsx
 
 import { useState, useEffect } from "react";
-import { ComponentProps } from "../types"; // Using shared type
-import { getBrands } from "@/app/actions/admin/product/product-read"; // Updated Import
+import { useFormContext } from "react-hook-form"; // 🔥 RHF Import
+import { getBrands } from "@/app/actions/admin/product/product-read";
 import { ChevronUp, Plus, Search } from "lucide-react";
+import { ProductFormValues } from "../schema"; // স্কিমা ইম্পোর্ট
 
-export default function Brand({ data, updateData }: ComponentProps) {
+export default function Brand() {
+    // 🔥 RHF Hooks
+    const { setValue, watch } = useFormContext<ProductFormValues>();
+    const currentVendor = watch("vendor"); // বর্তমান সিলেক্ট করা ভেন্ডর ট্র্যাক করা
+
     const [dbBrands, setDbBrands] = useState<{id: string, name: string}[]>([]);
     const [input, setInput] = useState("");
     const [filteredBrands, setFilteredBrands] = useState<{id: string, name: string}[]>([]);
-    const [showInput, setShowInput] = useState(false);
+    const [showInput, setShowInput] = useState(false); // লজিক অপরিবর্তিত রাখা হয়েছে
 
     useEffect(() => {
         getBrands().then(res => { 
@@ -28,18 +33,25 @@ export default function Brand({ data, updateData }: ComponentProps) {
     };
 
     const handleSelect = (brandName: string) => {
-        if (data.vendor === brandName) {
-            updateData('vendor', "");
+        // টগল লজিক (Select/Deselect)
+        if (currentVendor === brandName) {
+            setValue('vendor', "", { shouldDirty: true });
         } else {
-            updateData('vendor', brandName);
+            setValue('vendor', brandName, { shouldDirty: true });
         }
     };
 
     const addNewBrand = () => {
         if(!input.trim()) return;
-        updateData('vendor', input.trim());
-        setDbBrands([...dbBrands, { id: `temp_${Date.now()}`, name: input.trim() }]);
-        setFilteredBrands([...filteredBrands, { id: `temp_${Date.now()}`, name: input.trim() }]);
+        
+        // RHF এ ভ্যালু সেট করা
+        setValue('vendor', input.trim(), { shouldDirty: true });
+
+        // লোকাল স্টেটে টেম্পোরারি ব্র্যান্ড যোগ করা (যাতে লিস্টে দেখায়)
+        const newBrand = { id: `temp_${Date.now()}`, name: input.trim() };
+        setDbBrands([...dbBrands, newBrand]);
+        setFilteredBrands([...filteredBrands, newBrand]); // ফিল্টারড লিস্টও আপডেট করা
+        
         setInput("");
         setShowInput(false);
     };
@@ -68,7 +80,7 @@ export default function Brand({ data, updateData }: ComponentProps) {
                             <label key={brand.id} className="flex items-center gap-2 mb-1 select-none text-xs cursor-pointer hover:text-[#2271b1]">
                                 <input 
                                     type="radio" 
-                                    checked={data.vendor === brand.name} 
+                                    checked={currentVendor === brand.name} 
                                     onChange={() => handleSelect(brand.name)}
                                     className="accent-[#2271b1]"
                                 />

@@ -1,129 +1,23 @@
 // File: app/admin/products/create/types.ts
 
-export interface Attribute {
-    id: string;
-    name: string;
-    values: string[];
-    visible: boolean;
-    variation: boolean;
-    position: number;
-}
+import { z } from "zod";
+import { productSchema } from "./schema"; // আপনার তৈরি করা স্কিমা ইম্পোর্ট করুন
 
-export interface Variation {
-    id: string;
-    name: string;
-    price: number;
-    stock: number;
-    sku: string;
-    attributes: Record<string, string>;
-    
-    // 🔥 UPDATE: Single 'image' string is removed, replaced by 'images' array
-    images: string[]; 
-    
-    // Advanced Variant Details
-    barcode?: string;
-    costPerItem?: number;
-    weight?: number;
-    length?: number;
-    width?: number;
-    height?: number;
-}
+// ১. পুরো ফর্মের টাইপ এখন Zod থেকে আসবে
+export type ProductFormData = z.infer<typeof productSchema>;
 
-export interface DigitalFile {
-    id?: string;
-    name: string;
-    url: string;
-}
+// ২. সাব-কম্পোনেন্টগুলোর টাইপ আলাদা করে বের করে নেওয়া হলো (যাতে রিইউজ করা যায়)
+export type Attribute = ProductFormData['attributes'][number];
+export type Variation = ProductFormData['variations'][number];
+export type BundleItem = ProductFormData['bundleItems'][number];
+export type DigitalFile = ProductFormData['digitalFiles'][number];
 
-export interface BundleItem {
-    childProductId: string;
-    childProductName?: string; 
-    childProductImage?: string; 
-    quantity: number;
-}
-
-export interface ProductFormData {
-    id?: string;
-    name: string;
-    slug: string;
-    description: string;
-    shortDescription: string;
-    productType: string;
-    status: string; 
-    isVirtual: boolean;
-    isDownloadable: boolean;
-    isFeatured: boolean; 
-    
-    videoUrl: string;
-    videoThumbnail: string;
-
-    gender: string; 
-    ageGroup: string; 
-    metafields: string; 
-    seoSchema: string; 
-
-    bundleItems: BundleItem[];
-
-    saleStart: string; 
-    saleEnd: string;   
-
-    downloadLimit: number | "";
-    downloadExpiry: number | "";
-    
-    price: number | "";
-    salePrice: number | "";
-    costPerItem: number | "";
-    
-    taxStatus: string;
-    taxRateId: string;      
-    shippingClassId: string; 
-    
-    sku: string;
-    barcode: string;
-    trackQuantity: boolean;
-    stock: number | "";
-
-    lowStockThreshold: number | "";
-    backorderStatus: string; 
-    soldIndividually: boolean;
-    mpn: string;
-    
-    weight: string;
-    length: string;
-    width: string;
-    height: string;
-    
-    hsCode: string;
-    countryOfManufacture: string;
-    isDangerousGood: boolean;
-
-    category: string;
-    vendor: string;
-    tags: string[];
-    collectionIds: string[]; 
-    
-    upsells: string[]; 
-    crossSells: string[];
-    
-    featuredImage: string | null;
-    galleryImages: string[];
-    digitalFiles: DigitalFile[]; 
-    
-    attributes: Attribute[];
-    variations: Variation[];
-    
-    metaTitle: string;
-    metaDesc: string;
-    seoCanonicalUrl: string; 
-    
-    purchaseNote: string;
-    menuOrder: number;
-    enableReviews: boolean;
-}
-
+// ৩. কম্পোনেন্ট প্রপস আপডেট
+// আগে ছিল: data, updateData
+// এখন React Hook Form ব্যবহার হবে, তাই প্রপস দরকার নেই (context দিয়ে ডাটা পাবে)।
+// কিন্তু যদি আপনি কিছু প্রপস রাখতে চান, তবে এটি ক্লিন রাখা ভালো:
 export interface ComponentProps {
-    data: ProductFormData;
-    updateData: (field: keyof ProductFormData, value: any) => void;
+    // এখন আর data বা updateData লাগবে না, কারণ আমরা useFormContext() ব্যবহার করব।
+    // তবে লোডিং স্টেট বা অন্য কিছুর জন্য প্রপস রাখা যেতে পারে।
     loading?: boolean;
-    onSubmit?: (e?: React.FormEvent) => void;
 }

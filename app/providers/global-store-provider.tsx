@@ -4,46 +4,94 @@
 
 import { createContext, useContext, ReactNode } from "react";
 
-// --- Types Definition (Based on Schema) ---
+// ==========================================
+// 1. TYPE DEFINITIONS & INTERFACES
+// ==========================================
 
-interface StoreAddress {
+export interface StoreAddress {
   address1?: string;
   address2?: string;
   city?: string;
-  country?: string;
+  state?: string;
   postcode?: string;
+  country?: string;
+  email?: string;
+  phone?: string;
 }
 
-interface SocialLinks {
+export interface SocialLinks {
   facebook?: string;
   instagram?: string;
   twitter?: string;
   youtube?: string;
   linkedin?: string;
+  tiktok?: string;
+  pinterest?: string;
 }
 
+export interface TaxSettings {
+  pricesIncludeTax: boolean;
+  calculateTaxBasedOn: 'shipping' | 'billing' | 'shop';
+  displayPricesInShop: 'inclusive' | 'exclusive';
+  displayPricesDuringCart: 'inclusive' | 'exclusive';
+}
+
+export interface GeneralConfig {
+  timezone: string;
+  dateFormat: string;
+  orderIdFormat: string;
+}
+
+export interface SeoConfig {
+  siteName: string;
+  titleSeparator: string;
+  defaultMetaTitle: string | null;
+  defaultMetaDesc: string | null;
+  ogImage: string | null;
+  twitterCard: string;
+  twitterSite: string | null;
+}
+
+export interface MarketingConfig {
+  gtmEnabled: boolean;
+  gtmContainerId: string | null;
+  fbEnabled: boolean;
+  fbPixelId: string | null;
+  klaviyoEnabled: boolean;
+  klaviyoPublicKey: string | null;
+}
+
+// ==========================================
+// 2. CONTEXT STATE DEFINITION
+// ==========================================
+
 interface GlobalStoreContextType {
-  // Identity
   storeName: string;
   storeEmail: string;
   storePhone: string;
   logo: string | null;
-  
-  // Settings
   currency: string;
   symbol: string;
   weightUnit: string;
   dimensionUnit: string;
   
-  // Objects
   address: StoreAddress;
   socials: SocialLinks;
   
-  // Helpers
   formatPrice: (price: number | string | null) => string;
+
+  favicon: string | null;
+  isMaintenanceMode: boolean;
+  general: GeneralConfig;
+  tax: TaxSettings;
+  seo: SeoConfig;
+  marketing: MarketingConfig;
 }
 
-// Default Values (Safety fallback)
+// ==========================================
+// 3. DEFAULT VALUES (FALLBACK)
+// ==========================================
+
 const defaultContext: GlobalStoreContextType = {
   storeName: "GoBike",
   storeEmail: "",
@@ -56,22 +104,29 @@ const defaultContext: GlobalStoreContextType = {
   address: {},
   socials: {},
   formatPrice: () => "$0.00",
+  favicon: null,
+  isMaintenanceMode: false,
+  general: { timezone: "UTC", dateFormat: "dd MMM yyyy", orderIdFormat: "#" },
+  tax: { pricesIncludeTax: false, calculateTaxBasedOn: 'shipping', displayPricesInShop: 'exclusive', displayPricesDuringCart: 'exclusive' },
+  seo: { siteName: "GoBike", titleSeparator: "|", defaultMetaTitle: null, defaultMetaDesc: null, ogImage: null, twitterCard: "summary_large_image", twitterSite: null },
+  marketing: { gtmEnabled: false, gtmContainerId: null, fbEnabled: false, fbPixelId: null, klaviyoEnabled: false, klaviyoPublicKey: null },
 };
 
 const GlobalStoreContext = createContext<GlobalStoreContextType>(defaultContext);
 
-// --- Provider Component ---
+// ==========================================
+// 4. PROVIDER COMPONENT
+// ==========================================
 
 interface ProviderProps {
   children: ReactNode;
-  settings: any; // Raw data from DB
+  settings: any; 
 }
 
 export function GlobalStoreProvider({ children, settings }: ProviderProps) {
   
   const s = settings || {};
 
-  // Helper: Format Price
   const formatPrice = (price: number | string | null) => {
     if (price === null || price === "") return "";
     const numPrice = typeof price === "string" ? parseFloat(price) : price;
@@ -83,7 +138,6 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
     }).format(numPrice);
   };
 
-  // Construct Value Object
   const value = {
     storeName: s.storeName || "GoBike",
     storeEmail: s.storeEmail || "",
@@ -98,7 +152,14 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
     address: (s.storeAddress as StoreAddress) || {},
     socials: (s.socialLinks as SocialLinks) || {},
     
-    formatPrice
+    formatPrice,
+
+    favicon: s.favicon || null,
+    isMaintenanceMode: s.maintenance || false,
+    general: (s.generalConfig as GeneralConfig) || defaultContext.general,
+    tax: (s.taxSettings as TaxSettings) || defaultContext.tax,
+    seo: (s.seo as SeoConfig) || defaultContext.seo,
+    marketing: (s.marketing as MarketingConfig) || defaultContext.marketing,
   };
 
   return (

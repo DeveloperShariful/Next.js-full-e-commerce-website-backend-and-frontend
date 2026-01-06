@@ -1,17 +1,19 @@
 // app/admin/products/create/_components/description.tsx
 
-import { ComponentProps } from "../types";
-// পাথ ঠিক আছে কিনা নিশ্চিত হয়ে নিন
-import RichTextEditor from "./RichTextEditor"; 
+import { useFormContext } from "react-hook-form";
+import RichTextEditor from "./RichTextEditor";
+import { ProductFormData } from "../types";
 
-export default function Description({ data, updateData }: ComponentProps) {
+export default function Description() {
+    const { watch, setValue } = useFormContext<ProductFormData>();
+    const description = watch("description") || "";
+
     return (
         <div className="mb-5">
-            {/* এখানে আমরা কাস্টম এডিটর ব্যবহার করছি */}
             <RichTextEditor 
                 label="Product Description"
-                value={data.description} 
-                onChange={(val) => updateData('description', val)} 
+                value={description} 
+                onChange={(val) => setValue("description", val, { shouldDirty: true, shouldValidate: true })} 
             />
         </div>
     );

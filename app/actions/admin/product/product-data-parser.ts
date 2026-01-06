@@ -27,10 +27,10 @@ export const parseProductFormData = (formData: FormData) => {
         productType: typeInput as ProductType,
         status: statusInput as ProductStatus, 
 
-        // 🔥 NEW: Featured Flag Added
+        // Featured Flag
         isFeatured: formData.get("isFeatured") === "true",
 
-        // 🔥 NEW: Bundle Items Added
+        // Bundle Items
         bundleItems: parseJSON<any[]>(formData.get("bundleItems") as string, []),
 
         // Media Fields
@@ -45,7 +45,9 @@ export const parseProductFormData = (formData: FormData) => {
 
         price: cleanPrice(formData.get("price") as string),
         salePrice: formData.get("salePrice") ? cleanPrice(formData.get("salePrice") as string) : null,
-        costPerItem: formData.get("cost") ? cleanPrice(formData.get("cost") as string) : null,
+        
+        // 🔥 FIX: 'cost' was wrong, updated to 'costPerItem' to match frontend
+        costPerItem: formData.get("costPerItem") ? cleanPrice(formData.get("costPerItem") as string) : null,
 
         sku: formData.get("sku") as string || null,
         barcode: formData.get("barcode") as string || null,

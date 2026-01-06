@@ -1,7 +1,10 @@
+//app/(admin)/admin/media/_components/media-details.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
-import { MediaItem, updateMediaMetadata } from "@/app/actions/admin/media";
+import { updateMediaMetadata } from "@/app/actions/admin/media/media-update"; // ✅ NEW PATH
+import { MediaItem } from "@/app/actions/admin/media/media-read"; // ✅ NEW PATH
 import { X, Save, Copy, FileText, Calendar, HardDrive, Check, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import Image from "next/image";
@@ -30,7 +33,6 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Sync state if file changes
   useEffect(() => {
     setFormData({
       filename: file.filename,
@@ -47,7 +49,7 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
     
     if (res.success) {
       toast.success(res.message);
-      onUpdate(); // Refresh list
+      onUpdate();
     } else {
       toast.error(res.message);
     }
@@ -72,7 +74,7 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition"><X size={18}/></button>
         </div>
 
-        {/* Scrollable Content */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
           {/* Preview */}
@@ -88,7 +90,7 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
              )}
           </div>
 
-          {/* Info Grid */}
+          {/* Info Grid - ✅ NOW SHOWING REAL DIMENSIONS */}
           <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 border-b border-slate-100 pb-6">
              <div>
                 <span className="block font-bold text-slate-700 mb-1">Uploaded on</span>
@@ -104,7 +106,8 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
              </div>
              <div>
                 <span className="block font-bold text-slate-700 mb-1">Dimensions</span>
-                <span>-</span> {/* Need width/height in DB for this */}
+                {/* ✅ Showing Real Width/Height */}
+                <span>{file.width && file.height ? `${file.width} x ${file.height}` : '-'}</span>
              </div>
           </div>
 
@@ -120,12 +123,12 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
              </div>
              
              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Alt Text <span className="text-slate-400 font-normal">(Alternative Text)</span></label>
+                <label className="text-xs font-bold text-slate-700">Alt Text <span className="text-slate-400 font-normal">(SEO)</span></label>
                 <input 
                   className="w-full border p-2 rounded text-sm focus:ring-2 ring-blue-100 outline-none"
                   value={formData.altText}
                   onChange={(e) => setFormData({...formData, altText: e.target.value})}
-                  placeholder="Describe the image for SEO"
+                  placeholder="Describe image for Google"
                 />
              </div>
 
@@ -149,7 +152,6 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
                 />
              </div>
 
-             {/* Copy Link Input */}
              <div className="space-y-1 pt-2">
                 <label className="text-xs font-bold text-slate-700">File URL</label>
                 <div className="flex gap-2">
@@ -162,7 +164,7 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
           </div>
         </div>
 
-        {/* Footer Actions */}
+        {/* Footer */}
         <div className="p-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50">
            <button onClick={onUpdate} className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-800">Cancel</button>
            <button 
@@ -170,7 +172,7 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
              disabled={saving}
              className="px-6 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-slate-800 flex items-center gap-2 disabled:opacity-70"
            >
-              {saving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save Changes
+              {saving ? <Loader2 className="animate-spin" size={16}/> : <Save size={16}/>} Save
            </button>
         </div>
 

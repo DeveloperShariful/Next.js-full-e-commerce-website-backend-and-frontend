@@ -22,10 +22,15 @@ export async function duplicateProduct(id: string) {
         tags: true,
         category: true,
         brand: true,
-        images: true, // All images
+        images: true, 
         attributes: true,
-        variants: { include: { images: true } }, // Include variant images
-        inventoryLevels: true,
+        inventoryLevels: true, // Main product inventory
+        variants: { 
+            include: { 
+                images: true,
+                inventoryLevels: true // 🔥 UPDATE: ভেরিয়েন্টের ইনভেন্টরিও আনতে হবে
+            } 
+        }, 
       }
     });
 
@@ -36,10 +41,9 @@ export async function duplicateProduct(id: string) {
     const newSku = original.sku ? `${original.sku}-COPY-${timestamp}` : null;
     const newName = `${original.name} (Copy)`;
 
-    // 🔥 FIX: Transaction ব্যবহার করা হচ্ছে যাতে রিলেশন এরর না দেয়
     await db.$transaction(async (tx) => {
         
-        // ২. প্রথমে মেইন প্রোডাক্ট তৈরি (ভেরিয়েন্ট ছাড়া)
+        // ২. প্রথমে মেইন প্রোডাক্ট তৈরি
         const newProduct = await tx.product.create({
             data: {
                 name: newName,
@@ -72,7 +76,6 @@ export async function duplicateProduct(id: string) {
                     connect: original.tags.map(t => ({ id: t.id }))
                 },
 
-                // শুধু মেইন প্রোডাক্টের ইমেজগুলো কপি হবে (যেগুলোর variantId নেই)
                 images: {
                     create: original.images
                         .filter(img => img.variantId === null)
@@ -91,16 +94,28 @@ export async function duplicateProduct(id: string) {
                         position: attr.position
                     }))
                 }
-                // ❌ ভেরিয়েন্ট এখানে তৈরি করব না, নিচে আলাদা লুপে করব
             }
         });
 
-        // ৩. এখন ভেরিয়েন্টগুলো তৈরি করব (New Product ID ব্যবহার করে)
+        // 🔥 ৩. মেইন প্রোডাক্টের ইনভেন্টরি লেভেল কপি করা (Simple Product এর জন্য)
+        if (original.inventoryLevels.length > 0) {
+            await tx.inventoryLevel.createMany({
+                data: original.inventoryLevels.map(inv => ({
+                    productId: newProduct.id,
+                    locationId: inv.locationId,
+                    quantity: inv.quantity,
+                    variantId: null
+                }))
+            });
+        }
+
+        // ৪. ভেরিয়েন্ট এবং তাদের ইনভেন্টরি তৈরি
         if (original.variants.length > 0) {
             for (const v of original.variants) {
-                await tx.productVariant.create({
+                // ভেরিয়েন্ট তৈরি
+                const newVariant = await tx.productVariant.create({
                     data: {
-                        productId: newProduct.id, // 🔥 Link to new product
+                        productId: newProduct.id,
                         name: v.name,
                         sku: v.sku ? `${v.sku}-COPY-${Math.floor(Math.random() * 1000)}` : null,
                         price: v.price,
@@ -109,20 +124,31 @@ export async function duplicateProduct(id: string) {
                         trackQuantity: v.trackQuantity,
                         weight: v.weight,
                         
-                        // 🔥 ভেরিয়েন্ট ইমেজের জন্য এখন আমরা productId পাস করতে পারব
                         images: {
                             create: v.images.map(vImg => ({
                                 url: vImg.url,
                                 position: vImg.position,
-                                productId: newProduct.id // ✅ This fixes the error!
+                                productId: newProduct.id
                             }))
                         }
                     }
                 });
+
+                // 🔥 ৫. ভেরিয়েন্টের ইনভেন্টরি লেভেল কপি করা (Variable Product এর জন্য)
+                if (v.inventoryLevels && v.inventoryLevels.length > 0) {
+                    await tx.inventoryLevel.createMany({
+                        data: v.inventoryLevels.map(inv => ({
+                            productId: newProduct.id,
+                            variantId: newVariant.id,
+                            locationId: inv.locationId,
+                            quantity: inv.quantity
+                        }))
+                    });
+                }
             }
         }
 
-        // ৪. লগ অ্যাক্টিভিটি
+        // ৬. লগ অ্যাক্টিভিটি
         if (dbUser) {
             await tx.activityLog.create({
                 data: {

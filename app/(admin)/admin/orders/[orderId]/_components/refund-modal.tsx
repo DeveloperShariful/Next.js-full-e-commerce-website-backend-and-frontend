@@ -1,4 +1,4 @@
-// File: app/admin/orders/_components/refund-modal.tsx
+// File: app/admin/orders/[orderId]/_components/refund-modal.tsx
 
 "use client";
 
@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { processRefund } from "@/app/actions/admin/order/process-refund";
+import { useGlobalStore } from "@/app/providers/global-store-provider"; // ✅ Global Import
 
 interface RefundModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ interface RefundModalProps {
 }
 
 export const RefundModal = ({ isOpen, onClose, order }: RefundModalProps) => {
+  const { formatPrice } = useGlobalStore(); // ✅ Hook
   const [loading, setLoading] = useState(false);
   
   const refundableAmount = order.total - (order.refundedAmount || 0);
@@ -71,7 +73,8 @@ export const RefundModal = ({ isOpen, onClose, order }: RefundModalProps) => {
           <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 flex gap-2">
              <AlertTriangle size={16} className="shrink-0"/>
              <div>
-                Available to refund: <strong>${refundableAmount.toFixed(2)}</strong>
+                {/* ✅ Global Formatting */}
+                Available to refund: <strong>{formatPrice(refundableAmount)}</strong>
                 <br/>Gateway: {order.paymentGateway?.toUpperCase()}
              </div>
           </div>
@@ -99,9 +102,7 @@ export const RefundModal = ({ isOpen, onClose, order }: RefundModalProps) => {
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="destructive" disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Confirm Refund

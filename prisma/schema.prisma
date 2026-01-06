@@ -209,6 +209,8 @@ model User {
   password           String?
   phone              String?   @unique
   image              String?
+  mediaId            String?
+  media              Media?    @relation(fields: [mediaId], references: [id])
   role               Role      @default(CUSTOMER)
   isActive           Boolean   @default(true)
   dateOfBirth        DateTime?
@@ -381,6 +383,8 @@ model Category {
   slug         String                @unique
   description  String?               @db.Text
   image        String?
+  mediaId      String?
+  media        Media?    @relation(fields: [mediaId], references: [id])
   isActive     Boolean               @default(true)
   menuOrder    Int                   @default(0)
   parentId     String?
@@ -417,6 +421,8 @@ model Brand {
   name              String
   slug              String             @unique
   logo              String?
+  logoMediaId       String?
+  logoMedia         Media?    @relation(fields: [logoMediaId], references: [id])
   description       String?            @db.Text
   website           String?
   countryOfOrigin   String?
@@ -453,6 +459,8 @@ model Collection {
   slug        String    @unique
   description String?   @db.Text
   image       String?
+  mediaId     String?
+  media       Media?    @relation(fields: [mediaId], references: [id])
   isActive    Boolean   @default(true)
   startDate   DateTime?
   endDate     DateTime?
@@ -492,6 +500,8 @@ model Product {
   tags                 Tag[]
   collections          Collection[]
   featuredImage        String?
+  featuredMediaId      String?
+  featuredMedia        Media?  @relation(fields: [featuredMediaId], references: [id])
   images               ProductImage[]
   videoUrl             String?
   videoThumbnail       String?
@@ -590,7 +600,10 @@ model ProductTranslation {
 model ProductImage {
   id        String          @id @default(uuid())
   url       String
+  title     String?
   altText   String?
+  width     Int?
+  height    Int?
   position  Int             @default(0)
   productId String
   product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -670,6 +683,8 @@ model ProductVariant {
   stock       Int      @default(0)
   trackQuantity Boolean @default(true)
   image       String?
+  mediaId     String?
+  media       Media?    @relation(fields: [mediaId], references: [id])
   images      ProductImage[]
   weight      Float?
   length      Float?
@@ -1185,6 +1200,8 @@ model BlogPost {
   content     String   @db.Text
   excerpt     String?
   image       String?
+  featuredMediaId String?
+  featuredMedia   Media? @relation(fields: [featuredMediaId], references: [id])
   authorId    String
   author      User     @relation(fields: [authorId], references: [id])
   isPublished Boolean  @default(false)
@@ -1306,6 +1323,10 @@ model StoreSettings {
   dimensionUnit       String  @default("cm")
   logo                String?
   favicon             String?
+  logoMediaId         String?
+  logoMedia           Media?  @relation("StoreLogo", fields: [logoMediaId], references: [id])
+  faviconMediaId       String?
+  faviconMedia        Media?  @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
   socialLinks         Json?
   smtpConfig          Json?
   maintenance         Boolean @default(false)
@@ -1444,6 +1465,8 @@ model EmailConfiguration {
   smtpPassword        String?
   encryption          String?  @default("tls")
   headerImage         String?
+  mediaId             String?
+  media               Media?    @relation(fields: [mediaId], references: [id])
   footerText          String?  @default("© 2025 GoBike. All rights reserved.")
   baseColor           String?  @default("#2271b1")
   backgroundColor     String?  @default("#F7F7F7")
@@ -1572,6 +1595,10 @@ model Media {
   url           String
   type          MediaType      @default(IMAGE)
   filename      String
+  originalName  String?
+  publicId      String?
+  width         Int?
+  height        Int?
   mimeType      String
   size          Int
   altText       String?
@@ -1583,6 +1610,19 @@ model Media {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   productImages ProductImage[]
+  categories    Category[]
+  brands        Brand[]
+  products      Product[]
+  variants      ProductVariant[]
+  blogPosts     BlogPost[]
+  
+  storeLogos    StoreSettings[] @relation("StoreLogo")
+  storeFavicons StoreSettings[] @relation("StoreFavicon")
+  users         User[]
+  collections   Collection[]
+  banners       Banner[]
+  emailConfigs  EmailConfiguration[]
+  seoConfigs    SeoGlobalConfig[]
 
   @@index([folderId])
   @@index([createdAt(sort: Desc)])
@@ -1612,6 +1652,8 @@ model SeoGlobalConfig {
   sitemapEnabled   Boolean  @default(true)
   isPublic         Boolean  @default(true)
   ogImage          String?
+  ogMediaId        String?
+  ogMedia          Media?    @relation(fields: [ogMediaId], references: [id])
   ogImageWidth     Int?     @default(1200)
   ogImageHeight    Int?     @default(630)
   ogType           String   @default("website")
@@ -1657,6 +1699,8 @@ model Banner {
   id        String   @id @default(uuid())
   title     String
   image     String
+  mediaId   String?
+  media     Media?    @relation(fields: [mediaId], references: [id])
   link      String?
   position  Int      @default(0)
   isActive  Boolean  @default(true)

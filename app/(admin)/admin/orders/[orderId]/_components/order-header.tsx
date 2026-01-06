@@ -1,4 +1,4 @@
-// File: app/admin/orders/_components/order-header.tsx
+// File: app/admin/orders/[orderId]/_components/order-header.tsx
 
 "use client"
 

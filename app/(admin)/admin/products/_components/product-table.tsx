@@ -9,7 +9,7 @@ import { Search, Image as ImageIcon, Star } from "lucide-react";
 import { bulkProductAction, moveToTrash } from "@/app/actions/admin/product/product-list"; 
 import { duplicateProduct } from "@/app/actions/admin/product/duplicate-product"; 
 import { toast } from "react-hot-toast";
-import { useGlobalStore } from "@/app/providers/global-store-provider"; // 🚀 Hook Import
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface ProductTableProps {
   products: any[];
@@ -23,7 +23,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   
-  // 🚀 Use Global Formatter
   const { formatPrice } = useGlobalStore();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -246,7 +245,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
                        )}
                     </td>
                     <td className="p-3 whitespace-nowrap">
-                       {/* 🚀 Dynamic Price Formatting */}
                        {product.salePrice ? (
                           <div className="flex flex-col">
                              <span className="line-through text-slate-400 text-xs">{formatPrice(product.price)}</span>
@@ -264,8 +262,8 @@ export default function ProductTable({ products, categories, counts, statusFilte
                     </td>
                     <td className="p-3 text-slate-600 hidden 2xl:table-cell">
                        {product.tags && product.tags.length > 0 
-                         ? product.tags.map((t:any) => t.name).join(', ') 
-                         : <span className="text-slate-400">–</span>}
+                          ? product.tags.map((t:any) => t.name).join(', ') 
+                          : <span className="text-slate-400">–</span>}
                     </td>
                     <td className="p-3 text-center hidden sm:table-cell">
                        <Star size={16} className={`mx-auto cursor-pointer transition-colors ${product.isFeatured ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300 hover:text-yellow-400'}`} />

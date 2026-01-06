@@ -4,22 +4,32 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
-export async function deleteOrder(orderId: string) {
+export async function deleteOrder(orderId: string, force: boolean = false) {
   try {
-    if (!orderId) return { success: false, error: "Order ID missing" };
+    if (!orderId) {
+      return { success: false, error: "Order ID is required" };
+    }
 
-    await db.order.delete({
-      where: { id: orderId }
-    });
-
-    revalidatePath("/admin/orders");
-    // সফল হলে কিছুই রিটার্ন করছি না, ফ্রন্টএন্ড থেকে রিডাইরেক্ট বা রিফ্রেশ হ্যান্ডেল করা হবে
-    return { success: true, message: "Order deleted successfully" };
+    if (force) {
+      // 🔴 Permanent Delete (ফাইল, লগ সব মুছে যাবে)
+      await db.order.delete({
+        where: { id: orderId }
+      });
+      revalidatePath("/admin/orders");
+      return { success: true, message: "Order permanently deleted" };
+    } else {
+      // 🟡 Soft Delete (Trash এ পাঠানো)
+      await db.order.update({
+        where: { id: orderId },
+        data: { deletedAt: new Date() } // স্কিমার deletedAt ফিল্ড ব্যবহার করা হচ্ছে
+      });
+      revalidatePath("/admin/orders");
+      return { success: true, message: "Moved to trash" };
+    }
 
   } catch (error) {
-    console.error("DELETE_ORDER_ERROR", error);
-    return { success: false, error: "Failed to delete order" };
+    console.error("DELETE_ORDER_ERROR:", error);
+    return { success: false, error: "Operation failed" };
   }
 }

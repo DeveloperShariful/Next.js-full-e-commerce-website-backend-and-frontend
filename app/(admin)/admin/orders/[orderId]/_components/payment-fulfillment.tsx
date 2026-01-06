@@ -1,5 +1,4 @@
-// File Location: app/admin/orders/_components/payment-fulfillment.tsx
-
+// File Location: app/admin/orders/[orderId]/_components/payment-fulfillment.tsx
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,19 +9,12 @@ import { Truck, CreditCard, ExternalLink, PackageCheck, Loader2, Info } from "lu
 import { addTrackingInfo } from "@/app/actions/admin/order/fulfillment"; 
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { useGlobalStore } from "@/app/providers/global-store-provider"; // ✅ Global Import
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const PaymentFulfillment = ({ order }: { order: any }) => {
+  const { formatPrice } = useGlobalStore(); // ✅ Use Global Formatter
   const [loading, setLoading] = useState(false);
-
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency || 'USD' }).format(amount);
-  };
 
   const handleTracking = async (formData: FormData) => {
     setLoading(true);
@@ -32,8 +24,6 @@ export const PaymentFulfillment = ({ order }: { order: any }) => {
     setLoading(false);
   }
 
-  // 👇 REAL DATA LOGIC
-  // ডাটাবেসে যদি ফি থাকে, সেটাই দেখাবো। না থাকলে ০।
   const fee = order.paymentFee || 0;
   const net = order.netAmount || (order.total - fee);
 
@@ -62,12 +52,12 @@ export const PaymentFulfillment = ({ order }: { order: any }) => {
                     </div>
                 </div>
 
-                {/* 👇 REAL FEE SECTION */}
+                {/* FEE SECTION */}
                 {order.paymentStatus === 'PAID' && (
                     <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 space-y-2">
                         <div className="flex justify-between text-xs">
                             <span className="text-slate-500">Total Paid</span>
-                            <span className="font-bold text-slate-700">{formatMoney(order.total)}</span>
+                            <span className="font-bold text-slate-700">{formatPrice(order.total)}</span>
                         </div>
                         <div className="flex justify-between text-xs">
                             <span className="text-red-500 flex items-center gap-1">
@@ -79,11 +69,11 @@ export const PaymentFulfillment = ({ order }: { order: any }) => {
                                     </Tooltip>
                                 </TooltipProvider>
                             </span>
-                            <span className="text-red-500 font-mono">-{formatMoney(fee)}</span>
+                            <span className="text-red-500 font-mono">-{formatPrice(fee)}</span>
                         </div>
                         <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-bold">
                             <span className="text-green-700">Net Profit</span>
-                            <span className="text-green-700">{formatMoney(net)}</span>
+                            <span className="text-green-700">{formatPrice(net)}</span>
                         </div>
                     </div>
                 )}
@@ -97,7 +87,7 @@ export const PaymentFulfillment = ({ order }: { order: any }) => {
             </CardContent>
         </Card>
 
-        {/* Fulfillment Card Code (No Change Needed here, keeping it same) */}
+        {/* Fulfillment Card */}
         <Card className="border-slate-200 shadow-sm">
             <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
                 <CardTitle className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2 tracking-wider">
@@ -128,7 +118,6 @@ export const PaymentFulfillment = ({ order }: { order: any }) => {
                 ) : null}
                 {order.shipments && order.shipments.length > 0 && (
                     <div className="mt-4 space-y-3">
-                         {/* Shipment history UI stays same */}
                         <p className="text-xs font-bold text-slate-400 uppercase">Shipment History</p>
                         {order.shipments.map((ship: any) => (
                             <div key={ship.id} className="bg-white p-3 rounded border border-blue-100 shadow-sm flex justify-between items-center">

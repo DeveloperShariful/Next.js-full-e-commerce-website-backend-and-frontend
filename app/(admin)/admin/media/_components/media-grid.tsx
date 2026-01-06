@@ -1,8 +1,10 @@
+// app/(admin)/admin/media/_components/media-grid.tsx
+
 "use client";
 
 import Image from "next/image";
 import { CheckSquare, Square, FileText } from "lucide-react";
-import { MediaItem } from "@/app/actions/admin/media";
+import { MediaItem } from "@/app/actions/admin/media/media-read";
 
 interface MediaGridProps {
   data: MediaItem[];
@@ -34,7 +36,7 @@ export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick }: Me
             </div>
 
             {/* Content */}
-            <div className="w-full h-full relative bg-slate-50 flex items-center justify-center">
+            <div className="w-full h-full relative bg-slate-50 flex items-center justify-center pb-10"> {/* 🔥 Added pb-10 so text doesn't cover content */}
                {item.type === 'IMAGE' ? (
                   <Image src={item.url} alt={item.altText || item.filename} fill className="object-cover"/>
                ) : (
@@ -45,10 +47,13 @@ export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick }: Me
                )}
             </div>
             
-            {/* Footer Label */}
-            <div className="absolute bottom-0 inset-x-0 bg-white/95 backdrop-blur-sm p-2 translate-y-full group-hover:translate-y-0 transition-transform duration-200 border-t border-slate-100">
+            {/* Footer Label - 🔥 ALWAYS VISIBLE (Removed translate-y-full) */}
+            <div className="absolute bottom-0 inset-x-0 bg-white border-t border-slate-100 p-2">
                <p className="text-xs font-bold text-slate-700 truncate">{item.filename}</p>
-               <p className="text-[10px] text-slate-500 uppercase">{item.mimeType.split('/')[1]} • {(item.size / 1024).toFixed(0)} KB</p>
+               <p className="text-[10px] text-slate-500 uppercase flex justify-between">
+                  <span>{item.mimeType.split('/')[1]}</span>
+                  <span>{(item.size / 1024).toFixed(0)} KB</span>
+               </p>
             </div>
          </div>
       ))}

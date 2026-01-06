@@ -2,18 +2,17 @@
 
 "use client";
 
-import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { OrderStatus, PaymentStatus } from "@prisma/client";
+import { useGlobalStore } from "@/app/providers/global-store-provider"; // ✅ Global Import
 import { formatDistanceToNow } from "date-fns";
-import { MoreHorizontal, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import Link from "next/link";
 
 interface RecentOrdersProps {
-  orders: any[]; // Using any for brevity, ideally use Prisma Type
+  orders: any[];
 }
 
 export function RecentOrders({ orders }: RecentOrdersProps) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice } = useGlobalStore(); // ✅ Use Global Formatter
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -72,6 +71,7 @@ export function RecentOrders({ orders }: RecentOrdersProps) {
                     )}
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-slate-700">
+                    {/* ✅ Global Formatting */}
                     {formatPrice(order.total)}
                   </td>
                   <td className="px-6 py-4 text-right">

@@ -12,7 +12,8 @@ interface ImageUploadProps {
   onChange: (value: string) => void;
   onRemove: (value: string) => void;
   value: string[];
-  showPreview?: boolean; // 🔥 NEW PROP: To control preview visibility
+  showPreview?: boolean;
+  onUploadSuccess?: (result: any) => void;
 }
 
 export default function ImageUpload({
@@ -20,7 +21,8 @@ export default function ImageUpload({
   onChange,
   onRemove,
   value,
-  showPreview = true // Default is true
+  showPreview = true,
+  onUploadSuccess
 }: ImageUploadProps) {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -30,32 +32,25 @@ export default function ImageUpload({
 
   const onUpload = (result: any) => {
     onChange(result.info.secure_url);
+    if (onUploadSuccess) {
+        onUploadSuccess(result);
+    }
   };
 
   if (!isMounted) return null;
 
   return (
     <div>
-      {/* 🔥 CONDITIONALLY RENDER PREVIEW */}
       {showPreview && (
         <div className="mb-4 flex items-center gap-4 flex-wrap">
           {value.map((url, index) => (
             <div key={url + index} className="relative w-[100px] h-[100px] rounded-md overflow-hidden border border-gray-200 group">
               <div className="z-10 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
-                <button 
-                  type="button" 
-                  onClick={() => onRemove(url)} 
-                  className="bg-red-500 text-white p-1 rounded-full shadow-sm hover:bg-red-600"
-                >
+                <button type="button" onClick={() => onRemove(url)} className="bg-red-500 text-white p-1 rounded-full shadow-sm hover:bg-red-600">
                   <X size={14} />
                 </button>
               </div>
-              <Image 
-                fill 
-                className="object-cover" 
-                alt="Image" 
-                src={url} 
-              />
+              <Image fill className="object-cover" alt="Image" src={url} />
             </div>
           ))}
         </div>
@@ -66,12 +61,14 @@ export default function ImageUpload({
         uploadPreset="my_shop_preset" 
         options={{
           multiple: true,
-          maxFiles: 15
+          maxFiles: 20, 
+          resourceType: "auto",
+        
         }}
       >
         {({ open }) => {
           const handleOnClick = () => {
-            open();
+            if (open) open();
           }
           return (
             <button
@@ -81,7 +78,7 @@ export default function ImageUpload({
               className="flex items-center justify-center gap-2 bg-slate-100 border border-slate-300 w-full p-8 rounded-lg text-slate-600 hover:bg-slate-200 transition border-dashed"
             >
               <ImagePlus size={30} />
-              <span className="font-medium">Upload Images</span>
+              <span className="font-medium">Select Files</span>
             </button>
           );
         }}

@@ -1,25 +1,26 @@
 // app/admin/products/create/_components/LinkedProducts.tsx
 
 import { useState, useEffect } from "react";
-import { ComponentProps } from "../types";
+import { useFormContext } from "react-hook-form";
 import { X, Search, Loader2 } from "lucide-react";
-// Import the new search action
 import { searchProducts } from "@/app/actions/admin/product/product-read";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { ProductFormData } from "../types";
 
-export default function LinkedProducts({ data, updateData }: ComponentProps) {
-    // Inputs for search text
+export default function LinkedProducts() {
+    const { watch, setValue } = useFormContext<ProductFormData>();
+    const upsells = watch("upsells") || [];
+    const crossSells = watch("crossSells") || [];
+    
+    const { formatPrice } = useGlobalStore();
+
     const [upsellInput, setUpsellInput] = useState("");
     const [crossSellInput, setCrossSellInput] = useState("");
-    
-    // Search Results State
     const [upsellResults, setUpsellResults] = useState<any[]>([]);
     const [crossSellResults, setCrossSellResults] = useState<any[]>([]);
-    
-    // Loading State
     const [loadingUpsell, setLoadingUpsell] = useState(false);
     const [loadingCrossSell, setLoadingCrossSell] = useState(false);
 
-    // --- UPSELL SEARCH LOGIC ---
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (upsellInput.length > 1) {
@@ -30,12 +31,10 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
             } else {
                 setUpsellResults([]);
             }
-        }, 300); // 300ms delay to prevent too many requests
-
+        }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [upsellInput]);
 
-    // --- CROSS-SELL SEARCH LOGIC ---
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (crossSellInput.length > 1) {
@@ -47,17 +46,15 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
                 setCrossSellResults([]);
             }
         }, 300);
-
         return () => clearTimeout(delayDebounceFn);
     }, [crossSellInput]);
 
-
-    // Add Handler
     const addProduct = (type: 'upsells' | 'crossSells', id: string) => {
-        if (!data[type].includes(id)) {
-            updateData(type, [...data[type], id]);
+        const currentList = type === 'upsells' ? upsells : crossSells;
+        if (!currentList.includes(id)) {
+            setValue(type, [...currentList, id], { shouldDirty: true, shouldValidate: true });
         }
-        // Clear input and results
+        
         if (type === 'upsells') {
             setUpsellInput("");
             setUpsellResults([]);
@@ -68,19 +65,18 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
     };
 
     const removeProduct = (type: 'upsells' | 'crossSells', id: string) => {
-        updateData(type, data[type].filter(item => item !== id));
+        const currentList = type === 'upsells' ? upsells : crossSells;
+        setValue(type, currentList.filter(item => item !== id), { shouldDirty: true, shouldValidate: true });
     };
 
     return (
         <div className="space-y-6 max-w-lg">
-            {/* --- UPSELLS SECTION --- */}
             <div className="space-y-2 relative">
                 <div className="flex items-center gap-2 mb-1">
                     <label className="text-xs font-bold text-gray-700">Upsells</label>
                     <span className="text-[10px] text-gray-400 cursor-help" title="Products you recommend instead of the current one">(?)</span>
                 </div>
                 
-                {/* Search Input */}
                 <div className="relative">
                     <input 
                         value={upsellInput}
@@ -95,13 +91,12 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
                     )}
                 </div>
 
-                {/* Suggestions Dropdown */}
                 {upsellResults.length > 0 && (
                     <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-sm shadow-lg max-h-48 overflow-y-auto mt-1">
                         {upsellResults.map((prod) => (
                             <li 
                                 key={prod.id} 
-                                onClick={() => addProduct('upsells', prod.id)} // Storing ID
+                                onClick={() => addProduct('upsells', prod.id)}
                                 className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-xs flex items-center gap-2 border-b border-gray-100 last:border-0"
                             >
                                 <img src={prod.featuredImage || prod.image || "/placeholder.jpg"} className="w-6 h-6 object-cover rounded" alt="" />
@@ -114,11 +109,9 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
                     </ul>
                 )}
 
-                {/* Selected Items List */}
                 <div className="flex flex-wrap gap-2">
-                    {data.upsells?.map((id, i) => (
+                    {upsells.map((id, i) => (
                         <span key={i} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs flex items-center gap-1">
-                            {/* Note: Showing ID here. Ideally, you fetch names to display prettily */}
                             <span className="max-w-[150px] truncate">{id}</span> 
                             <X size={12} className="cursor-pointer hover:text-red-600" onClick={() => removeProduct('upsells', id)}/>
                         </span>
@@ -126,14 +119,12 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
                 </div>
             </div>
 
-            {/* --- CROSS-SELLS SECTION --- */}
             <div className="space-y-2 relative">
                 <div className="flex items-center gap-2 mb-1">
                     <label className="text-xs font-bold text-gray-700">Cross-sells</label>
                     <span className="text-[10px] text-gray-400 cursor-help" title="Products you promote in the cart">(?)</span>
                 </div>
                 
-                {/* Search Input */}
                 <div className="relative">
                     <input 
                         value={crossSellInput}
@@ -148,13 +139,12 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
                     )}
                 </div>
 
-                {/* Suggestions Dropdown */}
                 {crossSellResults.length > 0 && (
                     <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-sm shadow-lg max-h-48 overflow-y-auto mt-1">
                         {crossSellResults.map((prod) => (
                             <li 
                                 key={prod.id} 
-                                onClick={() => addProduct('crossSells', prod.id)} // Storing ID
+                                onClick={() => addProduct('crossSells', prod.id)}
                                 className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-xs flex items-center gap-2 border-b border-gray-100 last:border-0"
                             >
                                 <img src={prod.featuredImage || prod.image || "/placeholder.jpg"} className="w-6 h-6 object-cover rounded" alt="" />
@@ -167,9 +157,8 @@ export default function LinkedProducts({ data, updateData }: ComponentProps) {
                     </ul>
                 )}
 
-                {/* Selected Items List */}
                 <div className="flex flex-wrap gap-2">
-                    {data.crossSells?.map((id, i) => (
+                    {crossSells.map((id, i) => (
                         <span key={i} className="bg-gray-100 border border-gray-300 rounded px-2 py-1 text-xs flex items-center gap-1">
                             <span className="max-w-[150px] truncate">{id}</span>
                             <X size={12} className="cursor-pointer hover:text-red-600" onClick={() => removeProduct('crossSells', id)}/>

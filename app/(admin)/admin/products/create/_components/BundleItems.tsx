@@ -1,16 +1,23 @@
 // app/admin/products/create/_components/BundleItems.tsx
 
 import { useState, useEffect } from "react";
-import { ComponentProps } from "../types";
+import { useFormContext } from "react-hook-form";
 import { X, Search, Loader2, Plus, Package } from "lucide-react";
 import { searchProducts } from "@/app/actions/admin/product/product-read";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { BundleItem, ProductFormData } from "../types";
 
-export default function BundleItems({ data, updateData }: ComponentProps) {
+export default function BundleItems() {
+    const { watch, setValue } = useFormContext<ProductFormData>();
+    const bundleItems = watch("bundleItems") || [];
+    const productId = watch("id");
+
+    const { formatPrice } = useGlobalStore();
+
     const [input, setInput] = useState("");
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Search Logic with Debounce
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (input.length > 1) {
@@ -26,34 +33,31 @@ export default function BundleItems({ data, updateData }: ComponentProps) {
     }, [input]);
 
     const addProduct = (prod: any) => {
-        // Prevent adding same product twice
-        if (data.bundleItems.some(item => item.childProductId === prod.id)) return;
-        
-        // Prevent adding self
-        if (data.id === prod.id) return;
+        if (bundleItems.some((item) => item.childProductId === prod.id)) return;
+        if (productId === prod.id) return;
 
-        const newItem = {
+        const newItem: BundleItem = {
             childProductId: prod.id,
             childProductName: prod.name,
             childProductImage: prod.featuredImage || prod.images?.[0]?.url,
-            quantity: 1 // Default Quantity
+            quantity: 1
         };
 
-        updateData('bundleItems', [...data.bundleItems, newItem]);
+        setValue("bundleItems", [...bundleItems, newItem]);
         setInput("");
         setResults([]);
     };
 
     const removeProduct = (id: string) => {
-        updateData('bundleItems', data.bundleItems.filter(item => item.childProductId !== id));
+        setValue("bundleItems", bundleItems.filter((item) => item.childProductId !== id));
     };
 
     const updateQuantity = (id: string, qty: number) => {
         if (qty < 1) return;
-        const newItems = data.bundleItems.map(item => 
+        const newItems = bundleItems.map((item) => 
             item.childProductId === id ? { ...item, quantity: qty } : item
         );
-        updateData('bundleItems', newItems);
+        setValue("bundleItems", newItems);
     };
 
     return (
@@ -72,7 +76,6 @@ export default function BundleItems({ data, updateData }: ComponentProps) {
             <div className="space-y-2 relative">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Search Products to Add</label>
                 
-                {/* Search Input */}
                 <div className="relative">
                     <input 
                         value={input}
@@ -87,7 +90,6 @@ export default function BundleItems({ data, updateData }: ComponentProps) {
                     )}
                 </div>
 
-                {/* Suggestions Dropdown */}
                 {results.length > 0 && (
                     <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-sm shadow-xl max-h-60 overflow-y-auto mt-1">
                         {results.map((prod) => (
@@ -101,7 +103,9 @@ export default function BundleItems({ data, updateData }: ComponentProps) {
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="font-semibold text-gray-800 text-sm">{prod.name}</span>
-                                    <span className="text-[11px] text-gray-500">SKU: {prod.sku || 'N/A'} | Price: {prod.price}</span>
+                                    <span className="text-[11px] text-gray-500">
+                                        SKU: {prod.sku || 'N/A'} | Price: {formatPrice(prod.price)}
+                                    </span>
                                 </div>
                                 <Plus size={16} className="ml-auto text-[#2271b1]"/>
                             </li>
@@ -110,8 +114,7 @@ export default function BundleItems({ data, updateData }: ComponentProps) {
                 )}
             </div>
 
-            {/* Selected Bundle Items Table */}
-            {data.bundleItems.length > 0 ? (
+            {bundleItems.length > 0 ? (
                 <div className="border border-gray-300 rounded-sm overflow-hidden shadow-sm mt-4">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-gray-50 border-b border-gray-300 font-semibold text-gray-700 text-xs uppercase">
@@ -122,7 +125,7 @@ export default function BundleItems({ data, updateData }: ComponentProps) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 bg-white">
-                            {data.bundleItems.map((item) => (
+                            {bundleItems.map((item) => (
                                 <tr key={item.childProductId} className="hover:bg-gray-50 transition">
                                     <td className="p-3">
                                         <div className="flex items-center gap-3">

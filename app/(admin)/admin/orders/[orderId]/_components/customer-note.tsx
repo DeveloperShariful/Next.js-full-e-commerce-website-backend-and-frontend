@@ -1,4 +1,4 @@
-// File Location: app/admin/orders/_components/customer-note.tsx
+// File Location: app/admin/orders/[orderId]/_components/customer-note.tsx
 
 "use client"
 

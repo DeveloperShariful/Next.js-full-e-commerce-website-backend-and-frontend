@@ -13,9 +13,11 @@ interface GiftCardInputProps {
     onApply: (giftCard: any) => void;
     onRemove: () => void;
     appliedCard: any;
+    // ✅ New: Dynamic Price Formatter
+    formatPrice: (price: number) => string;
 }
 
-export const GiftCardInput = ({ onApply, onRemove, appliedCard }: GiftCardInputProps) => {
+export const GiftCardInput = ({ onApply, onRemove, appliedCard, formatPrice }: GiftCardInputProps) => {
     const [code, setCode] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -43,8 +45,9 @@ export const GiftCardInput = ({ onApply, onRemove, appliedCard }: GiftCardInputP
                     <span>Card <strong>{appliedCard.code}</strong> applied</span>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* ✅ Dynamic Balance Display */}
                     <span className="text-xs font-bold text-purple-700 bg-white px-2 py-1 rounded border border-purple-100">
-                        -${appliedCard.balance}
+                        -{formatPrice(appliedCard.balance)}
                     </span>
                     <Button size="icon" variant="ghost" className="h-6 w-6 text-purple-400 hover:text-red-500" onClick={onRemove}>
                         <X size={14}/>

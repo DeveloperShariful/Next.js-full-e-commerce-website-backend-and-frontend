@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { validateDiscount } from "@/app/actions/admin/order/create_order/validate-discount";
 import { toast } from "sonner";
-import { Tag } from "lucide-react";
+import { Tag, Loader2 } from "lucide-react";
 
 interface CouponProps {
     cartSubtotal: number;
@@ -58,9 +58,9 @@ export const Coupon = ({ cartSubtotal, onApplyDiscount }: CouponProps) => {
                         variant={applied ? "outline" : "default"}
                         onClick={handleApply} 
                         disabled={loading || applied}
-                        className={applied ? "text-green-600 border-green-200" : "bg-slate-900"}
+                        className={`w-20 ${applied ? "text-green-600 border-green-200" : "bg-slate-900 hover:bg-slate-800 text-white"}`}
                     >
-                        {applied ? "Applied" : "Apply"}
+                        {loading ? <Loader2 size={14} className="animate-spin"/> : (applied ? "Applied" : "Apply")}
                     </Button>
                 </div>
             </div>

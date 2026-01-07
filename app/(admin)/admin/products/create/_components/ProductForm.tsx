@@ -67,7 +67,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
         const value = (data as any)[key];
         
         // Handle Arrays/Objects with JSON.stringify
-        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles', 'bundleItems'].includes(key)) {
+        // 🔥 UPDATE: Added 'inventoryData' to this list so multi-warehouse stock saves correctly
+        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles', 'bundleItems', 'inventoryData'].includes(key)) {
             formData.append(key, JSON.stringify(value));
         } 
         // Handle Booleans & Strings

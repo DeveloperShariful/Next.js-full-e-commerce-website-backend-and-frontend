@@ -96,7 +96,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
   };
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
+    <div className="p-3 md:p-6 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         
@@ -113,7 +113,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
             + Add New
           </Link>
           
-          <div className="flex gap-2 flex-1 md:flex-none justify-end md:justify-start">
+          <div className="flex gap-1 flex-1 md:flex-none justify-end md:justify-start">
              <ImportExportButtons />
              <ProductLogViewer />
           </div>

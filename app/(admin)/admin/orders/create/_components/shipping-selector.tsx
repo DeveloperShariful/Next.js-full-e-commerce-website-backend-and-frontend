@@ -7,8 +7,7 @@ import { getShippingResources } from "@/app/actions/admin/order/create_order/get
 import { getTransdirectQuotes } from "@/app/actions/admin/order/create_order/get-transdirect-quotes"; 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Truck, MapPin, ClipboardList, Loader2, Store, CheckCircle } from "lucide-react";
+import { Truck, MapPin, Loader2, Store, CheckCircle } from "lucide-react";
 
 interface ShippingSelectorProps {
   onPickupLocationChange: (id: string | null) => void;
@@ -17,6 +16,8 @@ interface ShippingSelectorProps {
   onCustomerNoteChange: (note: string) => void;
   address?: { city: string; postcode: string; state: string } | null;
   cartItems: any[];
+  // ✅ Dynamic Price Formatter passed from parent
+  formatPrice: (price: number) => string;
 }
 
 export const ShippingSelector = ({
@@ -25,7 +26,8 @@ export const ShippingSelector = ({
   onAdminNoteChange,
   onCustomerNoteChange,
   address,
-  cartItems
+  cartItems,
+  formatPrice
 }: ShippingSelectorProps) => {
   const [loadingLocal, setLoadingLocal] = useState(true);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
@@ -36,16 +38,16 @@ export const ShippingSelector = ({
   
   const [selectedMethod, setSelectedMethod] = useState<string>("");
 
-  // ১. নাম সুন্দর করার ফাংশন (tnt_road_express -> TNT Road Express)
+  // Helper to beautify service names
   const formatServiceName = (name: string) => {
     return name
       .replace(/_/g, " ")
       .replace(/\b\w/g, (char) => char.toUpperCase())
-      .replace("Tnt", "TNT") // Special case
+      .replace("Tnt", "TNT")
       .replace("Dhl", "DHL");
   };
 
-  // ২. লোকাল রেট লোড
+  // 1. Load Local Rates & Pickup Points
   useEffect(() => {
     const loadResources = async () => {
       setLoadingLocal(true);
@@ -65,7 +67,7 @@ export const ShippingSelector = ({
     loadResources();
   }, []);
 
-  // ৩. লাইভ কোট ফেচ (Transdirect)
+  // 2. Fetch Live Quotes (Transdirect)
   useEffect(() => {
     if (!address?.postcode || !address?.city || cartItems.length === 0) {
         setLiveQuotes([]); 
@@ -74,7 +76,7 @@ export const ShippingSelector = ({
 
     const fetchLiveQuotes = async () => {
         setLoadingQuotes(true);
-        // রিসেট: নতুন কোট আসার আগে সিলেকশন মুছে ফেলা হচ্ছে
+        // Reset selection when inputs change
         setSelectedMethod(""); 
         onShippingCostChange(0);
 
@@ -93,6 +95,7 @@ export const ShippingSelector = ({
         setLoadingQuotes(false);
     };
 
+    // Debounce to avoid too many API calls
     const timeout = setTimeout(() => {
         fetchLiveQuotes();
     }, 1000);
@@ -100,14 +103,13 @@ export const ShippingSelector = ({
     return () => clearTimeout(timeout);
   }, [address, cartItems]); 
 
-  // ৪. মেথড ফিল্টারিং এবং সর্টিং
+  // 3. Merge & Sort Methods
   const allMethods = useMemo(() => {
-      // যদি লাইভ কোট থাকে, তাহলে লোকাল ডাটাবেসের "Transdirect Shipping" ($0) বা "Standard" অপশনগুলো বাদ দিব
-      // যাতে ডুপ্লিকেট বা কনফিউশন না হয়।
+      // Filter out local rates that might duplicate live quotes if needed
       const filteredLocalRates = localRates.filter(r => {
-          // যদি লাইভ কোট থাকে, তাহলে যেসব রেটের নাম Transdirect বা Courier দিয়ে শুরু, সেগুলো বাদ
           if (liveQuotes.length > 0) {
               const nameLower = r.name.toLowerCase();
+              // Example logic: hide generic local rates if live quotes exist
               return !nameLower.includes("transdirect") && !nameLower.includes("carrier");
           }
           return true;
@@ -120,12 +122,12 @@ export const ShippingSelector = ({
       ].sort((a, b) => a.price - b.price); 
   }, [localRates, liveQuotes, pickupPoints]);
 
-  // ৫. সিলেকশন হ্যান্ডলার
+  // 4. Handle Selection
   const handleMethodClick = (methodId: string) => {
       const method = allMethods.find(m => m.id === methodId);
       if (method) {
           setSelectedMethod(methodId);
-          onShippingCostChange(method.price); // প্যারেন্টে প্রাইস পাঠানো
+          onShippingCostChange(method.price); 
           
           if (method.type !== 'pickup') {
               onPickupLocationChange(null);
@@ -178,7 +180,6 @@ export const ShippingSelector = ({
                             <div className="flex flex-col">
                                 <span className={`text-xs font-bold flex items-center gap-2 ${selectedMethod === method.id ? 'text-blue-700' : 'text-slate-700'}`}>
                                     {method.type === 'transdirect' ? <Truck size={14} className="text-blue-500"/> : method.type === 'pickup' ? <Store size={14} className="text-green-600"/> : <MapPin size={14} className="text-slate-400"/>}
-                                    {/* ফরম্যাট করা নাম */}
                                     {formatServiceName(method.name)}
                                 </span>
                                 {method.transit_time && (
@@ -189,7 +190,8 @@ export const ShippingSelector = ({
                             </div>
                             <div className="text-right">
                                 <span className={`text-sm font-bold ${selectedMethod === method.id ? 'text-blue-700' : 'text-slate-900'}`}>
-                                    ${method.price.toFixed(2)}
+                                    {/* ✅ Dynamic Price */}
+                                    {formatPrice(method.price)}
                                 </span>
                             </div>
                         </div>
@@ -206,6 +208,7 @@ export const ShippingSelector = ({
         )}
       </div>
 
+      {/* Pickup Location Select */}
       {selectedMethod === "pickup_only" && (
         <div className="space-y-2 animate-in fade-in slide-in-from-top-1 bg-green-50 p-3 rounded border border-green-100">
           <Label className="text-[11px] font-bold text-green-700 uppercase flex items-center gap-1">

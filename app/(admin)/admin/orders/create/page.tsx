@@ -15,7 +15,9 @@ import { CustomerSelector } from "./_components/customer-selector";
 import { OrderSummary } from "./_components/order-summary";
 import { Coupon } from "./_components/coupon"; 
 import { ShippingSelector } from "./_components/shipping-selector"; 
-import { GiftCardInput } from "./_components/gift-card-input"; // ✅ NEW IMPORT
+import { GiftCardInput } from "./_components/gift-card-input"; 
+// ✅ Global Store Hook
+import { useGlobalStore } from "@/app/providers/global-store-provider"; 
 
 interface CartItem {
   productId: string;
@@ -34,6 +36,17 @@ interface CartItem {
 
 export default function CreateOrderPage() {
   const router = useRouter();
+  
+  // ✅ Fetch Dynamic Settings
+  const { 
+    currency,       // e.g. "AUD"
+    symbol,         // e.g. "A$"
+    weightUnit,     // e.g. "kg"
+    dimensionUnit,  // e.g. "cm"
+    features,       // e.g. guestCheckout enabled/disabled
+    formatPrice     // Helper function
+  } = useGlobalStore();
+
   const [loading, setLoading] = useState(false);
 
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -42,17 +55,18 @@ export default function CreateOrderPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [shippingCost, setShippingCost] = useState(0);
   const [appliedDiscount, setAppliedDiscount] = useState<any>(null);
-  const [appliedGiftCard, setAppliedGiftCard] = useState<any>(null); // ✅ NEW STATE
+  const [appliedGiftCard, setAppliedGiftCard] = useState<any>(null); 
   
   const [pickupLocationId, setPickupLocationId] = useState<string | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [customerNote, setCustomerNote] = useState("");
-  const [transitTime, setTransitTime] = useState(""); // ✅ Transit Time State
+  const [transitTime, setTransitTime] = useState("");
 
+  // --- Calculations ---
   const totals = useMemo(() => {
     const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     
-    // Discount Calculation
+    // Discount Logic
     let discountAmount = 0;
     if (appliedDiscount) {
       discountAmount = appliedDiscount.type === "PERCENTAGE" 
@@ -61,12 +75,13 @@ export default function CreateOrderPage() {
     }
     
     const taxableAmount = Math.max(0, subtotal - discountAmount + shippingCost);
+    
+    // Tax Logic (Simple 10% for now, can be enhanced with tax settings later)
     const taxTotal = taxableAmount * 0.10; 
     
-    // Total before Gift Card
     const grossTotal = taxableAmount + taxTotal;
 
-    // Gift Card Deduction
+    // Gift Card Logic
     let giftCardDeduction = 0;
     if (appliedGiftCard) {
         giftCardDeduction = Math.min(appliedGiftCard.balance, grossTotal);
@@ -90,6 +105,7 @@ export default function CreateOrderPage() {
       return guestInputAddress;
   }, [selectedCustomer, guestInputAddress]);
 
+  // --- Handlers ---
   const addToCart = (product: any, variant?: any) => {
     const price = variant ? variant.price : product.price;
     const stock = variant ? variant.stock : product.stock;
@@ -121,6 +137,7 @@ export default function CreateOrderPage() {
         sku,
         image: product.featuredImage,
         maxStock: stock,
+        // Using DB values (assumed to match global units logic)
         weight: Number(variant?.weight || product.weight || 1),
         length: Number(variant?.length || product.length || 10),
         width: Number(variant?.width || product.width || 10),
@@ -155,25 +172,23 @@ export default function CreateOrderPage() {
       discountCode: appliedDiscount?.code || null,
       discountAmount: totals.discountAmount,
       
-      // ✅ NEW: Gift Card Data
       giftCardCode: appliedGiftCard?.code || null,
       giftCardAmount: totals.giftCardDeduction,
 
       taxTotal: totals.taxTotal,
-      total: totals.finalTotal, // Final amount to be paid
+      total: totals.finalTotal,
       
       address: selectedCustomer.addresses?.[0] || guestInputAddress,
       pickupLocationId,
-      
-      // ✅ NEW: Transit Time
       estimatedTransitTime: transitTime || null,
 
       adminNote,
       customerNote,
-      currency: "AUD", 
+      
+      // ✅ Dynamic Currency Code passed to backend
+      currency: currency, 
       
       status: "PENDING",
-      // If Fully paid by Gift Card
       paymentStatus: (totals.finalTotal === 0 && totals.grossTotal > 0) ? "PAID" : "UNPAID"
     };
 
@@ -194,7 +209,7 @@ export default function CreateOrderPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Create New Order</h1>
-          <p className="text-slate-500 text-sm">Draft a manual order with full schema support</p>
+          <p className="text-slate-500 text-sm">Draft a manual order ({currency})</p>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
           <Button variant="outline" className="flex-1 sm:flex-none bg-white" onClick={() => router.back()}>
@@ -213,8 +228,18 @@ export default function CreateOrderPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <div className="lg:col-span-2 space-y-6">
-          <ProductSearch onAddProduct={addToCart} />
-          <CartItemsTable items={cartItems} onRemoveItem={removeCartItem} />
+          <ProductSearch 
+             onAddProduct={addToCart} 
+             // ✅ No props needed, it uses context internally
+          />
+          
+          <CartItemsTable 
+             items={cartItems} 
+             onRemoveItem={removeCartItem} 
+             // ✅ Pass Dynamic Helpers
+             formatPrice={formatPrice} 
+             weightUnit={weightUnit} 
+          />
         </div>
 
         <div className="space-y-6">
@@ -226,6 +251,8 @@ export default function CreateOrderPage() {
                 setGuestInputAddress(null);
             }}
             onAddressChange={(addr) => setGuestInputAddress(addr)}
+            // ✅ Pass Feature Flag
+            enableGuestCheckout={features.enableGuestCheckout}
           />
 
           <ShippingSelector 
@@ -235,6 +262,8 @@ export default function CreateOrderPage() {
             onShippingCostChange={(cost) => setShippingCost(cost)}
             address={currentAddress}
             cartItems={cartItems}
+            // ✅ Pass Dynamic Helpers
+            formatPrice={formatPrice}
           />
 
           <Coupon 
@@ -242,11 +271,12 @@ export default function CreateOrderPage() {
             onApplyDiscount={(discount: any) => setAppliedDiscount(discount)}
           />
 
-          {/* ✅ NEW: Gift Card Input */}
           <GiftCardInput 
             onApply={setAppliedGiftCard}
             onRemove={() => setAppliedGiftCard(null)}
             appliedCard={appliedGiftCard}
+            // ✅ Pass Dynamic Helpers
+            formatPrice={formatPrice}
           />
 
           <OrderSummary 
@@ -254,14 +284,15 @@ export default function CreateOrderPage() {
             shippingCost={shippingCost}
             discount={totals.discountAmount}
             tax={totals.taxTotal}
-            total={totals.finalTotal} // Final Payable
-            currencySymbol="$"
+            total={totals.finalTotal}
+            // ✅ Dynamic Symbol
+            currencySymbol={symbol} 
             setShippingCost={setShippingCost}
           />
 
           {totals.giftCardDeduction > 0 && (
              <div className="p-3 bg-purple-50 text-xs text-purple-800 rounded border border-purple-200">
-                Paid via Gift Card: <strong>-${totals.giftCardDeduction.toFixed(2)}</strong>
+                Paid via Gift Card: <strong>-{formatPrice(totals.giftCardDeduction)}</strong>
              </div>
           )}
 

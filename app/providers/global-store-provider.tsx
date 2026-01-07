@@ -1,12 +1,36 @@
-//app/providers/global-store-provider.tsx
+// app/providers/global-store-provider.tsx
 
 "use client";
 
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useMemo } from "react";
 
 // ==========================================
 // 1. TYPE DEFINITIONS & INTERFACES
 // ==========================================
+
+export interface MenuItem {
+  id: string;
+  label: string;
+  url: string;
+  target?: "_self" | "_blank";
+  children?: MenuItem[];
+  type?: "category" | "page" | "custom";
+}
+
+export interface StoreBanner {
+  id: string;
+  title: string;
+  image: string;
+  link: string | null;
+  position: number;
+}
+
+export interface ActivePaymentMethod {
+  identifier: string;
+  name: string;
+  icon: string | null;
+  description?: string | null;
+}
 
 export interface StoreAddress {
   address1?: string;
@@ -34,6 +58,7 @@ export interface StoreMedia {
   altText?: string | null;
   width?: number | null;
   height?: number | null;
+  mimeType?: string;
 }
 
 export interface TaxSettings {
@@ -41,6 +66,7 @@ export interface TaxSettings {
   calculateTaxBasedOn: 'shipping' | 'billing' | 'shop';
   displayPricesInShop: 'inclusive' | 'exclusive';
   displayPricesDuringCart: 'inclusive' | 'exclusive';
+  defaultRate?: number; 
 }
 
 export interface GeneralConfig {
@@ -48,6 +74,9 @@ export interface GeneralConfig {
   dateFormat: string;
   orderIdFormat: string;
   locale?: string;
+  supportedLocales?: string[];
+  headerScripts?: string;
+  footerScripts?: string;
 }
 
 export interface SeoConfig {
@@ -76,6 +105,7 @@ export interface MarketingConfig {
   fbPixelId: string | null;
   klaviyoEnabled: boolean;
   klaviyoPublicKey: string | null;
+  cookieConsentRequired?: boolean; // [ADDED]
 }
 
 export interface StoreFeatures {
@@ -84,6 +114,8 @@ export interface StoreFeatures {
   enableBlog: boolean;
   enableGuestCheckout: boolean;
   maintenanceMode: boolean;
+  enableMultiCurrency?: boolean;
+  enablePickup?: boolean;
 }
 
 // ==========================================
@@ -108,6 +140,11 @@ interface GlobalStoreContextType {
   address: StoreAddress;
   socials: SocialLinks;
   
+  // [ADDED] New Dynamic Data
+  menus: Record<string, MenuItem[]>;
+  activeBanners: StoreBanner[];
+  activePaymentMethods: ActivePaymentMethod[];
+
   formatPrice: (price: number | string | null) => string;
 
   general: GeneralConfig;
@@ -136,6 +173,12 @@ const defaultContext: GlobalStoreContextType = {
   dimensionUnit: "cm",
   address: {},
   socials: {},
+  
+  // [ADDED] Defaults
+  menus: {},
+  activeBanners: [],
+  activePaymentMethods: [],
+
   formatPrice: () => "$0.00",
   general: { timezone: "UTC", dateFormat: "dd MMM yyyy", orderIdFormat: "#", locale: "en-AU" },
   tax: { pricesIncludeTax: false, calculateTaxBasedOn: 'shipping', displayPricesInShop: 'exclusive', displayPricesDuringCart: 'exclusive' },
@@ -154,9 +197,19 @@ const GlobalStoreContext = createContext<GlobalStoreContextType>(defaultContext)
 interface ProviderProps {
   children: ReactNode;
   settings: any; 
+  // [ADDED] Optional props so existing usage doesn't break
+  menus?: any[]; 
+  banners?: any[];
+  paymentMethods?: any[];
 }
 
-export function GlobalStoreProvider({ children, settings }: ProviderProps) {
+export function GlobalStoreProvider({ 
+  children, 
+  settings, 
+  menus = [], 
+  banners = [], 
+  paymentMethods = [] 
+}: ProviderProps) {
   
   const s = settings || {};
   const seoData = s.seoConfig || {};
@@ -164,8 +217,9 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
   
   const activeLocale = s.generalConfig?.locale || "en-AU";
 
-  const formatPrice = (price: number | string | null) => {
-    if (price === null || price === "") return "";
+  // [UPDATED] Use useMemo for performance, logic remains same
+  const formatPrice = useMemo(() => (price: number | string | null) => {
+    if (price === null || price === "" || price === undefined) return "";
     const numPrice = typeof price === "string" ? parseFloat(price) : price;
     
     return new Intl.NumberFormat(activeLocale, {
@@ -173,16 +227,59 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
       currency: s.currency || "AUD",
       minimumFractionDigits: 2,
     }).format(numPrice);
-  };
+  }, [activeLocale, s.currency]);
 
   const logoData: StoreMedia | null = s.logoMedia 
     ? {
         url: s.logoMedia.url,
         altText: s.logoMedia.altText || s.storeName,
         width: s.logoMedia.width,
-        height: s.logoMedia.height
+        height: s.logoMedia.height,
+        mimeType: s.logoMedia.mimeType // [ADDED]
       }
     : (s.logo ? { url: s.logo } : null);
+
+  // [ADDED] Logic to process Menus
+  const processedMenus = useMemo(() => {
+    const map: Record<string, MenuItem[]> = {};
+    if (Array.isArray(menus)) {
+        menus.forEach((menu: any) => {
+          if (menu.isActive) {
+            map[menu.slug] = menu.items as MenuItem[];
+          }
+        });
+    }
+    return map;
+  }, [menus]);
+
+  // [ADDED] Logic to process Banners
+  const processedBanners = useMemo(() => {
+    if (!Array.isArray(banners)) return [];
+    return banners
+      .filter((b: any) => b.isActive)
+      .sort((a: any, b: any) => a.position - b.position)
+      .map((b: any) => ({
+        id: b.id,
+        title: b.title,
+        image: b.media?.url || b.image,
+        link: b.link,
+        position: b.position
+      }));
+  }, [banners]);
+
+  // [ADDED] Logic to process Payment Methods
+  const processedPayments = useMemo(() => {
+    if (!Array.isArray(paymentMethods)) return [];
+    return paymentMethods
+      .filter((pm: any) => pm.isEnabled)
+      .sort((a: any, b: any) => a.displayOrder - b.displayOrder)
+      .map((pm: any) => ({
+        identifier: pm.identifier,
+        name: pm.name,
+        icon: pm.icon,
+        description: pm.description
+      }));
+  }, [paymentMethods]);
 
   const value = {
     storeName: s.storeName || "GoBike",
@@ -201,10 +298,24 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
     
     address: (s.storeAddress as StoreAddress) || {},
     socials: (s.socialLinks as SocialLinks) || {},
+
+    // [ADDED] New Values
+    menus: processedMenus,
+    activeBanners: processedBanners,
+    activePaymentMethods: processedPayments,
     
     formatPrice,
 
-    general: (s.generalConfig as GeneralConfig) || defaultContext.general,
+    general: {
+      timezone: s.generalConfig?.timezone || defaultContext.general.timezone,
+      dateFormat: s.generalConfig?.dateFormat || defaultContext.general.dateFormat,
+      orderIdFormat: s.generalConfig?.orderIdFormat || defaultContext.general.orderIdFormat,
+      locale: activeLocale,
+      supportedLocales: s.generalConfig?.supportedLocales || ["en-AU"], // [ADDED]
+      headerScripts: s.generalConfig?.headerScripts || "", // [ADDED]
+      footerScripts: s.generalConfig?.footerScripts || "", // [ADDED]
+    },
+
     tax: (s.taxSettings as TaxSettings) || defaultContext.tax,
     
     seo: {
@@ -227,6 +338,7 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
       fbPixelId: mktData.fbPixelId || null,
       klaviyoEnabled: mktData.klaviyoEnabled || false,
       klaviyoPublicKey: mktData.klaviyoPublicKey || null,
+      cookieConsentRequired: mktData.cookieConsentRequired || false, // [ADDED]
     },
 
     verifications: {
@@ -240,6 +352,8 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
       enableBlog: true,
       enableGuestCheckout: true,
       maintenanceMode: s.maintenance || false,
+      enableMultiCurrency: s.generalConfig?.enableMultiCurrency || false, // [ADDED]
+      enablePickup: s.generalConfig?.enablePickup || false, // [ADDED]
     }
   };
 
@@ -255,5 +369,9 @@ export function GlobalStoreProvider({ children, settings }: ProviderProps) {
 // ==========================================
 
 export function useGlobalStore() {
-  return useContext(GlobalStoreContext);
+  const context = useContext(GlobalStoreContext);
+  if (!context) {
+    throw new Error("useGlobalStore must be used within a GlobalStoreProvider");
+  }
+  return context;
 }

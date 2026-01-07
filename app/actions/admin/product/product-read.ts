@@ -18,22 +18,24 @@ export async function getProductById(id: string) {
         taxRate: true,
         downloadFiles: true,
         
-        // Main Product Images (Where variantId is null)
+        // Main Product Images
         images: { 
             where: { variantId: null },
             orderBy: { position: 'asc' } 
         },
         attributes: { orderBy: { position: 'asc' } },
         
-        // 🔥 UPDATE: Include 'images' for variants
+        // Variants with Inventory
         variants: {
           include: {
-            inventoryLevels: true,
-            images: { orderBy: { position: 'asc' }, select: { url: true } } // Fetch variant images
+            // 🔥 UPDATE: লোকেশন সহ ইনভেন্টরি
+            inventoryLevels: { include: { location: true } },
+            images: { orderBy: { position: 'asc' }, select: { url: true } }
           },
           orderBy: { id: 'asc' }
         },
-        inventoryLevels: true,
+        // 🔥 UPDATE: মেইন প্রোডাক্টের ইনভেন্টরি
+        inventoryLevels: { include: { location: true } },
         tags: true,
 
         // Bundle Items
@@ -61,6 +63,20 @@ export async function getProductById(id: string) {
   }
 }
 
+// 🔥 NEW: GET ALL LOCATIONS
+export async function getLocations() {
+    try {
+        const locations = await db.location.findMany({
+            where: { isActive: true },
+            orderBy: { isDefault: 'desc' }, // ডিফল্ট লোকেশন সবার আগে থাকবে
+            select: { id: true, name: true, isDefault: true }
+        });
+        return { success: true, data: locations };
+    } catch (error) {
+        console.error("GET_LOCATIONS_ERROR", error);
+        return { success: false, data: [] };
+    }
+}
 
 export async function getBrands() {
     try {

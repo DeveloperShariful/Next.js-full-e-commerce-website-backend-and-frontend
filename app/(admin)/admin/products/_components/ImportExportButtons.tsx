@@ -61,7 +61,7 @@ export default function ImportExportButtons() {
     };
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
             {/* Hidden Input for Import */}
             <input 
                 type="file" 
@@ -74,7 +74,7 @@ export default function ImportExportButtons() {
             <button 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading}
-                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                className="flex items-center gap-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
             >
                 {loading ? <Loader2 className="animate-spin w-4 h-4"/> : <Upload className="w-4 h-4"/>}
                 Import
@@ -83,7 +83,7 @@ export default function ImportExportButtons() {
             <button 
                 onClick={handleExport}
                 disabled={loading}
-                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                className="flex items-center gap-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
             >
                 <Download className="w-4 h-4"/>
                 Export

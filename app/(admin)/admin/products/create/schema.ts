@@ -1,3 +1,5 @@
+// File: app/admin/products/create/schema.ts
+
 import { z } from "zod";
 
 // Helper for converting empty strings to null/undefined
@@ -6,13 +8,11 @@ const emptyToNumber = z.preprocess(
   z.number().nullable().optional()
 );
 
-// Helper for removing null/undefined strings
 const emptyToString = z.preprocess(
   (val) => (val === null || val === undefined ? "" : String(val)),
   z.string().optional()
 );
 
-// Helper for JSON strings validation
 const jsonString = z.string().optional().refine((val) => {
   if (!val) return true;
   try {
@@ -49,7 +49,16 @@ export const productSchema = z.object({
   barcode: emptyToString,
   mpn: emptyToString,
   trackQuantity: z.boolean().default(true),
+  
+  // 🔥 Stock is now derived, but kept for legacy/display support
   stock: z.coerce.number().default(0),
+
+  // 🔥 NEW: Multi-Warehouse Inventory Data
+  inventoryData: z.array(z.object({
+    locationId: z.string(),
+    quantity: z.number()
+  })).default([]),
+
   lowStockThreshold: z.coerce.number().default(2),
   
   backorderStatus: z.enum(["DO_NOT_ALLOW", "ALLOW", "ALLOW_BUT_NOTIFY"]).default("DO_NOT_ALLOW"),
@@ -98,6 +107,7 @@ export const productSchema = z.object({
     position: z.number()
   })).default([]),
 
+  // 🔥 Variations Schema Updated for Inventory Data
   variations: z.array(z.object({
     id: z.string(),
     name: z.string(),
@@ -108,6 +118,12 @@ export const productSchema = z.object({
     attributes: z.record(z.string(), z.string()), 
     images: z.array(z.string()).default([]),
     
+    // Variation specific inventory
+    inventoryData: z.array(z.object({
+        locationId: z.string(),
+        quantity: z.number()
+    })).optional(),
+
     costPerItem: emptyToNumber,
     weight: emptyToNumber,
     length: emptyToNumber,
@@ -133,9 +149,7 @@ export const productSchema = z.object({
   saleStart: z.string().nullable().optional(),
   saleEnd: z.string().nullable().optional()
 })
-// 🔥 HERE IS THE MISSING SUPER REFINE LOGIC
 .superRefine((data, ctx) => {
-  // 1. Date Validation
   if (data.saleStart && data.saleEnd) {
     const start = new Date(data.saleStart);
     const end = new Date(data.saleEnd);
@@ -148,7 +162,6 @@ export const productSchema = z.object({
     }
   }
 
-  // 2. Variable Product Validation
   if (data.productType === "VARIABLE") {
     if (data.attributes.length === 0) {
       ctx.addIssue({
@@ -166,7 +179,6 @@ export const productSchema = z.object({
     }
   }
 
-  // 3. Bundle Product Validation
   if (data.productType === "BUNDLE") {
     if (data.bundleItems.length === 0) {
       ctx.addIssue({
@@ -178,5 +190,4 @@ export const productSchema = z.object({
   }
 });
 
-// Export Type from Schema
 export type ProductFormValues = z.infer<typeof productSchema>;

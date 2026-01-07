@@ -1,4 +1,4 @@
-// app/actions/admin/product/product-data-parser.ts
+// File: app/actions/admin/product/product-data-parser.ts
 
 import { ProductType, TaxStatus, ProductStatus } from "@prisma/client";
 import { generateSlug, parseJSON, cleanPrice } from "@/app/actions/admin/product/product-utils";
@@ -46,13 +46,15 @@ export const parseProductFormData = (formData: FormData) => {
         price: cleanPrice(formData.get("price") as string),
         salePrice: formData.get("salePrice") ? cleanPrice(formData.get("salePrice") as string) : null,
         
-        // 🔥 FIX: 'cost' was wrong, updated to 'costPerItem' to match frontend
         costPerItem: formData.get("costPerItem") ? cleanPrice(formData.get("costPerItem") as string) : null,
 
         sku: formData.get("sku") as string || null,
         barcode: formData.get("barcode") as string || null,
         trackQuantity: formData.get("trackQuantity") === "true",
-        stock: parseInt(formData.get("stock") as string) || 0,
+        stock: parseInt(formData.get("stock") as string) || 0, // Legacy fallback for UI
+
+        // 🔥 NEW: Multi-Warehouse Inventory Data Parsing
+        inventoryData: parseJSON<any[]>(formData.get("inventoryData") as string, []),
 
         isVirtual: formData.get("isVirtual") === "true",
         isDownloadable: formData.get("isDownloadable") === "true",

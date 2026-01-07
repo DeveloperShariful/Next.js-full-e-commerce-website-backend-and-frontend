@@ -85,20 +85,31 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
     <div className="bg-white p-4 md:p-6 rounded-lg border border-slate-200 shadow-sm mb-6 space-y-6 transition-all duration-300 hover:shadow-md">
       
       {/* Top Row */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Orders</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage and fulfill your store orders.</p>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-           <OrderImportExportButtons />
-           <Link href="/admin/orders/create" className="w-full sm:w-auto">
-             <Button className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto shadow-sm transition-all duration-200 active:scale-95 cursor-pointer">
-               <Plus size={16} className="mr-2"/> Create Order
-             </Button>
-           </Link>
-        </div>
-      </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
+  
+  {/* --- Title Section --- */}
+  <div className="w-full sm:w-auto">
+    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Orders</h1>
+    <p className="text-sm text-slate-500 mt-1">Manage and fulfill your store orders.</p>
+  </div>
+
+  {/* --- Actions Section --- */}
+  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+     
+     {/* Import/Export Buttons */}
+     <div className="flex-1 sm:flex-none">
+        <OrderImportExportButtons />
+     </div>
+
+     {/* Create Button */}
+     <Link href="/admin/orders/create" className="flex-1 sm:flex-none">
+       <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all duration-200 active:scale-95 cursor-pointer whitespace-nowrap">
+         <Plus size={16} className="mr-2"/> Create Order
+       </Button>
+     </Link>
+  </div>
+
+</div>
 
       {/* Filters Row */}
       <div className="flex flex-col xl:flex-row gap-4 items-center justify-between">

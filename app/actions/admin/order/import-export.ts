@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import Papa from "papaparse";
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { currentUser } from "@clerk/nextjs/server"; // ✅ Added for Log Fix
 
 // --- HELPERS ---
 
@@ -27,27 +28,36 @@ const mapStatus = (wcStatus: string): OrderStatus => {
     return "PENDING";
 };
 
-// --- 1. EXPORT FUNCTION (Generating WooCommerce Style CSV) ---
+// ✅ HELPER: Get Real DB User ID for Logging
+async function getDbUserId() {
+    try {
+        const user = await currentUser();
+        if (!user) return null;
+        const dbUser = await db.user.findUnique({ where: { clerkId: user.id } });
+        return dbUser?.id;
+    } catch (e) {
+        return null;
+    }
+}
+
+// --- 1. EXPORT FUNCTION (Original Logic Preserved) ---
 export async function exportOrdersCSV() {
   try {
-    // ১. অর্ডারগুলো ডাটাবেস থেকে আনা (items সহ)
     const orders = await db.order.findMany({
       include: {
         user: true,
-        items: true, // আইটেমগুলো দরকার
+        items: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 2000 // Performance limit (Need batching for more)
+      take: 2000
     });
 
     const csvRows: any[] = [];
 
-    // ২. প্রতিটি অর্ডার এবং তার আইটেম লুপ করা
     for (const order of orders) {
         const billing: any = order.billingAddress || {};
         const shipping: any = order.shippingAddress || {};
 
-        // যদি আইটেম থাকে, প্রতিটি আইটেমের জন্য একটা রো হবে
         if (order.items.length > 0) {
             order.items.forEach((item, index) => {
                 csvRows.push({
@@ -56,7 +66,6 @@ export async function exportOrdersCSV() {
                     "Order Date": order.createdAt.toISOString(),
                     "Customer Note": order.customerNote || "",
                     
-                    // Billing
                     "First Name (Billing)": billing.firstName || "",
                     "Last Name (Billing)": billing.lastName || "",
                     "Address 1&2 (Billing)": billing.address1 || "",
@@ -67,7 +76,6 @@ export async function exportOrdersCSV() {
                     "Email (Billing)": order.user?.email || order.guestEmail || "",
                     "Phone (Billing)": billing.phone || "",
 
-                    // Shipping
                     "First Name (Shipping)": shipping.firstName || "",
                     "Last Name (Shipping)": shipping.lastName || "",
                     "Address 1&2 (Shipping)": shipping.address1 || "",
@@ -76,8 +84,6 @@ export async function exportOrdersCSV() {
                     "Postcode (Shipping)": shipping.postcode || "",
                     "Country Code (Shipping)": shipping.country || "",
 
-                    // Financials (Only show totals on first row of order to avoid confusion in some systems, or repeat it)
-                    // WooCommerce usually repeats these
                     "Payment Method Title": order.paymentMethod,
                     "Order Subtotal Amount": order.subtotal,
                     "Order Shipping Amount": order.shippingTotal,
@@ -87,7 +93,6 @@ export async function exportOrdersCSV() {
                     "Coupon Code": order.couponCode,
                     "Discount Amount": order.discountTotal,
 
-                    // Item Details
                     "SKU": item.sku || "",
                     "Item Name": item.productName,
                     "Quantity (- Refund)": item.quantity,
@@ -95,13 +100,11 @@ export async function exportOrdersCSV() {
                 });
             });
         } else {
-            // যদি আইটেম না থাকে (Edge case), তবুও অর্ডারের বেসিক ইনফো রো বানাবো
             csvRows.push({
                 "Order Number": order.orderNumber,
                 "Order Status": order.status,
                 "Order Date": order.createdAt.toISOString(),
                 "Order Total Amount": order.total,
-                // ... other fields empty
             });
         }
     }
@@ -115,13 +118,15 @@ export async function exportOrdersCSV() {
   }
 }
 
-// --- 2. IMPORT FUNCTION (Handling Grouping & Batching) ---
+// --- 2. IMPORT FUNCTION (Fixed Activity Log) ---
 export async function importOrdersCSV(csvString: string) {
     try {
         const { data } = Papa.parse(csvString, { header: true, skipEmptyLines: true });
         
-        // --- STEP A: GROUPING ROWS BY ORDER NUMBER ---
-        // CSV তে একই অর্ডারের ৫টা আইটেম থাকলে ৫টা রো থাকে। আমরা সেটাকে ১টা অবজেক্টে মার্জ করব।
+        // ✅ Fix: Get Real User ID
+        const userId = await getDbUserId();
+
+        // --- STEP A: GROUPING ROWS ---
         const groupedOrders = new Map<string, any>();
 
         for (const row of data as any[]) {
@@ -129,14 +134,12 @@ export async function importOrdersCSV(csvString: string) {
             if (!orderNum) continue;
 
             if (!groupedOrders.has(orderNum)) {
-                // নতুন অর্ডার শুরু
                 groupedOrders.set(orderNum, {
-                    meta: row, // মেইন অর্ডারের ডাটা (Address, Status, etc)
-                    items: []  // আইটেম লিস্ট
+                    meta: row,
+                    items: []
                 });
             }
 
-            // আইটেম পুশ করা
             if (row["Item Name"] || row["SKU"]) {
                 groupedOrders.get(orderNum).items.push({
                     name: row["Item Name"] || "Imported Item",
@@ -152,32 +155,31 @@ export async function importOrdersCSV(csvString: string) {
         let skipCount = 0;
         let errorCount = 0;
 
-        // --- STEP C: PROCESS EACH GROUPED ORDER ---
+        // --- STEP C: PROCESS ---
         for (const [orderNum, data] of groupedOrders) {
             const row = data.meta;
             const items = data.items;
 
-            // ১. ডুপ্লিকেট চেক
+            // 1. Duplicate Check
             const existing = await db.order.findUnique({ where: { orderNumber: String(orderNum) } });
             if (existing) {
                 skipCount++;
                 continue;
             }
 
-            // ২. ইউজার খোঁজা
+            // 2. User
             const email = row["Email (Billing)"] || row["billing_email"];
             const user = email ? await db.user.findUnique({ where: { email } }) : null;
 
-            // ৩. স্ট্যাটাস সেট করা
+            // 3. Status
             const status = mapStatus(row["Order Status"]);
             
-            // Payment Status Logic
             let payStatus: PaymentStatus = "UNPAID";
             if (["DELIVERED", "PROCESSING", "SHIPPED", "COMPLETED"].includes(status as any)) payStatus = "PAID";
             if (status === "REFUNDED") payStatus = "REFUNDED";
             if (status === "CANCELLED") payStatus = "VOIDED";
 
-            // ৪. অ্যাড্রেস অবজেক্ট তৈরি
+            // 4. Address
             const billingAddr = {
                 firstName: row["First Name (Billing)"] || "",
                 lastName: row["Last Name (Billing)"] || "",
@@ -203,13 +205,10 @@ export async function importOrdersCSV(csvString: string) {
                 email: email
             };
 
-            // ৫. আইটেম এবং প্রোডাক্ট লিংকিং
-            // আমরা SKU দিয়ে প্রোডাক্ট খুঁজব, যদি পাই লিংক করব, না পেলে নাম দিয়ে আইটেম বানাব
+            // 5. Items
             const orderItemsData = [];
-            
             for (const item of items) {
                 let productId = null;
-                // SKU দিয়ে প্রোডাক্ট খোঁজা
                 if (item.sku) {
                     const product = await db.product.findUnique({ where: { sku: item.sku }, select: { id: true } });
                     if (product) productId = product.id;
@@ -221,12 +220,15 @@ export async function importOrdersCSV(csvString: string) {
                     price: item.cost,
                     quantity: item.qty,
                     total: item.cost * item.qty,
-                    productId: productId // লিংক হচ্ছে যদি থাকে
+                    productId: productId
                 });
             }
 
-            // ৬. ডাটাবেসে সেভ (TRANSACTION)
+            // 6. DB Save
             try {
+                // Parse date carefully
+                const orderDate = row["Order Date"] ? new Date(row["Order Date"]) : new Date();
+
                 await db.order.create({
                     data: {
                         orderNumber: String(orderNum),
@@ -244,22 +246,20 @@ export async function importOrdersCSV(csvString: string) {
                         refundedAmount: safeFloat(row["Order Refund Amount"]),
                         discountTotal: safeFloat(row["Cart Discount Amount"] || row["Discount Amount"]),
                         
-                        currency: "AUD", // ডিফল্ট বা CSV থেকে নিতে পারেন
+                        currency: "AUD",
                         paymentMethod: row["Payment Method Title"] || "Imported",
                         customerNote: row["Customer Note"],
                         couponCode: row["Coupon Code"],
                         
-                        createdAt: row["Order Date"] ? new Date(row["Order Date"]) : new Date(),
+                        createdAt: isNaN(orderDate.getTime()) ? new Date() : orderDate,
                         
                         shippingAddress: shippingAddr as any,
                         billingAddress: billingAddr as any,
                         
-                        // 🔥 Items Creation
                         items: {
                             create: orderItemsData
                         },
 
-                        // Log Note
                         orderNotes: {
                             create: {
                                 content: "Order imported via CSV",
@@ -275,12 +275,14 @@ export async function importOrdersCSV(csvString: string) {
             }
         }
 
-        // --- Log Activity ---
-        if (successCount > 0) {
+        // --- Log Activity (FIXED) ---
+        // Only log if userId exists
+        if (userId && successCount > 0) {
             await db.activityLog.create({
                 data: {
-                    userId: "system", // Or current user ID if passed
+                    userId: userId, // ✅ Using Real ID
                     action: "BULK_IMPORT_ORDERS",
+                    entityType: "Order", // Optional: Add entity type if your schema supports it
                     details: { success: successCount, skipped: skipCount, failed: errorCount }
                 }
             });

@@ -104,48 +104,72 @@ export default async function ProductListPage(props: ProductsPageProps) {
   };
 
   return (
-    <div className="p-4 md:p-3 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-normal text-slate-800">Products</h1>
-          
-          <div className="flex items-center gap-2">
-            <Link href="/admin/products/create" className="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-600 bg-white rounded hover:bg-blue-50 transition">
-              Add New
-            </Link>
-            <ImportExportButtons />
-            <ProductLogViewer />
-          </div>
+  <div className="p-4 md:p-6 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
+    
+    {/* --- HEADER SECTION --- */}
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      
+      {/* Title */}
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-800">Products</h1>
+        <p className="text-sm text-slate-500 mt-1 hidden sm:block">Manage your product catalog</p>
+      </div>
+      
+      {/* Action Buttons (Mobile: Wrap, Desktop: Row) */}
+      <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <Link 
+          href="/admin/products/create" 
+          className="flex-1 md:flex-none text-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition shadow-sm whitespace-nowrap"
+        >
+          + Add New
+        </Link>
+        
+        {/* Import/Export & Log Viewer Components */}
+        <div className="flex gap-2 flex-1 md:flex-none justify-end md:justify-start">
+           <ImportExportButtons />
+           <ProductLogViewer />
         </div>
       </div>
+    </div>
 
+    {/* --- TABLE SECTION --- */}
+    <div className="w-full">
       <ProductTable 
         products={products}
         categories={categories}
         counts={counts}
         statusFilter={statusFilter}
       />
-
-      {totalProducts > 0 && (
-        <div className="flex flex-col sm:flex-row justify-between items-center mt-4 text-sm text-slate-600 gap-4 sm:gap-0 pb-4">
-          <div>{totalProducts} items</div>
-          <div className="flex gap-1">
-            <Link 
-               href={`/admin/products?page=${page > 1 ? page - 1 : 1}&query=${query}&status=${statusFilter}`} 
-               className={`px-3 py-1 border border-slate-300 bg-white rounded hover:bg-slate-50 ${page <= 1 ? 'pointer-events-none opacity-50' : ''}`}
-            >
-               &laquo;
-            </Link>
-            <div className="px-3 py-1 border border-slate-300 bg-white rounded font-bold">{page}</div>
-            <Link 
-               href={`/admin/products?page=${page < totalPages ? page + 1 : totalPages}&query=${query}&status=${statusFilter}`} 
-               className={`px-3 py-1 border border-slate-300 bg-white rounded hover:bg-slate-50 ${page >= totalPages ? 'pointer-events-none opacity-50' : ''}`}
-            >
-               &raquo;
-            </Link>
-          </div>
-        </div>
-      )}
     </div>
-  );
+
+    {/* --- PAGINATION SECTION --- */}
+    {totalProducts > 0 && (
+      <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-slate-600 gap-4 pb-8">
+        <div>
+           Showing {products.length} of {totalProducts} items
+        </div>
+        
+        <div className="flex gap-2">
+          <Link 
+             href={`/admin/products?page=${page > 1 ? page - 1 : 1}&query=${query}&status=${statusFilter}`} 
+             className={`px-3 py-1.5 border border-slate-300 bg-white rounded hover:bg-slate-50 transition ${page <= 1 ? 'pointer-events-none opacity-50' : ''}`}
+          >
+             Previous
+          </Link>
+          
+          <div className="px-3 py-1.5 border border-blue-500 bg-blue-50 text-blue-600 rounded font-bold">
+             {page}
+          </div>
+          
+          <Link 
+             href={`/admin/products?page=${page < totalPages ? page + 1 : totalPages}&query=${query}&status=${statusFilter}`} 
+             className={`px-3 py-1.5 border border-slate-300 bg-white rounded hover:bg-slate-50 transition ${page >= totalPages ? 'pointer-events-none opacity-50' : ''}`}
+          >
+             Next
+          </Link>
+        </div>
+      </div>
+    )}
+  </div>
+);
 }

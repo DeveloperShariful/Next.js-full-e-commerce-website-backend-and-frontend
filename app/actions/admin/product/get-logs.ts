@@ -18,7 +18,7 @@ export async function getProductActivityLogs() {
       orderBy: {
         createdAt: "desc",
       },
-      take: 100, // লাস্ট ১০০টি লগ দেখাবে
+      take: 100, 
       include: {
         user: {
           select: { name: true, email: true, image: true }

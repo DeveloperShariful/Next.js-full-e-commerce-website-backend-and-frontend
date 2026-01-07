@@ -5,8 +5,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Image as ImageIcon, Star } from "lucide-react";
-import { bulkProductAction, moveToTrash } from "@/app/actions/admin/product/product-list"; 
+import { Search, Image as ImageIcon, Star, Loader2 } from "lucide-react";
+import { bulkProductAction, moveToTrash, deleteProduct } from "@/app/actions/admin/product/product-list"; 
 import { duplicateProduct } from "@/app/actions/admin/product/duplicate-product"; 
 import { toast } from "react-hot-toast";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
@@ -22,6 +22,7 @@ export default function ProductTable({ products, categories, counts, statusFilte
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   
   const { formatPrice } = useGlobalStore();
 
@@ -54,6 +55,7 @@ export default function ProductTable({ products, categories, counts, statusFilte
     else setSelectedIds([...selectedIds, id]);
   };
 
+  // ✅ FIX 1: Bulk Action Fix
   const handleBulkApply = async () => {
     if (!bulkAction) return toast.error("Select an action");
     if (selectedIds.length === 0) return toast.error("Select items first");
@@ -63,22 +65,55 @@ export default function ProductTable({ products, categories, counts, statusFilte
     formData.append("action", bulkAction);
 
     startTransition(async () => {
-        const res = await bulkProductAction(formData);
-        if (res.success) {
-            toast.success(res.message);
-            setSelectedIds([]);
-        } else {
-            toast.error(res.message);
+        try {
+            const res = await bulkProductAction(formData);
+            if (res.success) {
+                toast.success(res.message || "Bulk action successful");
+                setSelectedIds([]); // সিলেকশন ক্লিয়ার
+                setBulkAction("");  // ড্রপডাউন রিসেট
+                router.refresh();   // 🔥 ফোর্স রিফ্রেশ (UI সাথে সাথে আপডেট হবে)
+            } else {
+                toast.error(res.message || "Action failed");
+            }
+        } catch (error) {
+            toast.error("Something went wrong");
         }
     });
   };
 
-  const handleDuplicate = (id: string) => {
-      const toastId = toast.loading("Duplicating...");
+  // ✅ FIX 2: Single Action Fix (Try-Finally)
+  const handleSingleAction = (id: string, actionType: 'duplicate' | 'trash' | 'restore' | 'delete') => {
+      setLoadingId(id);
+      
       startTransition(async () => {
-          const res = await duplicateProduct(id);
-          if(res.success) toast.success(res.message, { id: toastId });
-          else toast.error(res.message, { id: toastId });
+          try {
+              let res: { success: boolean; message?: string; error?: string } | undefined;
+              
+              if (actionType === 'duplicate') res = await duplicateProduct(id);
+              else if (actionType === 'trash') { 
+                  await moveToTrash(id); 
+                  res = { success: true, message: "Moved to trash" }; 
+              }
+              else if (actionType === 'restore') {
+                 const fd = new FormData(); fd.append("ids", JSON.stringify([id])); fd.append("action", "restore");
+                 res = await bulkProductAction(fd);
+              }
+              else if (actionType === 'delete') {
+                 res = await deleteProduct(id);
+              }
+    
+              if(res?.success) {
+                  toast.success(res.message || "Success");
+                  router.refresh(); // 🔥 ফোর্স রিফ্রেশ
+              } else {
+                  toast.error(res?.message || "Action failed");
+              }
+          } catch (error) {
+              toast.error("An error occurred");
+          } finally {
+              // 🔥 কাজ শেষ হোক বা এরর হোক, লোডিং বন্ধ হবেই
+              setLoadingId(null);
+          }
       });
   };
 
@@ -110,7 +145,7 @@ export default function ProductTable({ products, categories, counts, statusFilte
                <select 
                   value={bulkAction} 
                   onChange={(e) => setBulkAction(e.target.value)}
-                  className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none focus:border-blue-500 w-full sm:w-auto"
+                  className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none focus:border-blue-500 w-full sm:w-auto cursor-pointer"
                >
                   <option value="">Bulk Actions</option>
                   {statusFilter === 'archived' ? (
@@ -128,21 +163,21 @@ export default function ProductTable({ products, categories, counts, statusFilte
                </select>
                <button 
                   onClick={handleBulkApply} 
-                  disabled={isPending}
-                  className="h-9 px-4 border border-slate-400 rounded text-sm bg-white hover:bg-slate-50 disabled:opacity-50"
+                  disabled={isPending || !bulkAction}
+                  className="h-9 px-4 border border-slate-400 rounded text-sm bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[80px]"
                >
-                  Apply
+                  {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Apply"}
                </button>
            </div>
            
            <div className="flex gap-2 w-full sm:w-auto">
-              <select onChange={(e) => handleFilter("category", e.target.value)} className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none w-full sm:w-40">
+              <select onChange={(e) => handleFilter("category", e.target.value)} className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none w-full sm:w-40 cursor-pointer">
                  <option value="">Select a category</option>
                  {categories.map((c) => (
                     <option key={c.name} value={c.name}>{c.name}</option>
                  ))}
               </select>
-              <select onChange={(e) => handleFilter("type", e.target.value)} className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none w-full sm:w-32">
+              <select onChange={(e) => handleFilter("type", e.target.value)} className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none w-full sm:w-32 cursor-pointer">
                  <option value="">Filter by type</option>
                  <option value="SIMPLE">Simple</option>
                  <option value="VARIABLE">Variable</option>
@@ -157,18 +192,18 @@ export default function ProductTable({ products, categories, counts, statusFilte
              placeholder="Search products..." 
              className="h-9 pl-3 pr-8 border border-slate-400 rounded text-sm w-full lg:w-64 outline-none focus:border-blue-500" 
            />
-           <button type="submit" className="absolute right-0 top-0 h-9 w-9 flex items-center justify-center text-slate-500 hover:text-slate-700">
+           <button type="submit" className="absolute right-0 top-0 h-9 w-9 flex items-center justify-center text-slate-500 hover:text-slate-700 cursor-pointer">
               <Search size={16} />
            </button>
         </form>
       </div>
 
-      <div className="bg-white border border-slate-300 shadow-sm overflow-x-auto rounded-sm">
+      <div className={`bg-white border border-slate-300 shadow-sm overflow-x-auto rounded-sm transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
         <table className="w-full text-left border-collapse text-sm min-w-[600px] md:min-w-full">
           <thead className="bg-white border-b border-slate-300 text-slate-700">
             <tr>
               <th className="p-3 w-10 text-center">
-                  <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="rounded border-slate-400" />
+                  <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="rounded border-slate-400 cursor-pointer w-4 h-4 accent-blue-600" />
               </th>
               <th className="p-3 w-16 text-center"><ImageIcon size={16} className="mx-auto text-slate-400" /></th>
               <th className="p-3 font-semibold text-blue-600 min-w-[200px]">Name</th>
@@ -189,11 +224,12 @@ export default function ProductTable({ products, categories, counts, statusFilte
               products.map((product) => {
                 const displayImage = product.featuredImage || product.images[0]?.url || null;
                 const stock = product.inventoryLevels?.reduce((acc: number, curr: any) => acc + curr.quantity, 0) || 0;
+                const isProcessing = loadingId === product.id;
 
                 return (
                   <tr key={product.id} className="hover:bg-[#F9F9F9] group align-top transition-colors">
                     <td className="p-3 text-center">
-                        <input type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelect(product.id)} className="rounded border-slate-400" />
+                        <input type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelect(product.id)} className="rounded border-slate-400 cursor-pointer w-4 h-4 accent-blue-600" />
                     </td>
                     <td className="p-3">
                        <div className="h-10 w-10 bg-slate-100 border border-slate-300 flex items-center justify-center overflow-hidden rounded-sm">
@@ -209,28 +245,33 @@ export default function ProductTable({ products, categories, counts, statusFilte
                           {product.name} 
                           {product.status === 'DRAFT' && <span className="text-slate-400 font-normal italic text-xs ml-1">— Draft</span>}
                        </Link>
-                       <div className="flex flex-wrap gap-1 text-[11px] text-slate-400 mt-1">
+                       <div className="flex flex-wrap gap-1 text-[11px] text-slate-400 mt-1 items-center h-5">
                           <span className="text-slate-500 font-bold bg-slate-100 px-1 rounded">ID: {product.productCode} | </span>
+                          
                           {statusFilter === 'archived' ? (
-                             <>
-                                <button onClick={() => {
-                                    const fd = new FormData(); fd.append("ids", JSON.stringify([product.id])); fd.append("action", "restore"); bulkProductAction(fd);
-                                }} className="text-blue-600 hover:underline">Restore</button>
+                             <div className="flex gap-2 items-center">
+                                <button onClick={() => handleSingleAction(product.id, 'restore')} disabled={isProcessing} className="text-blue-600 hover:underline disabled:opacity-50 flex items-center gap-1">
+                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Restore"}
+                                </button>
                                 <span className="text-slate-300"> | </span>
-                                <button onClick={() => {
-                                    const fd = new FormData(); fd.append("ids", JSON.stringify([product.id])); fd.append("action", "delete"); bulkProductAction(fd);
-                                }} className="text-red-600 hover:underline">Delete Permanently</button>
-                             </>
+                                <button onClick={() => handleSingleAction(product.id, 'delete')} disabled={isProcessing} className="text-red-600 hover:underline disabled:opacity-50 flex items-center gap-1">
+                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Delete Permanently"}
+                                </button>
+                             </div>
                           ) : (
-                             <>
+                             <div className="flex gap-2 items-center">
                                 <Link href={`/admin/products/create?id=${product.id}`} className="text-blue-600 hover:underline">Edit</Link>
                                 <span className="text-slate-300"> | </span>
-                                <button onClick={() => moveToTrash(product.id)} className="text-red-600 hover:underline">Trash</button>
+                                <button onClick={() => handleSingleAction(product.id, 'trash')} disabled={isProcessing} className="text-red-600 hover:underline disabled:opacity-50 flex items-center gap-1">
+                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Trash"}
+                                </button>
                                 <span className="text-slate-300"> | </span>
                                 <Link href={`/product/${product.slug}`} target="_blank" className="text-blue-600 hover:underline">View</Link>
                                 <span className="text-slate-300"> | </span>
-                                <button onClick={() => handleDuplicate(product.id)} className="text-blue-600 hover:underline" disabled={isPending}>Duplicate</button>
-                             </>
+                                <button onClick={() => handleSingleAction(product.id, 'duplicate')} disabled={isProcessing} className="text-blue-600 hover:underline disabled:opacity-50 flex items-center gap-1">
+                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Duplicate"}
+                                </button>
+                             </div>
                           )}
                        </div>
                     </td>

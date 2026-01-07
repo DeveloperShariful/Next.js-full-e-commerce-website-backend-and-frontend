@@ -61,9 +61,6 @@ export async function getProductById(id: string) {
   }
 }
 
-// ... Rest of the helper functions remain unchanged (getBrands, getCategories etc.)
-// You can keep the existing helper functions as they were in the previous version.
-// ... 
 
 export async function getBrands() {
     try {

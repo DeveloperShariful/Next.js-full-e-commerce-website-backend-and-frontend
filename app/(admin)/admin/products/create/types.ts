@@ -17,7 +17,6 @@ export type DigitalFile = ProductFormData['digitalFiles'][number];
 // এখন React Hook Form ব্যবহার হবে, তাই প্রপস দরকার নেই (context দিয়ে ডাটা পাবে)।
 // কিন্তু যদি আপনি কিছু প্রপস রাখতে চান, তবে এটি ক্লিন রাখা ভালো:
 export interface ComponentProps {
-    // এখন আর data বা updateData লাগবে না, কারণ আমরা useFormContext() ব্যবহার করব।
-    // তবে লোডিং স্টেট বা অন্য কিছুর জন্য প্রপস রাখা যেতে পারে।
+   
     loading?: boolean;
 }

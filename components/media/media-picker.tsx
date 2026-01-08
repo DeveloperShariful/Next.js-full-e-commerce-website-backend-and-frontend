@@ -18,8 +18,15 @@ interface MediaPickerProps {
 export function MediaPicker({ label = "Featured Image", value, onChange, onRemove }: MediaPickerProps) {
   const [open, setOpen] = useState(false);
 
-  const handleSelect = (media: MediaItem) => {
-    onChange(media.url, media.id); // Pass URL and ID back to form
+  // --- Fixed handleSelect Function ---
+  const handleSelect = (media: MediaItem | MediaItem[]) => {
+    // চেক করা হচ্ছে এটি Array কিনা। যদি Array হয় তবে প্রথমটি নেব, না হলে সরাসরি অবজেক্টটি নেব।
+    const item = Array.isArray(media) ? media[0] : media;
+    
+    if (item) {
+      onChange(item.url, item.id); // Pass URL and ID back to form
+      setOpen(false); // ইমেজ সিলেক্ট করার পর মোডাল বন্ধ করে দিচ্ছি (UX এর জন্য ভালো)
+    }
   };
 
   return (

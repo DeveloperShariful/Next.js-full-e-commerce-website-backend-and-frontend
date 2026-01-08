@@ -63,6 +63,31 @@ export async function getProductById(id: string) {
   }
 }
 
+// 🔥 NEW: GET CONFIG OPTIONS (GENDER & AGE GROUP)
+export async function getConfigOptions() {
+    try {
+        const attributes = await db.attribute.findMany({
+            where: {
+                name: { in: ["Gender", "Age Group"] } 
+            },
+            select: { name: true, values: true }
+        });
+
+        const genderAttr = attributes.find(a => a.name === "Gender");
+        const ageAttr = attributes.find(a => a.name === "Age Group");
+
+        return {
+            success: true,
+            data: {
+                genders: genderAttr?.values || ["Male", "Female", "Unisex", "Kids"], // Default Fallback
+                ageGroups: ageAttr?.values || ["Adult", "Teen", "Kids", "Toddler", "Infant"] // Default Fallback
+            }
+        };
+    } catch (error) {
+        return { success: false, data: { genders: [], ageGroups: [] } };
+    }
+}
+
 // 🔥 NEW: GET ALL LOCATIONS
 export async function getLocations() {
     try {

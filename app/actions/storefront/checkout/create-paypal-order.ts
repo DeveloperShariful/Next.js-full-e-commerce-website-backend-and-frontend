@@ -8,18 +8,19 @@ import { getCheckoutSummary } from "./get-checkout-summary"
 interface PayPalOrderParams {
   cartId: string;
   shippingMethodId?: string;
+  shippingCost?: number; // ✅ NEW
   couponCode?: string;
   address: {
     country: string;
     state: string;
     postcode: string;
     suburb: string;
-    address1: string; // ✅ Added address lines
+    address1: string;
     city: string;
   };
 }
 
-export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, address }: PayPalOrderParams) {
+export async function createPaypalOrder({ cartId, shippingMethodId, shippingCost, couponCode, address }: PayPalOrderParams) {
   try {
     // 1. Config Check
     const [methodConfig, storeSettings] = await Promise.all([
@@ -44,6 +45,7 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
         cartId, 
         shippingAddress: address, 
         shippingMethodId, 
+        shippingCost, // 🔥 Passing existing cost
         couponCode 
     });
 
@@ -51,11 +53,23 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
       return { success: false, error: "Failed to calculate order total." };
     }
 
-    const finalAmount = summary.breakdown.total.toFixed(2);
-    // ✅ FIX: Use Store Currency
+    let finalAmount = summary.breakdown.total;
+    const breakdown = summary.breakdown;
+
+    // 🔥 3. Calculate Surcharge
+    let surcharge = 0;
+    if (methodConfig.surchargeEnabled) {
+        if (methodConfig.surchargeType === "percentage") {
+            surcharge = (breakdown.subtotal * (methodConfig.surchargeAmount || 0)) / 100;
+        } else {
+            surcharge = methodConfig.surchargeAmount || 0;
+        }
+        finalAmount += surcharge;
+    }
+
     const currencyCode = (storeSettings?.currency || "AUD").toUpperCase();
 
-    // 3. Decrypt Credentials
+    // 4. Decrypt Credentials
     const isSandbox = config.sandbox
     const clientId = isSandbox ? config.sandboxClientId : config.liveClientId
     const encryptedSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret
@@ -65,7 +79,7 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
       return { success: false, error: "PayPal credentials missing." }
     }
 
-    // 4. Get Auth Token
+    // 5. Get Auth Token
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com"
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
 
@@ -80,7 +94,7 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
       return { success: false, error: "Could not authenticate with PayPal." }
     }
 
-    // 5. Create Order
+    // 6. Create Order with Detailed Breakdown
     const orderRes = await fetch(`${baseUrl}/v2/checkout/orders`, {
       method: "POST",
       headers: {
@@ -93,15 +107,37 @@ export async function createPaypalOrder({ cartId, shippingMethodId, couponCode, 
           reference_id: cartId,
           amount: {
             currency_code: currencyCode,
-            value: finalAmount
+            value: finalAmount.toFixed(2),
+            breakdown: {
+                item_total: {
+                    currency_code: currencyCode,
+                    value: breakdown.subtotal.toFixed(2)
+                },
+                shipping: {
+                    currency_code: currencyCode,
+                    value: breakdown.shipping.toFixed(2)
+                },
+                tax_total: {
+                    currency_code: currencyCode,
+                    value: breakdown.tax.toFixed(2)
+                },
+                discount: {
+                    currency_code: currencyCode,
+                    value: breakdown.discount.toFixed(2)
+                },
+                // 🔥 Add Surcharge as Handling Fee
+                handling: {
+                    currency_code: currencyCode,
+                    value: surcharge.toFixed(2)
+                }
+            }
           },
           description: `Order from Store`,
-          // ✅ FIX: Pass Shipping Address to PayPal
           shipping: {
             address: {
                 address_line_1: address.address1,
-                admin_area_2: address.suburb, // City/Suburb
-                admin_area_1: address.state,  // State
+                admin_area_2: address.suburb, 
+                admin_area_1: address.state,
                 postal_code: address.postcode,
                 country_code: address.country
             }

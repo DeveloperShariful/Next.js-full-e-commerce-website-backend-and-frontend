@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react"
+import { Loader2, CheckCircle2, AlertTriangle, CreditCard } from "lucide-react"
 
 import { Stripe_Save_Sticky_Bar } from "./Components/Stripe_Save_Sticky_Bar"
 
@@ -29,6 +29,7 @@ interface AdvancedProps {
   config: StripeConfigType
 }
 
+// Wallets List
 const paymentFeatures = [
   { 
     id: "savedCards", 
@@ -54,6 +55,25 @@ const paymentFeatures = [
     id: "inlineCreditCardForm", 
     label: "Inline Card Form", 
     desc: "Display card inputs directly on the page instead of a modal." 
+  }
+] as const
+
+// 🔥 NEW: BNPL Options List
+const bnplOptions = [
+  { 
+    id: "klarnaEnabled", 
+    label: "Klarna", 
+    desc: "Pay in 3 interest-free installments." 
+  },
+  { 
+    id: "afterpayEnabled", 
+    label: "Afterpay / Clearpay", 
+    desc: "Buy now, pay later in 4 installments." 
+  },
+  { 
+    id: "zipEnabled", 
+    label: "Zip Pay", 
+    desc: "Flexible repayments for Australian customers." 
   }
 ] as const
 
@@ -88,6 +108,11 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
       googlePayEnabled: config.googlePayEnabled ?? true,
       paymentRequestButtons: config.paymentRequestButtons ?? true,
       buttonTheme: config.buttonTheme || "dark",
+
+      // 🔥 NEW FIELDS (Default to true as per your schema)
+      klarnaEnabled: config.klarnaEnabled ?? true,
+      afterpayEnabled: config.afterpayEnabled ?? true,
+      zipEnabled: config.zipEnabled ?? true,
 
       minOrderAmount: method.minOrderAmount ?? null,
       maxOrderAmount: method.maxOrderAmount ?? null,
@@ -132,6 +157,7 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
         
+        {/* Processing Logic */}
         <Card>
           <CardHeader>
             <CardTitle>Processing Logic</CardTitle>
@@ -203,11 +229,12 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
           </CardContent>
         </Card>
 
+        {/* Wallets */}
         <Card>
           <CardHeader>
-            <CardTitle>Wallets & Features</CardTitle>
+            <CardTitle>Wallets & Cards</CardTitle>
             <CardDescription>
-              Toggle specific payment capabilities and wallets.
+              Toggle specific card capabilities and digital wallets.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -261,11 +288,51 @@ export const Stripe_Advanced = ({ method, config }: AdvancedProps) => {
                  </Button>
                </div>
             )}
+          </CardContent>
+        </Card>
 
+        {/* 🔥 NEW: Buy Now Pay Later Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Buy Now, Pay Later (BNPL)</CardTitle>
+            <CardDescription>
+              Offer flexible payment options. These will appear as separate options or within the Stripe element.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {bnplOptions.map((option) => (
+                <FormField
+                  key={option.id}
+                  control={form.control}
+                  name={option.id as any}
+                  render={({ field }) => (
+                     <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 bg-white hover:bg-purple-50/50 transition-colors border-l-4 border-l-transparent hover:border-l-purple-500">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="font-semibold cursor-pointer">
+                          {option.label}
+                        </FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          {option.desc}
+                        </p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
+            
             <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 text-xs rounded-md border border-yellow-100 flex items-start gap-2">
                <AlertTriangle className="h-4 w-4 shrink-0" />
                <span>
-                  <strong>Note:</strong> Other local payment methods (iDEAL, Klarna, Alipay) are managed automatically by Stripe based on your Dashboard settings and customer location.
+                  <strong>Important:</strong> Ensure these payment methods are also enabled in your 
+                  <a href="https://dashboard.stripe.com/settings/payment_methods" target="_blank" className="underline font-bold ml-1">Stripe Dashboard</a>.
                </span>
             </div>
           </CardContent>

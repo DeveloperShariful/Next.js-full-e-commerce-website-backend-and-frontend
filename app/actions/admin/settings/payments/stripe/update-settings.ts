@@ -91,8 +91,14 @@ export async function updateStripeSettings(
           applePayEnabled: validated.applePayEnabled ?? true,
           googlePayEnabled: validated.googlePayEnabled ?? true,
           paymentRequestButtons: validated.paymentRequestButtons ?? true,
-          buttonTheme: validated.buttonTheme ?? "dark",
           
+          // 🔥 NEW FIELDS
+          // (Make sure to add these to your Prisma Schema!)
+          klarnaEnabled: validated.klarnaEnabled ?? false,
+          afterpayEnabled: validated.afterpayEnabled ?? false,
+          zipEnabled: validated.zipEnabled ?? false,
+
+          buttonTheme: validated.buttonTheme ?? "dark",
           debugLog: validated.debugLog ?? false,
         },
         update: {
@@ -119,8 +125,13 @@ export async function updateStripeSettings(
           applePayEnabled: validated.applePayEnabled ?? true,
           googlePayEnabled: validated.googlePayEnabled ?? true,
           paymentRequestButtons: validated.paymentRequestButtons ?? true,
+
+          // 🔥 NEW FIELDS UPDATED
+          klarnaEnabled: validated.klarnaEnabled ?? false,
+          afterpayEnabled: validated.afterpayEnabled ?? false,
+          zipEnabled: validated.zipEnabled ?? false,
+
           buttonTheme: validated.buttonTheme ?? "dark",
-          
           debugLog: validated.debugLog ?? false,
         }
       })

@@ -29,12 +29,18 @@ export async function POST(req: Request) {
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
     
-    // ১. ডাটাবেস থেকে ক্রেডেনশিয়াল আনা
+    // ১. [UPDATED] ডাটাবেস থেকে সঠিক ক্রেডেনশিয়াল আনা
+    // শুধুমাত্র Enabled নয়, আমরা চেক করব যার Webhook ID সেট করা আছে
+    // কারণ Webhook ID ছাড়া ভেরিফিকেশন সম্ভব নয়
     const config = await db.paypalConfig.findFirst({
-      where: { paymentMethod: { isEnabled: true } }
+      where: { 
+        webhookId: { not: null }, // 🔥 Must have a webhook ID
+        paymentMethod: { isEnabled: true } 
+      }
     });
 
     if (!config || !config.webhookId) {
+      console.error("❌ PayPal Config or Webhook ID missing in DB");
       return NextResponse.json({ error: "PayPal config missing" }, { status: 500 });
     }
 
@@ -63,7 +69,7 @@ export async function POST(req: Request) {
         cert_url: headersList.get("paypal-cert-url"),
         auth_algo: headersList.get("paypal-auth-algo"),
         transmission_sig: headersList.get("paypal-transmission-sig"),
-        webhook_id: config.webhookId,
+        webhook_id: config.webhookId, // 🔥 Verifying against stored ID
         webhook_event: body,
       }),
     });
@@ -116,7 +122,7 @@ export async function POST(req: Request) {
                     });
                 }
                 
-                // মেইন প্রোডাক্টের স্টকও কমাবে (যদি Simple Product হয় অথবা প্যারেন্ট স্টক ট্র্যাক করেন)
+                // মেইন প্রোডাক্টের স্টকও কমাবে
                 if (item.productId) {
                     await tx.product.update({
                         where: { id: item.productId },

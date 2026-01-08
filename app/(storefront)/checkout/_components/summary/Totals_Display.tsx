@@ -6,7 +6,10 @@ import { useCheckoutStore } from "../../useCheckoutStore";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Totals_Display = () => {
-  const { totals, isProcessing, selectedShippingMethod } = useCheckoutStore();
+  const { totals, isProcessing, selectedShippingMethod, selectedPaymentMethod, settings } = useCheckoutStore();
+
+  const methodConfig = settings?.paymentMethods?.find((m: any) => m.identifier === selectedPaymentMethod);
+  const surchargeLabel = methodConfig?.name ? `${methodConfig.name} Fee` : "Payment Fee";
 
   return (
     <div className="space-y-3 text-sm">
@@ -46,6 +49,14 @@ export const Totals_Display = () => {
         <div className="flex justify-between text-green-600 font-medium animate-in slide-in-from-right-2">
           <span>Discount</span>
           <span>-${totals.discount.toFixed(2)}</span>
+        </div>
+      )}
+
+      {/* 🔥 Surcharge Display */}
+      {totals.surcharge > 0 && (
+        <div className="flex justify-between text-gray-600 animate-in slide-in-from-right-2">
+          <span>{surchargeLabel}</span>
+          <span className="font-medium text-gray-900">+${totals.surcharge.toFixed(2)}</span>
         </div>
       )}
 

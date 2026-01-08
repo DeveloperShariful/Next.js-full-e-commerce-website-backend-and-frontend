@@ -1779,9 +1779,12 @@ model StripeConfig {
   inlineCreditCardForm      Boolean             @default(true)
   applePayEnabled           Boolean             @default(true)
   googlePayEnabled          Boolean             @default(true)
+  klarnaEnabled             Boolean             @default(true)
+  afterpayEnabled           Boolean             @default(true)
+  zipEnabled                Boolean             @default(true)
   paymentRequestButtons     Boolean             @default(true)
   buttonTheme               String              @default("dark")
-  debugLog                  Boolean             @default(false)
+  debugLog                  Boolean             @default(true)
   updatedAt                 DateTime            @updatedAt
 }
 

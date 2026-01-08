@@ -17,7 +17,7 @@ interface CheckoutState {
   isSameBilling: boolean;
   customerNote: string;
   
-  // Selected Method (Typed correctly)
+  // Selected Method
   selectedShippingMethod: { 
       id: string; 
       price: number; 
@@ -34,6 +34,7 @@ interface CheckoutState {
     shipping: number;
     tax: number;
     discount: number;
+    surcharge: number; // 🔥 NEW
     total: number;
   };
 
@@ -75,6 +76,7 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
     shipping: 0,
     tax: 0,
     discount: 0,
+    surcharge: 0, // 🔥 Init
     total: 0
   },
 
@@ -104,6 +106,7 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
         shipping: 0,
         tax: 0,
         discount: 0,
+        surcharge: 0,
         total: 0 
       }
     });
@@ -116,13 +119,10 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
 
   setShippingAddress: (address) => {
     const currentAddress = get().shippingAddress;
-
-    // ✅ FIX: Prevent redundant updates / Infinite Loop
     if (JSON.stringify(currentAddress) === JSON.stringify(address)) return;
 
     set({ shippingAddress: address });
 
-    // Only trigger calculation if minimal required fields are present
     if (address.country && address.postcode) {
         get().updateTotals();
     }
@@ -136,15 +136,17 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
 
   setShippingMethod: (method) => {
     const currentMethod = get().selectedShippingMethod;
-
-    // ✅ FIX: Prevent update loop if same method is set
     if (currentMethod?.id === method.id) return;
 
     set({ selectedShippingMethod: method });
     get().updateTotals();
   },
 
-  setPaymentMethod: (method) => set({ selectedPaymentMethod: method }),
+  setPaymentMethod: (methodIdentifier) => {
+    set({ selectedPaymentMethod: methodIdentifier });
+    // মেথড চেঞ্জ হলে টোটাল রিক্যালকুলেট করতে হবে (Surcharge এর জন্য)
+    get().updateTotals();
+  },
 
   applyCoupon: async (code) => {
     set({ couponCode: code });
@@ -156,9 +158,9 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
     await get().updateTotals();
   },
 
-  // 🔥 Server-Side Calculation Logic
+  // 🔥 CORE CALCULATION LOGIC
   updateTotals: async () => {
-    const { cartId, shippingAddress, selectedShippingMethod, couponCode } = get();
+    const { cartId, shippingAddress, selectedShippingMethod, couponCode, selectedPaymentMethod, settings } = get();
     
     if (!cartId) return;
 
@@ -171,23 +173,40 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
                 country: shippingAddress.country || "AU",
                 state: shippingAddress.state || "",
                 postcode: shippingAddress.postcode || "",
-                // ✅ FIX: Ensure 'city' from form is passed as 'suburb' for backend logic
                 suburb: shippingAddress.suburb || shippingAddress.city || "" 
             },
             shippingMethodId: selectedShippingMethod?.id,
-            // ✅ FIX: Pass selected price to avoid re-fetching rates on server
             shippingCost: selectedShippingMethod?.price,
             couponCode: couponCode || undefined
         });
 
         if (res.success && res.breakdown) {
+            
+            // 🔥 Calculate Surcharge Client-Side (Faster UI)
+            let surcharge = 0;
+            const currentSubtotal = res.breakdown.subtotal;
+            
+            if (selectedPaymentMethod && settings?.paymentMethods) {
+                const methodConfig = settings.paymentMethods.find((m: any) => m.identifier === selectedPaymentMethod);
+                
+                if (methodConfig?.surchargeEnabled) {
+                    const amount = methodConfig.surchargeAmount || 0;
+                    if (methodConfig.surchargeType === "percentage") {
+                        surcharge = (currentSubtotal * amount) / 100;
+                    } else {
+                        surcharge = amount;
+                    }
+                }
+            }
+
             set({
                 totals: {
                     subtotal: res.breakdown.subtotal,
                     shipping: res.breakdown.shipping,
                     tax: res.breakdown.tax,
                     discount: res.breakdown.discount,
-                    total: res.breakdown.total
+                    surcharge: surcharge, // 🔥 Added
+                    total: res.breakdown.total + surcharge // 🔥 Added to Total
                 }
             });
         }

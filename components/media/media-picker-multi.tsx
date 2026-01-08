@@ -1,11 +1,11 @@
-//components/media/media-picker-multi.tsx
+// components/media/media-picker-multi.tsx
 
 "use client";
 
 import { useState } from "react";
 import { MediaSelectorModal } from "./media-selector-modal";
 import { MediaItem } from "@/app/actions/admin/media/media-read";
-import { Image as ImageIcon, X, Plus } from "lucide-react";
+import { Image as ImageIcon, X, Plus, GripVertical } from "lucide-react";
 import Image from "next/image";
 
 interface MediaPickerMultiProps {
@@ -18,48 +18,83 @@ interface MediaPickerMultiProps {
 export function MediaPickerMulti({ label = "Gallery", value = [], onChange, onRemove }: MediaPickerMultiProps) {
   const [open, setOpen] = useState(false);
 
-  const handleSelect = (media: MediaItem) => {
-    // Add new image to existing array
-    const newImages = [...value, media.url];
-    onChange(newImages); 
-    // Note: We are currently saving URLs only for gallery. 
-    // If you need IDs later, we will update logic.
+  // Handle Selection from Modal
+  const handleSelect = (media: MediaItem | MediaItem[]) => {
+    let newUrls: string[] = [];
+
+    // Check if it's an array (Multi-select) or single object
+    if (Array.isArray(media)) {
+        newUrls = media.map((m) => m.url);
+    } else {
+        newUrls = [media.url];
+    }
+
+    // Filter duplicates
+    const uniqueUrls = newUrls.filter(url => !value.includes(url));
+    
+    // Append to existing
+    onChange([...value, ...uniqueUrls]);
   };
 
   return (
     <div className="space-y-3">
-      {/* Grid of Images */}
-      {value.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-3">
-           {value.map((url, i) => (
-             <div key={i} className="relative group aspect-square border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
-                <Image src={url} alt="Gallery" fill className="object-cover" />
+      {label && <label className="text-sm font-bold text-slate-700 block">{label}</label>}
+
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+        
+        {/* Existing Images */}
+        {value.map((url, i) => (
+          <div key={i} className="relative group aspect-square bg-slate-50 rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all">
+             <Image 
+                src={url} 
+                alt={`Gallery ${i}`} 
+                fill 
+                className="object-cover" 
+             />
+             
+             {/* Delete Button (Visible on Hover or Touch) */}
+             <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <button 
                   type="button" 
                   onClick={() => onRemove(i)} 
-                  className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition shadow-sm z-10"
+                  className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600 shadow-sm"
+                  title="Remove"
                 >
                   <X size={12}/>
                 </button>
              </div>
-           ))}
-        </div>
-      )}
 
-      {/* Add Button */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-4 py-2 rounded-lg transition border border-indigo-200 w-full justify-center border-dashed"
-      >
-         <Plus size={16}/> Add Image from Library
-      </button>
+             {/* Optional: Number Badge */}
+             <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[9px] px-1.5 py-0.5 rounded backdrop-blur-sm">
+                {i + 1}
+             </div>
+          </div>
+        ))}
+
+        {/* Add Button (Last Card) */}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50/50 transition-all text-slate-400 hover:text-indigo-600 group"
+        >
+           <div className="p-2 bg-slate-100 rounded-full group-hover:bg-white mb-1 transition">
+              <Plus size={20} />
+           </div>
+           <span className="text-[10px] font-bold uppercase tracking-wider">Add</span>
+        </button>
+
+      </div>
+
+      {value.length === 0 && (
+         <p className="text-[11px] text-slate-400 italic">No images selected yet.</p>
+      )}
 
       {/* Modal */}
       {open && (
         <MediaSelectorModal 
           onClose={() => setOpen(false)}
           onSelect={handleSelect}
+          allowMultiple={true} // 🔥 This fixes your previous error
         />
       )}
     </div>

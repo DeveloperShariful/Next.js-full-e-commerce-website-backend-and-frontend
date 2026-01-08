@@ -47,6 +47,36 @@ async function ensureUniqueSlug(slug: string, productId?: string): Promise<strin
     return uniqueSlug;
 }
 
+// 🔥 NEW: Helper Function for Gender/Age Group Sync
+async function syncSystemAttribute(tx: any, name: string, value: string | null) {
+    if (!value) return;
+
+    const slug = name.toLowerCase().replace(/\s+/g, '-'); 
+    
+    // Check if attribute exists
+    const existing = await tx.attribute.findUnique({ where: { slug } });
+
+    if (existing) {
+        // If exists, add new value if not present
+        if (!existing.values.includes(value)) {
+            await tx.attribute.update({
+                where: { id: existing.id },
+                data: { values: { push: value } }
+            });
+        }
+    } else {
+        // If not exists, create new attribute
+        await tx.attribute.create({
+            data: {
+                name,
+                slug,
+                type: "TEXT",
+                values: [value]
+            }
+        });
+    }
+}
+
 export async function createProduct(formData: FormData): Promise<ProductFormState> {
     return await saveProduct(formData, "CREATE");
 }
@@ -76,8 +106,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
     const finalSlug = await ensureUniqueSlug(data.slug, data.id);
 
     try {
-        // 3. Ensure Default Location (UPDATED LOGIC)
-        // Variable product er jonno Location ID must lagbe, otherwise variations stock save hobe na
+        // 3. Ensure Default Location
         let locationId = "";
         
         if (data.trackQuantity || data.productType === 'VARIABLE') {
@@ -90,20 +119,18 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             }
         }
 
-        // 4. Global Attribute Sync
+        // 4. Global Attribute Sync (User defined attributes)
         await Promise.all(data.attributesData.map(async (attr) => {
             if (!attr.name) return;
             const attrSlug = generateSlug(attr.name);
             const existingGlobal = await db.attribute.findUnique({ where: { slug: attrSlug } });
             
             if (existingGlobal) {
-                // Merge new values with existing ones
                 const mergedValues = Array.from(new Set([...existingGlobal.values, ...attr.values]));
                 if (mergedValues.length > existingGlobal.values.length) {
                     await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
                 }
             } else {
-                // Create new global attribute if it doesn't exist
                 await db.attribute.create({ data: { name: attr.name, slug: attrSlug, values: attr.values } });
             }
         }));
@@ -111,6 +138,10 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         // 5. Database Transaction
         const savedProduct = await db.$transaction(async (tx) => {
             
+            // 🔥 NEW: Sync System Attributes (Gender & Age Group)
+            await syncSystemAttribute(tx, "Gender", data.gender);
+            await syncSystemAttribute(tx, "Age Group", data.ageGroup);
+
             const taxRateRelation = data.taxRateId ? { connect: { id: data.taxRateId } } : (type === "UPDATE" ? { disconnect: true } : undefined);
             const shippingClassRelation = data.shippingClassId ? { connect: { id: data.shippingClassId } } : (type === "UPDATE" ? { disconnect: true } : undefined);
             

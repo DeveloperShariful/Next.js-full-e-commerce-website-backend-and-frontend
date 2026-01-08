@@ -9,7 +9,7 @@ import { OrderStatus, PaymentStatus } from "@prisma/client";
 
 interface CheckoutPayload {
   cartId: string;
-  userId?: string; // ✅ This is crucial
+  userId?: string; 
   guestInfo?: { email: string; name: string; phone: string };
   shippingAddress: any;
   billingAddress: any;
@@ -29,6 +29,21 @@ interface CheckoutPayload {
     discount: number;
     total: number;
   };
+}
+
+// Helper to calculate surcharge
+async function calculateSurcharge(methodIdentifier: string, subtotal: number) {
+    const method = await db.paymentMethodConfig.findUnique({
+        where: { identifier: methodIdentifier }
+    });
+
+    if (!method || !method.isEnabled || !method.surchargeEnabled) return 0;
+
+    const amount = method.surchargeAmount || 0;
+    if (method.surchargeType === "percentage") {
+        return (subtotal * amount) / 100;
+    }
+    return amount; // Fixed
 }
 
 export async function processCheckout(payload: CheckoutPayload) {
@@ -52,8 +67,7 @@ export async function processCheckout(payload: CheckoutPayload) {
       return { success: false, error: "Cart expired or empty." };
     }
 
-    // 2. Fetch User Email (If Logged In)
-    // ✅ FIX: Guest ইমেইল না থাকলে User ID দিয়ে ইমেইল বের করা
+    // 2. Fetch User Info
     let customerEmail = payload.guestInfo?.email;
     let customerName = payload.guestInfo?.name || "Customer";
 
@@ -68,17 +82,16 @@ export async function processCheckout(payload: CheckoutPayload) {
         }
     }
 
+    // 3. Discount Logic
     let finalDiscountId = payload.discountId;
     if (!finalDiscountId && payload.couponCode) {
         const discount = await db.discount.findUnique({
             where: { code: payload.couponCode.toUpperCase() }
         });
-        if (discount) {
-            finalDiscountId = discount.id;
-        }
+        if (discount) finalDiscountId = discount.id;
     }
 
-    // 3. Calculate Subtotal & Prepare Items
+    // 4. Calculate Items & Subtotal
     let calculatedSubtotal = 0;
     const orderItemsPayload = cart.items.map(item => {
         let imgUrl = item.product.featuredImage;
@@ -104,21 +117,29 @@ export async function processCheckout(payload: CheckoutPayload) {
         };
     });
 
-    const finalTotal = calculatedSubtotal + Number(payload.shippingData.cost) + Number(payload.totals.tax) - (payload.totals.discount || 0);
+    // 🔥 5. Calculate Surcharge (Server Side Verification)
+    // ক্লায়েন্ট সাইডের টোটালের ওপর ভরসা না করে সার্ভারে আবার ক্যালকুলেট করা হচ্ছে
+    const surcharge = await calculateSurcharge(payload.paymentMethod, calculatedSubtotal);
+
+    // Final Total Calculation
+    const tax = Number(payload.totals.tax);
+    const shipping = Number(payload.shippingData.cost);
+    const discount = Number(payload.totals.discount || 0);
+    
+    const finalTotal = calculatedSubtotal + shipping + tax + surcharge - discount;
     const orderNumber = await generateNextOrderNumber();
 
-    // 4. Payment Status Logic
+    // 6. Payment Status Logic
     const isOnline = payload.paymentMethod === "stripe" || payload.paymentMethod === "paypal";
     const isPaid = isOnline && !!payload.paymentId;
     const paymentStatus = isPaid ? PaymentStatus.PAID : PaymentStatus.UNPAID;
     
-    // 5. DB Transaction
+    // 7. DB Transaction
     const newOrder = await db.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           orderNumber,
           userId: payload.userId || null,
-          // ✅ FIX: Save resolved email if guest email is missing
           guestEmail: payload.guestInfo?.email || (!payload.userId ? customerEmail : null),
           
           status: OrderStatus.PENDING,
@@ -127,11 +148,16 @@ export async function processCheckout(payload: CheckoutPayload) {
           paymentId: payload.paymentId,
           
           subtotal: calculatedSubtotal,
-          taxTotal: payload.totals.tax,
-          shippingTotal: payload.shippingData.cost,
-          discountTotal: payload.totals.discount || 0,
+          taxTotal: tax,
+          shippingTotal: shipping,
+          discountTotal: discount,
+          
+          // 🔥 SAVING SURCHARGE
+          surcharge: surcharge, 
+          paymentFee: surcharge, // Keeping track of fee separately
+          
           total: finalTotal,
-          netAmount: finalTotal,
+          netAmount: finalTotal, // Net revenue
           
           shippingAddress: payload.shippingAddress,
           billingAddress: payload.billingAddress,
@@ -143,7 +169,7 @@ export async function processCheckout(payload: CheckoutPayload) {
             
           selectedCourierService: payload.shippingData.carrier,
           
-          discountId: payload.discountId, // We assume ID is resolved or passed correctly now, or handle like previous fix
+          discountId: finalDiscountId,
           couponCode: payload.couponCode,
           
           items: { create: orderItemsPayload }
@@ -152,6 +178,7 @@ export async function processCheckout(payload: CheckoutPayload) {
 
       await tx.cart.delete({ where: { id: payload.cartId } });
 
+      // Stock Decrement
       for (const item of cart.items) {
         if (item.variantId) {
             await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
@@ -162,10 +189,7 @@ export async function processCheckout(payload: CheckoutPayload) {
       return order;
     });
 
-    // ==========================================
-    // 6. NOTIFICATIONS (Updated Logic)
-    // ==========================================
-    
+    // 8. Notifications
     const [storeSettings, emailConfig] = await Promise.all([
         db.storeSettings.findUnique({ where: { id: "settings" }, select: { storeEmail: true } }),
         db.emailConfiguration.findUnique({ where: { id: "email_config" }, select: { senderEmail: true } })
@@ -175,11 +199,10 @@ export async function processCheckout(payload: CheckoutPayload) {
 
     const emailData = {
         order_number: newOrder.orderNumber,
-        customer_name: customerName, // ✅ Using resolved name
+        customer_name: customerName,
         total: `$${finalTotal.toFixed(2)}`
     };
 
-    // A. Notify Customer (✅ Now works for Logged In users too)
     if (customerEmail) {
         const customerTrigger = isPaid ? "PAYMENT_PAID" : "ORDER_PENDING";
         await sendNotification({ 
@@ -188,12 +211,8 @@ export async function processCheckout(payload: CheckoutPayload) {
             data: emailData,
             orderId: newOrder.id 
         });
-        console.log(`✅ Customer email queued for: ${customerEmail}`);
-    } else {
-        console.error("❌ Customer email not found, skipping notification.");
     }
 
-    // B. Notify Admin
     if (adminEmail) {
         await sendNotification({
             trigger: "ADMIN_ORDER_PENDING",

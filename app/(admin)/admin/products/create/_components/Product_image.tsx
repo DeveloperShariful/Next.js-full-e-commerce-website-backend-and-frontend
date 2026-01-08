@@ -4,9 +4,10 @@
 
 import { useState } from "react"; 
 import { useFormContext } from "react-hook-form";
-import { X, RefreshCw, ImagePlus } from "lucide-react"; 
+import { X, RefreshCw, ImagePlus, UploadCloud } from "lucide-react"; 
 import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
 import { ProductFormData } from "../types";
+import Image from "next/image";
 
 export default function ProductImage() {
     const { watch, setValue } = useFormContext<ProductFormData>();
@@ -21,29 +22,35 @@ export default function ProductImage() {
     };
 
     return (
-        <div className="bg-white border border-gray-300 shadow-sm rounded-sm">
-            <div className="px-3 py-2 border-b border-gray-300 bg-gray-50 font-semibold text-xs text-gray-700">
-                Product Image
+        <div className="bg-white border border-gray-300 shadow-sm rounded-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <span className="font-semibold text-xs text-gray-700 uppercase tracking-wide">Featured Image</span>
+                {featuredImage && (
+                    <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">Set</span>
+                )}
             </div>
             
-            <div className="p-3">
+            <div className="p-4">
                 {featuredImage ? (
-                    <div className="relative group">
-                        <img 
-                            src={featuredImage} 
-                            alt="Featured" 
-                            className="w-full h-auto rounded border border-gray-200" 
-                        />
+                    <div className="flex flex-col gap-3">
+                        {/* Image Preview Container */}
+                        <div className="relative w-full aspect-square bg-gray-100 rounded-lg border border-gray-200 overflow-hidden shadow-inner">
+                            <Image 
+                                src={featuredImage} 
+                                alt="Featured" 
+                                fill
+                                className="object-cover"
+                            />
+                        </div>
                         
-                        {/* Actions Overlay */}
-                        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition duration-200">
+                        {/* Actions Row (Always Visible) */}
+                        <div className="grid grid-cols-2 gap-2">
                             <button 
                                 type="button" 
                                 onClick={() => setOpen(true)} 
-                                className="bg-white text-indigo-600 p-1.5 rounded shadow-sm hover:bg-indigo-50 border border-gray-200"
-                                title="Replace Image"
+                                className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-[#2271b1] border border-blue-200 rounded text-xs font-semibold hover:bg-blue-100 transition"
                             >
-                                <RefreshCw size={14}/>
+                                <RefreshCw size={14} /> Change
                             </button>
 
                             <button 
@@ -52,10 +59,9 @@ export default function ProductImage() {
                                     setValue("featuredImage", null, { shouldDirty: true, shouldValidate: true });
                                     setValue("featuredMediaId", null, { shouldDirty: true });
                                 }} 
-                                className="bg-white text-red-500 p-1.5 rounded shadow-sm hover:bg-red-50 border border-gray-200"
-                                title="Remove Image"
+                                className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded text-xs font-semibold hover:bg-red-100 transition"
                             >
-                                <X size={14}/>
+                                <X size={14} /> Remove
                             </button>
                         </div>
                     </div>
@@ -63,13 +69,16 @@ export default function ProductImage() {
                     <button
                         type="button"
                         onClick={() => setOpen(true)}
-                        className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded hover:bg-gray-50 hover:border-indigo-400 transition gap-2 text-gray-500 hover:text-indigo-600"
+                        className="group flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-[#2271b1] transition-all duration-200"
                     >
-                        <ImagePlus size={24} />
-                        <span className="text-xs font-semibold">Select Featured Image</span>
+                        <div className="p-3 bg-gray-100 rounded-full group-hover:bg-white group-hover:text-[#2271b1] transition mb-2">
+                            <ImagePlus size={24} className="text-gray-400 group-hover:text-[#2271b1]" />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-600 group-hover:text-[#2271b1]">Set Product Image</span>
                     </button>
                 )}
             </div>
+
             {open && (
                 <MediaSelectorModal 
                     onClose={() => setOpen(false)}

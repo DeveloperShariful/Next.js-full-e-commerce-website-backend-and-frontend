@@ -1,4 +1,4 @@
-// app/admin/settings/payments/schemas.ts
+// app/(admin)/admin/settings/payments/schemas.ts
 
 import * as z from "zod"
 import { PaymentIntent, PaymentMode, PayPalButtonColor, PayPalButtonLabel, PayPalButtonLayout, PayPalButtonShape, PayPalLandingPage } from "@prisma/client"
@@ -52,9 +52,16 @@ export const StripeSettingsSchema = LimitsAndSurchargeSchema.extend({
   
   savedCards: booleanField,
   inlineCreditCardForm: booleanField,
+  
+  // Wallet Options
   applePayEnabled: booleanField,
   googlePayEnabled: booleanField,
   paymentRequestButtons: booleanField,
+  
+  // 🔥 NEW: Buy Now Pay Later Options
+  klarnaEnabled: booleanField,
+  afterpayEnabled: booleanField,
+  zipEnabled: booleanField,
   
   buttonTheme: stringField,
   debugLog: booleanField

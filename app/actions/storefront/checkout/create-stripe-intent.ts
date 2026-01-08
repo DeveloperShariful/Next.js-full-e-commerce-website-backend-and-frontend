@@ -9,6 +9,8 @@ import Stripe from "stripe";
 interface IntentParams {
     cartId: string;
     shippingMethodId?: string;
+    // ✅ NEW: Receive raw cost to avoid re-fetching shipping APIs
+    shippingCost?: number; 
     couponCode?: string;
     address: {
         country: string;
@@ -18,7 +20,7 @@ interface IntentParams {
     };
 }
 
-export async function createStripeIntent({ cartId, shippingMethodId, couponCode, address }: IntentParams) {
+export async function createStripeIntent({ cartId, shippingMethodId, shippingCost, couponCode, address }: IntentParams) {
   try {
     // 1. Config Check
     const [methodConfig, storeSettings] = await Promise.all([
@@ -36,11 +38,12 @@ export async function createStripeIntent({ cartId, shippingMethodId, couponCode,
       return { success: false, error: "Stripe payments are currently disabled." };
     }
 
-    // 2. Calculate Total (Secure)
+    // 2. Calculate Order Total (Using passed shipping cost to avoid API recall)
     const summary = await getCheckoutSummary({ 
         cartId, 
         shippingAddress: address, 
         shippingMethodId, 
+        shippingCost, // 🔥 Passing existing cost
         couponCode 
     });
 
@@ -48,13 +51,27 @@ export async function createStripeIntent({ cartId, shippingMethodId, couponCode,
       return { success: false, error: "Failed to calculate order total." };
     }
 
-    const finalAmount = summary.breakdown.total;
+    let finalAmount = summary.breakdown.total;
+
+    // 🔥 3. Calculate Surcharge
+    if (methodConfig.surchargeEnabled) {
+        const subtotal = summary.breakdown.subtotal;
+        let surcharge = 0;
+        
+        if (methodConfig.surchargeType === "percentage") {
+            surcharge = (subtotal * (methodConfig.surchargeAmount || 0)) / 100;
+        } else {
+            surcharge = methodConfig.surchargeAmount || 0;
+        }
+        
+        finalAmount += surcharge;
+    }
 
     if (finalAmount <= 0) {
         return { success: false, error: "Invalid order amount." };
     }
 
-    // 3. Decrypt Key
+    // 4. Decrypt Key
     const config = methodConfig.stripeConfig;
     const encryptedKey = config.testMode ? config.testSecretKey : config.liveSecretKey;
     const secretKey = decrypt(encryptedKey ?? "");
@@ -63,14 +80,13 @@ export async function createStripeIntent({ cartId, shippingMethodId, couponCode,
       return { success: false, error: "Stripe configuration error (Key missing)." };
     }
 
-    // 4. Initialize Stripe
+    // 5. Initialize Stripe
     const stripe = new Stripe(secretKey, {
       apiVersion: "2025-01-27.acacia" as any,
       typescript: true,
     });
 
-    // 5. Create Intent
-    // ✅ FIX: Use Store Currency
+    // 6. Create Intent
     const currencyCode = (storeSettings?.currency || "aud").toLowerCase();
     const amountInCents = Math.round(finalAmount * 100); 
 
@@ -82,7 +98,8 @@ export async function createStripeIntent({ cartId, shippingMethodId, couponCode,
         cartId: cartId,
         orderType: "ecom_checkout",
         shippingMethod: summary.breakdown.shippingMethod,
-        taxTotal: summary.breakdown.tax.toFixed(2)
+        taxTotal: summary.breakdown.tax.toFixed(2),
+        surchargeApplied: methodConfig.surchargeEnabled ? "yes" : "no"
       },
       capture_method: config.paymentAction === "CAPTURE" ? "automatic" : "manual",
     });

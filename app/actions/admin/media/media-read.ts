@@ -1,9 +1,9 @@
-//app/actions/admin/media/media-read.ts
+// app/actions/admin/media/media-read.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { unstable_noStore as noStore } from "next/cache"; // 👈 ১. ক্যাশ অকার্যকর করার জন্য ইম্পোর্ট
+import { unstable_noStore as noStore } from "next/cache"; 
 
 export type MediaItem = {
   id: string;
@@ -21,7 +21,6 @@ export type MediaItem = {
   description?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  // Relation for "Used In" column
   productImages: {
     product: {
       id: string;
@@ -32,16 +31,20 @@ export type MediaItem = {
   }[];
 };
 
+// 🔥 UPDATE: Added Pagination Parameters (page, limit)
 export async function getAllMedia(
   query: string = "", 
   sortBy: string = "newest", 
   typeFilter: string = "ALL",
-  usageFilter: string = "ALL"
+  usageFilter: string = "ALL",
+  page: number = 1,
+  limit: number = 30
 ) {
-  noStore(); // 👈 ২. এই ফাংশনটি সার্ভারকে বলে ক্যাশ ব্যবহার না করতে
+  noStore(); 
 
   try {
     const where: any = {};
+    const skip = (page - 1) * limit;
     
     // 1. Search Query
     if (query) {
@@ -60,14 +63,13 @@ export async function getAllMedia(
 
     // 3. Usage Filter
     if (usageFilter === "USED") {
-      where.productImages = { some: {} }; // Attached to at least one product
+      where.productImages = { some: {} }; 
     } else if (usageFilter === "UNUSED") {
-      where.productImages = { none: {} }; // Not attached to any product
+      where.productImages = { none: {} }; 
     }
 
     // 4. Sort Logic
     let orderBy: any = { createdAt: 'desc' };
-    
     switch (sortBy) {
       case "oldest": orderBy = { createdAt: 'asc' }; break;
       case "name_asc": orderBy = { filename: 'asc' }; break;
@@ -77,29 +79,37 @@ export async function getAllMedia(
       default: orderBy = { createdAt: 'desc' };
     }
 
-    const data = await db.media.findMany({
-      where,
-      orderBy,
-      include: {
-        productImages: {
-          select: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                slug: true,
-                category: { select: { name: true } }
+    // 🔥 Parallel Fetch: Data + Count
+    const [data, total] = await Promise.all([
+      db.media.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: {
+          productImages: {
+            select: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  category: { select: { name: true } }
+                }
               }
             }
           }
         }
-      }
-    });
+      }),
+      db.media.count({ where })
+    ]);
 
-    return { success: true, data };
+    const hasMore = skip + data.length < total;
+
+    return { success: true, data, meta: { total, page, hasMore } };
 
   } catch (error) {
     console.error("GET_MEDIA_ERROR", error);
-    return { success: false, data: [] };
+    return { success: false, data: [], meta: { total: 0, page: 1, hasMore: false } };
   }
 }

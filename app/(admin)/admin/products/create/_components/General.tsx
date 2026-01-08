@@ -1,29 +1,135 @@
-// app/admin/products/create/_components/General.tsx
+// File: app/admin/products/create/_components/General.tsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useFormContext } from "react-hook-form";
-import { getTaxClasses } from "@/app/actions/admin/product/product-read";
-import { X } from "lucide-react";
+import { getTaxClasses, getConfigOptions } from "@/app/actions/admin/product/product-read";
+import { X, ChevronDown, Check, Plus } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { ProductFormData } from "../types";
+
+// --- 🔥 NEW: ULTRA PRO CREATABLE SELECT COMPONENT ---
+const CreatableSelect = ({ 
+    options, 
+    value, 
+    onChange, 
+    placeholder 
+}: { 
+    options: string[], 
+    value: string, 
+    onChange: (val: string) => void, 
+    placeholder: string 
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Close on click outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Filter options based on search
+    const filteredOptions = options.filter(opt => 
+        opt.toLowerCase().includes(search.toLowerCase())
+    );
+
+    const handleSelect = (val: string) => {
+        onChange(val);
+        setIsOpen(false);
+        setSearch("");
+    };
+
+    return (
+        <div className="relative" ref={wrapperRef}>
+            {/* Input Trigger */}
+            <div 
+                className={`w-full border px-3 py-2 rounded-sm text-sm flex justify-between items-center cursor-pointer bg-white transition-colors ${isOpen ? 'border-[#2271b1] ring-1 ring-[#2271b1]' : 'border-gray-400 hover:border-gray-500'}`}
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span className={value ? "text-[#3c434a]" : "text-gray-400"}>
+                    {value || placeholder}
+                </span>
+                <ChevronDown size={14} className={`text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}/>
+            </div>
+
+            {/* Dropdown Menu */}
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-sm shadow-lg max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+                    {/* Search Input inside dropdown */}
+                    <div className="p-2 border-b border-gray-100">
+                        <input 
+                            autoFocus
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Type to search or create..."
+                            className="w-full text-xs px-2 py-1.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-[#2271b1]"
+                        />
+                    </div>
+
+                    <div className="overflow-y-auto flex-1">
+                        {filteredOptions.map((opt) => (
+                            <div 
+                                key={opt}
+                                onClick={() => handleSelect(opt)}
+                                className={`px-3 py-2 text-xs cursor-pointer hover:bg-blue-50 flex justify-between items-center ${value === opt ? 'bg-blue-50 text-[#2271b1] font-medium' : 'text-gray-700'}`}
+                            >
+                                {opt}
+                                {value === opt && <Check size={12}/>}
+                            </div>
+                        ))}
+
+                        {/* Create New Option */}
+                        {search && !filteredOptions.some(o => o.toLowerCase() === search.toLowerCase()) && (
+                            <div 
+                                onClick={() => handleSelect(search)}
+                                className="px-3 py-2 text-xs cursor-pointer hover:bg-green-50 text-green-700 border-t border-gray-100 flex items-center gap-2 font-medium"
+                            >
+                                <Plus size={12}/> Create &quot;{search}&quot;
+                            </div>
+                        )}
+
+                        {filteredOptions.length === 0 && !search && (
+                            <div className="px-3 py-4 text-center text-xs text-gray-400">
+                                No options found.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default function General() {
     const { register, watch, setValue, formState: { errors } } = useFormContext<ProductFormData>();
     const data = watch();
     
     const [taxClasses, setTaxClasses] = useState<{id: string, name: string}[]>([]);
-    const [showSchedule, setShowSchedule] = useState(!!data.saleStart);
     
+    // States for Dynamic Options
+    const [genderOptions, setGenderOptions] = useState<string[]>([]);
+    const [ageGroupOptions, setAgeGroupOptions] = useState<string[]>([]);
+    
+    const [showSchedule, setShowSchedule] = useState(!!data.saleStart);
     const { symbol } = useGlobalStore(); 
 
     useEffect(() => {
         getTaxClasses().then(res => { if(res.success) setTaxClasses(res.data as any) });
+        
+        // Fetch Dynamic Options (Gender/Age)
+        getConfigOptions().then(res => {
+            if(res.success) {
+                setGenderOptions(res.data.genders);
+                setAgeGroupOptions(res.data.ageGroups);
+            }
+        });
     }, []);
-
-    const formatDate = (dateString: string | null | undefined) => {
-        if (!dateString) return "";
-        return new Date(dateString).toISOString().split('T')[0];
-    };
 
     const addFile = () => {
         const currentFiles = data.digitalFiles || [];
@@ -142,33 +248,31 @@ export default function General() {
 
             <hr className="border-gray-200 my-4"/>
 
-            {/* --- DEMOGRAPHICS --- */}
+            {/* --- 🔥 DEMOGRAPHICS (ULTRA PRO UI) --- */}
             <h3 className="text-xs font-bold text-gray-700">Demographics</h3>
+            
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Gender</label>
-                <select 
-                    {...register("gender")}
-                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
-                >
-                    <option value="">Any / Unisex</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Kids">Kids</option>
-                </select>
+                <div className="col-span-2">
+                    <CreatableSelect 
+                        options={genderOptions}
+                        value={data.gender || ""}
+                        onChange={(val) => setValue("gender", val, { shouldDirty: true })}
+                        placeholder="Select gender"
+                    />
+                </div>
             </div>
+
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Age Group</label>
-                <select 
-                    {...register("ageGroup")}
-                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
-                >
-                    <option value="">All Ages</option>
-                    <option value="Adult">Adult</option>
-                    <option value="Teen">Teen</option>
-                    <option value="Kids">Kids</option>
-                    <option value="Toddler">Toddler</option>
-                    <option value="Infant">Infant</option>
-                </select>
+                <div className="col-span-2">
+                    <CreatableSelect 
+                        options={ageGroupOptions}
+                        value={data.ageGroup || ""}
+                        onChange={(val) => setValue("ageGroup", val, { shouldDirty: true })}
+                        placeholder="Select age group"
+                    />
+                </div>
             </div>
 
             <hr className="border-gray-200 my-4"/>

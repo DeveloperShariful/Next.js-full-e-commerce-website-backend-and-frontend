@@ -1,8 +1,9 @@
-//app/(admin)/admin/media/_components/media-toolbar.tsx
+// app/(admin)/admin/media/_components/media-toolbar.tsx
 
 "use client";
 
-import { Search, Grid, List, Trash2, RefreshCw } from "lucide-react"; // ✅ Import Refresh Icon
+import { Search, Grid, List, Trash2, RefreshCw, HardDrive, CheckSquare, Square } from "lucide-react";
+import { MediaItem } from "@/app/actions/admin/media/media-read";
 
 interface MediaToolbarProps {
   view: "GRID" | "LIST";
@@ -16,35 +17,63 @@ interface MediaToolbarProps {
   sort: string;
   setSort: (v: string) => void;
   selectedCount: number;
+  selectedItems: MediaItem[]; 
   onBulkDelete: () => void;
   onCancelSelection: () => void;
-  onRefresh: () => void; // 🔥 NEW PROP: Refresh Function
+  onRefresh: () => void;
+  // 🔥 NEW PROPS
+  onSelectAll: () => void;
+  isAllSelected: boolean;
 }
+
+const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
 
 export function MediaToolbar({
   view, setView, search, setSearch, 
   filter, setFilter, 
   usageFilter, setUsageFilter,
   sort, setSort,
-  selectedCount, onBulkDelete, onCancelSelection,
-  onRefresh // 🔥 Destructure new prop
+  selectedCount, selectedItems,
+  onBulkDelete, onCancelSelection,
+  onRefresh,
+  onSelectAll, isAllSelected // 🔥 Destructured
 }: MediaToolbarProps) {
+
+  const totalSize = selectedItems.reduce((acc, item) => acc + item.size, 0);
 
   if (selectedCount > 0) {
     return (
-      <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl mb-6 flex justify-between items-center animate-in fade-in slide-in-from-top-2">
-         <div className="flex items-center gap-3">
-            <span className="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+      <div className="bg-indigo-600 text-white p-3 rounded-xl mb-6 flex flex-col sm:flex-row justify-between items-center animate-in fade-in slide-in-from-top-2 shadow-lg shadow-indigo-200">
+         <div className="flex items-center gap-4 mb-2 sm:mb-0">
+            {/* 🔥 Select All Button inside Selection Mode */}
+            <button 
+                onClick={onSelectAll}
+                className="flex items-center gap-2 bg-indigo-700/50 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition"
+                title={isAllSelected ? "Deselect All" : "Select All"}
+            >
+                {isAllSelected ? <CheckSquare size={18} className="text-white"/> : <Square size={18} className="text-white/70"/>}
+            </button>
+
+            <span className="bg-white text-indigo-700 text-xs font-extrabold px-3 py-1 rounded-full">
                {selectedCount} Selected
             </span>
-            <span className="text-sm text-indigo-900 font-medium">items ready for action</span>
+            <span className="text-sm font-medium opacity-90 flex items-center gap-1">
+               <HardDrive size={14} className="opacity-70"/> 
+               Size: {formatSize(totalSize)}
+            </span>
          </div>
          <div className="flex gap-2">
-            <button onClick={onCancelSelection} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-white rounded border border-transparent hover:border-slate-200 transition">
+            <button onClick={onCancelSelection} className="px-4 py-1.5 text-xs font-bold text-white/80 hover:text-white hover:bg-white/10 rounded transition">
                Cancel
             </button>
-            <button onClick={onBulkDelete} className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center gap-1 shadow-sm">
-               <Trash2 size={14}/> Delete Selected
+            <button onClick={onBulkDelete} className="px-4 py-1.5 text-xs font-bold bg-white text-red-600 rounded hover:bg-red-50 transition flex items-center gap-1 shadow-sm">
+               <Trash2 size={14}/> Delete
             </button>
          </div>
       </div>
@@ -54,8 +83,16 @@ export function MediaToolbar({
   return (
     <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col lg:flex-row justify-between items-center gap-4 ">
        
-       {/* Left: Search & Filters */}
        <div className="flex flex-col sm:flex-row flex-1 gap-3 w-full lg:w-auto">
+          {/* 🔥 Select All Button (Normal Mode) */}
+          <button 
+                onClick={onSelectAll}
+                className={`p-2.5 rounded-lg border transition flex items-center justify-center ${isAllSelected ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
+                title="Select All (Ctrl+A)"
+          >
+                {isAllSelected ? <CheckSquare size={18}/> : <Square size={18}/>}
+          </button>
+
           <div className="relative flex-1 max-w-md">
              <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
              <input 
@@ -88,7 +125,6 @@ export function MediaToolbar({
              <option value="UNUSED">Unused</option>
           </select>
 
-          {/* 🔥 NEW: Refresh Button (Mobile Friendly) */}
           <button 
             onClick={onRefresh}
             className="px-3 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-indigo-600 transition flex items-center justify-center gap-2 sm:w-auto w-full"
@@ -99,7 +135,6 @@ export function MediaToolbar({
           </button>
        </div>
 
-       {/* Right: Sort & View */}
        <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
           <select 
             value={sort}

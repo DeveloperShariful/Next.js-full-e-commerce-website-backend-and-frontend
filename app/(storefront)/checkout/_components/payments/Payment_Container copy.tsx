@@ -14,11 +14,8 @@ export const Payment_Container = () => {
   // Find Config logic updated to handle split IDs
   let methodConfig = null;
   
-  // 🔥 FIX: Correctly mapping sub-methods to main config
   if (selectedPaymentMethod?.startsWith('stripe')) {
       methodConfig = settings?.paymentMethods?.find((m: any) => m.identifier === 'stripe');
-  } else if (selectedPaymentMethod === 'paypal') {
-      methodConfig = settings?.paymentMethods?.find((m: any) => m.identifier === 'paypal');
   } else {
       methodConfig = settings?.paymentMethods?.find((m: any) => m.identifier === selectedPaymentMethod);
   }
@@ -40,12 +37,12 @@ export const Payment_Container = () => {
             ) : (
                 <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     
-                    {/* PAYPAL FIX */}
+                    {/* PAYPAL */}
                     {selectedPaymentMethod === "paypal" && methodConfig && (
                         <PayPal_Payment_UI methodConfig={methodConfig} />
                     )}
 
-                    {/* STRIPE FIX (Handles all stripe_... IDs) */}
+                    {/* STRIPE (Card, Afterpay, Klarna) */}
                     {selectedPaymentMethod?.startsWith("stripe") && methodConfig && (
                         <Stripe_Payment_UI methodConfig={methodConfig} />
                     )}

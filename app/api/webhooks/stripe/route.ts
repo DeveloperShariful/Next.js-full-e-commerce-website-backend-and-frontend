@@ -1,3 +1,5 @@
+//app/api/webhooks/stripe/route.ts
+
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
@@ -21,10 +23,12 @@ export async function POST(req: Request) {
   // 2. Secret Key Decrypt kora
   const isTest = config.testMode;
   const apiKey = decrypt(isTest ? config.testSecretKey! : config.liveSecretKey!);
-  const webhookSecret = isTest ? config.testWebhookSecret : config.liveWebhookSecret;
+  // Note: Since we updated the setup file to encrypt the webhook secret, 
+  // decrypt() here will now work correctly.
+  const webhookSecret = decrypt(isTest ? config.testWebhookSecret! : config.liveWebhookSecret!);
 
   if (!apiKey || !webhookSecret) {
-    return NextResponse.json({ error: "Missing API keys" }, { status: 500 });
+    return NextResponse.json({ error: "Missing API keys or Webhook Secret" }, { status: 500 });
   }
 
   const stripe = new Stripe(apiKey, {
@@ -34,7 +38,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
 
-  // 3. Signature Verify kora (Security)
+  // 3. Signature Verify kora
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: any) {
@@ -48,44 +52,69 @@ export async function POST(req: Request) {
     
     console.log(`💰 Stripe Payment succeeded: ${paymentIntent.id}`);
 
-    // Transaction shuru (Order Update + Inventory Update)
     await db.$transaction(async (tx) => {
-        // Order khuje ber kora (Items shoho)
+        // Order khuje ber kora
         const order = await tx.order.findFirst({
             where: { paymentId: paymentIntent.id },
-            include: { items: true } 
+            include: { items: { include: { product: true, variant: true } } } 
         });
 
         if (order && order.paymentStatus !== "PAID") {
-            // A. Order Status Update
+            
+            // ✅ FIX 3: Transaction Record তৈরি করা (অ্যাডমিন প্যানেলের জন্য জরুরি)
+            await tx.orderTransaction.create({
+                data: {
+                    orderId: order.id,
+                    gateway: "STRIPE",
+                    type: "SALE",
+                    // Stripe amount is in cents, convert to main currency unit
+                    amount: paymentIntent.amount / 100, 
+                    currency: paymentIntent.currency.toUpperCase(),
+                    transactionId: paymentIntent.id,
+                    status: "COMPLETED",
+                    rawResponse: paymentIntent as any,
+                    metadata: {
+                        payment_method: paymentIntent.payment_method_types[0],
+                        mode: isTest ? "TEST" : "LIVE"
+                    }
+                }
+            });
+
+            // ✅ FIX 4: Stock Komanor Logic (Track Quantity চেক সহ)
+            for (const item of order.items) {
+                // A. Variant Logic
+                if (item.variantId && item.variant) {
+                    if (item.variant.trackQuantity) { // শুধু যদি ট্র্যাকিং অন থাকে
+                        await tx.productVariant.update({
+                            where: { id: item.variantId },
+                            data: { stock: { decrement: item.quantity } }
+                        });
+                    }
+                }
+                
+                // B. Simple Product Logic
+                else if (item.productId && item.product) {
+                    if (item.product.trackQuantity) { // শুধু যদি ট্র্যাকিং অন থাকে
+                        await tx.product.update({
+                            where: { id: item.productId },
+                            data: { stock: { decrement: item.quantity } }
+                        });
+                    }
+                }
+            }
+
+            // Order Status Update
             await tx.order.update({
                 where: { id: order.id },
                 data: { 
                     paymentStatus: "PAID",
-                    status: "PROCESSING" 
+                    status: "PROCESSING",
+                    capturedAt: new Date(),
+                    paymentGateway: "STRIPE"
                 }
             });
 
-            // B. Stock Komanor Logic
-            for (const item of order.items) {
-                // Jodi Variant hoy, tahole Variant er stock komano hobe
-                if (item.variantId) {
-                    await tx.productVariant.update({
-                        where: { id: item.variantId },
-                        data: { stock: { decrement: item.quantity } }
-                    });
-                }
-                
-                // Main Product er stock o komano hobe
-                if (item.productId) {
-                    await tx.product.update({
-                        where: { id: item.productId },
-                        data: { stock: { decrement: item.quantity } }
-                    });
-                }
-            }
-
-            // C. Email Notification Pathano
+            // Email Notification
             if (order.guestEmail) {
                 await sendNotification({
                     trigger: "PAYMENT_PAID",
@@ -93,12 +122,13 @@ export async function POST(req: Request) {
                     data: {
                         order_number: order.orderNumber,
                         customer_name: "Customer",
-                        total: `$${order.total.toFixed(2)}`
+                        // Stripe amount fix here too
+                        total: `${(paymentIntent.amount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()}`
                     },
                     orderId: order.id
                 });
             }
-            console.log(`✅ Order ${order.orderNumber} marked as PAID & Stock Updated (Stripe)`);
+            console.log(`✅ Order ${order.orderNumber} fully processed.`);
         }
     });
   }

@@ -29,19 +29,17 @@ export async function POST(req: Request) {
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
     
-    // ১. [UPDATED] ডাটাবেস থেকে সঠিক ক্রেডেনশিয়াল আনা
-    // শুধুমাত্র Enabled নয়, আমরা চেক করব যার Webhook ID সেট করা আছে
-    // কারণ Webhook ID ছাড়া ভেরিফিকেশন সম্ভব নয়
+    // 1. Find Config using the Unique Webhook ID from the event (if possible) or verify generally
+    // For safety, we fetch the config that has a webhookId stored
     const config = await db.paypalConfig.findFirst({
       where: { 
-        webhookId: { not: null }, // 🔥 Must have a webhook ID
+        webhookId: { not: null },
         paymentMethod: { isEnabled: true } 
       }
     });
 
     if (!config || !config.webhookId) {
-      console.error("❌ PayPal Config or Webhook ID missing in DB");
-      return NextResponse.json({ error: "PayPal config missing" }, { status: 500 });
+      return NextResponse.json({ error: "PayPal config or webhook ID missing" }, { status: 500 });
     }
 
     const isSandbox = config.sandbox;
@@ -53,7 +51,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Credentials missing" }, { status: 500 });
     }
 
-    // ২. সিকিউরিটি ভেরিফিকেশন (PayPal Server এর সাথে চেক করা)
+    // 2. Verify Webhook Signature with PayPal
     const accessToken = await getPayPalAccessToken(clientId, clientSecret, isSandbox);
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 
@@ -69,7 +67,7 @@ export async function POST(req: Request) {
         cert_url: headersList.get("paypal-cert-url"),
         auth_algo: headersList.get("paypal-auth-algo"),
         transmission_sig: headersList.get("paypal-transmission-sig"),
-        webhook_id: config.webhookId, // 🔥 Verifying against stored ID
+        webhook_id: config.webhookId,
         webhook_event: body,
       }),
     });
@@ -77,61 +75,93 @@ export async function POST(req: Request) {
     const verificationData = await verificationRes.json();
 
     if (verificationData.verification_status !== "SUCCESS") {
-      console.error("⚠️ Fake PayPal Webhook Detected!");
+      console.error("⚠️ Invalid PayPal Webhook Signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
-    // ৩. ভেরিফিকেশন সাকসেস - ডাটা প্রসেস শুরু
+    // 3. Process the Event
     const eventType = body.event_type;
     const resource = body.resource;
 
-    console.log(`🔔 Verified PayPal Webhook: ${eventType}`);
-
+    // Handle Payment Capture
     if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
-      const orderId = resource.supplementary_data?.related_ids?.order_id;
+      const orderId = resource.supplementary_data?.related_ids?.order_id; // Usually PayPal Order ID
       const captureId = resource.id;
+      const customId = resource.custom_id; // Your Internal Order ID (if sent)
 
-      // ট্রানজ্যাকশন শুরু
+      // Start Database Transaction
       await db.$transaction(async (tx) => {
-        // অর্ডার এবং তার আইটেমগুলো খুঁজে বের করা
+        // Find the Order
+        // We check paymentId (PayPal Order ID) or we could check a custom_id if you sent one
         const order = await tx.order.findFirst({
           where: {
-            OR: [{ paymentId: orderId }, { paymentId: captureId }],
+            OR: [
+              { paymentId: orderId },
+              { paymentId: captureId }, // Some gateways use capture ID
+              { id: customId }          // Fallback if custom_id was used
+            ]
           },
-          include: { items: true } // Stock কমানোর জন্য items লাগবে
+          include: { items: { include: { product: true, variant: true } } }
         });
 
         if (order && order.paymentStatus !== "PAID") {
-            // A. অর্ডার স্ট্যাটাস আপডেট
+            
+            // === FIX A: Create Order Transaction Record ===
+            // এটি ভবিষ্যতের অডিট এবং রিফান্ড হ্যান্ডলিংয়ের জন্য জরুরি
+            await tx.orderTransaction.create({
+              data: {
+                orderId: order.id,
+                gateway: "PAYPAL",
+                type: "SALE",
+                amount: parseFloat(resource.amount.value),
+                currency: resource.amount.currency_code,
+                transactionId: captureId, // The Capture ID
+                status: "COMPLETED",
+                rawResponse: body, // Full JSON for debugging
+                metadata: {
+                  payer_email: resource.payer?.email_address,
+                  payer_id: resource.payer?.payer_id,
+                  payment_mode: isSandbox ? "TEST" : "LIVE"
+                }
+              }
+            });
+
+            // === FIX B: Inventory Decrement Logic (with TrackQuantity Check) ===
+            for (const item of order.items) {
+                // 1. Variant Logic
+                if (item.variantId && item.variant) {
+                    if (item.variant.trackQuantity) { // ✅ Only if tracking is enabled
+                        await tx.productVariant.update({
+                            where: { id: item.variantId },
+                            data: { stock: { decrement: item.quantity } }
+                        });
+                    }
+                } 
+                // 2. Simple Product Logic
+                else if (item.productId && item.product) {
+                    if (item.product.trackQuantity) { // ✅ Only if tracking is enabled
+                        await tx.product.update({
+                            where: { id: item.productId },
+                            data: { stock: { decrement: item.quantity } }
+                        });
+                    }
+                }
+            }
+    
+            // Update Order Status
             await tx.order.update({
               where: { id: order.id },
               data: { 
                 paymentStatus: "PAID",
                 status: "PROCESSING",
-                paymentId: captureId
+                paymentId: captureId, // Update to Capture ID for refunds
+                capturedAt: new Date(),
+                paymentGateway: "PAYPAL",
+                paymentMethod: "PayPal Wallet"
               }
             });
 
-            // B. স্টক কমানোর লজিক (Inventory Management)
-            for (const item of order.items) {
-                // ভ্যারিয়েন্ট থাকলে ভ্যারিয়েন্টের স্টক কমাবে
-                if (item.variantId) {
-                    await tx.productVariant.update({
-                        where: { id: item.variantId },
-                        data: { stock: { decrement: item.quantity } }
-                    });
-                }
-                
-                // মেইন প্রোডাক্টের স্টকও কমাবে
-                if (item.productId) {
-                    await tx.product.update({
-                        where: { id: item.productId },
-                        data: { stock: { decrement: item.quantity } }
-                    });
-                }
-            }
-    
-            // C. ইমেইল নোটিফিকেশন
+            // Send Email Notification
             if (order.guestEmail) {
                 await sendNotification({
                     trigger: "PAYMENT_PAID",
@@ -139,12 +169,13 @@ export async function POST(req: Request) {
                     data: {
                         order_number: order.orderNumber,
                         customer_name: "Customer",
-                        total: `$${order.total.toFixed(2)}`
+                        total: `${resource.amount.currency_code} ${resource.amount.value}`
                     },
                     orderId: order.id
                 });
             }
-            console.log(`✅ Order ${order.orderNumber} marked as PAID & Stock Updated`);
+            
+            console.log(`✅ Order ${order.orderNumber} successfully processed via PayPal Webhook`);
         }
       });
     }
@@ -152,7 +183,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true });
 
   } catch (error) {
-    console.error("Webhook Error:", error);
-    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+    console.error("PayPal Webhook Error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

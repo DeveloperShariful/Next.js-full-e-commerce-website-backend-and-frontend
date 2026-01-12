@@ -1765,12 +1765,12 @@ model StripeConfig {
   oauthAccessToken          String?             @db.Text
   oauthRefreshToken         String?             @db.Text
   oauthTokenType            String?
-  livePublishableKey        String?
-  liveSecretKey             String?
-  liveWebhookSecret         String?
-  testPublishableKey        String?
-  testSecretKey             String?
-  testWebhookSecret         String?
+  livePublishableKey        String?             @db.Text
+  liveSecretKey             String?             @db.Text
+  liveWebhookSecret         String?             @db.Text
+  testPublishableKey        String?             @db.Text
+  testSecretKey             String?             @db.Text
+  testWebhookSecret         String?             @db.Text
   paymentAction             PaymentIntent       @default(CAPTURE)
   statementDescriptor       String?
   shortStatementDescriptor  String?
@@ -1802,11 +1802,11 @@ model PaypalConfig {
   tokenType                String?
   partnerReferralId        String?
   liveEmail                String?
-  liveClientId             String?
-  liveClientSecret         String?
+  liveClientId             String?             @db.Text
+  liveClientSecret         String?             @db.Text
   sandboxEmail             String?
-  sandboxClientId          String?
-  sandboxClientSecret      String?
+  sandboxClientId          String?             @db.Text
+  sandboxClientSecret      String?             @db.Text
   title                    String              @default("PayPal")
   description              String              @default("Pay via PayPal; you can pay with your credit card if you don't have a PayPal account.")
   intent                   PaymentIntent       @default(CAPTURE)
@@ -1830,8 +1830,8 @@ model PaypalConfig {
   subtotalMismatchBehavior String              @default("add_line_item")
   invoicePrefix            String?             @default("wc-")
   debugLog                 Boolean             @default(false)
-  webhookId                String?
-  webhookUrl               String?
+  webhookId                String?             @unique
+  webhookUrl               String?             @db.Text
   updatedAt                DateTime            @updatedAt
 }
 

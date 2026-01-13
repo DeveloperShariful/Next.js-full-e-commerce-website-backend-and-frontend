@@ -3,7 +3,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { createStaff, updateStaff } from "@/app/actions/admin/staff"; // [FIXED Import]
+import { createStaff, updateStaff } from "@/app/actions/admin/staff-role/staff"; 
 import { X, Loader2, Save, User, Mail, Shield } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -12,9 +12,10 @@ interface StaffModalProps {
   isOpen: boolean;
   onClose: () => void;
   staffToEdit?: any;
+  currentUserRole?: string;
 }
 
-export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
+export function StaffModal({ isOpen, onClose, staffToEdit, currentUserRole }: StaffModalProps) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -99,6 +100,9 @@ export function StaffModal({ isOpen, onClose, staffToEdit }: StaffModalProps) {
                   defaultValue={staffToEdit?.role || "EDITOR"}
                   className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 bg-white cursor-pointer"
                 >
+                    {currentUserRole === 'SUPER_ADMIN' && (
+                      <option value="SUPER_ADMIN">Super Admin</option>
+                    )}
                     <option value="ADMIN">Admin</option>
                     <option value="MANAGER">Manager</option>
                     <option value="EDITOR">Editor</option>

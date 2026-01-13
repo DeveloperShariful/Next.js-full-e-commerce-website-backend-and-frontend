@@ -6,7 +6,11 @@ import { useState } from "react";
 import { ShieldCheck, Plus } from "lucide-react";
 import { StaffModal } from "./staff-modal";
 
-export function StaffHeader() {
+interface StaffHeaderProps {
+  currentUserRole?: string;
+}
+
+export function StaffHeader({ currentUserRole }: StaffHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -26,7 +30,11 @@ export function StaffHeader() {
         </button>
       </div>
 
-      <StaffModal isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      <StaffModal 
+        isOpen={isOpen} 
+        onClose={() => setIsOpen(false)} 
+        currentUserRole={currentUserRole} // [UPDATE]
+      />
     </>
   );
 }

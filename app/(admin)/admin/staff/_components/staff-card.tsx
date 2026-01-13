@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { deleteStaff } from "@/app/actions/admin/staff"; 
+import { deleteStaff } from "@/app/actions/admin/staff-role/staff"; 
 import { Trash2, Mail, Shield, Loader2, Pencil } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -16,9 +16,13 @@ interface StaffCardProps {
     email: string | null;
     role: string;
   };
+  currentUser: {
+    id: string;
+    role: string;
+  } | null;
 }
 
-export function StaffCard({ staff }: StaffCardProps) {
+export function StaffCard({ staff, currentUser }: StaffCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const router = useRouter();
@@ -47,21 +51,29 @@ export function StaffCard({ staff }: StaffCardProps) {
     }
   };
 
+  const isSelf = currentUser?.id === staff.id;
+  const amISuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const isTargetSuperAdmin = staff.role === 'SUPER_ADMIN';
+
+  const canDelete = !isSelf && (amISuperAdmin || (!isTargetSuperAdmin && currentUser?.role === 'ADMIN'));
+  const canEdit = amISuperAdmin || (!isTargetSuperAdmin && currentUser?.role === 'ADMIN');
+
   return (
     <>
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition relative group">
         
-        {/* Action Buttons */}
         <div className="absolute top-4 right-4 flex gap-2">
-          <button 
-            onClick={() => setIsEditOpen(true)}
-            className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition shadow-sm"
-            title="Edit Staff"
-          >
-            <Pencil size={14} />
-          </button>
+          {canEdit && (
+            <button 
+              onClick={() => setIsEditOpen(true)}
+              className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition shadow-sm"
+              title="Edit Staff"
+            >
+              <Pencil size={14} />
+            </button>
+          )}
 
-          {staff.role !== 'SUPER_ADMIN' && (
+          {canDelete && (
             <button 
               onClick={handleDelete} 
               disabled={isDeleting}
@@ -73,7 +85,6 @@ export function StaffCard({ staff }: StaffCardProps) {
           )}
         </div>
         
-        {/* User Info */}
         <div className="flex items-center gap-4 mb-4 pr-20">
           <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-lg border border-slate-200 shrink-0">
               {staff.name?.charAt(0).toUpperCase() || "U"}
@@ -88,7 +99,6 @@ export function StaffCard({ staff }: StaffCardProps) {
           </div>
         </div>
 
-        {/* Role Badge */}
         <div className="border-t border-slate-100 pt-4 mt-2">
           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getRoleColor(staff.role)}`}>
               <Shield size={12}/> {staff.role.replace(/_/g, ' ')}
@@ -100,6 +110,7 @@ export function StaffCard({ staff }: StaffCardProps) {
         isOpen={isEditOpen} 
         onClose={() => setIsEditOpen(false)} 
         staffToEdit={staff} 
+        currentUserRole={currentUser?.role}
       />
     </>
   );

@@ -1,4 +1,4 @@
-//app/(admin)/admin/media/_components/media-list.tsx
+// app/(admin)/admin/media/_components/media-list.tsx
 
 "use client";
 
@@ -22,7 +22,7 @@ export function MediaList({ data, selectedIds, onToggleSelect, onItemClick }: Me
                <th className="p-4 w-10">Select</th>
                <th className="p-4 w-16">Preview</th>
                <th className="p-4">Filename</th>
-               <th className="p-4">Used In</th> {/* 🔥 NEW: Usage Column */}
+               <th className="p-4">Used In</th> 
                <th className="p-4">Dimensions</th>
                <th className="p-4">Type</th>
                <th className="p-4">Size</th>
@@ -55,18 +55,18 @@ export function MediaList({ data, selectedIds, onToggleSelect, onItemClick }: Me
                       <div className="truncate max-w-[150px]" title={item.filename}>{item.filename}</div>
                   </td>
 
-                  {/* 🔥 NEW: Used In Logic */}
+                  {/* ✅ FIXED: Usage Logic using 'usage.details' array */}
                   <td className="p-4">
-                     {item.productImages && item.productImages.length > 0 ? (
+                     {item.usage && item.usage.details.length > 0 ? (
                         <div className="flex flex-col gap-1 items-start">
-                           {item.productImages.slice(0, 2).map((pi, idx) => (
-                              <div key={idx} className="flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100 w-fit max-w-[120px]">
+                           {item.usage.details.slice(0, 2).map((detail, idx) => (
+                              <div key={idx} className="flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100 w-fit max-w-[150px]">
                                  <Link2 size={10} className="shrink-0"/>
-                                 <span className="truncate">{pi.product.name}</span>
+                                 <span className="truncate">{detail}</span>
                               </div>
                            ))}
-                           {item.productImages.length > 2 && (
-                              <span className="text-[10px] text-slate-400 pl-1">+{item.productImages.length - 2} more</span>
+                           {item.usage.details.length > 2 && (
+                              <span className="text-[10px] text-slate-400 pl-1">+{item.usage.details.length - 2} more</span>
                            )}
                         </div>
                      ) : (

@@ -7,8 +7,9 @@ import { MediaLibrary } from "./_components/media-library";
 export default async function MediaPage() {
   
   // 1. Initial Fetch on Server
-  // আমরা ডিফল্ট ফিল্টার দিয়ে প্রথম পেজ লোড করছি
-  const res = await getAllMedia("", "newest", "ALL", "ALL", 1, 40);
+  // আপডেট: মাঝখানে 'null' যোগ করা হয়েছে (folderId এর জন্য)
+  // getAllMedia(query, sort, type, usage, folderId, page, limit)
+  const res = await getAllMedia("", "newest", "ALL", "ALL", null, 1, 40);
   
   const initialData = res.success ? (res.data as any) : [];
   const initialTotal = res.success ? res.meta.total : 0;

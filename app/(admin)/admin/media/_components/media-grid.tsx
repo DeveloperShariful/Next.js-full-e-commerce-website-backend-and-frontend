@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { CheckSquare, Square, FileText, Copy, Eye, Trash2, Edit } from "lucide-react";
+import { CheckSquare, Square, FileText, Copy, Eye, Trash2 } from "lucide-react";
 import { MediaItem } from "@/app/actions/admin/media/media-read";
 import { bulkDeleteMedia } from "@/app/actions/admin/media/media-delete";
 import { toast } from "react-hot-toast";
@@ -14,14 +14,14 @@ interface MediaGridProps {
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onItemClick: (item: MediaItem) => void;
-  onDeleteRefresh: () => void; // Refresh after delete
+  onDeleteRefresh: () => void;
+  // 🔥 NEW PROP
+  onDragStart: (e: React.DragEvent, mediaId: string) => void;
 }
 
-export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick, onDeleteRefresh }: MediaGridProps) {
-  // Context Menu State
+export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick, onDeleteRefresh, onDragStart }: MediaGridProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, item: MediaItem | null }>({ x: 0, y: 0, item: null });
 
-  // Close context menu on click elsewhere
   useEffect(() => {
     const handleClick = () => setContextMenu({ x: 0, y: 0, item: null });
     document.addEventListener("click", handleClick);
@@ -35,14 +35,14 @@ export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick, onDe
 
   const handleCopyUrl = (url: string) => {
     navigator.clipboard.writeText(url);
-    toast.success("URL copied to clipboard");
+    toast.success("URL copied");
   };
 
   const handleDeleteSingle = async (id: string) => {
-    if (!confirm("Delete this file permanently?")) return;
+    if (!confirm("Delete this file?")) return;
     const res = await bulkDeleteMedia([id]);
     if (res.success) {
-        toast.success("File deleted");
+        toast.success("Deleted");
         onDeleteRefresh();
     } else {
         toast.error("Delete failed");
@@ -55,12 +55,16 @@ export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick, onDe
         {data.map((item) => (
             <div 
             key={item.id} 
+            // 🔥 ENABLE DRAG
+            draggable={true}
+            onDragStart={(e) => onDragStart(e, item.id)}
             className={`
-                group relative aspect-square bg-white rounded-xl border overflow-hidden cursor-pointer transition-all duration-200
-                ${selectedIds.includes(item.id) ? "ring-2 ring-indigo-500 border-transparent shadow-md" : "border-slate-200 hover:shadow-lg hover:border-indigo-300"}
+                group relative aspect-square bg-white rounded-xl border overflow-hidden cursor-pointer transition-all duration-200 select-none
+                active:cursor-grabbing hover:shadow-lg
+                ${selectedIds.includes(item.id) ? "ring-2 ring-indigo-500 border-transparent shadow-md" : "border-slate-200 hover:border-indigo-300"}
             `}
             onClick={() => onItemClick(item)}
-            onContextMenu={(e) => handleContextMenu(e, item)} // 🔥 Right Click Trigger
+            onContextMenu={(e) => handleContextMenu(e, item)}
             >
                 {/* Checkbox */}
                 <div 
@@ -75,7 +79,7 @@ export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick, onDe
                 {/* Content */}
                 <div className="w-full h-full relative bg-slate-50 flex items-center justify-center pb-10">
                 {item.type === 'IMAGE' ? (
-                    <Image src={item.url} alt={item.altText || item.filename} fill className="object-cover"/>
+                    <Image src={item.url} alt={item.altText || item.filename} fill className="object-cover pointer-events-none"/>
                 ) : (
                     <div className="text-slate-400 flex flex-col items-center">
                         <FileText size={40} strokeWidth={1.5}/>
@@ -84,42 +88,29 @@ export function MediaGrid({ data, selectedIds, onToggleSelect, onItemClick, onDe
                 )}
                 </div>
                 
-                {/* Footer Label */}
                 <div className="absolute bottom-0 inset-x-0 bg-white border-t border-slate-100 p-2">
-                <p className="text-xs font-bold text-slate-700 truncate">{item.filename}</p>
-                <p className="text-[10px] text-slate-500 uppercase flex justify-between">
-                    <span>{item.mimeType.split('/')[1]}</span>
-                    <span>{(item.size / 1024).toFixed(0)} KB</span>
-                </p>
+                    <p className="text-xs font-bold text-slate-700 truncate">{item.filename}</p>
+                    <p className="text-[10px] text-slate-500 uppercase flex justify-between">
+                        <span>{item.mimeType.split('/')[1]}</span>
+                        <span>{(item.size / 1024).toFixed(0)} KB</span>
+                    </p>
                 </div>
             </div>
         ))}
         </div>
 
-        {/* 🔥 CUSTOM CONTEXT MENU */}
+        {/* Context Menu */}
         {contextMenu.item && (
             <div 
                 className="fixed bg-white border border-slate-200 shadow-xl rounded-lg w-48 py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
                 style={{ top: contextMenu.y, left: contextMenu.x }}
-                onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+                onClick={(e) => e.stopPropagation()}
             >
-                <div className="px-3 py-2 text-xs text-slate-400 font-bold border-b border-slate-100 mb-1 truncate">
-                    {contextMenu.item.filename}
-                </div>
-                
-                <button onClick={() => onItemClick(contextMenu.item!)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2">
-                    <Eye size={14}/> Preview / Edit
-                </button>
-                
-                <button onClick={() => { handleCopyUrl(contextMenu.item!.url); setContextMenu({x:0, y:0, item:null}); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2">
-                    <Copy size={14}/> Copy URL
-                </button>
-                
+                <div className="px-3 py-2 text-xs text-slate-400 font-bold border-b border-slate-100 mb-1 truncate">{contextMenu.item.filename}</div>
+                <button onClick={() => onItemClick(contextMenu.item!)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2"><Eye size={14}/> Preview</button>
+                <button onClick={() => { handleCopyUrl(contextMenu.item!.url); setContextMenu({x:0, y:0, item:null}); }} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600 flex items-center gap-2"><Copy size={14}/> Copy URL</button>
                 <div className="h-px bg-slate-100 my-1"></div>
-                
-                <button onClick={() => handleDeleteSingle(contextMenu.item!.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                    <Trash2 size={14}/> Delete Permanently
-                </button>
+                <button onClick={() => handleDeleteSingle(contextMenu.item!.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"><Trash2 size={14}/> Delete</button>
             </div>
         )}
     </>

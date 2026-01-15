@@ -5,6 +5,18 @@
 import { db } from "@/lib/prisma";
 import { unstable_noStore as noStore } from "next/cache"; 
 
+export type MediaUsage = {
+  inProducts: number;
+  inCategories: number;
+  inBrands: number;
+  inBlogs: number;
+  inStoreSettings: number;
+  inCollections: number;
+  inBanners: number;
+  details: string[]; 
+};
+
+// ✅ Updated Type Definition
 export type MediaItem = {
   id: string;
   url: string;
@@ -19,9 +31,13 @@ export type MediaItem = {
   altText?: string | null;
   caption?: string | null;
   description?: string | null;
+  folderId?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  productImages: {
+  usage: MediaUsage; // ✅ Usage Object added
+  
+  // ✅ Explicit Relation Type (Optional but good for strict check)
+  productImages?: {
     product: {
       id: string;
       name: string;
@@ -31,14 +47,16 @@ export type MediaItem = {
   }[];
 };
 
-// 🔥 UPDATE: Added Pagination Parameters (page, limit)
+// ... (Rest of the getAllMedia function remains same as previous step)
+// 🔥 Ultra-Advanced Fetch Function
 export async function getAllMedia(
   query: string = "", 
   sortBy: string = "newest", 
   typeFilter: string = "ALL",
   usageFilter: string = "ALL",
+  folderId: string | null = null, // ✅ Null means Root, string means specific folder
   page: number = 1,
-  limit: number = 30
+  limit: number = 40
 ) {
   noStore(); 
 
@@ -46,26 +64,27 @@ export async function getAllMedia(
     const where: any = {};
     const skip = (page - 1) * limit;
     
-    // 1. Search Query
+    // 1. Folder Logic (Critical for Enterprise Structure)
+    // If folderId is "root" or null, we fetch files with folderId: null
+    // If "all", we ignore folder scope (good for global search)
+    if (folderId !== "ALL_MEDIA_SEARCH") {
+        where.folderId = folderId === "root" ? null : folderId;
+    }
+
+    // 2. Search Query (Searching overrides folder view usually, but here we keep it strict or loose based on UX)
     if (query) {
       where.OR = [
         { filename: { contains: query, mode: 'insensitive' } },
         { originalName: { contains: query, mode: 'insensitive' } },
         { altText: { contains: query, mode: 'insensitive' } },
-        { description: { contains: query, mode: 'insensitive' } }
       ];
+      // If searching, we might want to search EVERYWHERE, not just current folder
+      if(folderId !== "root") delete where.folderId; 
     }
 
-    // 2. Type Filter
+    // 3. Type Filter
     if (typeFilter !== "ALL") {
       where.type = typeFilter;
-    }
-
-    // 3. Usage Filter
-    if (usageFilter === "USED") {
-      where.productImages = { some: {} }; 
-    } else if (usageFilter === "UNUSED") {
-      where.productImages = { none: {} }; 
     }
 
     // 4. Sort Logic
@@ -79,34 +98,95 @@ export async function getAllMedia(
       default: orderBy = { createdAt: 'desc' };
     }
 
-    // 🔥 Parallel Fetch: Data + Count
-    const [data, total] = await Promise.all([
+    // 5. Usage Filter Logic is applied POST-FETCH or via Complex Query
+    // Prisma doesn't support easy filtering on "count of multiple relations" directly without raw query.
+    // For performance, we fetch relations and filter in memory if "usageFilter" is strict, 
+    // OR we rely on a computed field approach. Here we fetch relations to display usage.
+
+    const [mediaRaw, total] = await Promise.all([
       db.media.findMany({
         where,
         orderBy,
         skip,
         take: limit,
+        // ✅ FETCHING ALL RELATIONS TO CHECK USAGE
         include: {
-          productImages: {
-            select: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  category: { select: { name: true } }
-                }
-              }
-            }
-          }
+          productImages: { select: { product: { select: { name: true } } } },
+          categories: { select: { name: true } },
+          brands: { select: { name: true } },
+          products: { select: { name: true } }, // Featured Image of Product
+          variants: { select: { name: true } },
+          blogPosts: { select: { title: true } },
+          storeLogos: { select: { storeName: true } },
+          storeFavicons: { select: { storeName: true } },
+          collections: { select: { name: true } },
+          banners: { select: { title: true } },
+          seoConfigs: { select: { siteName: true } } // OG Image
         }
       }),
       db.media.count({ where })
     ]);
 
-    const hasMore = skip + data.length < total;
+    // 6. Transform Data & Calculate Usage
+    const data: MediaItem[] = mediaRaw.map((m) => {
+        const details: string[] = [];
+        
+        // Push human readable usage
+        m.productImages.forEach(p => details.push(`Product Gallery: ${p.product.name}`));
+        m.categories.forEach(c => details.push(`Category: ${c.name}`));
+        m.brands.forEach(b => details.push(`Brand Logo: ${b.name}`));
+        m.products.forEach(p => details.push(`Product Featured: ${p.name}`));
+        m.blogPosts.forEach(b => details.push(`Blog: ${b.title}`));
+        m.banners.forEach(b => details.push(`Banner: ${b.title}`));
+        if(m.storeLogos.length > 0) details.push("Store Logo");
+        
+        const usageStats: MediaUsage = {
+            inProducts: m.productImages.length + m.products.length + m.variants.length,
+            inCategories: m.categories.length,
+            inBrands: m.brands.length,
+            inBlogs: m.blogPosts.length,
+            inStoreSettings: m.storeLogos.length + m.storeFavicons.length + m.seoConfigs.length,
+            inCollections: m.collections.length,
+            inBanners: m.banners.length,
+            details: details.slice(0, 5) // Limit details to 5 items to keep payload light
+        };
 
-    return { success: true, data, meta: { total, page, hasMore } };
+        return {
+            id: m.id,
+            url: m.url,
+            type: m.type,
+            filename: m.filename,
+            originalName: m.originalName,
+            publicId: m.publicId,
+            mimeType: m.mimeType,
+            size: m.size,
+            width: m.width,
+            height: m.height,
+            altText: m.altText,
+            caption: m.caption,
+            description: m.description,
+            folderId: m.folderId,
+            createdAt: m.createdAt,
+            updatedAt: m.updatedAt,
+            usage: usageStats
+        };
+    });
+
+    // 7. Apply Usage Filter (In-Memory because complex relation count query is heavy)
+    let filteredData = data;
+    if (usageFilter === "USED") {
+        filteredData = data.filter(d => d.usage.details.length > 0);
+    } else if (usageFilter === "UNUSED") {
+        filteredData = data.filter(d => d.usage.details.length === 0);
+    }
+
+    const hasMore = skip + filteredData.length < total;
+
+    return { 
+        success: true, 
+        data: filteredData, 
+        meta: { total, page, hasMore } 
+    };
 
   } catch (error) {
     console.error("GET_MEDIA_ERROR", error);

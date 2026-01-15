@@ -1,9 +1,10 @@
-//app/(admin)/admin/media/_components/media-header.tsx
+// app/(admin)/admin/media/_components/media-header.tsx
+
 "use client";
 
 import { useState } from "react";
-import { UploadCloud, RefreshCw, Database } from "lucide-react";
-import { syncOldMedia } from "@/app/actions/admin/media/media-sync"; // ✅ Import Action
+import { UploadCloud, Database, Loader2 } from "lucide-react";
+import { syncOldMedia } from "@/app/actions/admin/media/media-sync";
 import { toast } from "react-hot-toast";
 
 interface MediaHeaderProps {
@@ -14,47 +15,61 @@ export function MediaHeader({ onUploadClick }: MediaHeaderProps) {
   const [syncing, setSyncing] = useState(false);
 
   const handleSync = async () => {
-    if(!confirm("এটি আপনার পুরনো সব প্রোডাক্ট ও ক্যাটাগরি ইমেজ খুঁজে মিডিয়া লাইব্রেরিতে নিয়ে আসবে। আপনি কি শুরু করতে চান?")) return;
+    if(!confirm("Are you sure you want to sync all old images? This might take a while.")) return;
 
     setSyncing(true);
     const toastId = toast.loading("Scanning old images...");
     
-    const res = await syncOldMedia();
-    
-    if (res.success) {
-        toast.success(res.message, { id: toastId });
-        window.location.reload(); // পেজ রিফ্রেশ
-    } else {
-        toast.error("Sync failed", { id: toastId });
+    try {
+        const res = await syncOldMedia();
+        if (res.success) {
+            toast.success(res.message, { id: toastId });
+            window.location.reload();
+        } else {
+            toast.error("Sync failed", { id: toastId });
+        }
+    } catch (error) {
+        toast.error("Something went wrong", { id: toastId });
+    } finally {
+        setSyncing(false);
     }
-    setSyncing(false);
   };
 
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Media Library</h1>
-        <p className="text-sm text-slate-500">Manage all your images, videos and documents</p>
+    <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
+      
+      {/* --- Title Section --- */}
+      <div className="space-y-1">
+        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl tracking-tight">
+          Media Library
+        </h1>
+        <p className="text-xs text-slate-500 sm:text-sm font-medium">
+          Manage images, videos & documents
+        </p>
       </div>
       
-      <div className="flex gap-3">
-        {/* 🔥 SYNC BUTTON */}
+      {/* --- Actions Section --- */}
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        
+        {/* Sync Button */}
         <button 
             onClick={handleSync}
             disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 transition border border-slate-300"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-white text-slate-600 font-bold text-xs sm:text-sm rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition border border-slate-200 shadow-sm active:scale-95 disabled:opacity-70 whitespace-nowrap"
         >
-            <Database size={18} className={syncing ? "animate-pulse" : ""} />
-            {syncing ? "Syncing..." : "Sync Old Data"}
+            {syncing ? <Loader2 size={16} className="animate-spin"/> : <Database size={16} />}
+            <span>{syncing ? "Syncing..." : "Sync Data"}</span>
         </button>
 
+        {/* Upload Button */}
         <button 
           onClick={onUploadClick}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
+          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-indigo-600 text-white font-bold text-xs sm:text-sm rounded-lg hover:bg-indigo-700 transition shadow-md shadow-indigo-100 active:scale-95 whitespace-nowrap"
         >
-          <UploadCloud size={20}/>
-          <span className="hidden sm:inline">Upload New</span>
+          <UploadCloud size={18}/>
+          <span>Upload New</span>
         </button>
+
       </div>
     </div>
   );

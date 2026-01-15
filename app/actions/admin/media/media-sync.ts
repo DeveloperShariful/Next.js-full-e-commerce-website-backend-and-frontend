@@ -5,18 +5,15 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-// হেল্পার ফাংশন: মিডিয়া তৈরি বা খুঁজে বের করা
 async function ensureMediaExists(url: string, filename: string) {
   if (!url) return null;
 
-  // ১. চেক করি এই URL অলরেডি মিডিয়াতে আছে কিনা
   const existing = await db.media.findFirst({
     where: { url: url }
   });
 
   if (existing) return existing.id;
 
-  // ২. না থাকলে নতুন তৈরি করি
   try {
     const newMedia = await db.media.create({
       data: {
@@ -40,7 +37,6 @@ export async function syncOldMedia() {
   try {
     let count = 0;
 
-    // --- ১. CATEGORIES SYNC ---
     const categories = await db.category.findMany({ 
         where: { image: { not: null }, mediaId: null } 
     });
@@ -59,7 +55,6 @@ export async function syncOldMedia() {
       }
     }
 
-    // --- ২. BRANDS SYNC ---
     const brands = await db.brand.findMany({ 
         where: { logo: { not: null }, logoMediaId: null } 
     });
@@ -78,7 +73,6 @@ export async function syncOldMedia() {
       }
     }
 
-    // --- ৩. PRODUCTS (Featured Image) SYNC ---
     const products = await db.product.findMany({ 
         where: { featuredImage: { not: null }, featuredMediaId: null } 
     });
@@ -97,27 +91,21 @@ export async function syncOldMedia() {
       }
     }
 
-    // --- ৪. GALLERY IMAGES SYNC (FIXED) ---
-    // আমরা রিলেশন সহ প্রোডাক্টগুলো কল করছি
     const productsWithGallery = await db.product.findMany({
         include: {
-            images: true // ✅ Fix 1: ইমেজ রিলেশন ইনক্লুড করা হলো
+            images: true 
         }
     });
 
     for (const prod of productsWithGallery) {
-        // ✅ Fix 2: 'galleryImages' এর বদলে 'images' ব্যবহার করা হলো
         if (prod.images && prod.images.length > 0) {
             
             for (const imgObj of prod.images) {
-                // ✅ Fix 3: অবজেক্ট থেকে URL বের করা হলো
                 const imgUrl = imgObj.url;
 
                 if (imgUrl) {
                     const name = `gallery-${prod.slug}-${imgObj.id}.jpg`;
                     const mediaId = await ensureMediaExists(imgUrl, name);
-
-                    // Optional: যদি চান ProductImage টেবিলেও mediaId আপডেট হোক
                     if (mediaId && !imgObj.mediaId) {
                         await db.productImage.update({
                             where: { id: imgObj.id },

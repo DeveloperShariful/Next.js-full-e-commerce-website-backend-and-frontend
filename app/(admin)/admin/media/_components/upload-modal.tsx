@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { saveMedia } from "@/app/actions/admin/media/media-create";
 import { X, CheckCircle, FileCheck } from "lucide-react";
-import ImageUpload from "@/components/ui/image-upload";
+import ImageUpload from "@/components/media/image-upload";
 import { toast } from "react-hot-toast";
 
 interface UploadModalProps {

@@ -3,9 +3,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateMediaMetadata } from "@/app/actions/admin/media/media-update"; // ✅ NEW PATH
-import { MediaItem } from "@/app/actions/admin/media/media-read"; // ✅ NEW PATH
-import { X, Save, Copy, FileText, Calendar, HardDrive, Check, Loader2 } from "lucide-react";
+import { updateMediaMetadata } from "@/app/actions/admin/media/media-update"; 
+import { MediaItem } from "@/app/actions/admin/media/media-read"; 
+import { X, Save, Copy, FileText, Calendar, HardDrive, Check, Loader2, Crop } from "lucide-react";
 import { toast } from "react-hot-toast";
 import Image from "next/image";
 
@@ -13,6 +13,8 @@ interface MediaDetailsProps {
   file: MediaItem;
   onClose: () => void;
   onUpdate: () => void;
+  // 🔥 NEW PROP
+  onEdit: () => void;
 }
 
 const formatBytes = (bytes: number) => {
@@ -23,7 +25,7 @@ const formatBytes = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
+export function MediaDetails({ file, onClose, onUpdate, onEdit }: MediaDetailsProps) {
   const [formData, setFormData] = useState({
     filename: file.filename,
     altText: file.altText || "",
@@ -77,11 +79,22 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Preview */}
+          {/* Preview with Edit Button */}
           <div className="bg-slate-100 rounded-lg overflow-hidden border border-slate-200 relative group">
              {file.type === 'IMAGE' ? (
                 <div className="aspect-video relative">
                    <Image src={file.url} alt={file.filename} fill className="object-contain"/>
+                   
+                   {/* 🔥 EDIT BUTTON */}
+                   <div className="absolute top-2 right-2">
+                       <button 
+                         onClick={onEdit}
+                         className="bg-white/90 hover:bg-white text-slate-700 hover:text-indigo-600 p-2 rounded-full shadow-sm backdrop-blur-sm transition border border-slate-200"
+                         title="Crop & Edit Image"
+                       >
+                           <Crop size={16}/>
+                       </button>
+                   </div>
                 </div>
              ) : (
                 <div className="h-40 flex items-center justify-center text-slate-400">
@@ -90,7 +103,7 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
              )}
           </div>
 
-          {/* Info Grid - ✅ NOW SHOWING REAL DIMENSIONS */}
+          {/* Info Grid */}
           <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 border-b border-slate-100 pb-6">
              <div>
                 <span className="block font-bold text-slate-700 mb-1">Uploaded on</span>
@@ -106,7 +119,6 @@ export function MediaDetails({ file, onClose, onUpdate }: MediaDetailsProps) {
              </div>
              <div>
                 <span className="block font-bold text-slate-700 mb-1">Dimensions</span>
-                {/* ✅ Showing Real Width/Height */}
                 <span>{file.width && file.height ? `${file.width} x ${file.height}` : '-'}</span>
              </div>
           </div>

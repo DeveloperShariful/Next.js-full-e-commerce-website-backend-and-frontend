@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { getBanners, saveBanner, deleteBanner } from "@/app/actions/admin/banner";
-import ImageUpload from "@/components/ui/image-upload";
+import ImageUpload from "@/components/media/image-upload";
 import { toast } from "react-hot-toast";
 import { 
   Megaphone, Plus, Trash2, Pencil, Save, 

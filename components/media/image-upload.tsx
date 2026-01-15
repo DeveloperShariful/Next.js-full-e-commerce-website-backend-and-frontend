@@ -1,4 +1,4 @@
-// components/ui/image-upload.tsx
+// components/media/image-upload.tsx
 
 "use client";
 
@@ -62,9 +62,9 @@ export default function ImageUpload({
         options={{
           multiple: true,
           maxFiles: 20, 
-          resourceType: "auto",
+          resourceType: "auto", 
         
-        }}
+        }  }
       >
         {({ open }) => {
           const handleOnClick = () => {

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import ImageUpload from "@/components/ui/image-upload"; // Ensure this matches your project
+import ImageUpload from "@/components/media/image-upload"; // Ensure this matches your project
 import { CategoryData } from "../types";
 import { toast } from "react-hot-toast";
 import { Save, Loader2, LayoutGrid, Globe, AlertCircle } from "lucide-react";

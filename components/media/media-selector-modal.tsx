@@ -7,7 +7,7 @@ import { X, Search, Check, Loader2, Image as ImageIcon, CheckCircle2 } from "luc
 import Image from "next/image";
 import { getAllMedia, MediaItem } from "@/app/actions/admin/media/media-read";
 import { saveMedia } from "@/app/actions/admin/media/media-create";
-import ImageUpload from "@/components/ui/image-upload"; 
+import ImageUpload from "@/components/media/image-upload"; 
 import { toast } from "react-hot-toast";
 
 interface MediaSelectorModalProps {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { toast } from "react-hot-toast";
-import ImageUpload from "@/components/ui/image-upload"; 
+import ImageUpload from "@/components/media/image-upload"; 
 import { ChevronDown, ChevronUp, Trash2, Wand2, MapPin, Box, X } from "lucide-react"; 
 import { getLocations } from "@/app/actions/admin/product/product-read";
 import { ProductFormData, Variation } from "../types";

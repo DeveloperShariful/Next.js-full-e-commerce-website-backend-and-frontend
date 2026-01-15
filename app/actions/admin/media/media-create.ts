@@ -28,8 +28,8 @@ export async function saveMedia(fileData: SaveMediaParams) {
     if (fileData.mimeType.startsWith("image/")) type = "IMAGE";
     else if (fileData.mimeType.startsWith("video/")) type = "VIDEO";
 
-    // Auto-generate Alt Text from original name (Best for SEO)
-    // e.g., "kids-bike-red.jpg" -> "Kids Bike Red"
+    const cleanUrl = fileData.url.replace(/\/v\d+\//, "/");
+
     const altText = fileData.originalName
         .split('.')[0]
         .replace(/[-_]/g, ' ')
@@ -37,17 +37,17 @@ export async function saveMedia(fileData: SaveMediaParams) {
 
     const newMedia = await db.media.create({
       data: {
-        url: fileData.url,
+        url: cleanUrl,
         publicId: fileData.publicId,     // ✅ Saving Public ID
         filename: fileData.filename,
         originalName: fileData.originalName, // ✅ Saving Original Name
         mimeType: fileData.mimeType,
         size: fileData.size,
-        width: fileData.width,           // ✅ Saving Dimensions
-        height: fileData.height,         // ✅ Saving Dimensions
+        width: fileData.width,          
+        height: fileData.height,       
         type: type as MediaType,
         uploadedBy: uploadedBy, 
-        altText: altText                 // ✅ Auto SEO Alt Text
+        altText: altText                
       }
     });
 

@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, Trash2, Wand2, MapPin, Box, X, Plus } from "luc
 import { getLocations } from "@/app/actions/admin/product/product-read";
 import { ProductFormData, Variation } from "../types";
 import { MediaSelectorModal } from "@/components/media/media-selector-modal";
+import { useGlobalStore } from "@/app/providers/global-store-provider"; // 🔥 Imported
 import Image from "next/image";
 
 export default function Variations() {
@@ -14,12 +15,14 @@ export default function Variations() {
     const attributes = watch("attributes") || [];
     const variations = watch("variations") || [];
     const mainData = watch();
+    
+    // 🔥 Global Currency Symbol
+    const { symbol } = useGlobalStore(); 
+    const currency = symbol || "$";
 
     const [openIndex, setOpenIndex] = useState<number | null>(null);
     const [locations, setLocations] = useState<{id: string, name: string}[]>([]);
     const [managingStockIndex, setManagingStockIndex] = useState<number | null>(null);
-    
-    // State to track which variation is currently opening the media modal
     const [mediaModalIndex, setMediaModalIndex] = useState<number | null>(null);
 
     useEffect(() => {
@@ -145,7 +148,6 @@ export default function Variations() {
         }
     };
 
-    // --- Media Selector Handlers ---
     const handleMediaSelect = (media: any | any[]) => {
         if (mediaModalIndex === null) return;
 
@@ -262,7 +264,6 @@ export default function Variations() {
                                                     )
                                                 })}
                                                 
-                                                {/* Media Selector Trigger Button */}
                                                 <button 
                                                     type="button"
                                                     onClick={() => setMediaModalIndex(i)}
@@ -282,7 +283,8 @@ export default function Variations() {
                                                     <input value={v.sku || ""} onChange={e => updateVar(i, 'sku', e.target.value)} className="w-full border border-gray-400 p-2 rounded-sm text-sm focus:border-[#2271b1] outline-none" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-bold block mb-1">Regular Price ($)</label>
+                                                    {/* 🔥 Using Currency */}
+                                                    <label className="text-xs font-bold block mb-1">Regular Price ({currency})</label>
                                                     <input type="number" value={v.price} onChange={e => updateVar(i, 'price', parseFloat(e.target.value))} className="w-full border border-gray-400 p-2 rounded-sm text-sm focus:border-[#2271b1] outline-none" />
                                                 </div>
                                                 
@@ -374,7 +376,6 @@ export default function Variations() {
                 </div>
             )}
 
-            {/* Media Selector Modal */}
             {mediaModalIndex !== null && (
                 <MediaSelectorModal 
                     onClose={() => setMediaModalIndex(null)}

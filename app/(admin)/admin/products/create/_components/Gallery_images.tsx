@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { useFormContext } from "react-hook-form";
-import { Plus, X, Image as ImageIcon, Type } from "lucide-react";
+import { Plus, X, Type, Info } from "lucide-react";
 import { ProductFormData } from "../types";
 import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
 import Image from "next/image";
@@ -56,6 +56,15 @@ export default function GalleryImages() {
             </div>
             
             <div className="p-4">
+                {/* 🔥 NEW: UI Hint for Deletion */}
+                <div className="mb-3 flex items-start gap-2 text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                    <Info size={14} className="shrink-0 mt-0.5 text-blue-500" />
+                    <p>
+                        Removing an image here only unlinks it from this product. 
+                        The original file remains in your <strong>Media Library</strong>.
+                    </p>
+                </div>
+
                 <div className="grid grid-cols-3 gap-3">
                     {galleryImages.map((img: any, index: number) => {
                         const url = typeof img === 'string' ? img : img.url;
@@ -86,7 +95,7 @@ export default function GalleryImages() {
                                     type="button" 
                                     onClick={() => handleRemove(index)}
                                     className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition z-10 opacity-0 group-hover:opacity-100"
-                                    title="Remove image"
+                                    title="Unlink image"
                                 >
                                     <X size={12} />
                                 </button>

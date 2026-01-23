@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent } from "@/app/actions/admin/product/product-utils"; 
+import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData } from "@/app/actions/admin/product/product-utils"; 
 import { currentUser } from "@clerk/nextjs/server"; 
 
 import { parseProductFormData } from "./product-data-parser";
@@ -412,10 +412,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
             await Promise.all(promises);
 
-            // 🔥 FULL DIFF GENERATION (Including Nested Arrays)
             const diff = oldProductData ? generateDiff(oldProductData, data) : { status: "CREATED", name: product.name };
 
-            // Inject Product Name for UI
             const logDetails = {
                 ...diff,
                 productName: product.name
@@ -433,9 +431,14 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 });
             }
 
-            return product;
+            // 🔥 SERIALIZATION: Ensure Decimal/Date objects are clean for client
+            return serializeData(product);
 
         }, { maxWait: 10000, timeout: 30000 });
+
+        if ("success" in savedProduct) {
+            return savedProduct;
+        }
 
         revalidatePath("/admin/products");
         return { success: true, productId: savedProduct.id };

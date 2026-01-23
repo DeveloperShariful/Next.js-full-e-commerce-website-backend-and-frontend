@@ -7,6 +7,7 @@ import ProductTable from './_components/product-table';
 import ProductLogViewer from './_components/ProductLogViewer';
 import ImportExportButtons from './_components/ImportExportButtons';
 import { PaginationControls } from "./_components/pagination-controls";
+import { serializeData } from "@/app/actions/admin/product/product-utils";
 
 interface ProductsPageProps {
   searchParams: Promise<{
@@ -86,9 +87,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
     })
   ]);
 
-  // ✅ FIX: Serialize data to handle Decimal objects
-  // এটি Prisma-র Decimal অবজেক্টগুলোকে স্ট্রিং/নাম্বারে কনভার্ট করে ক্লায়েন্ট কম্পোনেন্টের উপযোগী করে
-  const serializedProducts = JSON.parse(JSON.stringify(products));
+  const serializedProducts = serializeData(products);
 
   const totalPages = Math.ceil(totalProducts / limit);
 

@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { getShippingClasses } from "@/app/actions/admin/product/product-read";
-import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { useGlobalStore } from "@/app/providers/global-store-provider"; // 🔥 Imported
 import { ProductFormData } from "../types";
 
 export default function Shipping() {
-    const { register, watch, setValue } = useFormContext<ProductFormData>();
-    const data = watch();
+    const { register, watch } = useFormContext<ProductFormData>();
     const [classes, setClasses] = useState<{id: string, name: string}[]>([]);
     
+    // 🔥 Global Units
     const { weightUnit, dimensionUnit } = useGlobalStore();
+    const wUnit = weightUnit || "kg";
+    const dUnit = dimensionUnit || "cm";
 
     useEffect(() => {
         getShippingClasses().then(res => { if(res.success) setClasses(res.data as any) });
@@ -20,7 +22,8 @@ export default function Shipping() {
     return (
         <div className="space-y-4 max-w-lg">
             <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Weight ({weightUnit})</label>
+                {/* 🔥 Dynamic Weight Unit */}
+                <label className="text-right font-medium text-xs">Weight ({wUnit})</label>
                 <input 
                     type="number" 
                     step="0.01"
@@ -30,7 +33,8 @@ export default function Shipping() {
                 />
             </div>
             <div className="grid grid-cols-3 gap-4 items-start">
-                <label className="text-right font-medium text-xs pt-2">Dimensions ({dimensionUnit})</label>
+                {/* 🔥 Dynamic Dimension Unit */}
+                <label className="text-right font-medium text-xs pt-2">Dimensions ({dUnit})</label>
                 <div className="col-span-2 flex gap-2">
                     <input 
                         type="number" 

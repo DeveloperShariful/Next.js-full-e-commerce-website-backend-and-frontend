@@ -1,11 +1,10 @@
 // File: app/actions/admin/product/product-read.ts
-
 "use server";
 
 import { db } from "@/lib/prisma";
 import { ProductStatus } from "@prisma/client";
+import { serializeData } from "./product-utils";
 
-// --- SINGLE PRODUCT READ ---
 export async function getProductById(id: string) {
   try {
     const product = await db.product.findUnique({
@@ -55,14 +54,14 @@ export async function getProductById(id: string) {
     });
     
     if (!product) return { success: false, error: "Product not found" };
-    return { success: true, product };
+    
+    return { success: true, product: serializeData(product) };
   } catch (error) {
     console.error("GET_PRODUCT_ERROR", error);
     return { success: false, error: "Database error" };
   }
 }
 
-// 🔥 NEW: GET CONFIG OPTIONS (GENDER & AGE GROUP)
 export async function getConfigOptions() {
     try {
         const attributes = await db.attribute.findMany({
@@ -87,7 +86,6 @@ export async function getConfigOptions() {
     }
 }
 
-// 🔥 NEW: GET ALL LOCATIONS
 export async function getLocations() {
     try {
         const locations = await db.location.findMany({
@@ -147,13 +145,7 @@ export async function getTaxRates() {
             select: { id: true, name: true, rate: true }
         });
         
-        // 🔥 FIX: Decimal conversion for Tax Rates
-        const serializedRates = rates.map(r => ({
-            ...r,
-            rate: Number(r.rate)
-        }));
-
-        return { success: true, data: serializedRates };
+        return { success: true, data: serializeData(rates) };
     } catch (error) {
         return { success: false, data: [] };
     }
@@ -214,13 +206,7 @@ export async function searchProducts(query: string) {
       }
     });
 
-    // 🔥 FIX: Convert Decimal to Number before sending to Client
-    const serializedProducts = products.map(p => ({
-        ...p,
-        price: Number(p.price)
-    }));
-
-    return { success: true, data: serializedProducts };
+    return { success: true, data: serializeData(products) };
   } catch (error) {
     try {
         const fallbackData = await db.product.findMany({
@@ -232,13 +218,7 @@ export async function searchProducts(query: string) {
             select: { id: true, name: true, featuredImage: true, sku: true, price: true }
         });
 
-        // 🔥 FIX: Convert Decimal to Number here too
-        const serializedFallback = fallbackData.map(p => ({
-            ...p,
-            price: Number(p.price)
-        }));
-
-        return { success: true, data: serializedFallback };
+        return { success: true, data: serializeData(fallbackData) };
     } catch(e) {
         return { success: false, data: [] };
     }

@@ -2,6 +2,33 @@
 
 import { db } from "@/lib/prisma";
 import _ from "lodash";
+import { Prisma } from "@prisma/client";
+
+export function serializeData<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+
+  if (typeof data === "object") {
+    if (data instanceof Prisma.Decimal) {
+      return Number(data) as unknown as T;
+    }
+    
+    if (data instanceof Date) {
+      return data.toISOString() as unknown as T;
+    }
+
+    if (Array.isArray(data)) {
+      return data.map((item) => serializeData(item)) as unknown as T;
+    }
+
+    const newObj: any = {};
+    for (const key in data) {
+      newObj[key] = serializeData((data as any)[key]);
+    }
+    return newObj;
+  }
+
+  return data;
+}
 
 export function generateSlug(name: string): string {
   if (!name) return "";
@@ -99,11 +126,9 @@ export function arraysHaveSameContent(arr1: any[], arr2: any[], keySelector?: (i
     return JSON.stringify(keys1) === JSON.stringify(keys2);
 }
 
-// 🔥 ULTRA PRO DIFF GENERATOR (Updated for ALL Fields)
 export function generateDiff(oldData: any, newData: any) {
   const diffs: Record<string, { old: any; new: any }> = {};
   
-  // 1. Basic Fields
   const basicFields = [
     "name", "price", "salePrice", "status", "stock", "sku", 
     "isPreOrder", "isFeatured", "isVirtual", "isDownloadable",
@@ -118,13 +143,11 @@ export function generateDiff(oldData: any, newData: any) {
     let oldVal = oldData ? oldData[key] : null;
     let newVal = newData[key];
 
-    // Normalize Numbers
     if (["price", "salePrice", "stock", "costPerItem", "lowStockThreshold", "menuOrder", "downloadLimit", "downloadExpiry", "preOrderLimit"].includes(key)) {
         oldVal = oldVal === null || oldVal === undefined ? 0 : Number(oldVal);
         newVal = newVal === null || newVal === undefined ? 0 : Number(newVal);
     }
 
-    // Normalize Strings
     if (["name", "sku", "description", "shortDescription", "purchaseNote", "barcode", "mpn", "hsCode", "countryOfManufacture", "preOrderMessage", "videoUrl", "videoThumbnail"].includes(key)) {
         oldVal = (oldVal || "").trim();
         newVal = (newVal || "").trim();
@@ -141,7 +164,6 @@ export function generateDiff(oldData: any, newData: any) {
     }
   });
 
-  // 2. Dimensions
   const dimensions = ["weight", "length", "width", "height"];
   dimensions.forEach(key => {
       const oldVal = Number(oldData?.[key] || 0);
@@ -151,7 +173,6 @@ export function generateDiff(oldData: any, newData: any) {
       }
   });
 
-  // 3. Relations
   if (oldData?.categoryId !== (newData.categoryId || null)) {
       diffs["Category"] = { old: oldData?.category?.name || "None", new: newData.categoryName || "None" };
   }
@@ -168,7 +189,6 @@ export function generateDiff(oldData: any, newData: any) {
       diffs["Shipping Class"] = { old: oldData?.shippingClassId || "None", new: newData.shippingClassId || "None" };
   }
 
-  // 4. Arrays
   const compareArrays = (label: string, oldArr: any[], newArr: any[]) => {
       const oldSorted = [...(oldArr || [])].sort().join(", ");
       const newSorted = [...(newArr || [])].sort().join(", ");
@@ -187,12 +207,10 @@ export function generateDiff(oldData: any, newData: any) {
   compareArrays("Upsells", oldData?.upsellIds, newData.upsells);
   compareArrays("Cross-sells", oldData?.crossSellIds, newData.crossSells);
 
-  // 5. Featured Image
   if (oldData?.featuredImage !== newData.featuredImage) {
       diffs["Featured Image"] = { old: "Old Image", new: "New Image" };
   }
 
-  // 6. Gallery Images
   const oldImages = oldData?.images?.map((img: any) => img.url).sort() || [];
   const newImages = newData?.galleryImages?.map((img: any) => typeof img === 'string' ? img : img.url).sort() || [];
 
@@ -200,7 +218,6 @@ export function generateDiff(oldData: any, newData: any) {
       diffs["Gallery Images"] = { old: `${oldImages.length} images`, new: `${newImages.length} images` };
   }
 
-  // 7. Attributes
   const simplifyAttrs = (attrs: any[]) => {
       if(!attrs) return [];
       return attrs.map((a: any) => ({
@@ -218,26 +235,22 @@ export function generateDiff(oldData: any, newData: any) {
       diffs["Attributes"] = { old: oldStr || "None", new: newStr || "None" };
   }
 
-  // 8. Variations (🔥 UPDATED FOR DETAILED LOGGING)
   if (newData.productType === 'VARIABLE') {
       const oldVars = oldData?.variants || [];
       const newVars = newData?.variationsData || [];
 
-      // Check for removed variants
       oldVars.forEach((ov: any) => {
           if (!newVars.find((nv: any) => nv.id === ov.id)) {
               diffs[`Variation Removed: ${ov.name}`] = { old: "Existed", new: "Removed" };
           }
       });
 
-      // Check for added or updated variants
       newVars.forEach((nv: any) => {
           const ov = oldVars.find((o: any) => o.id === nv.id);
 
           if (!ov) {
               diffs[`Variation Added: ${nv.name}`] = { old: "None", new: "Added" };
           } else {
-              // Compare specific fields
               const oldPrice = Number(ov.price);
               const newPrice = Number(nv.price);
               if (oldPrice !== newPrice) {
@@ -259,7 +272,6 @@ export function generateDiff(oldData: any, newData: any) {
       });
   }
 
-  // 9. Bundle Items
   if (newData.productType === 'BUNDLE') {
       const oldBundle = oldData?.bundleItems?.map((b: any) => b.childProductId).sort() || [];
       const newBundle = newData?.bundleItems?.map((b: any) => b.childProductId).sort() || [];

@@ -1,13 +1,15 @@
 // File: app/admin/products/create/_components/General.tsx
 
+"use client";
+
 import { useEffect, useState, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { getTaxClasses, getConfigOptions } from "@/app/actions/admin/product/product-read";
-import { X, ChevronDown, Check, Plus } from "lucide-react";
+import { X, ChevronDown, Check, Plus, Info } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { ProductFormData } from "../types";
 
-// --- 🔥 NEW: ULTRA PRO CREATABLE SELECT COMPONENT ---
+// --- Creatable Select Component (Same as before) ---
 const CreatableSelect = ({ 
     options, 
     value, 
@@ -23,7 +25,6 @@ const CreatableSelect = ({
     const [search, setSearch] = useState("");
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    // Close on click outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -34,7 +35,6 @@ const CreatableSelect = ({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Filter options based on search
     const filteredOptions = options.filter(opt => 
         opt.toLowerCase().includes(search.toLowerCase())
     );
@@ -47,7 +47,6 @@ const CreatableSelect = ({
 
     return (
         <div className="relative" ref={wrapperRef}>
-            {/* Input Trigger */}
             <div 
                 className={`w-full border px-3 py-2 rounded-sm text-sm flex justify-between items-center cursor-pointer bg-white transition-colors ${isOpen ? 'border-[#2271b1] ring-1 ring-[#2271b1]' : 'border-gray-400 hover:border-gray-500'}`}
                 onClick={() => setIsOpen(!isOpen)}
@@ -58,10 +57,8 @@ const CreatableSelect = ({
                 <ChevronDown size={14} className={`text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}/>
             </div>
 
-            {/* Dropdown Menu */}
             {isOpen && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-sm shadow-lg max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
-                    {/* Search Input inside dropdown */}
                     <div className="p-2 border-b border-gray-100">
                         <input 
                             autoFocus
@@ -84,7 +81,6 @@ const CreatableSelect = ({
                             </div>
                         ))}
 
-                        {/* Create New Option */}
                         {search && !filteredOptions.some(o => o.toLowerCase() === search.toLowerCase()) && (
                             <div 
                                 onClick={() => handleSelect(search)}
@@ -111,18 +107,16 @@ export default function General() {
     const data = watch();
     
     const [taxClasses, setTaxClasses] = useState<{id: string, name: string}[]>([]);
-    
-    // States for Dynamic Options
     const [genderOptions, setGenderOptions] = useState<string[]>([]);
     const [ageGroupOptions, setAgeGroupOptions] = useState<string[]>([]);
-    
     const [showSchedule, setShowSchedule] = useState(!!data.saleStart);
-    const { symbol } = useGlobalStore(); 
+    
+    // 🔥 FIX: Add Fallback if symbol is missing (e.g. "$")
+    const { symbol, tax } = useGlobalStore(); 
+    const currency = symbol || "$"; // ডিফল্ট কারেন্সি সিম্বল
 
     useEffect(() => {
         getTaxClasses().then(res => { if(res.success) setTaxClasses(res.data as any) });
-        
-        // Fetch Dynamic Options (Gender/Age)
         getConfigOptions().then(res => {
             if(res.success) {
                 setGenderOptions(res.data.genders);
@@ -144,9 +138,20 @@ export default function General() {
     return (
         <div className="space-y-5 max-w-lg">
             
-            {/* --- PRICING SECTION --- */}
+            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800 flex gap-2 items-start mb-4">
+                <Info size={16} className="shrink-0 mt-0.5" />
+                <div>
+                    <strong>Tax Settings:</strong> Prices entered here are considered 
+                    <span className="font-bold uppercase mx-1">
+                        {tax?.pricesIncludeTax ? "Tax Inclusive" : "Tax Exclusive"}
+                    </span> 
+                    based on your store configuration.
+                </div>
+            </div>
+
             <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Regular price ({symbol})</label>
+                {/* 🔥 FIX: Using 'currency' variable which has fallback */}
+                <label className="text-right font-medium text-xs">Regular price ({currency})</label>
                 <div className="col-span-2">
                     <input 
                         type="number" 
@@ -161,7 +166,8 @@ export default function General() {
 
             <div>
                 <div className="grid grid-cols-3 gap-4 items-center">
-                    <label className="text-right font-medium text-xs">Sale price ({symbol})</label>
+                    {/* 🔥 FIX: Using 'currency' variable */}
+                    <label className="text-right font-medium text-xs">Sale price ({currency})</label>
                     <div className="col-span-2 flex items-center gap-2">
                         <input 
                             type="number" 
@@ -210,7 +216,8 @@ export default function General() {
             </div>
 
             <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs text-gray-500">Cost per item</label>
+                {/* 🔥 FIX: Using 'currency' variable */}
+                <label className="text-right font-medium text-xs text-gray-500">Cost per item ({currency})</label>
                 <div className="col-span-2">
                     <input 
                         type="number" 
@@ -225,7 +232,6 @@ export default function General() {
 
             <hr className="border-gray-200 my-4"/>
 
-            {/* --- MEDIA (VIDEO) --- */}
             <h3 className="text-xs font-bold text-gray-700">Product Video</h3>
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Video URL</label>
@@ -248,7 +254,6 @@ export default function General() {
 
             <hr className="border-gray-200 my-4"/>
 
-            {/* --- 🔥 DEMOGRAPHICS (ULTRA PRO UI) --- */}
             <h3 className="text-xs font-bold text-gray-700">Demographics</h3>
             
             <div className="grid grid-cols-3 gap-4 items-center">
@@ -277,7 +282,6 @@ export default function General() {
 
             <hr className="border-gray-200 my-4"/>
 
-            {/* --- TAX SECTION --- */}
             <div className="grid grid-cols-3 gap-4 items-center">
                 <label className="text-right font-medium text-xs">Tax status</label>
                 <select 
@@ -305,7 +309,6 @@ export default function General() {
                 </div>
             )}
 
-            {/* --- DOWNLOAD SETTINGS --- */}
             {data.isDownloadable && (
                 <div className="mt-6 border-t border-gray-200 pt-4 animate-in fade-in">
                     <h3 className="text-xs font-bold text-gray-700 mb-3 ml-1">Download Settings</h3>

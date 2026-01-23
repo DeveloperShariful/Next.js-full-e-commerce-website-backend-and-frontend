@@ -1,11 +1,11 @@
 // File: app/actions/admin/product/import-export.ts
-// File: app/actions/admin/product/import-export.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
 import Papa from "papaparse";
-import { generateSlug } from "./product-utils";
-import { ProductStatus, ProductType } from "@prisma/client";
+import { generateSlug, serializeData } from "./product-utils"; // 🔥 serializeData imported
+import { ProductStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 // --- EXPORT FUNCTION ---
@@ -16,7 +16,10 @@ export async function exportProductsCSV() {
       orderBy: { id: 'desc' }
     });
 
-    const csvData = products.map(p => ({
+    // 🔥 FIX: Serialize data to handle Decimals & Dates before CSV conversion
+    const safeProducts = serializeData(products);
+
+    const csvData = safeProducts.map((p: any) => ({
       ID: p.id,
       Type: p.productType.toLowerCase(),
       SKU: p.sku || "",
@@ -25,7 +28,7 @@ export async function exportProductsCSV() {
       "Is featured?": p.isFeatured ? 1 : 0,
       "Short description": p.shortDescription || "",
       Description: p.description || "",
-      "Regular price": p.price,
+      "Regular price": p.price, // Now it's a number
       "Sale price": p.salePrice || "",
       "Cost of goods": p.costPerItem || "", 
       Stock: p.stock,
@@ -35,15 +38,14 @@ export async function exportProductsCSV() {
       "Height (cm)": p.height || "",
       "Allow customer reviews?": p.enableReviews ? 1 : 0,
       
-      // 🔥 NEW: Pre-order Columns
       "Is Pre-order?": p.isPreOrder ? 1 : 0,
-      "Pre-order Release Date": p.preOrderReleaseDate ? p.preOrderReleaseDate.toISOString().split('T')[0] : "",
+      "Pre-order Release Date": p.preOrderReleaseDate ? p.preOrderReleaseDate.split('T')[0] : "",
       "Pre-order Limit": p.preOrderLimit || "",
       "Pre-order Message": p.preOrderMessage || "",
 
       Categories: p.category?.name || "",
       Brands: p.brand?.name || "",
-      Tags: p.tags.map(t => t.name).join(", "),
+      Tags: p.tags.map((t: any) => t.name).join(", "),
       Images: p.featuredImage || "",
       Parent: ""
     }));
@@ -70,37 +72,31 @@ export async function importProductsCSV(csvString: string) {
             const name = row["Name"];
             if (!name) continue;
 
-            // Generate IDs
             const sku = row["SKU"] || `IMP-${Date.now()}-${Math.floor(Math.random()*1000)}`;
             const slug = generateSlug(name);
             
-            // Numbers Parsing
             const price = parseFloat(row["Regular price"]) || 0;
             const salePrice = row["Sale price"] ? parseFloat(row["Sale price"]) : null;
             const costPerItem = row["Cost of goods"] ? parseFloat(row["Cost of goods"]) : null;
             
-            // Dimensions & Weight
             const weight = row["Weight (kg)"] ? parseFloat(row["Weight (kg)"]) : null;
             const length = row["Length (cm)"] ? parseFloat(row["Length (cm)"]) : null;
             const width = row["Width (cm)"] ? parseFloat(row["Width (cm)"]) : null;
             const height = row["Height (cm)"] ? parseFloat(row["Height (cm)"]) : null;
 
-            // Booleans
             const enableReviews = row["Allow customer reviews?"] == "1";
             const soldIndividually = row["Sold individually?"] == "1";
             const isFeatured = row["Is featured?"] == "1";
             const status = row["Published"] == "1" ? "ACTIVE" : "DRAFT";
 
-            // 🔥 NEW: Pre-order Parsing
             const isPreOrder = row["Is Pre-order?"] == "1";
             const preOrderReleaseDate = row["Pre-order Release Date"] ? new Date(row["Pre-order Release Date"]) : null;
             const preOrderLimit = row["Pre-order Limit"] ? parseInt(row["Pre-order Limit"]) : null;
             const preOrderMessage = row["Pre-order Message"] || null;
 
-            // Category
             let categoryConnect = undefined;
             if (row["Categories"]) {
-                const catName = row["Categories"].split(",")[0].trim(); // Take first category
+                const catName = row["Categories"].split(",")[0].trim(); 
                 if(catName) {
                     categoryConnect = {
                         connectOrCreate: {
@@ -111,7 +107,6 @@ export async function importProductsCSV(csvString: string) {
                 }
             }
 
-            // Brand
             let brandConnect = undefined;
             const brandName = (row["Brands"] || row["Brand"])?.trim();
             if (brandName) {
@@ -123,7 +118,6 @@ export async function importProductsCSV(csvString: string) {
                 };
             }
 
-            // Tags
             let tagsConnect = undefined;
             if (row["Tags"]) {
                 const tagNames = row["Tags"].split(",").map((t: string) => t.trim()).filter((t: string) => t !== "");
@@ -137,11 +131,9 @@ export async function importProductsCSV(csvString: string) {
                 }
             }
 
-            // Images
             const images = row["Images"] ? row["Images"].split(",").map((url: string) => url.trim()) : [];
             const featuredImage = images.length > 0 ? images[0] : null;
 
-            // Database Create
             const product = await db.product.create({
                 data: {
                     name,
@@ -149,36 +141,27 @@ export async function importProductsCSV(csvString: string) {
                     sku,
                     productType: type === "variable" ? "VARIABLE" : "SIMPLE",
                     status: status as ProductStatus,
-                    
                     price,
                     salePrice,
                     costPerItem,
-                    
                     description: row["Description"] || "",
                     shortDescription: row["Short description"] || "",
-                    
                     stock: parseInt(row["Stock"]) || 0,
                     trackQuantity: row["In stock?"] == "1",
-                    
                     weight,
                     length,
                     width,
                     height,
-                    
                     enableReviews,
                     soldIndividually,
                     isFeatured,
-
-                    // 🔥 NEW: Pre-order Fields
                     isPreOrder,
                     preOrderReleaseDate,
                     preOrderLimit,
                     preOrderMessage,
-                    
                     category: categoryConnect,
                     brand: brandConnect,
                     tags: tagsConnect,
-
                     featuredImage,
                     images: {
                         create: images.map((url: string, idx: number) => ({
@@ -205,11 +188,9 @@ export async function importProductsCSV(csvString: string) {
             const stock = parseInt(row["Stock"]) || 0;
             const weight = row["Weight (kg)"] ? parseFloat(row["Weight (kg)"]) : null;
             
-            // 🔥 NEW: Variation Pre-order Parsing
             const isPreOrder = row["Is Pre-order?"] == "1";
             const preOrderReleaseDate = row["Pre-order Release Date"] ? new Date(row["Pre-order Release Date"]) : null;
 
-            // Dynamic Attributes Parsing
             let attributes: any = {};
             Object.keys(row).forEach(key => {
                 if (key.startsWith("Attribute") && key.endsWith("name")) {
@@ -234,8 +215,6 @@ export async function importProductsCSV(csvString: string) {
                     trackQuantity: true,
                     weight: weight,
                     attributes: attributes,
-                    
-                    // 🔥 NEW: Pre-order for Variation
                     isPreOrder,
                     preOrderReleaseDate
                 }

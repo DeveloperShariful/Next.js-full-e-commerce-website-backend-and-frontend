@@ -16,7 +16,6 @@ export async function deleteActivityLogs(ids: string[]) {
   }
 }
 
-// ২. অটোমেটিক ক্লিনআপ (৩০ দিনের পুরনো লগ ডিলিট)
 export async function cleanupOldLogs() {
   try {
     const thirtyDaysAgo = new Date();

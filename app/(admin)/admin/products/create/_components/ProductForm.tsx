@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -46,13 +46,23 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     mode: "onChange",
   });
 
-  const { handleSubmit, watch, formState: { isSubmitting, isDirty } } = methods;
+  const { handleSubmit, watch, setValue, formState: { isSubmitting, isDirty } } = methods;
   
   const productType = watch("productType");
   const isVirtual = watch("isVirtual");
 
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
   const onSubmit = async (data: ProductFormValues) => {
-    
     if (isEdit && !isDirty) {
         toast.success("No changes detected.");
         return;
@@ -119,7 +129,12 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                     {typeof window !== 'undefined' ? window.location.origin : ''}/product/
                                 </span>
                                 <input 
-                                    {...methods.register("slug")}
+                                    {...methods.register("slug", {
+                                        onChange: (e) => {
+                                            const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+                                            setValue("slug", val, { shouldDirty: true });
+                                        }
+                                    })}
                                     className="bg-transparent border border-transparent hover:border-gray-400 px-1 rounded text-xs text-[#3c434a] font-medium focus:border-[#2271b1] outline-none min-w-[50px] max-w-full"
                                 />
                             </div>

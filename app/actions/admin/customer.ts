@@ -1,11 +1,12 @@
-// app/actions/customer.ts
+
+// app/actions/admin/customer.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import bcrypt from "bcryptjs"; // Make sure to install: npm install bcryptjs @types/bcryptjs
+import bcrypt from "bcryptjs"; 
 
 // ==========================================
 // 1. ZOD SCHEMAS
@@ -76,7 +77,9 @@ export async function getCustomers(
 
     // Calculate Analytics in Memory (Total Spent, Last Order, AOV)
     const formattedUsers = users.map(user => {
-      const totalSpent = user.orders.reduce((acc, order) => acc + (order.total || 0), 0);
+      // 🔥 FIX: Convert Decimal to Number before adding
+      const totalSpent = user.orders.reduce((acc, order) => acc + Number(order.total || 0), 0);
+      
       const orderCount = user.orders.length;
       const lastOrderDate = user.orders[0]?.createdAt || null;
       const aov = orderCount > 0 ? totalSpent / orderCount : 0;
@@ -200,8 +203,17 @@ export async function getCustomerDetails(id: string) {
     });
 
     if (!customer) return { success: false, message: "Customer not found" };
+
+    // 🔥 FIX: Serialize Decimal fields to Numbers for Client Components
+    const serializedCustomer = {
+      ...customer,
+      orders: customer.orders.map(order => ({
+        ...order,
+        total: Number(order.total)
+      }))
+    };
     
-    return { success: true, data: customer };
+    return { success: true, data: serializedCustomer };
   } catch (error) {
     console.error("GET_CUSTOMER_DETAILS_ERROR", error);
     return { success: false, message: "Error fetching details" };

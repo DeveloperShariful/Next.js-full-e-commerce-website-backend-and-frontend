@@ -7,7 +7,7 @@ import "./globals.css";
 import { ClerkProvider } from '@clerk/nextjs';
 import NextTopLoader from 'nextjs-toploader';
 import { db } from "@/lib/prisma";
-import { GlobalStoreProvider } from "@/app/providers/global-store-provider"; // 🚀 Import Provider
+import { GlobalStoreProvider } from "@/app/providers/global-store-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,17 +24,26 @@ export const metadata: Metadata = {
   description: "Admin panel for GoBike e-commerce",
 };
 
-// 🚀 Made Async to fetch data
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   
-  // 1. Fetch Global Settings
-  const settings = await db.storeSettings.findUnique({
-    where: { id: "settings" },
-  });
+  // 1. Fetch ALL Required Settings concurrently
+  // আমরা এখানে Promise.all ব্যবহার করছি যাতে ৩টা কুয়েরি একসাথে রান হয় (Fast Performance)
+  const [storeSettings, seoConfig, marketingConfig] = await Promise.all([
+    db.storeSettings.findUnique({ where: { id: "settings" } }),
+    db.seoGlobalConfig.findUnique({ where: { id: "global_seo" } }),
+    db.marketingIntegration.findUnique({ where: { id: "marketing_config" } })
+  ]);
+
+  // 2. Prepare the settings object exactly as Provider expects
+  const providerSettings = {
+    storeSettings: storeSettings,
+    seoConfig: seoConfig,
+    marketingConfig: marketingConfig
+  };
 
   return (
     <ClerkProvider>
@@ -56,8 +65,8 @@ export default async function RootLayout({
           />
           <Toaster position="top-center" />
           
-          {/* 2. Wrap App with Global Store Data */}
-          <GlobalStoreProvider settings={settings}>
+          {/* 3. Pass the structured object */}
+          <GlobalStoreProvider settings={providerSettings}>
             {children}
           </GlobalStoreProvider>
           

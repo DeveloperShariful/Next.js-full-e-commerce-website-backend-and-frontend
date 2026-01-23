@@ -359,12 +359,16 @@ export function GlobalStoreProvider({
 
     if (isNaN(numPrice)) numPrice = 0;
     
-    return new Intl.NumberFormat(activeLocale, {
-      style: "currency",
-      currency: s.currency || "AUD",
-      minimumFractionDigits: 2,
-    }).format(numPrice);
-  }, [activeLocale, s.currency]);
+    try {
+      return new Intl.NumberFormat(activeLocale, {
+        style: "currency",
+        currency: s.currency || "AUD",
+        minimumFractionDigits: 2,
+      }).format(numPrice);
+    } catch (e) {
+      return `${s.currencySymbol || "$"}${numPrice.toFixed(2)}`;
+    }
+  }, [activeLocale, s.currency, s.currencySymbol]);
 
   const logoData: StoreMedia | null = s.logoMedia 
     ? {
@@ -409,18 +413,36 @@ export function GlobalStoreProvider({
     return paymentMethods
       .filter((pm) => pm.isEnabled)
       .sort((a, b) => a.displayOrder - b.displayOrder)
-      .map((pm) => ({
-        identifier: pm.identifier,
-        name: pm.name,
-        icon: pm.icon || null,
-        description: pm.description,
-        mode: pm.mode,
-        minOrderAmount: pm.minOrderAmount ? Number(pm.minOrderAmount) : null,
-        maxOrderAmount: pm.maxOrderAmount ? Number(pm.maxOrderAmount) : null,
-        surchargeEnabled: pm.surchargeEnabled || false,
-        surchargeAmount: pm.surchargeAmount ? Number(pm.surchargeAmount) : 0,
-        surchargeType: pm.surchargeType || 'fixed'
-      }));
+      .map((pm) => {
+        let minAmt = 0;
+        let maxAmt = 0;
+        let surAmt = 0;
+
+        // Safe conversion for Decimal/String/Number
+        const safeNum = (val: any) => {
+           if(typeof val === 'number') return val;
+           if(typeof val === 'string') return parseFloat(val);
+           if(val && typeof val === 'object' && 'toNumber' in val) return val.toNumber();
+           return 0;
+        };
+
+        minAmt = safeNum(pm.minOrderAmount);
+        maxAmt = safeNum(pm.maxOrderAmount);
+        surAmt = safeNum(pm.surchargeAmount);
+
+        return {
+          identifier: pm.identifier,
+          name: pm.name,
+          icon: pm.icon || null,
+          description: pm.description,
+          mode: pm.mode,
+          minOrderAmount: minAmt || null,
+          maxOrderAmount: maxAmt || null,
+          surchargeEnabled: pm.surchargeEnabled || false,
+          surchargeAmount: surAmt,
+          surchargeType: pm.surchargeType || 'fixed'
+        };
+      });
   }, [paymentMethods]);
 
   const processedPickups = useMemo(() => {

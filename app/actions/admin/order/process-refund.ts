@@ -22,16 +22,19 @@ export async function processRefund(formData: FormData) {
     if (!order) return { success: false, error: "Order not found" };
 
     // ভ্যালিডেশন: অর্ডারের টোটালের বেশি রিফান্ড করা যাবে না
-    const alreadyRefunded = order.refundedAmount || 0;
-    if ((alreadyRefunded + amount) > order.total) {
+    // FIX: Converting Prisma Decimal to Number for calculation
+    const currentRefunded = order.refundedAmount ? Number(order.refundedAmount) : 0;
+    const orderTotal = Number(order.total);
+
+    if ((currentRefunded + amount) > orderTotal) {
         return { success: false, error: "Refund amount exceeds order total." };
     }
 
     let gatewayRefundId = "";
     let transactionStatus = "FAILED";
 
-    // ==========================================
-    // ২. পেমেন্ট গেটওয়ে লজিক (STRIPE)
+    // =========================================
+    // ২. পেমেন্ট গেটওয়ে লজিক (STRIPE)
     // ==========================================
     if (order.paymentGateway === "stripe") {
         const stripeConfig = await db.stripeConfig.findFirst({ where: { enableStripe: true } });
@@ -46,7 +49,7 @@ export async function processRefund(formData: FormData) {
         try {
             // Stripe API Call
             const refund = await stripe.refunds.create({
-                payment_intent: order.paymentIntentId || undefined, // or charge: order.chargeId
+                payment_intent: order.paymentIntentId || undefined, 
                 charge: order.chargeId || undefined,
                 amount: Math.round(amount * 100), // Stripe cents এ কাজ করে
                 reason: "requested_by_customer",
@@ -62,7 +65,7 @@ export async function processRefund(formData: FormData) {
     }
 
     // ==========================================
-    // ৩. পেমেন্ট গেটওয়ে লজিক (PAYPAL)
+    // ৩. পেমেন্ট গেটওয়ে লজিক (PAYPAL)
     // ==========================================
     else if (order.paymentGateway === "paypal") {
         const ppConfig = await db.paypalConfig.findFirst({ where: { enablePaypal: true } });
@@ -84,7 +87,6 @@ export async function processRefund(formData: FormData) {
             const tokenData = await tokenRes.json();
             
             // B. Process Refund
-            // PayPal Capture ID লাগে (যা আমরা order.paymentId তে রাখি)
             const refundRes = await fetch(`${baseUrl}/v2/payments/captures/${order.paymentId}/refund`, {
                 method: "POST",
                 headers: {
@@ -116,10 +118,9 @@ export async function processRefund(formData: FormData) {
     }
     
     // ==========================================
-    // ৪. ম্যানুয়াল/অফলাইন রিফান্ড (COD)
+    // ৪. ম্যানুয়াল/অফলাইন রিফান্ড (COD)
     // ==========================================
     else {
-        // অফলাইন রিফান্ড হলে সরাসরি সাকসেস ধরে নিচ্ছি
         gatewayRefundId = `MANUAL-REF-${Date.now()}`;
         transactionStatus = "SUCCESS";
     }
@@ -156,7 +157,8 @@ export async function processRefund(formData: FormData) {
                 where: { id: order.id },
                 data: {
                     refundedAmount: { increment: amount },
-                    paymentStatus: (alreadyRefunded + amount) >= order.total ? "REFUNDED" : "PARTIALLY_REFUNDED"
+                    // FIX: Using Number variables for comparison
+                    paymentStatus: (currentRefunded + amount) >= orderTotal ? "REFUNDED" : "PARTIALLY_REFUNDED"
                 }
             })
         ]);

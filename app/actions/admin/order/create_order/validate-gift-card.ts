@@ -28,8 +28,9 @@ export async function validateGiftCard(code: string) {
       return { success: false, error: "Gift card has expired" };
     }
 
-    // ৫. ব্যালেন্স চেক
-    if (giftCard.balance <= 0) {
+    // ৫. ব্যালেন্স চেক (FIXED HERE)
+    // giftCard.balance হলো Decimal, তাই .toNumber() ব্যবহার করা হয়েছে
+    if (giftCard.balance.toNumber() <= 0) {
       return { success: false, error: "Gift card has zero balance" };
     }
 
@@ -39,7 +40,8 @@ export async function validateGiftCard(code: string) {
       data: {
         id: giftCard.id,
         code: giftCard.code,
-        balance: giftCard.balance
+        // রিটার্ন করার সময়ও নাম্বারে কনভার্ট করা ভালো, যাতে ক্লায়েন্ট সাইডে এরর না দেয়
+        balance: giftCard.balance.toNumber()
       }
     };
 

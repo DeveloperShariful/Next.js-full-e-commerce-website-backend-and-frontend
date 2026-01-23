@@ -17,8 +17,9 @@ export async function validateDiscount(code: string, cartTotal: number) {
         return { success: false, message: "Coupon expired" };
     }
 
-    // মিনিমাম স্পেন্ড চেক
-    if (discount.minSpend && cartTotal < discount.minSpend) {
+    // মিনিমাম স্পেন্ড চেক (FIXED HERE)
+    // discount.minSpend হলো Decimal, তাই .toNumber() ব্যবহার করা হয়েছে
+    if (discount.minSpend && cartTotal < discount.minSpend.toNumber()) {
         return { success: false, message: `Min spend ${discount.minSpend} required` };
     }
 

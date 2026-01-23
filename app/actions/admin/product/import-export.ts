@@ -1,4 +1,5 @@
 // File: app/actions/admin/product/import-export.ts
+// File: app/actions/admin/product/import-export.ts
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -8,7 +9,6 @@ import { ProductStatus, ProductType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 // --- EXPORT FUNCTION ---
-// (Export function same as before, no changes needed unless you want to add new columns)
 export async function exportProductsCSV() {
   try {
     const products = await db.product.findMany({
@@ -27,13 +27,20 @@ export async function exportProductsCSV() {
       Description: p.description || "",
       "Regular price": p.price,
       "Sale price": p.salePrice || "",
-      "Cost of goods": p.costPerItem || "", // Added Cost
+      "Cost of goods": p.costPerItem || "", 
       Stock: p.stock,
       "Weight (kg)": p.weight || "",
       "Length (cm)": p.length || "",
       "Width (cm)": p.width || "",
       "Height (cm)": p.height || "",
       "Allow customer reviews?": p.enableReviews ? 1 : 0,
+      
+      // 🔥 NEW: Pre-order Columns
+      "Is Pre-order?": p.isPreOrder ? 1 : 0,
+      "Pre-order Release Date": p.preOrderReleaseDate ? p.preOrderReleaseDate.toISOString().split('T')[0] : "",
+      "Pre-order Limit": p.preOrderLimit || "",
+      "Pre-order Message": p.preOrderMessage || "",
+
       Categories: p.category?.name || "",
       Brands: p.brand?.name || "",
       Tags: p.tags.map(t => t.name).join(", "),
@@ -49,7 +56,7 @@ export async function exportProductsCSV() {
   }
 }
 
-// --- IMPORT FUNCTION (UPDATED FOR YOUR CSV) ---
+// --- IMPORT FUNCTION ---
 export async function importProductsCSV(csvString: string) {
     try {
         const { data } = Papa.parse(csvString, { header: true, skipEmptyLines: true });
@@ -78,11 +85,17 @@ export async function importProductsCSV(csvString: string) {
             const width = row["Width (cm)"] ? parseFloat(row["Width (cm)"]) : null;
             const height = row["Height (cm)"] ? parseFloat(row["Height (cm)"]) : null;
 
-            // Booleans (WooCommerce uses 1 for true)
+            // Booleans
             const enableReviews = row["Allow customer reviews?"] == "1";
             const soldIndividually = row["Sold individually?"] == "1";
             const isFeatured = row["Is featured?"] == "1";
             const status = row["Published"] == "1" ? "ACTIVE" : "DRAFT";
+
+            // 🔥 NEW: Pre-order Parsing
+            const isPreOrder = row["Is Pre-order?"] == "1";
+            const preOrderReleaseDate = row["Pre-order Release Date"] ? new Date(row["Pre-order Release Date"]) : null;
+            const preOrderLimit = row["Pre-order Limit"] ? parseInt(row["Pre-order Limit"]) : null;
+            const preOrderMessage = row["Pre-order Message"] || null;
 
             // Category
             let categoryConnect = undefined;
@@ -98,7 +111,7 @@ export async function importProductsCSV(csvString: string) {
                 }
             }
 
-            // Brand (Handle both "Brand" and "Brands" columns)
+            // Brand
             let brandConnect = undefined;
             const brandName = (row["Brands"] || row["Brand"])?.trim();
             if (brandName) {
@@ -110,7 +123,7 @@ export async function importProductsCSV(csvString: string) {
                 };
             }
 
-            // Tags Logic (Comma Separated)
+            // Tags
             let tagsConnect = undefined;
             if (row["Tags"]) {
                 const tagNames = row["Tags"].split(",").map((t: string) => t.trim()).filter((t: string) => t !== "");
@@ -139,26 +152,32 @@ export async function importProductsCSV(csvString: string) {
                     
                     price,
                     salePrice,
-                    costPerItem, // ✅ Added Cost
+                    costPerItem,
                     
                     description: row["Description"] || "",
                     shortDescription: row["Short description"] || "",
                     
                     stock: parseInt(row["Stock"]) || 0,
-                    trackQuantity: row["In stock?"] == "1", // Simple logic for now
+                    trackQuantity: row["In stock?"] == "1",
                     
-                    weight, // ✅ Added Dimensions
+                    weight,
                     length,
                     width,
                     height,
                     
-                    enableReviews, // ✅ Added Reviews
+                    enableReviews,
                     soldIndividually,
                     isFeatured,
+
+                    // 🔥 NEW: Pre-order Fields
+                    isPreOrder,
+                    preOrderReleaseDate,
+                    preOrderLimit,
+                    preOrderMessage,
                     
                     category: categoryConnect,
                     brand: brandConnect,
-                    tags: tagsConnect, // ✅ Added Tags
+                    tags: tagsConnect,
 
                     featuredImage,
                     images: {
@@ -173,7 +192,7 @@ export async function importProductsCSV(csvString: string) {
             if (sku) skuToIdMap.set(sku, product.id);
         }
 
-        // --- PASS 2: Variations (Stock, Price, Dimensions update) ---
+        // --- PASS 2: Variations ---
         for (const row of data as any[]) {
             if (row["Type"]?.toLowerCase() !== "variation") continue;
 
@@ -182,16 +201,19 @@ export async function importProductsCSV(csvString: string) {
 
             if (!parentId) continue;
 
-            // Variation Data Parsing
             const price = parseFloat(row["Regular price"]) || 0;
             const stock = parseInt(row["Stock"]) || 0;
             const weight = row["Weight (kg)"] ? parseFloat(row["Weight (kg)"]) : null;
             
+            // 🔥 NEW: Variation Pre-order Parsing
+            const isPreOrder = row["Is Pre-order?"] == "1";
+            const preOrderReleaseDate = row["Pre-order Release Date"] ? new Date(row["Pre-order Release Date"]) : null;
+
             // Dynamic Attributes Parsing
             let attributes: any = {};
             Object.keys(row).forEach(key => {
                 if (key.startsWith("Attribute") && key.endsWith("name")) {
-                    const index = key.match(/\d+/)?.[0]; // Get number 1, 2 etc
+                    const index = key.match(/\d+/)?.[0]; 
                     if (index) {
                         const attrName = row[`Attribute ${index} name`];
                         const attrValue = row[`Attribute ${index} value(s)`];
@@ -210,8 +232,12 @@ export async function importProductsCSV(csvString: string) {
                     price: price,
                     stock: stock,
                     trackQuantity: true,
-                    weight: weight, // Variation weight
-                    attributes: attributes, 
+                    weight: weight,
+                    attributes: attributes,
+                    
+                    // 🔥 NEW: Pre-order for Variation
+                    isPreOrder,
+                    preOrderReleaseDate
                 }
             });
         }

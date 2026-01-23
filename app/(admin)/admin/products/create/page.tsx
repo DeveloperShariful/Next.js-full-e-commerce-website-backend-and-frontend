@@ -5,7 +5,7 @@ import { ProductForm } from "./_components/ProductForm";
 import { ProductFormValues } from "./schema";
 import { notFound } from "next/navigation";
 
-// Force dynamic rendering to ensure fresh data
+// Force dynamic rendering
 export const dynamic = "force-dynamic";
 
 interface PageProps {
@@ -24,7 +24,7 @@ export default async function CreateProductPage(props: PageProps) {
     stock: 0,
     attributes: [],
     variations: [],
-    galleryImages: [],
+    galleryImages: [], // Now supports objects
     tags: [],
     collectionIds: [],
     digitalFiles: [],
@@ -41,13 +41,16 @@ export default async function CreateProductPage(props: PageProps) {
     isDownloadable: false,
     isDangerousGood: false,
     soldIndividually: false,
+    isPreOrder: false, // Default
   };
 
   if (productId) {
     const product = await db.product.findUnique({
       where: { id: productId },
       include: {
-        images: { orderBy: { position: "asc" } },
+        // 🔥 Include Media relations
+        images: { orderBy: { position: "asc" }, include: { media: true } }, 
+        featuredMedia: true,
         attributes: { orderBy: { position: "asc" } },
         variants: { include: { images: true }, orderBy: { id: 'asc' } },
         tags: true,
@@ -67,40 +70,56 @@ export default async function CreateProductPage(props: PageProps) {
 
     if (!product) return notFound();
 
-    // Transform DB data to Form Schema
+    // ✅ Transform DB data to Form Schema
     initialData = {
       ...product,
       id: product.id,
       description: product.description || "",
       shortDescription: product.shortDescription || "",
       
+      // ✅ Decimal Fields Conversion
+      price: Number(product.price),
+      salePrice: product.salePrice ? Number(product.salePrice) : null,
+      costPerItem: product.costPerItem ? Number(product.costPerItem) : null,
+      weight: product.weight ? Number(product.weight) : null,
+      length: product.length ? Number(product.length) : null,
+      width: product.width ? Number(product.width) : null,
+      height: product.height ? Number(product.height) : null,
+      rating: Number(product.rating), 
+
       // Relations
       category: product.category?.name,
       vendor: product.brand?.name,
       tags: product.tags.map((t) => t.name),
       collectionIds: product.collections.map((c) => c.id),
       
-      // Images
+      // Media
       featuredImage: product.featuredImage,
+      featuredMediaId: product.featuredMediaId,
+      
+      // 🔥 UPDATED: Gallery Images Mapping (Object Structure)
       galleryImages: product.images
         .filter((img) => !img.variantId)
-        .map((img) => img.url),
+        .map((img) => ({
+            url: img.url,
+            mediaId: img.mediaId,
+            altText: img.altText || "",
+            id: img.id
+        })),
       
       // JSON Fields
       metafields: product.metafields ? JSON.stringify(product.metafields, null, 2) : "",
       seoSchema: product.seoSchema ? JSON.stringify(product.seoSchema, null, 2) : "",
       
-      // Dates
+      // Dates & Pre-order
       saleStart: product.saleStart ? product.saleStart.toISOString().split("T")[0] : null,
       saleEnd: product.saleEnd ? product.saleEnd.toISOString().split("T")[0] : null,
+      
+      isPreOrder: product.isPreOrder,
+      preOrderReleaseDate: product.preOrderReleaseDate ? product.preOrderReleaseDate.toISOString().split("T")[0] : null,
+      preOrderLimit: product.preOrderLimit,
+      preOrderMessage: product.preOrderMessage || "",
 
-      // Nullable Numbers
-      salePrice: product.salePrice ?? null,
-      costPerItem: product.costPerItem ?? null,
-      weight: product.weight ?? null,
-      length: product.length ?? null,
-      width: product.width ?? null,
-      height: product.height ?? null,
       downloadLimit: product.downloadLimit ?? null,
       downloadExpiry: product.downloadExpiry ?? null,
 
@@ -121,17 +140,23 @@ export default async function CreateProductPage(props: PageProps) {
       variations: product.variants.map((v) => ({
         id: v.id,
         name: v.name,
-        price: v.price,
+        price: Number(v.price),
         stock: v.stock,
         sku: v.sku || "",
         barcode: v.barcode || "",
+        trackQuantity: v.trackQuantity,
         attributes: v.attributes as Record<string, string>,
         images: v.images.map((img) => img.url),
-        costPerItem: v.costPerItem ?? null,
-        weight: v.weight ?? null,
-        length: v.length ?? null,
-        width: v.width ?? null,
-        height: v.height ?? null,
+        
+        salePrice: v.salePrice ? Number(v.salePrice) : null,
+        costPerItem: v.costPerItem ? Number(v.costPerItem) : null,
+        weight: v.weight ? Number(v.weight) : null,
+        length: v.length ? Number(v.length) : null,
+        width: v.width ? Number(v.width) : null,
+        height: v.height ? Number(v.height) : null,
+        
+        isPreOrder: v.isPreOrder,
+        preOrderReleaseDate: v.preOrderReleaseDate ? v.preOrderReleaseDate.toISOString().split("T")[0] : null,
       })),
 
       bundleItems: product.bundleItems.map((b) => ({
@@ -146,5 +171,8 @@ export default async function CreateProductPage(props: PageProps) {
     } as any;
   }
 
-  return <ProductForm initialData={initialData as ProductFormValues} isEdit={!!productId} />;
+  // ✅ DOUBLE SAFETY: Serialize entire object
+  const sanitizedInitialData = JSON.parse(JSON.stringify(initialData));
+
+  return <ProductForm initialData={sanitizedInitialData as ProductFormValues} isEdit={!!productId} />;
 }

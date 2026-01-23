@@ -22,7 +22,8 @@ export async function getGraphData(now: Date) {
 
   yearOrders.forEach(order => {
     const month = new Date(order.createdAt).getMonth();
-    graphData[month].total += order.total;
+    // ✅ FIX: Convert Decimal to Number before adding
+    graphData[month].total += Number(order.total);
   });
 
   return graphData;
@@ -35,13 +36,23 @@ export async function getRecentData() {
     include: { user: { select: { name: true, email: true } } }
   });
 
+  // ✅ FIX: Convert total to number for serialization
+  const serializedOrders = recentOrders.map(order => ({
+    ...order,
+    total: Number(order.total),
+    subtotal: Number(order.subtotal),
+    taxTotal: Number(order.taxTotal),
+    shippingTotal: Number(order.shippingTotal),
+    discountTotal: Number(order.discountTotal)
+  }));
+
   const recentActivities = await db.activityLog.findMany({
     take: 5,
     orderBy: { createdAt: 'desc' },
     include: { user: { select: { name: true, image: true, role: true } } }
   });
 
-  return { recentOrders, recentActivities };
+  return { recentOrders: serializedOrders, recentActivities };
 }
 
 export async function getStoreSettings() {

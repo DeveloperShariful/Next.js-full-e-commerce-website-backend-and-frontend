@@ -47,7 +47,8 @@ export default function AnalyticsPage() {
         
         if (isMounted) {
           if (res.success && res.data) {
-            setData(res.data);
+            // ✅ FIX: Serialize data to handle any remaining Decimal objects safely
+            setData(JSON.parse(JSON.stringify(res.data)));
           } else {
             setError(res.error || "Failed to load analytics data.");
           }

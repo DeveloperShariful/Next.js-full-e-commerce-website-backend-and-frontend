@@ -6,9 +6,6 @@ import { db } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { DateRange, TopProductMetric, InventoryHealthMetric, CategoryPerformanceMetric } from "./types";
 
-/**
- * Fetches comprehensive product analytics: Top Sellers, Inventory Issues, Category Stats.
- */
 export async function getProductAnalytics(current: DateRange): Promise<{
   topProducts: TopProductMetric[];
   inventoryHealth: InventoryHealthMetric[];
@@ -17,7 +14,6 @@ export async function getProductAnalytics(current: DateRange): Promise<{
   
   const validStatus = { notIn: [OrderStatus.CANCELLED, OrderStatus.DRAFT, OrderStatus.FAILED] as OrderStatus[] };
 
-  // 1. Fetch Top Selling Products (Grouped by Product Name)
   const topItems = await db.orderItem.groupBy({
     by: ['productId', 'productName'],
     where: {
@@ -31,25 +27,21 @@ export async function getProductAnalytics(current: DateRange): Promise<{
     take: 10
   });
 
-  // Map to TopProductMetric
   const topProducts: TopProductMetric[] = topItems.map(item => ({
     id: item.productId || "unknown",
     name: item.productName,
     sku: null, 
-    revenue: item._sum.total || 0,
+    // ✅ FIX: Decimal -> Number
+    revenue: Number(item._sum.total || 0),
     quantitySold: item._sum.quantity || 0,
     trend: 0 
   }));
 
-  // 2. Fetch Inventory Health
-  // Using explicit logic to find low stock items
   const inventoryAlerts = await db.product.findMany({
     where: {
       status: "ACTIVE",
       OR: [
-        // Prisma fields reference allows comparing columns in where clause (requires newer Prisma version)
-        // If strict typing fails here on older versions, we can fetch and filter in JS, but let's assume standard behavior
-        { stock: { lte: 2 } }, // Fallback hardcoded if dynamic field comparison fails, or use raw query
+        { stock: { lte: 2 } }, 
         { stock: 0 }
       ]
     },
@@ -64,7 +56,6 @@ export async function getProductAnalytics(current: DateRange): Promise<{
     take: 20
   });
 
-  // Filter JS side to be 100% safe with dynamic threshold logic
   const refinedInventory = inventoryAlerts.filter(p => p.stock <= (p.lowStockThreshold || 2));
 
   const inventoryHealth: InventoryHealthMetric[] = refinedInventory.map(p => ({
@@ -76,7 +67,6 @@ export async function getProductAnalytics(current: DateRange): Promise<{
     image: p.featuredImage
   }));
 
-  // 3. Category Performance
   const categoryItems = await db.orderItem.findMany({
     where: {
       order: {
@@ -102,25 +92,27 @@ export async function getProductAnalytics(current: DateRange): Promise<{
   for (const item of categoryItems) {
     if (item.product?.category) {
       const cat = item.product.category;
-      totalRevenue += item.total;
+      // ✅ FIX: Decimal -> Number
+      const itemTotal = Number(item.total);
+      
+      totalRevenue += itemTotal;
       
       if (catMap.has(cat.id)) {
         const existing = catMap.get(cat.id)!;
-        existing.revenue += item.total;
+        existing.revenue += itemTotal;
         existing.orderCount += 1;
       } else {
         catMap.set(cat.id, {
           id: cat.id,
           name: cat.name,
           orderCount: 1,
-          revenue: item.total,
-          percentage: 0 // Initialize
+          revenue: itemTotal,
+          percentage: 0 
         });
       }
     }
   }
 
-  // Calculate percentage and sort
   const categoryPerformance = Array.from(catMap.values())
     .map(c => ({
       ...c,

@@ -1,12 +1,13 @@
-// app/admin/products/create/_components/Variations.tsx
+// File: app/admin/products/create/_components/Variations.tsx
 
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { toast } from "react-hot-toast";
-import ImageUpload from "@/components/media/image-upload"; 
-import { ChevronDown, ChevronUp, Trash2, Wand2, MapPin, Box, X } from "lucide-react"; 
+import { ChevronDown, ChevronUp, Trash2, Wand2, MapPin, Box, X, Plus } from "lucide-react"; 
 import { getLocations } from "@/app/actions/admin/product/product-read";
 import { ProductFormData, Variation } from "../types";
+import { MediaSelectorModal } from "@/components/media/media-selector-modal";
+import Image from "next/image";
 
 export default function Variations() {
     const { watch, setValue } = useFormContext<ProductFormData>();
@@ -15,12 +16,12 @@ export default function Variations() {
     const mainData = watch();
 
     const [openIndex, setOpenIndex] = useState<number | null>(null);
-    
-    // 🔥 NEW: Location States
     const [locations, setLocations] = useState<{id: string, name: string}[]>([]);
-    const [managingStockIndex, setManagingStockIndex] = useState<number | null>(null); // For Modal
+    const [managingStockIndex, setManagingStockIndex] = useState<number | null>(null);
+    
+    // State to track which variation is currently opening the media modal
+    const [mediaModalIndex, setMediaModalIndex] = useState<number | null>(null);
 
-    // Fetch Locations on Mount
     useEffect(() => {
         getLocations().then(res => {
             if(res.success && res.data) {
@@ -33,7 +34,6 @@ export default function Variations() {
         setOpenIndex(openIndex === index ? null : index);
     };
 
-    // --- VARIATION GENERATOR LOGIC ---
     const generateVariations = () => {
         const varAttrs = attributes.filter(a => a.variation && a.values.length > 0);
         
@@ -42,7 +42,7 @@ export default function Variations() {
             return;
         }
 
-        const confirmGen = window.confirm("This will replace existing variations. Are you sure?");
+        const confirmGen = window.confirm("This will merge new combinations with existing ones. Continue?");
         if (!confirmGen) return;
 
         const cartesian = (...a: any[][]) => a.reduce((a, b) => a.flatMap(d => b.map(e => [d, e].flat())));
@@ -52,32 +52,41 @@ export default function Variations() {
             ? arraysToCombine[0].map(v => [v]) 
             : cartesian(...arraysToCombine);
 
-        const newVariations: Variation[] = combinations.map((combo: string[], index: number) => {
+        const newVariationsList: Variation[] = combinations.map((combo: string[], index: number) => {
             const attributesMap: Record<string, string> = {};
             varAttrs.forEach((attr, idx) => {
                 attributesMap[attr.name] = combo[idx];
             });
+
+            const existingVar = variations.find(v => {
+                return Object.keys(attributesMap).every(key => v.attributes[key] === attributesMap[key]);
+            });
+
+            if (existingVar) return existingVar;
 
             return {
                 id: `temp_gen_${Date.now()}_${index}`,
                 name: combo.join(" / "),
                 price: typeof mainData.price === 'number' ? mainData.price : 0,
                 stock: 0,
+                trackQuantity: true, 
                 sku: `${mainData.sku || 'SKU'}-${index + 1}`,
                 attributes: attributesMap,
                 barcode: "",
                 costPerItem: 0,
-                weight: parseFloat(mainData.weight as unknown as string) || 0,
-                length: parseFloat(mainData.length as unknown as string) || 0,
-                width: parseFloat(mainData.width as unknown as string) || 0,
-                height: parseFloat(mainData.height as unknown as string) || 0,
+                weight: typeof mainData.weight === 'number' ? mainData.weight : 0,
+                length: typeof mainData.length === 'number' ? mainData.length : 0,
+                width: typeof mainData.width === 'number' ? mainData.width : 0,
+                height: typeof mainData.height === 'number' ? mainData.height : 0,
                 images: [],
-                inventoryData: [] // Init empty inventory
+                inventoryData: [],
+                isPreOrder: false,
+                preOrderReleaseDate: null
             };
         });
 
-        setValue("variations", newVariations, { shouldDirty: true });
-        toast.success(`Generated ${newVariations.length} variations!`);
+        setValue("variations", newVariationsList, { shouldDirty: true });
+        toast.success(`Variations updated! Total: ${newVariationsList.length}`);
     };
 
     const addVariation = () => {
@@ -96,6 +105,7 @@ export default function Variations() {
             name: `Variation #${variations.length + 1}`,
             price: 0,
             stock: 0,
+            trackQuantity: true,
             sku: "",
             attributes: defaultAttrs,
             barcode: "",
@@ -105,14 +115,15 @@ export default function Variations() {
             width: 0,
             height: 0,
             images: [],
-            inventoryData: []
+            inventoryData: [],
+            isPreOrder: false,
+            preOrderReleaseDate: null
         };
 
         setValue("variations", [...variations, newVariation], { shouldDirty: true });
         setOpenIndex(variations.length);
     };
 
-    // --- UPDATE HANDLERS ---
     const updateVar = (index: number, field: keyof Variation, value: any) => {
         const newVars = [...variations];
         // @ts-ignore
@@ -128,16 +139,31 @@ export default function Variations() {
 
     const removeVariation = (e: React.MouseEvent, index: number) => {
         e.stopPropagation();
-        if(confirm("Remove this variation?")) {
+        if(confirm("Are you sure? If this variation has sales, it will be archived.")) {
             setValue("variations", variations.filter((_, vi) => vi !== index), { shouldDirty: true });
             setOpenIndex(null);
         }
     };
 
-    // Image Handlers
-    const handleVarImageUpload = (index: number, url: string) => {
-        const currentImages = variations[index].images || [];
-        updateVar(index, 'images', [...currentImages, url]);
+    // --- Media Selector Handlers ---
+    const handleMediaSelect = (media: any | any[]) => {
+        if (mediaModalIndex === null) return;
+
+        const selectedFiles = Array.isArray(media) ? media : [media];
+        const newImagesObj = selectedFiles.map((m: any) => ({
+            url: m.url,
+            mediaId: m.id,
+            altText: m.altText || "",
+            id: undefined 
+        }));
+
+        const currentImages = variations[mediaModalIndex].images || [];
+        const existingUrls = currentImages.map((img: any) => typeof img === 'string' ? img : img.url);
+        
+        const uniqueNewImages = newImagesObj.filter((img: any) => !existingUrls.includes(img.url));
+        
+        updateVar(mediaModalIndex, 'images', [...currentImages, ...uniqueNewImages]);
+        setMediaModalIndex(null);
     };
 
     const removeVarImage = (varIndex: number, imgIndex: number) => {
@@ -145,15 +171,12 @@ export default function Variations() {
         updateVar(varIndex, 'images', currentImages.filter((_, i) => i !== imgIndex));
     };
 
-    // 🔥 NEW: Multi-Warehouse Logic
     const handleStockUpdate = (locId: string, qtyStr: string) => {
         if (managingStockIndex === null) return;
-        
         const newQty = parseInt(qtyStr) || 0;
         const currentVar = variations[managingStockIndex];
         const currentInv = currentVar.inventoryData || [];
 
-        // Update inventory array
         const existingItem = currentInv.find(i => i.locationId === locId);
         let newInvData;
 
@@ -163,10 +186,7 @@ export default function Variations() {
             newInvData = [...currentInv, { locationId: locId, quantity: newQty }];
         }
 
-        // Calculate Total
         const newTotal = newInvData.reduce((acc, curr) => acc + curr.quantity, 0);
-
-        // Update State
         const newVars = [...variations];
         newVars[managingStockIndex].inventoryData = newInvData;
         newVars[managingStockIndex].stock = newTotal;
@@ -179,7 +199,6 @@ export default function Variations() {
 
     return (
         <div>
-            {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 p-4 bg-white border border-gray-200 shadow-sm rounded-sm gap-3 sm:gap-0">
                 <span className="text-sm font-semibold text-gray-700">{variations.length} variations defined</span>
                 <div className="flex gap-2">
@@ -192,7 +211,6 @@ export default function Variations() {
                 </div>
             </div>
 
-            {/* List */}
             <div className="border border-gray-300 rounded-sm divide-y divide-gray-300 shadow-sm">
                 {variations.length === 0 && (
                     <div className="p-8 text-center text-gray-500 text-sm bg-gray-50">No variations yet.</div>
@@ -200,14 +218,16 @@ export default function Variations() {
 
                 {variations.map((v, i) => {
                     const isOpen = openIndex === i;
-                    const mainImage = v.images && v.images.length > 0 ? v.images[0] : null;
+                    const firstImage = v.images && v.images.length > 0 ? v.images[0] : null;
+                    const imageUrl = firstImage 
+                        ? (typeof firstImage === 'object' ? (firstImage as any).url : firstImage) 
+                        : null;
 
                     return (
                         <div key={v.id} className="bg-white group transition-all">
-                            {/* Accordion Header */}
                             <div onClick={() => toggleAccordion(i)} className={`p-3 flex items-center gap-4 cursor-pointer hover:bg-gray-50 transition ${isOpen ? 'bg-gray-50 border-b border-gray-200' : ''}`}>
-                                <div className="w-8 h-8 bg-gray-200 rounded overflow-hidden border border-gray-300">
-                                    {mainImage && <img src={mainImage} alt="" className="w-full h-full object-cover"/>}
+                                <div className="w-8 h-8 bg-gray-200 rounded overflow-hidden border border-gray-300 relative">
+                                    {imageUrl && <Image src={imageUrl} alt="" fill className="object-cover"/>}
                                 </div>
                                 <div className="flex-1 flex flex-wrap gap-3" onClick={(e) => e.stopPropagation()}>
                                     {attributes.filter(a => a.variation).map(attr => (
@@ -226,26 +246,35 @@ export default function Variations() {
                                 </div>
                             </div>
                             
-                            {/* Accordion Body */}
                             {isOpen && (
                                 <div className="p-5 bg-white animate-in slide-in-from-top-2 duration-200">
                                     <div className="flex flex-col md:flex-row gap-6">
-                                        
-                                        {/* Image Section */}
                                         <div className="w-full md:w-40 shrink-0">
                                             <label className="text-xs font-bold block mb-2 text-gray-700">Variant Images</label>
                                             <div className="grid grid-cols-2 gap-2 mb-2">
-                                                {v.images?.map((img, imgIdx) => (
-                                                    <div key={imgIdx} className="relative aspect-square border rounded overflow-hidden group/img">
-                                                        <img src={img} alt="" className="w-full h-full object-cover" />
-                                                        <button type="button" onClick={() => removeVarImage(i, imgIdx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 opacity-0 group-hover/img:opacity-100 transition"><Trash2 size={10}/></button>
-                                                    </div>
-                                                ))}
+                                                {v.images?.map((img: any, imgIdx) => {
+                                                    const url = typeof img === 'object' ? img.url : img;
+                                                    return (
+                                                        <div key={imgIdx} className="relative aspect-square border rounded overflow-hidden group/img">
+                                                            <Image src={url} alt="" fill className="object-cover" />
+                                                            <button type="button" onClick={() => removeVarImage(i, imgIdx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 opacity-0 group-hover/img:opacity-100 transition"><Trash2 size={10}/></button>
+                                                        </div>
+                                                    )
+                                                })}
+                                                
+                                                {/* Media Selector Trigger Button */}
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setMediaModalIndex(i)}
+                                                    className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md hover:border-[#2271b1] hover:bg-blue-50 transition text-gray-400 hover:text-[#2271b1]"
+                                                    title="Add Images"
+                                                >
+                                                    <Plus size={16} />
+                                                    <span className="text-[10px] font-bold mt-1">Add</span>
+                                                </button>
                                             </div>
-                                            <ImageUpload value={[]} onChange={(url) => handleVarImageUpload(i, url)} onRemove={() => {}} showPreview={false} />
                                         </div>
 
-                                        {/* Fields Section */}
                                         <div className="flex-1 space-y-4">
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                                 <div>
@@ -257,7 +286,6 @@ export default function Variations() {
                                                     <input type="number" value={v.price} onChange={e => updateVar(i, 'price', parseFloat(e.target.value))} className="w-full border border-gray-400 p-2 rounded-sm text-sm focus:border-[#2271b1] outline-none" />
                                                 </div>
                                                 
-                                                {/* 🔥 STOCK BUTTON */}
                                                 <div>
                                                     <label className="text-xs font-bold block mb-1">Stock Qty</label>
                                                     <div className="flex gap-2">
@@ -286,7 +314,6 @@ export default function Variations() {
                                             </div>
                                             
                                             <hr className="border-gray-100"/>
-                                            {/* Shipping Fields */}
                                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-3 rounded border border-gray-200">
                                                 <div><label className="text-xs font-bold block mb-1 text-gray-500">Weight (kg)</label><input type="number" value={v.weight || ""} onChange={e => updateVar(i, 'weight', parseFloat(e.target.value))} className="w-full border border-gray-300 p-1.5 rounded-sm text-xs focus:border-[#2271b1] outline-none" placeholder="Parent weight"/></div>
                                                 <div className="col-span-3">
@@ -307,7 +334,6 @@ export default function Variations() {
                 })}
             </div>
 
-            {/* 🔥 STOCK MANAGEMENT MODAL */}
             {managingStockIndex !== null && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
@@ -346,6 +372,15 @@ export default function Variations() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Media Selector Modal */}
+            {mediaModalIndex !== null && (
+                <MediaSelectorModal 
+                    onClose={() => setMediaModalIndex(null)}
+                    onSelect={handleMediaSelect}
+                    allowMultiple={false}
+                />
             )}
         </div>
     );

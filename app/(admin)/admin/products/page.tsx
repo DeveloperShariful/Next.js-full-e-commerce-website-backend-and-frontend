@@ -86,6 +86,10 @@ export default async function ProductListPage(props: ProductsPageProps) {
     })
   ]);
 
+  // ✅ FIX: Serialize data to handle Decimal objects
+  // এটি Prisma-র Decimal অবজেক্টগুলোকে স্ট্রিং/নাম্বারে কনভার্ট করে ক্লায়েন্ট কম্পোনেন্টের উপযোগী করে
+  const serializedProducts = JSON.parse(JSON.stringify(products));
+
   const totalPages = Math.ceil(totalProducts / limit);
 
   const counts = {
@@ -122,7 +126,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
 
       <div className="w-full">
         <ProductTable 
-          products={products}
+          products={serializedProducts}
           categories={categories}
           counts={counts}
           statusFilter={statusFilter}

@@ -1,5 +1,4 @@
 //app/actions/admin/dashboard/fetch-stats.ts
-
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -28,6 +27,10 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
     },
     _sum: { total: true }
   });
+
+  // ✅ FIX: Convert aggregated Decimal to Number
+  const currentRevenue = Number(currentPaid._sum.total || 0);
+  const prevRevenue = Number(prevPaid._sum.total || 0);
 
   // 2. ORDER COUNTS (Total, Paid, Unpaid)
   const currentOrders = await db.order.findMany({
@@ -65,8 +68,8 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
 
   return {
     revenue: { 
-      value: currentPaid._sum.total || 0, 
-      growth: calculateGrowth(currentPaid._sum.total || 0, prevPaid._sum.total || 0) 
+      value: currentRevenue, 
+      growth: calculateGrowth(currentRevenue, prevRevenue) 
     },
     orders: { 
       total: currentOrders.length,

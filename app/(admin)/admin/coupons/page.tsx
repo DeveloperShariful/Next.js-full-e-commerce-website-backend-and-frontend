@@ -255,7 +255,7 @@ export default function CouponsPage() {
                                     <td className="p-4 font-mono font-bold text-blue-600">{coupon.code}</td>
                                     <td className="p-4 text-xs font-medium text-slate-500 bg-slate-50 inline-block rounded px-2 py-1 mt-3">{coupon.type.replace('_', ' ')}</td>
                                     <td className="p-4 font-bold text-slate-700">
-                                        {coupon.type === 'PERCENTAGE' ? `${coupon.value}%` : `৳${coupon.value}`}
+                                         {coupon.type === 'PERCENTAGE' ? `${Number(coupon.value)}%` : `৳${Number(coupon.value)}`}
                                     </td>
                                     <td className="p-4 text-center">
                                         <span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold text-slate-600">

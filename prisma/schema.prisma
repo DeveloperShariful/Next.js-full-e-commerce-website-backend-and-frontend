@@ -10,7 +10,7 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  extensions = [pg_trgm, unaccent]
+  extensions = [pg_trgm, unaccent, vector]
 }
 
 // ==========================================
@@ -196,55 +196,64 @@ enum NotificationChannel {
   PUSH
 }
 
+enum EventStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 // ==========================================
 // 3. USER, AUTH & SYSTEM
 // ==========================================
 
 model User {
-  id                 String    @id @default(uuid())
-  clerkId            String?   @unique
-  name               String?
-  email              String    @unique
-  emailVerified      DateTime?
-  password           String?
-  phone              String?   @unique
-  image              String?
-  mediaId            String?
-  media              Media?    @relation(fields: [mediaId], references: [id])
-  role               Role      @default(CUSTOMER)
-  isActive           Boolean   @default(true)
-  dateOfBirth        DateTime?
-  gender             String?
-  notes              String?
-  metafields         Json?
-  deletedAt          DateTime?
+  id                  String    @id @default(uuid())
+  clerkId             String?   @unique
+  name                String?
+  email               String    @unique
+  emailVerified       DateTime?
+  password            String?
+  phone               String?   @unique
+  image               String?
+  mediaId             String?
+  media               Media?    @relation(fields: [mediaId], references: [id])
+  role                Role      @default(CUSTOMER)
+  isActive            Boolean   @default(true)
+  dateOfBirth         DateTime?
+  gender              String?
+  notes               String?
+  metafields          Json?
+  deletedAt           DateTime?
+  version             Int       @default(1)
 
-  accounts           Account[]
-  sessions           Session[]
-  addresses          Address[]
-  paymentMethods     UserPaymentMethod[]
-  orders             Order[]
-  reviews            Review[]
-  wishlist           Wishlist[]
-  cart               Cart?
-  viewedProducts     RecentlyViewed[]
-  wallet             Wallet?
+  accounts            Account[]
+  sessions            Session[]
+  addresses           Address[]
+  paymentMethods      UserPaymentMethod[]
+  orders              Order[]
+  reviews             Review[]
+  wishlist            Wishlist[]
+  cart                Cart?
+  viewedProducts      RecentlyViewed[]
+  wallet              Wallet?
   abandonedCheckouts AbandonedCheckout[]
 
-  activityLogs       ActivityLog[]
-  blogPosts          BlogPost[]
-  notifications      Notification[]
+  activityLogs        ActivityLog[]
+  blogPosts           BlogPost[]
+  notifications       Notification[]
 
-  createdTickets     SupportTicket[] @relation("UserCreatedTickets")
-  assignedTickets    SupportTicket[] @relation("StaffTickets")
+  createdTickets      SupportTicket[] @relation("UserCreatedTickets")
+  assignedTickets     SupportTicket[] @relation("StaffTickets")
 
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([email])
   @@index([phone])
   @@index([role, createdAt(sort: Desc)])
   @@index([clerkId])
+  @@index([role, isActive])
 }
 
 model Account {
@@ -352,8 +361,9 @@ model Wallet {
   id           String              @id @default(uuid())
   userId       String              @unique
   user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  balance      Float               @default(0.00)
+  balance      Decimal             @default(0.00)
   points       Int                 @default(0)
+  version      Int                 @default(1)
   transactions WalletTransaction[]
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
@@ -363,7 +373,7 @@ model WalletTransaction {
   id          String          @id @default(uuid())
   walletId    String
   wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  amount      Float
+  amount      Decimal
   type        TransactionType
   description String?
   reference   String?
@@ -384,7 +394,7 @@ model Category {
   description  String?               @db.Text
   image        String?
   mediaId      String?
-  media        Media?    @relation(fields: [mediaId], references: [id])
+  media        Media?                @relation(fields: [mediaId], references: [id])
   isActive     Boolean               @default(true)
   menuOrder    Int                   @default(0)
   parentId     String?
@@ -422,7 +432,7 @@ model Brand {
   slug              String             @unique
   logo              String?
   logoMediaId       String?
-  logoMedia         Media?    @relation(fields: [logoMediaId], references: [id])
+  logoMedia         Media?             @relation(fields: [logoMediaId], references: [id])
   description       String?            @db.Text
   website           String?
   countryOfOrigin   String?
@@ -484,64 +494,73 @@ model ShippingClass {
 }
 
 model Product {
-  id                   String               @id @default(uuid())
-  productCode          Int                  @unique @default(autoincrement())
+  id                   String                @id @default(uuid())
+  versions             ProductVersion[]
+  stockHistory         StockHistory[]
+  productCode          Int                   @unique @default(autoincrement())
   name                 String
-  slug                 String               @unique
-  description          String?              @db.Text
-  shortDescription     String?              @db.Text
-  productType          ProductType          @default(SIMPLE)
-  status               ProductStatus        @default(DRAFT)
-  isFeatured           Boolean              @default(false)
+  slug                 String                @unique
+  description          String?               @db.Text
+  shortDescription     String?               @db.Text
+  productType          ProductType           @default(SIMPLE)
+  status               ProductStatus         @default(DRAFT)
+  isFeatured           Boolean               @default(false)
   categoryId           String?
-  category             Category?            @relation(fields: [categoryId], references: [id])
+  category             Category?             @relation(fields: [categoryId], references: [id])
   brandId              String?
-  brand                Brand?               @relation(fields: [brandId], references: [id])
+  brand                Brand?                @relation(fields: [brandId], references: [id])
   tags                 Tag[]
   collections          Collection[]
   featuredImage        String?
   featuredMediaId      String?
-  featuredMedia        Media?  @relation(fields: [featuredMediaId], references: [id])
+  featuredMedia        Media?                @relation(fields: [featuredMediaId], references: [id])
   images               ProductImage[]
   videoUrl             String?
   videoThumbnail       String?
-  price                Float                @default(0.00)
-  salePrice            Float?
+  price                Decimal               @default(0.00)
+  salePrice            Decimal?
   saleStart            DateTime?
   saleEnd              DateTime?
-  costPerItem          Float?
-  taxable              Boolean              @default(true)
-  taxStatus            TaxStatus            @default(TAXABLE)
+  costPerItem          Decimal?
+  taxable              Boolean               @default(true)
+  taxStatus            TaxStatus             @default(TAXABLE)
   taxRateId            String?
-  taxRate              TaxRate?             @relation(fields: [taxRateId], references: [id])
+  taxRate              TaxRate?              @relation(fields: [taxRateId], references: [id])
   taxClassId           String?
-  sku                  String?              @unique
+  sku                  String?               @unique
   barcode              String?
   mpn                  String?
-  trackQuantity        Boolean              @default(true)
-  stock                Int                  @default(0)
-  lowStockThreshold    Int                  @default(2)
-  backorderStatus      BackorderStatus      @default(DO_NOT_ALLOW)
-  soldIndividually     Boolean              @default(false)
-  weight               Float?               @default(0)
-  length               Float?
-  width                Float?
-  height               Float?
-  weightUnit           String?              @default("kg")
-  dimensionUnit        String?              @default("cm")
+  trackQuantity        Boolean               @default(true)
+  stock                Int                   @default(0)
+  lowStockThreshold    Int                   @default(2)
+  backorderStatus      BackorderStatus       @default(DO_NOT_ALLOW)
+  soldIndividually     Boolean               @default(false)
+  
+  // Pre-order Fields
+  isPreOrder           Boolean               @default(false)
+  preOrderReleaseDate  DateTime?
+  preOrderMessage      String?
+  preOrderLimit        Int?
+
+  weight               Decimal?              @default(0)
+  length               Decimal?
+  width                Decimal?
+  height               Decimal?
+  weightUnit           String?               @default("kg")
+  dimensionUnit        String?               @default("cm")
   shippingClassId      String?
-  shippingClass        ShippingClass?       @relation(fields: [shippingClassId], references: [id])
-  isVirtual            Boolean              @default(false)
-  isDownloadable       Boolean              @default(false)
+  shippingClass        ShippingClass?        @relation(fields: [shippingClassId], references: [id])
+  isVirtual            Boolean               @default(false)
+  isDownloadable       Boolean               @default(false)
   downloadFiles        DigitalFile[]
   downloadLimit        Int?
   downloadExpiry       Int?
-  isDangerousGood      Boolean              @default(false)
+  isDangerousGood      Boolean               @default(false)
   dangerousGoodType    String?
   hsCode               String?
   countryOfManufacture String?
-  bundleItems          BundleItem[]         @relation("BundleParent")
-  partOfBundles        BundleItem[]         @relation("BundleChild")
+  bundleItems          BundleItem[]          @relation("BundleParent")
+  partOfBundles        BundleItem[]          @relation("BundleChild")
   attributes           ProductAttribute[]
   variants             ProductVariant[]
   reviews              Review[]
@@ -556,21 +575,26 @@ model Product {
   seoSchema            Json?
   gender               String?
   ageGroup             String?
-  viewCount            Int                  @default(0)
-  soldCount            Int                  @default(0)
-  rating               Float                @default(0)
-  reviewCount          Int                  @default(0)
+  viewCount            Int                   @default(0)
+  soldCount            Int                   @default(0)
+  rating               Decimal               @default(0)
+  reviewCount          Int                   @default(0)
   metafields           Json?
-  menuOrder            Int                  @default(0)
+  menuOrder            Int                   @default(0)
   purchaseNote         String?
-  enableReviews        Boolean              @default(true)
+  enableReviews        Boolean               @default(true)
   deletedAt            DateTime?
+  version              Int                   @default(1)
+   
+  descriptionEmbedding Unsupported("vector(1536)")?
+  imageEmbedding       Unsupported("vector(512)")?
+
   wishlistedBy         Wishlist[]
   recentViews          RecentlyViewed[]
   orderItems           OrderItem[]
   cartItems            CartItem[]
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   @@index([slug])
   @@index([categoryId, status])
@@ -581,6 +605,12 @@ model Product {
   @@index([createdAt(sort: Desc)])
   @@index([stock(sort: Asc), status])
   @@index([metafields(ops: JsonbPathOps)], type: Gin)
+   
+  // New Composite Indices
+  @@index([categoryId, status, price])
+  @@index([brandId, status, isFeatured])
+  @@index([status, price, createdAt])
+  @@index([isPreOrder])
 }
 
 model ProductTranslation {
@@ -597,6 +627,34 @@ model ProductTranslation {
   @@unique([productId, language])
 }
 
+model ProductVersion {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  data        Json     // Full snapshot of product data before update
+  reason      String?  // e.g. "Price Update", "Bulk Edit"
+  createdBy   String?  // User ID
+  createdAt   DateTime @default(now())
+
+  @@index([productId])
+}
+
+// ✅ NEW MODEL: Inventory History (Why stock changed?)
+model StockHistory {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId   String?
+  locationId  String?
+  change      Int      // e.g. +10 or -5
+  finalStock  Int      // Stock after change
+  reason      String?  // "Order #123", "Restock", "Damage"
+  userId      String?  // Who changed it
+  createdAt   DateTime @default(now())
+
+  @@index([productId, variantId])
+}
+
 model ProductImage {
   id        String          @id @default(uuid())
   url       String
@@ -611,6 +669,8 @@ model ProductImage {
   media     Media?          @relation(fields: [mediaId], references: [id])
   variantId String?
   variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  imageEmbedding Unsupported("vector(512)")?
 
   @@index([productId, position(sort: Asc)])
 }
@@ -671,36 +731,45 @@ model ProductAttribute {
 }
 
 model ProductVariant {
-  id          String   @id @default(uuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name        String
-  sku         String?
-  barcode     String?
-  price       Float
-  salePrice   Float?
-  costPerItem Float?
-  stock       Int      @default(0)
-  trackQuantity Boolean @default(true)
-  image       String?
-  mediaId     String?
-  media       Media?    @relation(fields: [mediaId], references: [id])
-  images      ProductImage[]
-  weight      Float?
-  length      Float?
-  width       Float?
-  height      Float?
-  attributes  Json
-  metafields  Json?
+  id              String           @id @default(uuid())
+  productId       String
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name            String
+  sku             String?
+  barcode         String?
+  price           Decimal
+  salePrice       Decimal?
+  costPerItem     Decimal?
+  stock           Int              @default(0)
+  trackQuantity   Boolean          @default(true)
+  
+  // Pre-order Fields for Variants
+  isPreOrder      Boolean          @default(false)
+  preOrderReleaseDate DateTime?
+  
+  image           String?
+  mediaId         String?
+  media           Media?           @relation(fields: [mediaId], references: [id])
+  images          ProductImage[]
+  weight          Decimal?
+  length          Decimal?
+  width           Decimal?
+  height          Decimal?
+  attributes      Json
+  metafields      Json?
+  version         Int              @default(1)
   inventoryLevels InventoryLevel[]
   wishlistedBy    Wishlist[]
   recentViews     RecentlyViewed[]
   cartItems       CartItem[]
   orderItems      OrderItem[]
+  deletedAt       DateTime?
 
   @@index([productId])
   @@index([sku])
   @@index([attributes(ops: JsonbPathOps)], type: Gin)
+  @@index([productId, price])
+  @@index([isPreOrder])
 }
 
 // ==========================================
@@ -708,16 +777,16 @@ model ProductVariant {
 // ==========================================
 
 model Location {
-  id              String           @id @default(uuid())
+  id              String          @id @default(uuid())
   name            String
   address         String?
-  isDefault       Boolean          @default(false)
-  isActive        Boolean          @default(true)
+  isDefault       Boolean         @default(false)
+  isActive        Boolean         @default(true)
   inventoryLevels InventoryLevel[]
-  stockTransfers  StockTransfer[]  @relation("FromLocation")
-  stockReceived   StockTransfer[]  @relation("ToLocation")
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  stockTransfers  StockTransfer[] @relation("FromLocation")
+  stockReceived   StockTransfer[] @relation("ToLocation")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }
 
 model PickupLocation {
@@ -739,18 +808,20 @@ model PickupLocation {
 }
 
 model InventoryLevel {
-  id         String          @id @default(uuid())
-  quantity   Int             @default(0)
+  id        String          @id @default(uuid())
+  quantity  Int             @default(0)
   locationId String
-  location   Location        @relation(fields: [locationId], references: [id])
-  productId  String
-  product    Product         @relation(fields: [productId], references: [id])
-  variantId  String?
-  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  location  Location        @relation(fields: [locationId], references: [id])
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  version   Int             @default(1)
 
   @@unique([locationId, productId, variantId])
   @@index([productId, variantId])
   @@index([locationId])
+  @@index([locationId, productId, quantity])
 }
 
 model Supplier {
@@ -772,7 +843,7 @@ model PurchaseOrder {
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   status     String
-  totalCost  Float
+  totalCost  Decimal
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -810,18 +881,22 @@ model Order {
   status                 OrderStatus        @default(PENDING)
   paymentStatus          PaymentStatus      @default(UNPAID)
   fulfillmentStatus      FulfillmentStatus  @default(UNFULFILLED)
+  
+  // Pre-order Flag
+  hasPreOrderItems       Boolean            @default(false)
+  
   currency               String             @default("AUD")
-  exchangeRate           Float              @default(1.0)
-  subtotal               Float
-  discountTotal          Float              @default(0)
-  shippingTotal          Float              @default(0)
-  taxTotal               Float              @default(0)
-  surcharge              Float              @default(0)
-  total                  Float
-  paymentFee             Float              @default(0)
-  netAmount              Float              @default(0)
-  refundedAmount         Float              @default(0)
-  netTotal               Float              @default(0)
+  exchangeRate           Decimal            @default(1.0)
+  subtotal               Decimal
+  discountTotal          Decimal            @default(0)
+  shippingTotal          Decimal            @default(0)
+  taxTotal               Decimal            @default(0)
+  surcharge              Decimal            @default(0)
+  total                  Decimal
+  paymentFee             Decimal            @default(0)
+  netAmount              Decimal            @default(0)
+  refundedAmount         Decimal            @default(0)
+  netTotal               Decimal            @default(0)
   paymentGateway         String?
   paymentMethod          String?
   paymentId              String?            @unique
@@ -849,7 +924,7 @@ model Order {
   authorityToLeave       Boolean            @default(false)
   tailgatePickup         Boolean            @default(false)
   tailgateDelivery       Boolean            @default(false)
-  declaredValue          Float?
+  declaredValue          Decimal?
   isInsured              Boolean            @default(false)
   selectedCourierCode    String?
   selectedCourierService String?
@@ -881,6 +956,7 @@ model Order {
   disputes               Dispute[]
   orderNotes             OrderNote[]
   deletedAt              DateTime?
+  version                Int                @default(1)
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
@@ -891,6 +967,12 @@ model Order {
   @@index([orderNumber])
   @@index([paymentId])
   @@index([orderDate])
+  @@index([hasPreOrderItems])
+   
+  // New Composite Indices for Ultra Performance
+  @@index([userId, status, createdAt])
+  @@index([status, paymentStatus, fulfillmentStatus])
+  @@index([status, createdAt, total])
 }
 
 model OrderItem {
@@ -904,11 +986,16 @@ model OrderItem {
   variant     ProductVariant? @relation(fields: [variantId], references: [id])
   variantName String?
   sku         String?
+  
+  // Pre-order Snapshot
+  isPreOrder          Boolean   @default(false)
+  preOrderReleaseDate DateTime?
+  
   image       String?
-  price       Float
+  price       Decimal
   quantity    Int
-  total       Float
-  tax         Float    @default(0)
+  total       Decimal
+  tax         Decimal  @default(0)
   metadata    Json?
 
   @@index([orderId])
@@ -922,7 +1009,7 @@ model OrderTransaction {
   order               Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   gateway             String
   type                TransactionType
-  amount              Float
+  amount              Decimal
   currency            String             @default("AUD")
   transactionId       String
   idempotencyKey      String?
@@ -938,6 +1025,7 @@ model OrderTransaction {
 
   @@index([orderId, status])
   @@index([transactionId])
+  @@index([gateway, transactionId])
 }
 
 model Dispute {
@@ -947,7 +1035,7 @@ model Dispute {
   gatewayDisputeId String        @unique
   reason           String?
   status           DisputeStatus @default(WARNING_NEEDS_RESPONSE)
-  amount           Float
+  amount           Decimal
   currency         String        @default("AUD")
   evidenceDueBy    DateTime?
   metadata         Json?
@@ -961,7 +1049,7 @@ model Payout {
   id          String   @id @default(uuid())
   gateway     String
   payoutId    String   @unique
-  amount      Float
+  amount      Decimal
   currency    String
   status      String
   arrivalDate DateTime
@@ -984,14 +1072,14 @@ model PaymentWebhookLog {
 }
 
 model Shipment {
-  id                 String    @id @default(uuid())
+  id                 String   @id @default(uuid())
   orderId            String
-  order              Order     @relation(fields: [orderId], references: [id])
+  order              Order    @relation(fields: [orderId], references: [id])
   trackingNumber     String?
   trackingUrl        String?
   courier            String?
   items              Json
-  shippedDate        DateTime  @default(now())
+  shippedDate        DateTime @default(now())
   deliveredDate      DateTime?
   transdirectId      Int?
   connote            String?
@@ -1001,11 +1089,11 @@ model Shipment {
   lastTrackingStatus String?
   courierJobId       String?
   manifestId         String?
-  numberOfParcels    Int       @default(1)
-  syncedToGateway    Boolean   @default(false)
+  numberOfParcels    Int      @default(1)
+  syncedToGateway    Boolean  @default(false)
   syncError          String?
-  lastSyncedAt       DateTime? // Added for cache
-  rawStatus          Json?     // Added for cache
+  lastSyncedAt       DateTime? 
+  rawStatus          Json?       
 
   @@index([orderId])
 }
@@ -1031,7 +1119,7 @@ model Refund {
   id              String   @id @default(uuid())
   orderId         String
   order           Order    @relation(fields: [orderId], references: [id])
-  amount          Float
+  amount          Decimal
   reason          String?
   status          String   @default("pending")
   gatewayRefundId String?
@@ -1059,13 +1147,13 @@ model OrderNote {
 // ==========================================
 
 model Cart {
-  id             String     @id @default(uuid())
-  userId         String?    @unique
-  user           User?      @relation(fields: [userId], references: [id])
+  id             String   @id @default(uuid())
+  userId         String?  @unique
+  user           User?    @relation(fields: [userId], references: [id])
   sessionId      String?
   items          CartItem[]
   reminderSentAt DateTime?
-  updatedAt      DateTime   @updatedAt
+  updatedAt      DateTime @updatedAt
 
   @@index([sessionId])
   @@index([userId])
@@ -1091,7 +1179,7 @@ model AbandonedCheckout {
   userId        String?
   user          User?     @relation(fields: [userId], references: [id])
   items         Json
-  subtotal      Float
+  subtotal      Decimal
   currency      String    @default("AUD")
   recoveryUrl   String
   isRecovered   Boolean   @default(false)
@@ -1145,9 +1233,9 @@ model Discount {
   code             String       @unique
   description      String?
   type             DiscountType @default(PERCENTAGE)
-  value            Float
-  minSpend         Float?
-  maxSpend         Float?
+  value            Decimal
+  minSpend         Decimal?
+  maxSpend         Decimal?
   minQty           Int?
   startDate        DateTime     @default(now())
   endDate          DateTime?
@@ -1169,15 +1257,15 @@ model Discount {
 }
 
 model GiftCard {
-  id             String    @id @default(uuid())
-  code           String    @unique
-  initialValue   Float
-  balance        Float
+  id             String   @id @default(uuid())
+  code           String   @unique
+  initialValue   Decimal
+  balance        Decimal
   userId         String?
   recipientEmail String?
   expiresAt      DateTime?
-  isEnabled      Boolean   @default(true)
-  createdAt      DateTime  @default(now())
+  isEnabled      Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   @@index([code])
 }
@@ -1194,22 +1282,23 @@ model Newsletter {
 // ==========================================
 
 model BlogPost {
-  id          String   @id @default(uuid())
-  title       String
-  slug        String   @unique
-  content     String   @db.Text
-  excerpt     String?
-  image       String?
+  id              String   @id @default(uuid())
+  title           String
+  slug            String   @unique
+  content         String   @db.Text
+  excerpt         String?
+  image           String?
   featuredMediaId String?
-  featuredMedia   Media? @relation(fields: [featuredMediaId], references: [id])
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id])
-  isPublished Boolean  @default(false)
-  tags        String[]
-  metaTitle   String?
-  metaDesc    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  featuredMedia   Media?   @relation(fields: [featuredMediaId], references: [id])
+  authorId        String
+  author          User     @relation(fields: [authorId], references: [id])
+  isPublished     Boolean  @default(false)
+  tags            String[]
+  metaTitle       String?
+  metaDesc        String?
+  contentEmbedding Unsupported("vector(1536)")?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([slug])
   @@index([isPublished, createdAt(sort: Desc)])
@@ -1310,26 +1399,26 @@ model TicketMessage {
 // ==========================================
 
 model StoreSettings {
-  id                  String  @id @default("settings")
-  storeName           String  @default("My Store")
-  storeEmail          String?
-  storePhone          String?
-  currency            String  @default("AUD")
-  currencySymbol      String  @default("$")
-  storeAddress        Json?
-  taxSettings         Json?
-  generalConfig       Json?
-  weightUnit          String  @default("kg")
-  dimensionUnit       String  @default("cm")
-  logo                String?
-  favicon             String?
-  logoMediaId         String?
-  logoMedia           Media?  @relation("StoreLogo", fields: [logoMediaId], references: [id])
-  faviconMediaId       String?
-  faviconMedia        Media?  @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
-  socialLinks         Json?
-  smtpConfig          Json?
-  maintenance         Boolean @default(false)
+  id                String  @id @default("settings")
+  storeName         String  @default("My Store")
+  storeEmail        String?
+  storePhone        String?
+  currency          String  @default("AUD")
+  currencySymbol    String  @default("$")
+  storeAddress      Json?
+  taxSettings       Json?
+  generalConfig     Json?
+  weightUnit        String  @default("kg")
+  dimensionUnit     String  @default("cm")
+  logo              String?
+  favicon           String?
+  logoMediaId       String?
+  logoMedia         Media?  @relation("StoreLogo", fields: [logoMediaId], references: [id])
+  faviconMediaId     String?
+  faviconMedia       Media?  @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
+  socialLinks       Json?
+  smtpConfig        Json?
+  maintenance       Boolean @default(false)
 }
 
 // ==========================================
@@ -1339,7 +1428,7 @@ model StoreSettings {
 model TaxRate {
   id       String    @id @default(uuid())
   name     String    @default("GST")
-  rate     Float     @default(10.0)
+  rate     Decimal   @default(10.0)
   country  String?   @default("AU")
   state    String?
   priority Int       @default(0)
@@ -1365,10 +1454,10 @@ model ShippingRate {
   zone                    ShippingZone       @relation(fields: [zoneId], references: [id])
   name                    String
   type                    ShippingMethodType @default(FLAT_RATE)
-  price                   Float
-  minWeight               Float?
-  maxWeight               Float?
-  minPrice                Float?
+  price                   Decimal
+  minWeight               Decimal?
+  maxWeight               Decimal?
+  minPrice                Decimal?
   taxStatus               String             @default("taxable")
   freeShippingRequirement String?
   carrierServiceId        String?
@@ -1380,18 +1469,18 @@ model ShippingRate {
 }
 
 model CarrierService {
-  id               String        @id @default(uuid())
+  id               String             @id @default(uuid())
   name             String
-  slug             String        @unique
-  isEnabled        Boolean       @default(false)
+  slug             String             @unique
+  isEnabled        Boolean            @default(false)
   apiKey           String?
   apiSecret        String?
-  isSandbox        Boolean       @default(true)
+  isSandbox        Boolean            @default(true)
   settings         Json?
   rates            ShippingRate[]
   shippingPackages ShippingBox[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
 model TransdirectConfig {
@@ -1401,7 +1490,7 @@ model TransdirectConfig {
   password                String?
   apiKey                  String?
   memberId                Int?
-  creditLimit             Float?
+  creditLimit             Decimal?
   accountStatus           String?
   senderName              String?
   senderCompany           String?
@@ -1427,10 +1516,10 @@ model TransdirectBox {
   id          String   @id @default(uuid())
   code        String?
   description String?
-  length      Float
-  width       Float
-  height      Float
-  maxWeight   Float?
+  length      Decimal
+  width       Decimal
+  height      Decimal
+  maxWeight   Decimal?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1439,11 +1528,11 @@ model TransdirectBox {
 model ShippingBox {
   id               String          @id @default(uuid())
   name             String
-  length           Float
-  width            Float
-  height           Float
-  weight           Float?
-  maxWeight        Float?
+  length           Decimal
+  width            Decimal
+  height           Decimal
+  weight           Decimal?
+  maxWeight        Decimal?
   isEnabled        Boolean         @default(true)
   carrierServiceId String?
   carrierService   CarrierService? @relation(fields: [carrierServiceId], references: [id])
@@ -1466,7 +1555,7 @@ model EmailConfiguration {
   encryption          String?  @default("tls")
   headerImage         String?
   mediaId             String?
-  media               Media?    @relation(fields: [mediaId], references: [id])
+  media               Media?   @relation(fields: [mediaId], references: [id])
   footerText          String?  @default("© 2025 GoBike. All rights reserved.")
   baseColor           String?  @default("#2271b1")
   backgroundColor     String?  @default("#F7F7F7")
@@ -1492,36 +1581,36 @@ model EmailTemplate {
   emailType        String   @default("html")
   fromName         String?
   fromEmail        String?
-  delay            Int?     @default(0) // Added for queue delay (minutes)
+  delay            Int?     @default(0) 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
 
 model NotificationQueue {
-  id           String             @id @default(uuid())
+  id           String              @id @default(uuid())
   channel      NotificationChannel @default(EMAIL)
   recipient    String
   subject      String?
-  content      String             @db.Text
+  content      String              @db.Text
   templateSlug String?
   metadata     Json?
-  status       NotificationStatus @default(PENDING)
-  attempts     Int                @default(0)
-  maxAttempts  Int                @default(3)
-  scheduledAt  DateTime           @default(now())
+  status       NotificationStatus  @default(PENDING)
+  attempts     Int                 @default(0)
+  maxAttempts  Int                 @default(3)
+  scheduledAt  DateTime            @default(now())
   sentAt       DateTime?
   error        String?
   orderId      String?
   userId       String?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
   @@index([status])
   @@index([scheduledAt])
 }
 
 model EmailLog {
-  id           String    @id @default(uuid())
+  id           String   @id @default(uuid())
   recipient    String
   subject      String
   templateSlug String?
@@ -1531,7 +1620,7 @@ model EmailLog {
   openedAt     DateTime?
   orderId      String?
   userId       String?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime @default(now())
 
   @@index([recipient])
   @@index([status])
@@ -1570,11 +1659,12 @@ model Notification {
 model Analytics {
   id          String   @id @default(uuid())
   date        DateTime @default(now()) @db.Date
-  totalSales  Float    @default(0)
+  totalSales  Decimal  @default(0)
   totalOrders Int      @default(0)
   visitors    Int      @default(0)
 
   @@unique([date])
+  @@index([date, totalSales])
 }
 
 model MediaFolder {
@@ -1591,9 +1681,9 @@ model MediaFolder {
 }
 
 model Media {
-  id            String         @id @default(uuid())
+  id            String          @id @default(uuid())
   url           String
-  type          MediaType      @default(IMAGE)
+  type          MediaType       @default(IMAGE)
   filename      String
   originalName  String?
   publicId      String?
@@ -1605,17 +1695,17 @@ model Media {
   caption       String?
   description   String?
   folderId      String?
-  folder        MediaFolder?   @relation(fields: [folderId], references: [id])
+  folder        MediaFolder?    @relation(fields: [folderId], references: [id])
   uploadedBy    String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   productImages ProductImage[]
   categories    Category[]
   brands        Brand[]
   products      Product[]
   variants      ProductVariant[]
   blogPosts     BlogPost[]
-  
+   
   storeLogos    StoreSettings[] @relation("StoreLogo")
   storeFavicons StoreSettings[] @relation("StoreFavicon")
   users         User[]
@@ -1639,31 +1729,31 @@ model UrlRedirect {
 }
 
 model SeoGlobalConfig {
-  id               String   @id @default("global_seo")
-  siteName         String   @default("GoBike")
-  titleSeparator   String   @default("|")
-  siteUrl          String   @default("https://gobike.au")
-  organizationData Json?    @db.JsonB
-  defaultMetaTitle String?
-  defaultMetaDesc  String?  @db.Text
-  defaultKeywords  String[]
-  robotsTxtContent String?  @db.Text
-  globalRobotsProps Json?
-  sitemapEnabled   Boolean  @default(true)
-  isPublic         Boolean  @default(true)
-  ogImage          String?
-  ogMediaId        String?
-  ogMedia          Media?    @relation(fields: [ogMediaId], references: [id])
-  ogImageWidth     Int?     @default(1200)
-  ogImageHeight    Int?     @default(630)
-  ogType           String   @default("website")
-  ogLocale         String   @default("en_AU")
-  twitterCard      String   @default("summary_large_image")
-  twitterSite      String?
-  twitterCreator   String?
-  themeColor       String?  @default("#2271b1")
-  manifestJson     Json?
-  updatedAt        DateTime @updatedAt
+  id                 String   @id @default("global_seo")
+  siteName           String   @default("GoBike")
+  titleSeparator     String   @default("|")
+  siteUrl            String   @default("https://gobike.au")
+  organizationData   Json?    @db.JsonB
+  defaultMetaTitle   String?
+  defaultMetaDesc    String?  @db.Text
+  defaultKeywords    String[]
+  robotsTxtContent   String?  @db.Text
+  globalRobotsProps  Json?
+  sitemapEnabled     Boolean  @default(true)
+  isPublic           Boolean  @default(true)
+  ogImage            String?
+  ogMediaId          String?
+  ogMedia            Media?   @relation(fields: [ogMediaId], references: [id])
+  ogImageWidth       Int?     @default(1200)
+  ogImageHeight      Int?     @default(630)
+  ogType             String   @default("website")
+  ogLocale           String   @default("en_AU")
+  twitterCard        String   @default("summary_large_image")
+  twitterSite        String?
+  twitterCreator     String?
+  themeColor         String?  @default("#2271b1")
+  manifestJson       Json?
+  updatedAt          DateTime @updatedAt
 }
 
 model MarketingIntegration {
@@ -1700,7 +1790,7 @@ model Banner {
   title     String
   image     String
   mediaId   String?
-  media     Media?    @relation(fields: [mediaId], references: [id])
+  media     Media?   @relation(fields: [mediaId], references: [id])
   link      String?
   position  Int      @default(0)
   isActive  Boolean  @default(true)
@@ -1727,27 +1817,27 @@ model SystemLog {
 // ==========================================
 
 model PaymentMethodConfig {
-  id                   String                @id @default(uuid())
-  identifier           String                @unique
-  name                 String
-  isEnabled            Boolean               @default(false)
-  mode                 PaymentMode           @default(TEST)
-  displayOrder         Int                   @default(0)
-  description          String?
-  instructions         String?
-  icon                 String?
-  minOrderAmount       Float?
-  maxOrderAmount       Float?
-  surchargeEnabled     Boolean               @default(false)
-  surchargeType        String                @default("fixed")
-  surchargeAmount      Float                 @default(0)
-  taxableSurcharge     Boolean               @default(false)
-  needsSetup           Boolean               @default(true)
-  stripeConfig         StripeConfig?
-  paypalConfig         PaypalConfig?
-  offlineConfig        OfflinePaymentConfig?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id                 String                @id @default(uuid())
+  identifier         String                @unique
+  name               String
+  isEnabled          Boolean               @default(false)
+  mode               PaymentMode           @default(TEST)
+  displayOrder       Int                   @default(0)
+  description        String?
+  instructions       String?
+  icon               String?
+  minOrderAmount     Decimal?
+  maxOrderAmount     Decimal?
+  surchargeEnabled   Boolean               @default(false)
+  surchargeType      String                @default("fixed")
+  surchargeAmount    Decimal               @default(0)
+  taxableSurcharge   Boolean               @default(false)
+  needsSetup         Boolean               @default(true)
+  stripeConfig       StripeConfig?
+  paypalConfig       PaypalConfig?
+  offlineConfig      OfflinePaymentConfig?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   @@index([isEnabled, displayOrder(sort: Asc)])
 }
@@ -1843,4 +1933,38 @@ model OfflinePaymentConfig {
   chequePayTo              String?
   addressInfo              String?
   enableForShippingMethods String[]
+}
+
+// ==========================================
+// 16. AUDIT & ADVANCED EVENTS
+// ==========================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  tableName String
+  recordId  String
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([tableName, recordId])
+  @@index([userId, createdAt])
+}
+
+model OutboxEvent {
+  id          String      @id @default(uuid())
+  aggregateId String
+  type        String
+  payload     Json
+  status      EventStatus @default(PENDING)
+  attempts    Int         @default(0)
+  lastError   String?
+  createdAt   DateTime    @default(now())
+  processedAt DateTime?
+
+  @@index([status, createdAt])
 }

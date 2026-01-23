@@ -5,7 +5,6 @@ import { db } from "@/lib/prisma";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
 
-// PayPal Token Helper
 async function getPayPalAccessToken(clientId: string, clientSecret: string, isSandbox: boolean) {
   const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
   const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -29,8 +28,6 @@ export async function POST(req: Request) {
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
     
-    // 1. Find Config using the Unique Webhook ID from the event (if possible) or verify generally
-    // For safety, we fetch the config that has a webhookId stored
     const config = await db.paypalConfig.findFirst({
       where: { 
         webhookId: { not: null },
@@ -51,7 +48,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Credentials missing" }, { status: 500 });
     }
 
-    // 2. Verify Webhook Signature with PayPal
     const accessToken = await getPayPalAccessToken(clientId, clientSecret, isSandbox);
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 
@@ -75,49 +71,51 @@ export async function POST(req: Request) {
     const verificationData = await verificationRes.json();
 
     if (verificationData.verification_status !== "SUCCESS") {
-      console.error("⚠️ Invalid PayPal Webhook Signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
-    // 3. Process the Event
     const eventType = body.event_type;
     const resource = body.resource;
 
-    // Handle Payment Capture
     if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
-      const orderId = resource.supplementary_data?.related_ids?.order_id; // Usually PayPal Order ID
+      const orderId = resource.supplementary_data?.related_ids?.order_id;
       const captureId = resource.id;
-      const customId = resource.custom_id; // Your Internal Order ID (if sent)
+      const customId = resource.custom_id;
 
-      // Start Database Transaction
+      const existingTransaction = await db.orderTransaction.findFirst({
+        where: { 
+          transactionId: captureId,
+          status: "COMPLETED"
+        }
+      });
+
+      if (existingTransaction) {
+        return NextResponse.json({ received: true });
+      }
+
       await db.$transaction(async (tx) => {
-        // Find the Order
-        // We check paymentId (PayPal Order ID) or we could check a custom_id if you sent one
         const order = await tx.order.findFirst({
           where: {
             OR: [
               { paymentId: orderId },
-              { paymentId: captureId }, // Some gateways use capture ID
-              { id: customId }          // Fallback if custom_id was used
+              { paymentId: captureId },
+              { id: customId }
             ]
           },
           include: { items: { include: { product: true, variant: true } } }
         });
 
         if (order && order.paymentStatus !== "PAID") {
-            
-            // === FIX A: Create Order Transaction Record ===
-            // এটি ভবিষ্যতের অডিট এবং রিফান্ড হ্যান্ডলিংয়ের জন্য জরুরি
             await tx.orderTransaction.create({
               data: {
                 orderId: order.id,
                 gateway: "PAYPAL",
                 type: "SALE",
-                amount: parseFloat(resource.amount.value),
+                amount: resource.amount.value,
                 currency: resource.amount.currency_code,
-                transactionId: captureId, // The Capture ID
+                transactionId: captureId,
                 status: "COMPLETED",
-                rawResponse: body, // Full JSON for debugging
+                rawResponse: body,
                 metadata: {
                   payer_email: resource.payer?.email_address,
                   payer_id: resource.payer?.payer_id,
@@ -126,20 +124,17 @@ export async function POST(req: Request) {
               }
             });
 
-            // === FIX B: Inventory Decrement Logic (with TrackQuantity Check) ===
             for (const item of order.items) {
-                // 1. Variant Logic
                 if (item.variantId && item.variant) {
-                    if (item.variant.trackQuantity) { // ✅ Only if tracking is enabled
+                    if (item.variant.trackQuantity) {
                         await tx.productVariant.update({
                             where: { id: item.variantId },
                             data: { stock: { decrement: item.quantity } }
                         });
                     }
                 } 
-                // 2. Simple Product Logic
                 else if (item.productId && item.product) {
-                    if (item.product.trackQuantity) { // ✅ Only if tracking is enabled
+                    if (item.product.trackQuantity) {
                         await tx.product.update({
                             where: { id: item.productId },
                             data: { stock: { decrement: item.quantity } }
@@ -148,20 +143,18 @@ export async function POST(req: Request) {
                 }
             }
     
-            // Update Order Status
             await tx.order.update({
               where: { id: order.id },
               data: { 
                 paymentStatus: "PAID",
                 status: "PROCESSING",
-                paymentId: captureId, // Update to Capture ID for refunds
+                paymentId: captureId,
                 capturedAt: new Date(),
                 paymentGateway: "PAYPAL",
                 paymentMethod: "PayPal Wallet"
               }
             });
 
-            // Send Email Notification
             if (order.guestEmail) {
                 await sendNotification({
                     trigger: "PAYMENT_PAID",
@@ -174,16 +167,21 @@ export async function POST(req: Request) {
                     orderId: order.id
                 });
             }
-            
-            console.log(`✅ Order ${order.orderNumber} successfully processed via PayPal Webhook`);
         }
       });
     }
 
     return NextResponse.json({ received: true });
 
-  } catch (error) {
-    console.error("PayPal Webhook Error:", error);
+  } catch (error: any) {
+    await db.systemLog.create({
+        data: {
+            level: "ERROR",
+            source: "PAYPAL_WEBHOOK",
+            message: error.message || "Unknown Error",
+            context: { error }
+        }
+    });
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

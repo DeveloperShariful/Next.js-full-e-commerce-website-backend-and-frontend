@@ -3,75 +3,109 @@
 import { db } from "@/lib/prisma";
 import { cleanPrice } from "@/app/actions/admin/product/product-utils";
 
-// --- 1. SMART INVENTORY HANDLER (Simple Product Fix) ---
-export async function handleInventory(tx: any, product: any, data: any, defaultLocationId: string) {
+export async function handleInventory(tx: any, product: any, data: any, defaultLocationId: string, userId?: string) {
     if (data.productType === 'SIMPLE' && data.trackQuantity) {
         
         let inventoryItems = data.inventoryData && data.inventoryData.length > 0 
             ? data.inventoryData 
             : [{ locationId: defaultLocationId, quantity: data.stock }];
 
+        const incomingLocationIds = inventoryItems.map((i: any) => i.locationId || defaultLocationId);
+
+        await tx.inventoryLevel.deleteMany({
+            where: {
+                productId: product.id,
+                variantId: null,
+                locationId: { notIn: incomingLocationIds }
+            }
+        });
+
         let totalStock = 0;
 
         for (const item of inventoryItems) {
-            const qty = parseInt(item.quantity) || 0;
+            const targetQty = parseInt(item.quantity) || 0;
             const locId = item.locationId || defaultLocationId;
             
             if(!locId) continue;
 
-            totalStock += qty;
+            totalStock += targetQty;
 
-            const existingEntries = await tx.inventoryLevel.findMany({
+            const existingEntry = await tx.inventoryLevel.findFirst({
                 where: {
                     productId: product.id,
                     locationId: locId,
                     variantId: null 
-                },
-                orderBy: { id: 'asc' } 
+                }
             });
 
-            if (existingEntries.length > 0) {
-                const firstEntry = existingEntries[0];
-                await tx.inventoryLevel.update({
-                    where: { id: firstEntry.id },
-                    data: { quantity: qty }
-                });
+            const oldQty = existingEntry ? existingEntry.quantity : 0;
+            const diff = targetQty - oldQty;
 
-                if (existingEntries.length > 1) {
-                    const idsToDelete = existingEntries.slice(1).map((e: any) => e.id);
-                    await tx.inventoryLevel.deleteMany({
-                        where: { id: { in: idsToDelete } }
+            if (existingEntry) {
+                if (diff !== 0) {
+                    await tx.inventoryLevel.update({
+                        where: { id: existingEntry.id },
+                        data: { 
+                            quantity: { increment: diff },
+                            version: { increment: 1 }
+                        }
                     });
                 }
             } else {
                 await tx.inventoryLevel.create({
                     data: { 
-                        quantity: qty, 
+                        quantity: targetQty, 
                         locationId: locId, 
                         productId: product.id, 
-                        variantId: null 
+                        variantId: null,
+                        version: 1
+                    }
+                });
+            }
+
+            if (diff !== 0) {
+                await tx.stockHistory.create({
+                    data: {
+                        productId: product.id,
+                        locationId: locId,
+                        change: diff,
+                        finalStock: targetQty,
+                        reason: "Manual Admin Update",
+                        userId: userId || "SYSTEM"
                     }
                 });
             }
         }
+        
         await tx.product.update({ 
             where: { id: product.id }, 
-            data: { stock: totalStock } 
+            data: { 
+                stock: totalStock,
+                version: { increment: 1 }
+            } 
+        });
+
+    } else {
+        await tx.inventoryLevel.deleteMany({
+            where: { productId: product.id, variantId: null }
         });
     }
 }
 
-// --- 2. IMAGE HANDLER ---
-export async function handleImages(tx: any, productId: string, images: string[]) {
+export async function handleImages(tx: any, productId: string, images: any[]) {
     const existingImages = await tx.productImage.findMany({ 
         where: { productId, variantId: null } 
     });
 
-    const existingUrls = existingImages.map((img: any) => img.url);
+    const incomingIds = images.filter((img: any) => typeof img === 'object' && img.id).map((img: any) => img.id);
+    const incomingUrls = images.map((img: any) => typeof img === 'string' ? img : img.url);
     
-    const imagesToDelete = existingImages.filter((img: any) => !images.includes(img.url));
-
-    const imagesToCreate = images.filter((url) => !existingUrls.includes(url));
+    const imagesToDelete = existingImages.filter((img: any) => {
+        if (incomingIds.length > 0) {
+            return !incomingIds.includes(img.id) && !incomingUrls.includes(img.url);
+        }
+        return !incomingUrls.includes(img.url);
+    });
 
     if (imagesToDelete.length > 0) {
         await tx.productImage.deleteMany({
@@ -79,34 +113,70 @@ export async function handleImages(tx: any, productId: string, images: string[])
         });
     }
 
-    if (imagesToCreate.length > 0) {
-        let startPosition = existingImages.length - imagesToDelete.length;
-        await tx.productImage.createMany({
-            data: imagesToCreate.map((url, idx) => ({
-                productId,
-                url,
-                position: startPosition + idx,
-                variantId: null
-            }))
-        });
-    }
+    await Promise.all(images.map(async (img: any, idx: number) => {
+        const url = typeof img === 'string' ? img : img.url;
+        const mediaId = typeof img === 'object' ? img.mediaId : null;
+        const altText = typeof img === 'object' ? img.altText : null;
+        const id = typeof img === 'object' ? img.id : null;
+
+        if (id) {
+            await tx.productImage.update({
+                where: { id },
+                data: { position: idx, altText }
+            });
+        } else {
+            const existingByUrl = existingImages.find((e: any) => e.url === url);
+            if (existingByUrl) {
+                await tx.productImage.update({
+                    where: { id: existingByUrl.id },
+                    data: { position: idx, altText, mediaId }
+                });
+            } else {
+                await tx.productImage.create({
+                    data: {
+                        productId,
+                        url,
+                        position: idx,
+                        mediaId,
+                        altText,
+                        variantId: null
+                    }
+                });
+            }
+        }
+    }));
 }
 
-// --- 3. DIGITAL FILES ---
 export async function handleDigitalFiles(tx: any, productId: string, isDownloadable: boolean, files: any[]) {
-    await tx.digitalFile.deleteMany({ where: { productId } });
-    if (isDownloadable && files.length > 0) {
-        await tx.digitalFile.createMany({
-            data: files.map((file: any) => ({
-                productId,
-                name: file.name,
-                url: file.url
-            }))
-        });
+    if (!isDownloadable) {
+        await tx.digitalFile.deleteMany({ where: { productId } });
+        return;
+    }
+
+    const existingFiles = await tx.digitalFile.findMany({ where: { productId } });
+    const incomingFileUrls = files.map(f => f.url);
+    
+    await tx.digitalFile.deleteMany({
+        where: { 
+            productId,
+            url: { notIn: incomingFileUrls }
+        }
+    });
+
+    for (const file of files) {
+        const exists = existingFiles.find((f: any) => f.url === file.url);
+        if (!exists) {
+            await tx.digitalFile.create({
+                data: {
+                    productId,
+                    name: file.name,
+                    url: file.url
+                }
+            });
+        }
     }
 }
 
-// --- 4. ATTRIBUTES HANDLER ---
 export async function handleAttributes(tx: any, productId: string, attributesData: any[]) {
     const existingAttrs = await tx.productAttribute.findMany({ where: { productId } });
     const existingAttrIds = existingAttrs.map((a: any) => a.id);
@@ -135,31 +205,50 @@ export async function handleAttributes(tx: any, productId: string, attributesDat
     }));
 }
 
-// --- 5. VARIATIONS HANDLER (Variable Product Fix) ---
-export async function handleVariations(tx: any, productId: string, variationsData: any[], productType: string, defaultLocationId: string) {
-    if (productType.toUpperCase() !== 'VARIABLE') return;
+export async function handleVariations(tx: any, productId: string, variationsData: any[], productType: string, defaultLocationId: string, userId?: string) {
+    if (productType.toUpperCase() !== 'VARIABLE') {
+        const variants = await tx.productVariant.findMany({ where: { productId } });
+        if(variants.length > 0) {
+            const variantIds = variants.map((v:any) => v.id);
+            await tx.inventoryLevel.deleteMany({ where: { variantId: { in: variantIds } } });
+            await tx.productImage.deleteMany({ where: { variantId: { in: variantIds } } }); 
+            await tx.productVariant.deleteMany({ where: { productId } });
+        }
+        return;
+    }
 
     const existingVars = await tx.productVariant.findMany({ where: { productId } });
     const existingVarIds = existingVars.map((v: any) => v.id);
-    
     const incomingVarIds = variationsData.map(v => v.id).filter(id => id && !id.toString().startsWith("temp_"));
     const varsToDelete = existingVarIds.filter((id: string) => !incomingVarIds.includes(id));
-
+    
     if (varsToDelete.length > 0) {
-        await tx.productVariant.deleteMany({ where: { id: { in: varsToDelete } } });
+        await Promise.all(varsToDelete.map(async (vId: string) => {
+            const hasOrders = await tx.orderItem.findFirst({ where: { variantId: vId } });
+            
+            if (hasOrders) {
+                await tx.productVariant.update({
+                    where: { id: vId },
+                    data: { deletedAt: new Date() }
+                });
+            } else {
+                await tx.inventoryLevel.deleteMany({ where: { variantId: vId } });
+                await tx.cartItem.deleteMany({ where: { variantId: vId } });
+                await tx.productImage.deleteMany({ where: { variantId: vId } });
+                await tx.productVariant.delete({ where: { id: vId } });
+            }
+        }));
     }
 
     let totalProductStock = 0;
 
     await Promise.all(variationsData.map(async (v) => {
-        
         let variantStock = 0;
         let inventoryItems = v.inventoryData && v.inventoryData.length > 0 
             ? v.inventoryData 
             : [{ locationId: defaultLocationId, quantity: parseInt(v.stock) || 0 }];
 
         inventoryItems.forEach((item: any) => variantStock += (parseInt(item.quantity) || 0));
-        
         totalProductStock += variantStock;
 
         const variantData = {
@@ -175,6 +264,9 @@ export async function handleVariations(tx: any, productId: string, variationsDat
             length: v.length ? parseFloat(v.length) : null,
             width: v.width ? parseFloat(v.width) : null,
             height: v.height ? parseFloat(v.height) : null,
+            isPreOrder: v.isPreOrder || false,
+            preOrderReleaseDate: v.preOrderReleaseDate ? new Date(v.preOrderReleaseDate) : null,
+            deletedAt: null
         };
 
         let variantId = v.id;
@@ -186,46 +278,111 @@ export async function handleVariations(tx: any, productId: string, variationsDat
             variantId = newVar.id;
         }
 
-        await tx.productImage.deleteMany({ where: { variantId } });
-        if (v.images && Array.isArray(v.images) && v.images.length > 0) {
-            await tx.productImage.createMany({
-                data: v.images.map((url: string, idx: number) => ({
-                    productId: productId,
-                    variantId: variantId,
-                    url: url,
-                    position: idx
-                }))
+        const incomingImages = v.images || [];
+        const incomingUrls = incomingImages.map((img: any) => typeof img === 'string' ? img : img.url);
+        const currentVarImages = await tx.productImage.findMany({ where: { variantId } });
+        
+        const varImagesToDelete = currentVarImages.filter((img: any) => !incomingUrls.includes(img.url));
+        if (varImagesToDelete.length > 0) {
+            await tx.productImage.deleteMany({
+                where: { id: { in: varImagesToDelete.map((i: any) => i.id) } }
             });
         }
 
+        if (incomingImages.length > 0) {
+            await Promise.all(incomingImages.map(async (img: any, idx: number) => {
+                const url = typeof img === 'string' ? img : img.url;
+                const existing = currentVarImages.find((e: any) => e.url === url);
+                if (existing) {
+                    await tx.productImage.update({
+                        where: { id: existing.id },
+                        data: { position: idx }
+                    });
+                } else {
+                    await tx.productImage.create({
+                        data: { productId, variantId, url, position: idx }
+                    });
+                }
+            }));
+        }
+
+        const incomingLocationIds = inventoryItems.map((i: any) => i.locationId || defaultLocationId);
+        await tx.inventoryLevel.deleteMany({
+            where: {
+                variantId: variantId,
+                locationId: { notIn: incomingLocationIds }
+            }
+        });
+
         for (const item of inventoryItems) {
-            const qty = parseInt(item.quantity) || 0;
+            const targetQty = parseInt(item.quantity) || 0;
             const locId = item.locationId || defaultLocationId;
 
             if(!locId) continue;
 
-            await tx.inventoryLevel.upsert({
+            const existingInv = await tx.inventoryLevel.findFirst({
                 where: {
-                    locationId_productId_variantId: {
-                        locationId: locId,
-                        productId,
-                        variantId 
-                    } as any
-                },
-                update: { quantity: qty },
-                create: { quantity: qty, locationId: locId, productId, variantId }
+                    locationId: locId,
+                    productId,
+                    variantId 
+                }
             });
+
+            const oldQty = existingInv ? existingInv.quantity : 0;
+            const diff = targetQty - oldQty;
+
+            if (existingInv) {
+                if (diff !== 0) {
+                    await tx.inventoryLevel.update({
+                        where: { id: existingInv.id },
+                        data: { 
+                            quantity: { increment: diff },
+                            version: { increment: 1 }
+                        }
+                    });
+                }
+            } else {
+                await tx.inventoryLevel.create({
+                    data: { 
+                        quantity: targetQty, 
+                        locationId: locId, 
+                        productId, 
+                        variantId,
+                        version: 1
+                    }
+                });
+            }
+
+            if (diff !== 0) {
+                await tx.stockHistory.create({
+                    data: {
+                        productId,
+                        variantId,
+                        locationId: locId,
+                        change: diff,
+                        finalStock: targetQty,
+                        reason: "Admin Variation Update",
+                        userId: userId || "SYSTEM"
+                    }
+                });
+            }
         }
     }));
 
     await tx.product.update({ 
         where: { id: productId }, 
-        data: { stock: totalProductStock } 
+        data: { 
+            stock: totalProductStock,
+            version: { increment: 1 }
+        } 
     });
 }
 
 export async function handleBundleItems(tx: any, productId: string, productType: string, bundleItems: any[]) {
-    if (productType.toUpperCase() !== 'BUNDLE') return;
+    if (productType.toUpperCase() !== 'BUNDLE') {
+        await tx.bundleItem.deleteMany({ where: { parentProductId: productId } });
+        return;
+    }
 
     await tx.bundleItem.deleteMany({ where: { parentProductId: productId } });
 

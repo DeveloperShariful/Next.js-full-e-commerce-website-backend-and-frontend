@@ -3,23 +3,40 @@
 import { db } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { InvoiceActions } from "./_components/invoice-actions"; // 👇 Updated Component
+import { InvoiceActions } from "./_components/invoice-actions";
+
+// ✅ FIX: Utility function to serialize Decimal objects
+const serializeData = (data: any) => {
+  return JSON.parse(JSON.stringify(data, (key, value) => {
+    // If value is a Decimal (has toString method but not a Date), convert to number
+    if (value && typeof value === 'object' && !Array.isArray(value) && value.toString && value.constructor.name === 'Decimal') {
+      return Number(value);
+    }
+    return value;
+  }));
+};
 
 export default async function InvoicePage(props: { params: Promise<{ orderId: string }> }) {
   const params = await props.params;
 
-  const [order, settings] = await Promise.all([
-    db.order.findUnique({
-      where: { id: params.orderId },
-      include: { items: true, user: true }
-    }),
-    db.storeSettings.findUnique({ where: { id: "settings" } })
-  ]);
+  const rawOrder = await db.order.findUnique({
+    where: { id: params.orderId },
+    include: { items: true, user: true }
+  });
 
-  if (!order) return notFound();
+  const rawSettings = await db.storeSettings.findUnique({ where: { id: "settings" } });
+
+  if (!rawOrder) return notFound();
+
+  // ✅ FIX: Serialize data before passing to client components or using in JSX
+  const order = serializeData(rawOrder);
+  const settings = serializeData(rawSettings);
 
   const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: order.currency }).format(amount);
+    return new Intl.NumberFormat('en-US', { 
+        style: 'currency', 
+        currency: order.currency 
+    }).format(amount);
   };
 
   const billing: any = order.billingAddress || {};
@@ -28,7 +45,6 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8 flex flex-col items-center print:bg-white print:p-0">
       
-      {/* 1. Header Actions (Responsive) */}
       <div className="w-full max-w-[210mm] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 print:hidden">
         <div>
            <h1 className="text-xl font-bold text-slate-800">Invoice Preview</h1>
@@ -37,16 +53,10 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
         <InvoiceActions orderId={order.id} />
       </div>
 
-      {/* 2. Invoice Paper (Responsive Wrapper) */}
       <div className="w-full max-w-[210mm] bg-white shadow-lg rounded-sm print:shadow-none print:w-full overflow-hidden">
-        
-        {/* Scrollable Area for very small screens */}
         <div className="overflow-x-auto">
             <div className="min-w-[600px] md:min-w-full p-8 md:p-12 min-h-[297mm]">
                 
-                {/* === INVOICE CONTENT START === */}
-                
-                {/* Logo & Company Info */}
                 <div className="flex justify-between items-start border-b border-slate-200 pb-8 mb-8">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 uppercase tracking-widest">Invoice</h1>
@@ -64,7 +74,6 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
                     </div>
                 </div>
 
-                {/* Bill To & Details */}
                 <div className="grid grid-cols-2 gap-8 mb-10">
                     <div>
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bill To</h3>
@@ -96,7 +105,6 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
                     </div>
                 </div>
 
-                {/* Items Table */}
                 <table className="w-full mb-8">
                     <thead>
                         <tr className="border-b-2 border-slate-900">
@@ -107,7 +115,7 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {order.items.map((item) => (
+                        {order.items.map((item: any) => (
                             <tr key={item.id}>
                                 <td className="py-4">
                                     <p className="font-bold text-sm text-slate-800">{item.productName}</p>
@@ -121,7 +129,6 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
                     </tbody>
                 </table>
 
-                {/* Totals */}
                 <div className="flex justify-end border-t border-slate-200 pt-6">
                     <div className="w-64 space-y-3">
                         <div className="flex justify-between text-sm text-slate-600">
@@ -145,7 +152,6 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className="mt-20 pt-8 border-t border-slate-100 text-center">
                     <p className="text-slate-500 text-sm">Thank you for shopping with {settings?.storeName || "us"}!</p>
                     {settings?.storeEmail && (
@@ -154,8 +160,6 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
                         </p>
                     )}
                 </div>
-                
-                {/* === INVOICE CONTENT END === */}
             
             </div>
         </div>

@@ -8,17 +8,18 @@ import { revalidatePath } from "next/cache";
 // --- GET CONFIG ---
 export async function getTransdirectConfig() {
   try {
-    // আমরা আইডি ফিক্সড রাখছি কারণ কনফিগারেশন একটাই হবে
     let config = await db.transdirectConfig.findUnique({
       where: { id: "transdirect_config" }
     });
 
-    // যদি কনফিগ না থাকে, ডিফল্ট একটা রিটার্ন করি (ক্রিয়েট করছি না, শুধু UI এর জন্য)
-    if (!config) {
+    // ✅ FIX: Serialize data to handle Decimal objects
+    const serializedConfig = config ? JSON.parse(JSON.stringify(config)) : null;
+
+    if (!serializedConfig) {
       return { success: true, data: null };
     }
 
-    return { success: true, data: config };
+    return { success: true, data: serializedConfig };
   } catch (error) {
     console.error("GET_TRANSDIRECT_ERROR", error);
     return { success: false, error: "Failed to fetch Transdirect settings" };
@@ -33,7 +34,6 @@ export async function saveTransdirectCredentials(formData: FormData) {
     const apiKey = formData.get("apiKey") as string;
     const isEnabled = formData.get("isEnabled") === "true";
 
-    // Upsert: থাকলে আপডেট, না থাকলে তৈরি
     await db.transdirectConfig.upsert({
       where: { id: "transdirect_config" },
       update: { email, password, apiKey, isEnabled },

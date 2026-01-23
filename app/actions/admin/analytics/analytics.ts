@@ -5,11 +5,10 @@
 import { db } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 
-// --- TYPES ---
 export type AnalyticsSummary = {
   revenue: number;
   orders: number;
-  aov: number; // Average Order Value
+  aov: number; 
   refunded: number;
 };
 
@@ -33,7 +32,6 @@ export type AnalyticsResponse = {
 
 export async function getAnalyticsData(period: string = "30d") {
   try {
-    // 1. Calculate Date Range
     const now = new Date();
     const startDate = new Date();
     
@@ -42,7 +40,6 @@ export async function getAnalyticsData(period: string = "30d") {
     else if (period === "90d") startDate.setDate(now.getDate() - 90);
     else if (period === "year") startDate.setFullYear(now.getFullYear() - 1);
 
-    // 2. Fetch Summary using AGGREGATE (Much Faster)
     const orderAggregates = await db.order.aggregate({
       _sum: { total: true },
       _count: { id: true },
@@ -56,17 +53,16 @@ export async function getAnalyticsData(period: string = "30d") {
       _sum: { amount: true },
       where: {
         createdAt: { gte: startDate },
-        status: 'approved' // Ensure status matches your DB logic
+        status: 'approved'
       }
     });
 
-    const revenue = orderAggregates._sum.total || 0;
+    // ✅ FIX: Decimal to Number Conversion
+    const revenue = Number(orderAggregates._sum.total || 0);
     const totalOrders = orderAggregates._count.id || 0;
-    const refunded = refundAggregates._sum.amount || 0;
+    const refunded = Number(refundAggregates._sum.amount || 0);
     const aov = totalOrders > 0 ? (revenue / totalOrders) : 0;
 
-    // 3. Fetch Data for Chart (Lightweight Query)
-    // We only fetch createdAt and total, not the whole order object
     const ordersForChart = await db.order.findMany({
       where: {
         createdAt: { gte: startDate },
@@ -79,16 +75,15 @@ export async function getAnalyticsData(period: string = "30d") {
       orderBy: { createdAt: 'asc' }
     });
 
-    // Group by Date for Chart
     const chartMap = new Map<string, { sales: number; orders: number }>();
 
     ordersForChart.forEach(order => {
-      // Format: "Dec 10"
       const dateStr = new Date(order.createdAt).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
       
       const existing = chartMap.get(dateStr) || { sales: 0, orders: 0 };
       chartMap.set(dateStr, {
-        sales: existing.sales + (order.total || 0),
+        // ✅ FIX: Decimal to Number Conversion
+        sales: existing.sales + Number(order.total || 0),
         orders: existing.orders + 1
       });
     });
@@ -99,7 +94,6 @@ export async function getAnalyticsData(period: string = "30d") {
       orders: data.orders
     }));
 
-    // 4. Fetch Top Products using GROUP BY (Optimized)
     const topItems = await db.orderItem.groupBy({
       by: ['productName'],
       _sum: {
@@ -122,7 +116,8 @@ export async function getAnalyticsData(period: string = "30d") {
 
     const topProducts = topItems.map(item => ({
       name: item.productName,
-      sales: item._sum.total || 0,
+      // ✅ FIX: Decimal to Number Conversion
+      sales: Number(item._sum.total || 0),
       quantity: item._sum.quantity || 0
     }));
 

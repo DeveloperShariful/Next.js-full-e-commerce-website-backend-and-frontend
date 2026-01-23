@@ -1,12 +1,13 @@
 // File: app/actions/admin/product/product-data-parser.ts
 
 import { ProductType, TaxStatus, ProductStatus } from "@prisma/client";
-import { generateSlug, parseJSON, cleanPrice } from "@/app/actions/admin/product/product-utils";
+import { parseJSON, cleanPrice } from "@/app/actions/admin/product/product-utils"; 
 
 export const parseProductFormData = (formData: FormData) => {
-    const name = formData.get("name") as string;
-    const rawSlug = formData.get("slug") as string;
-    const slug = rawSlug && rawSlug.trim() !== "" ? rawSlug : generateSlug(name);
+    // নাম এবং স্লাগের আগে-পরে স্পেস রিমুভ করা হয়েছে
+    const name = (formData.get("name") as string)?.trim(); 
+    const rawSlug = (formData.get("slug") as string)?.trim();
+    const slug = rawSlug && rawSlug !== "" ? rawSlug : name; 
 
     // Enum Conversions
     const statusInput = (formData.get("status") as string || "DRAFT").toUpperCase();
@@ -36,6 +37,9 @@ export const parseProductFormData = (formData: FormData) => {
         // Media Fields
         videoUrl: formData.get("videoUrl") as string || null,
         videoThumbnail: formData.get("videoThumbnail") as string || null,
+        
+        featuredImage: formData.get("featuredImage") as string || null,
+        featuredMediaId: formData.get("featuredMediaId") as string || null,
 
         // Demographics & JSON Fields
         gender: formData.get("gender") as string || null,
@@ -51,9 +55,9 @@ export const parseProductFormData = (formData: FormData) => {
         sku: formData.get("sku") as string || null,
         barcode: formData.get("barcode") as string || null,
         trackQuantity: formData.get("trackQuantity") === "true",
-        stock: parseInt(formData.get("stock") as string) || 0, // Legacy fallback for UI
+        stock: parseInt(formData.get("stock") as string) || 0, 
 
-        // 🔥 NEW: Multi-Warehouse Inventory Data Parsing
+        // Multi-Warehouse Inventory Data Parsing
         inventoryData: parseJSON<any[]>(formData.get("inventoryData") as string, []),
 
         isVirtual: formData.get("isVirtual") === "true",
@@ -65,7 +69,12 @@ export const parseProductFormData = (formData: FormData) => {
         height: formData.get("height") ? parseFloat(formData.get("height") as string) : null,
 
         categoryName: formData.get("category") as string,
+        // 🔥 FIX: Added missing categoryId
+        categoryId: formData.get("categoryId") as string || null,
+        
         vendorName: formData.get("vendor") as string,
+        // 🔥 FIX: Added missing brandId
+        brandId: formData.get("brandId") as string || null,
 
         purchaseNote: formData.get("purchaseNote") as string,
         menuOrder: parseInt(formData.get("menuOrder") as string) || 0,
@@ -84,12 +93,12 @@ export const parseProductFormData = (formData: FormData) => {
         upsells: parseJSON<string[]>(formData.get("upsells") as string, []),
         crossSells: parseJSON<string[]>(formData.get("crossSells") as string, []),
         
-        galleryImages: parseJSON<string[]>(formData.get("galleryImages") as string, []),
+        galleryImages: parseJSON<any[]>(formData.get("galleryImages") as string, []),
+        
         digitalFiles: parseJSON<any[]>(formData.get("digitalFiles") as string, []),
         
         attributesData: parseJSON<any[]>(formData.get("attributes") as string, []),
         variationsData: parseJSON<any[]>(formData.get("variations") as string, []),
-        featuredImage: formData.get("featuredImage") as string || null,
 
         lowStockThreshold: parseInt(formData.get("lowStockThreshold") as string) || 2,
         backorderStatus: formData.get("backorderStatus") as any || "DO_NOT_ALLOW",
@@ -104,5 +113,10 @@ export const parseProductFormData = (formData: FormData) => {
 
         downloadLimit: formData.get("downloadLimit") ? parseInt(formData.get("downloadLimit") as string) : null,
         downloadExpiry: formData.get("downloadExpiry") ? parseInt(formData.get("downloadExpiry") as string) : null,
+
+        isPreOrder: formData.get("isPreOrder") === "true",
+        preOrderReleaseDate: formData.get("preOrderReleaseDate") as string || null,
+        preOrderLimit: formData.get("preOrderLimit") ? parseInt(formData.get("preOrderLimit") as string) : null,
+        preOrderMessage: formData.get("preOrderMessage") as string || null,
     };
 };

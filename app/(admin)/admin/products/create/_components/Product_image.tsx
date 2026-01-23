@@ -4,7 +4,7 @@
 
 import { useState } from "react"; 
 import { useFormContext } from "react-hook-form";
-import { X, RefreshCw, ImagePlus, UploadCloud } from "lucide-react"; 
+import { X, RefreshCw, ImagePlus } from "lucide-react"; 
 import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
 import { ProductFormData } from "../types";
 import Image from "next/image";
@@ -16,6 +16,7 @@ export default function ProductImage() {
     const featuredImage = watch("featuredImage");
 
     const handleSelect = (media: any) => {
+        // Saving both URL and ID for relation
         setValue("featuredImage", media.url, { shouldDirty: true, shouldValidate: true });
         setValue("featuredMediaId", media.id, { shouldDirty: true });
         setOpen(false); 
@@ -33,17 +34,15 @@ export default function ProductImage() {
             <div className="p-4">
                 {featuredImage ? (
                     <div className="flex flex-col gap-3">
-                        {/* Image Preview Container */}
-                        <div className="relative w-full aspect-square bg-gray-100 rounded-lg border border-gray-200 overflow-hidden shadow-inner">
+                        <div className="relative w-full aspect-square bg-gray-100 rounded-lg border border-gray-200 overflow-hidden shadow-inner group">
                             <Image 
                                 src={featuredImage} 
-                                alt="Featured" 
+                                alt="Featured Product Image" 
                                 fill
-                                className="object-cover"
+                                className="object-cover transition-transform group-hover:scale-105 duration-500"
                             />
                         </div>
                         
-                        {/* Actions Row (Always Visible) */}
                         <div className="grid grid-cols-2 gap-2">
                             <button 
                                 type="button" 

@@ -18,27 +18,26 @@ export async function getProductById(id: string) {
         taxRate: true,
         downloadFiles: true,
         
-        // Main Product Images
+        stockHistory: { orderBy: { createdAt: 'desc' }, take: 10 },
+        versions: { orderBy: { createdAt: 'desc' }, take: 5, select: { id: true, createdAt: true, reason: true, createdBy: true } },
+
         images: { 
             where: { variantId: null },
             orderBy: { position: 'asc' } 
         },
         attributes: { orderBy: { position: 'asc' } },
         
-        // Variants with Inventory
         variants: {
+          where: { deletedAt: null },
           include: {
-            // 🔥 UPDATE: লোকেশন সহ ইনভেন্টরি
             inventoryLevels: { include: { location: true } },
             images: { orderBy: { position: 'asc' }, select: { url: true } }
           },
           orderBy: { id: 'asc' }
         },
-        // 🔥 UPDATE: মেইন প্রোডাক্টের ইনভেন্টরি
         inventoryLevels: { include: { location: true } },
         tags: true,
 
-        // Bundle Items
         bundleItems: {
             include: {
                 childProduct: {
@@ -79,8 +78,8 @@ export async function getConfigOptions() {
         return {
             success: true,
             data: {
-                genders: genderAttr?.values || ["Male", "Female", "Unisex", "Kids"], // Default Fallback
-                ageGroups: ageAttr?.values || ["Adult", "Teen", "Kids", "Toddler", "Infant"] // Default Fallback
+                genders: genderAttr?.values || ["Male", "Female", "Unisex", "Kids"],
+                ageGroups: ageAttr?.values || ["Adult", "Teen", "Kids", "Toddler", "Infant"]
             }
         };
     } catch (error) {
@@ -93,7 +92,7 @@ export async function getLocations() {
     try {
         const locations = await db.location.findMany({
             where: { isActive: true },
-            orderBy: { isDefault: 'desc' }, // ডিফল্ট লোকেশন সবার আগে থাকবে
+            orderBy: { isDefault: 'desc' },
             select: { id: true, name: true, isDefault: true }
         });
         return { success: true, data: locations };
@@ -147,7 +146,14 @@ export async function getTaxRates() {
             orderBy: { priority: "asc" },
             select: { id: true, name: true, rate: true }
         });
-        return { success: true, data: rates };
+        
+        // 🔥 FIX: Decimal conversion for Tax Rates
+        const serializedRates = rates.map(r => ({
+            ...r,
+            rate: Number(r.rate)
+        }));
+
+        return { success: true, data: serializedRates };
     } catch (error) {
         return { success: false, data: [] };
     }
@@ -207,7 +213,14 @@ export async function searchProducts(query: string) {
         price: true 
       }
     });
-    return { success: true, data: products };
+
+    // 🔥 FIX: Convert Decimal to Number before sending to Client
+    const serializedProducts = products.map(p => ({
+        ...p,
+        price: Number(p.price)
+    }));
+
+    return { success: true, data: serializedProducts };
   } catch (error) {
     try {
         const fallbackData = await db.product.findMany({
@@ -218,7 +231,14 @@ export async function searchProducts(query: string) {
             take: 10,
             select: { id: true, name: true, featuredImage: true, sku: true, price: true }
         });
-        return { success: true, data: fallbackData };
+
+        // 🔥 FIX: Convert Decimal to Number here too
+        const serializedFallback = fallbackData.map(p => ({
+            ...p,
+            price: Number(p.price)
+        }));
+
+        return { success: true, data: serializedFallback };
     } catch(e) {
         return { success: false, data: [] };
     }

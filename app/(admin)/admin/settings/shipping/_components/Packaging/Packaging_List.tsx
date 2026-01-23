@@ -34,11 +34,9 @@ export default function Packaging_List({ shippingBoxes, transdirectBoxes, refres
         if (confirm("Are you sure you want to delete this box definition?")) {
             const res = await deleteShippingBox(id);
             if (res.success) {
-                // ✅ FIXED: Added fallback string to satisfy TypeScript
                 toast.success(res.message || "Box removed successfully");
                 refreshData();
             } else {
-                // ✅ FIXED: Added fallback string
                 toast.error(res.error || "Error deleting box");
             }
         }
@@ -56,7 +54,7 @@ export default function Packaging_List({ shippingBoxes, transdirectBoxes, refres
 
     return (
         <div className="space-y-6 animate-in fade-in">
-            {/* Header Section - Responsive Stack */}
+            {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-sm border border-slate-200 shadow-sm">
                 <div>
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -75,7 +73,7 @@ export default function Packaging_List({ shippingBoxes, transdirectBoxes, refres
                 </button>
             </div>
 
-            {/* Custom Boxes Table - Responsive Scroll */}
+            {/* Custom Boxes Table */}
             <div className="bg-white rounded-sm border border-slate-200 shadow-sm overflow-hidden">
                 <div className="p-4 border-b bg-slate-50 font-bold text-slate-700 text-sm">
                     My Custom Boxes
@@ -103,14 +101,17 @@ export default function Packaging_List({ shippingBoxes, transdirectBoxes, refres
                                     <td className="p-4 text-slate-600">
                                         <div className="flex items-center gap-2">
                                             <Box size={14} className="text-slate-400"/>
-                                            {box.length} x {box.width} x {box.height} cm
+                                            {/* ✅ FIX: Convert Decimal to string/number for rendering */}
+                                            {Number(box.length)} x {Number(box.width)} x {Number(box.height)} cm
                                         </div>
                                     </td>
                                     <td className="p-4 text-slate-600">
-                                        {box.maxWeight ? `${box.maxWeight} kg` : <span className="text-slate-300">-</span>}
+                                        {/* ✅ FIX: Handle nullable Decimal */}
+                                        {box.maxWeight ? `${Number(box.maxWeight)} kg` : <span className="text-slate-300">-</span>}
                                     </td>
                                     <td className="p-4 text-slate-600">
-                                        {box.weight ? `${box.weight} kg` : <span className="text-slate-300">-</span>}
+                                        {/* ✅ FIX: Handle nullable Decimal */}
+                                        {box.weight ? `${Number(box.weight)} kg` : <span className="text-slate-300">-</span>}
                                     </td>
                                     <td className="p-4 text-center">
                                         <button 
@@ -148,7 +149,7 @@ export default function Packaging_List({ shippingBoxes, transdirectBoxes, refres
                 </div>
             </div>
 
-            {/* Transdirect Boxes Section (Responsive) */}
+            {/* Transdirect Boxes Section */}
             {transdirectBoxes && transdirectBoxes.length > 0 && (
                  <div className="mt-8 bg-white rounded-sm border border-slate-200 shadow-sm overflow-hidden opacity-80">
                     <div className="p-4 border-b bg-slate-50 font-bold text-slate-700 text-sm flex items-center gap-2">
@@ -167,8 +168,9 @@ export default function Packaging_List({ shippingBoxes, transdirectBoxes, refres
                                 {transdirectBoxes.map((tb) => (
                                     <tr key={tb.id} className="hover:bg-slate-50">
                                         <td className="p-3 font-medium text-slate-600">{tb.description || tb.code}</td>
-                                        <td className="p-3 text-slate-500">{tb.length} x {tb.width} x {tb.height} cm</td>
-                                        <td className="p-3 text-slate-500">{tb.maxWeight} kg</td>
+                                        {/* ✅ FIX: Convert Decimal to number for Transdirect boxes too */}
+                                        <td className="p-3 text-slate-500">{Number(tb.length)} x {Number(tb.width)} x {Number(tb.height)} cm</td>
+                                        <td className="p-3 text-slate-500">{tb.maxWeight ? `${Number(tb.maxWeight)} kg` : "-"}</td>
                                     </tr>
                                 ))}
                             </tbody>

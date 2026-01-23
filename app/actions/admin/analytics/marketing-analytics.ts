@@ -6,21 +6,10 @@ import { db } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { DateRange } from "./types";
 
-/**
- * Fetches marketing & operational metrics:
- * 1. Abandoned Cart Recovery Rates
- * 2. Coupon/Discount Usage
- * 3. Order Status Breakdown (Pie Chart Data)
- * 4. Payment Method Breakdown
- */
 export async function getMarketingAnalytics(current: DateRange) {
   
   const validStatus = { notIn: [OrderStatus.CANCELLED, OrderStatus.DRAFT, OrderStatus.FAILED] as OrderStatus[] };
 
-  // ====================================================
-  // 1. Abandoned Cart Analytics
-  // ====================================================
-  // We calculate how much money was lost in carts vs how much was recovered.
   const abandonedCarts = await db.abandonedCheckout.aggregate({
     where: {
       createdAt: { gte: current.startDate, lte: current.endDate },
@@ -38,9 +27,13 @@ export async function getMarketingAnalytics(current: DateRange) {
     _count: { id: true }
   });
 
+  // ✅ FIX: Decimal -> Number
+  const lostRev = Number(abandonedCarts._sum.subtotal || 0);
+  const recRev = Number(recoveredCarts._sum.subtotal || 0);
+
   const cartMetrics = {
-    totalLostRevenue: (abandonedCarts._sum.subtotal || 0) - (recoveredCarts._sum.subtotal || 0),
-    totalRecoveredRevenue: recoveredCarts._sum.subtotal || 0,
+    totalLostRevenue: lostRev - recRev,
+    totalRecoveredRevenue: recRev,
     abandonedCount: abandonedCarts._count.id || 0,
     recoveredCount: recoveredCarts._count.id || 0,
     recoveryRate: (abandonedCarts._count.id || 0) > 0 
@@ -48,10 +41,6 @@ export async function getMarketingAnalytics(current: DateRange) {
       : 0
   };
 
-  // ====================================================
-  // 2. Coupon & Discount Usage
-  // ====================================================
-  // See which coupons are driving sales.
   const couponUsage = await db.order.groupBy({
     by: ['couponCode'],
     where: {
@@ -68,12 +57,10 @@ export async function getMarketingAnalytics(current: DateRange) {
   const topCoupons = couponUsage.map(c => ({
     code: c.couponCode || "Unknown",
     usageCount: c._count.id || 0,
-    totalDiscounted: c._sum.discountTotal || 0
+    // ✅ FIX: Decimal -> Number
+    totalDiscounted: Number(c._sum.discountTotal || 0)
   }));
 
-  // ====================================================
-  // 3. Order Status Distribution (For Pie Chart)
-  // ====================================================
   const statusDist = await db.order.groupBy({
     by: ['status'],
     where: {
@@ -87,12 +74,8 @@ export async function getMarketingAnalytics(current: DateRange) {
     count: s._count.id || 0
   }));
 
-  // ====================================================
-  // 4. Payment Gateway Performance
-  // ====================================================
-  // See which payment method brings most money
   const paymentDist = await db.order.groupBy({
-    by: ['paymentGateway'], // or 'paymentMethod' based on your preference
+    by: ['paymentGateway'], 
     where: {
       createdAt: { gte: current.startDate, lte: current.endDate },
       status: validStatus
@@ -104,7 +87,8 @@ export async function getMarketingAnalytics(current: DateRange) {
   const paymentMethodDistribution = paymentDist.map(p => ({
     method: p.paymentGateway || "Unknown/Offline",
     count: p._count.id || 0,
-    amount: p._sum.total || 0
+    // ✅ FIX: Decimal -> Number
+    amount: Number(p._sum.total || 0)
   })).sort((a, b) => b.amount - a.amount);
 
   return {

@@ -37,10 +37,12 @@ export async function getInvoices(query?: string) {
         items: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 50 // সাম্প্রতিক ৫০টি ইনভয়েস
+      take: 50 
     });
 
-    return { success: true, data: orders };
+    const serializedOrders = JSON.parse(JSON.stringify(orders));
+
+    return { success: true, data: serializedOrders };
 
   } catch (error) {
     console.error("GET_INVOICES_ERROR", error);
@@ -60,7 +62,10 @@ export async function getInvoiceById(id: string) {
     });
 
     if (!order) return { success: false, error: "Invoice not found" };
-    return { success: true, data: order };
+
+    const serializedOrder = JSON.parse(JSON.stringify(order));
+
+    return { success: true, data: serializedOrder };
 
   } catch (error) {
     return { success: false, error: "Error fetching invoice" };

@@ -29,12 +29,10 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
         const res = await saveShippingBox(formData);
         
         if (res.success) {
-            // ✅ FIXED: Using fallback string (|| "") prevents 'undefined' error
             toast.success(res.message || "Box saved successfully");
             refreshData();
             onClose();
         } else {
-            // ✅ FIXED: Using fallback string
             toast.error(res.error || "Failed to save box");
         }
         setLoading(false);
@@ -42,10 +40,8 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            {/* Responsive Width: w-full max-w-lg */}
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 
-                {/* Header */}
                 <div className="flex justify-between items-center p-5 border-b sticky top-0 bg-white z-10">
                     <h3 className="text-lg font-bold text-slate-800">
                         {box ? "Edit Box" : "Add New Box"}
@@ -57,7 +53,6 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-5">
                     
-                    {/* Name */}
                     <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1">
                             Box Name / Reference <span className="text-red-500">*</span>
@@ -71,7 +66,6 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
                         />
                     </div>
 
-                    {/* Dimensions Grid - Responsive Columns */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1">Length (cm) *</label>
@@ -80,7 +74,8 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
                                 type="number" 
                                 step="0.1" 
                                 required 
-                                defaultValue={box?.length || ""}
+                                // ✅ FIX: Convert Decimal to string/number
+                                defaultValue={box?.length ? Number(box.length) : ""}
                                 placeholder="0.0" 
                                 className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
                             />
@@ -92,7 +87,8 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
                                 type="number" 
                                 step="0.1" 
                                 required 
-                                defaultValue={box?.width || ""}
+                                // ✅ FIX: Convert Decimal to string/number
+                                defaultValue={box?.width ? Number(box.width) : ""}
                                 placeholder="0.0" 
                                 className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
                             />
@@ -104,14 +100,14 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
                                 type="number" 
                                 step="0.1" 
                                 required 
-                                defaultValue={box?.height || ""}
+                                // ✅ FIX: Convert Decimal to string/number
+                                defaultValue={box?.height ? Number(box.height) : ""}
                                 placeholder="0.0" 
                                 className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
                             />
                         </div>
                     </div>
 
-                    {/* Weights Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1">
@@ -121,7 +117,8 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
                                 name="maxWeight" 
                                 type="number" 
                                 step="0.001" 
-                                defaultValue={box?.maxWeight || ""}
+                                // ✅ FIX: Convert Decimal to string/number
+                                defaultValue={box?.maxWeight ? Number(box.maxWeight) : ""}
                                 placeholder="Optional" 
                                 className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
                             />
@@ -135,7 +132,8 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
                                 name="weight" 
                                 type="number" 
                                 step="0.001" 
-                                defaultValue={box?.weight || 0}
+                                // ✅ FIX: Convert Decimal to string/number
+                                defaultValue={box?.weight ? Number(box.weight) : 0}
                                 placeholder="0.0" 
                                 className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
                             />
@@ -143,7 +141,6 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
                         </div>
                     </div>
 
-                    {/* Footer Actions */}
                     <div className="pt-4 flex items-center justify-end gap-3 border-t mt-4">
                         <button 
                             type="button" 

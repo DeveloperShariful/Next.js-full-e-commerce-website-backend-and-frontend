@@ -5,7 +5,6 @@ import { db } from "@/lib/prisma";
 import { getCartCalculation } from "./get-cart-calculation";
 import { cookies } from "next/headers"; 
 
-// 👇 এখানে shouldSetCookie প্যারামিটার যোগ করা হয়েছে (ডিফল্ট true)
 export async function validateCoupon(code: string, cartId: string, shouldSetCookie = true) {
   try {
     if (!code) return { success: false, error: "Please enter a code" };
@@ -36,21 +35,20 @@ export async function validateCoupon(code: string, cartId: string, shouldSetCook
       return { success: false, error: "Cart error." };
     }
 
-    if (discount.minSpend && cartData.total < discount.minSpend) {
+    if (discount.minSpend && cartData.total < Number(discount.minSpend)) {
       return { success: false, error: `Min spend $${discount.minSpend} required.` };
     }
 
     // ৫. ডিসকাউন্ট ক্যালকুলেশন
     let discountAmount = 0;
     if (discount.type === "PERCENTAGE") {
-      discountAmount = (cartData.total * discount.value) / 100;
+      discountAmount = (cartData.total * Number(discount.value)) / 100;
     } else {
-      discountAmount = discount.value;
+      discountAmount = Number(discount.value);
     }
 
     if (discountAmount > cartData.total) discountAmount = cartData.total;
 
-    // ✅ FIX: শুধুমাত্র যদি shouldSetCookie = true হয়, তবেই কুকি সেট করব
     if (shouldSetCookie) {
         const cookieStore = await cookies();
         cookieStore.set("coupon", discount.code, { 
@@ -68,7 +66,6 @@ export async function validateCoupon(code: string, cartId: string, shouldSetCook
     };
 
   } catch (error) {
-    // ডিবাগিংয়ের জন্য এরর লগ দেখতে পারেন
     console.error("Coupon Validate Error:", error);
     return { success: false, error: "Validation failed." };
   }

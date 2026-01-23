@@ -4,10 +4,6 @@
 
 import { createContext, useContext, ReactNode, useMemo } from "react";
 
-// ==========================================
-// 1. TYPE DEFINITIONS & INTERFACES
-// ==========================================
-
 export interface MenuItem {
   id: string;
   label: string;
@@ -25,11 +21,29 @@ export interface StoreBanner {
   position: number;
 }
 
+export interface PickupLocation {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string | null;
+  postcode: string;
+  country: string;
+  instructions: string | null;
+  openingHours: any;
+}
+
 export interface ActivePaymentMethod {
   identifier: string;
   name: string;
   icon: string | null;
   description?: string | null;
+  mode: "TEST" | "LIVE";
+  minOrderAmount?: number | null;
+  maxOrderAmount?: number | null;
+  surchargeEnabled: boolean;
+  surchargeAmount: number;
+  surchargeType: string;
 }
 
 export interface StoreAddress {
@@ -66,7 +80,7 @@ export interface TaxSettings {
   calculateTaxBasedOn: 'shipping' | 'billing' | 'shop';
   displayPricesInShop: 'inclusive' | 'exclusive';
   displayPricesDuringCart: 'inclusive' | 'exclusive';
-  defaultRate?: number; 
+  defaultRate?: number;
 }
 
 export interface GeneralConfig {
@@ -77,11 +91,18 @@ export interface GeneralConfig {
   supportedLocales?: string[];
   headerScripts?: string;
   footerScripts?: string;
+  enableWishlist?: boolean;
+  enableReviews?: boolean;
+  enableBlog?: boolean;
+  enableGuestCheckout?: boolean;
+  enableMultiCurrency?: boolean;
+  enablePickup?: boolean;
 }
 
 export interface SeoConfig {
   siteName: string;
   titleSeparator: string;
+  siteUrl: string;
   defaultMetaTitle: string | null;
   defaultMetaDesc: string | null;
   ogImage: string | null;
@@ -90,6 +111,7 @@ export interface SeoConfig {
   themeColor?: string | null;
   robotsTxt?: string | null;
   organizationJson?: any;
+  manifestJson?: any;
 }
 
 export interface VerificationConfig {
@@ -101,11 +123,13 @@ export interface VerificationConfig {
 export interface MarketingConfig {
   gtmEnabled: boolean;
   gtmContainerId: string | null;
+  gtmAuth: string | null;
+  gtmPreview: string | null;
   fbEnabled: boolean;
   fbPixelId: string | null;
   klaviyoEnabled: boolean;
   klaviyoPublicKey: string | null;
-  cookieConsentRequired?: boolean; // [ADDED]
+  cookieConsentRequired?: boolean;
 }
 
 export interface StoreFeatures {
@@ -117,10 +141,6 @@ export interface StoreFeatures {
   enableMultiCurrency?: boolean;
   enablePickup?: boolean;
 }
-
-// ==========================================
-// 2. CONTEXT STATE DEFINITION
-// ==========================================
 
 interface GlobalStoreContextType {
   storeName: string;
@@ -140,12 +160,12 @@ interface GlobalStoreContextType {
   address: StoreAddress;
   socials: SocialLinks;
   
-  // [ADDED] New Dynamic Data
   menus: Record<string, MenuItem[]>;
   activeBanners: StoreBanner[];
   activePaymentMethods: ActivePaymentMethod[];
+  pickupLocations: PickupLocation[];
 
-  formatPrice: (price: number | string | null) => string;
+  formatPrice: (price: number | string | { toNumber: () => number } | null | undefined) => string;
 
   general: GeneralConfig;
   tax: TaxSettings;
@@ -155,52 +175,157 @@ interface GlobalStoreContextType {
   features: StoreFeatures;
 }
 
-// ==========================================
-// 3. DEFAULT VALUES (FALLBACK)
-// ==========================================
-
 const defaultContext: GlobalStoreContextType = {
-  storeName: "GoBike",
+  storeName: "",
   storeEmail: "",
   storePhone: "",
   logo: null,
   favicon: null,
-  primaryColor: "#2271b1",
-  currency: "AUD",
-  symbol: "$",
-  locale: "en-AU",
-  weightUnit: "kg",
-  dimensionUnit: "cm",
+  primaryColor: "",
+  currency: "",
+  symbol: "",
+  locale: "en-US",
+  weightUnit: "",
+  dimensionUnit: "",
   address: {},
   socials: {},
-  
-  // [ADDED] Defaults
   menus: {},
   activeBanners: [],
   activePaymentMethods: [],
-
-  formatPrice: () => "$0.00",
-  general: { timezone: "UTC", dateFormat: "dd MMM yyyy", orderIdFormat: "#", locale: "en-AU" },
+  pickupLocations: [],
+  formatPrice: () => "",
+  general: { timezone: "UTC", dateFormat: "dd/MM/yyyy", orderIdFormat: "#" },
   tax: { pricesIncludeTax: false, calculateTaxBasedOn: 'shipping', displayPricesInShop: 'exclusive', displayPricesDuringCart: 'exclusive' },
-  seo: { siteName: "GoBike", titleSeparator: "|", defaultMetaTitle: null, defaultMetaDesc: null, ogImage: null, twitterCard: "summary_large_image", twitterSite: null },
-  marketing: { gtmEnabled: false, gtmContainerId: null, fbEnabled: false, fbPixelId: null, klaviyoEnabled: false, klaviyoPublicKey: null },
+  seo: { siteName: "", titleSeparator: "|", siteUrl: "", defaultMetaTitle: null, defaultMetaDesc: null, ogImage: null, twitterCard: "summary", twitterSite: null },
+  marketing: { gtmEnabled: false, gtmContainerId: null, gtmAuth: null, gtmPreview: null, fbEnabled: false, fbPixelId: null, klaviyoEnabled: false, klaviyoPublicKey: null },
   verifications: {},
-  features: { enableWishlist: true, enableReviews: true, enableBlog: true, enableGuestCheckout: true, maintenanceMode: false },
+  features: { enableWishlist: false, enableReviews: false, enableBlog: false, enableGuestCheckout: false, maintenanceMode: false },
 };
 
 const GlobalStoreContext = createContext<GlobalStoreContextType>(defaultContext);
 
-// ==========================================
-// 4. PROVIDER COMPONENT
-// ==========================================
+interface StoreSettingsDTO {
+  storeName: string;
+  storeEmail?: string | null;
+  storePhone?: string | null;
+  currency: string;
+  currencySymbol: string;
+  weightUnit: string;
+  dimensionUnit: string;
+  logo?: string | null;
+  favicon?: string | null;
+  maintenance: boolean;
+  storeAddress?: any;
+  socialLinks?: any;
+  generalConfig?: any;
+  taxSettings?: any;
+  logoMedia?: {
+    url: string;
+    altText?: string | null;
+    width?: number | null;
+    height?: number | null;
+    mimeType?: string;
+  } | null;
+  faviconMedia?: {
+    url: string;
+  } | null;
+  emailConfig?: {
+    baseColor?: string | null;
+  } | null;
+}
+
+interface SeoConfigDTO {
+  siteName: string;
+  titleSeparator: string;
+  siteUrl: string;
+  defaultMetaTitle?: string | null;
+  defaultMetaDesc?: string | null;
+  ogImage?: string | null;
+  twitterCard: string;
+  twitterSite?: string | null;
+  themeColor?: string | null;
+  robotsTxtContent?: string | null;
+  organizationData?: any;
+  manifestJson?: any;
+  ogMedia?: {
+    url: string;
+  } | null;
+}
+
+interface MarketingConfigDTO {
+  gtmEnabled: boolean;
+  gtmContainerId?: string | null;
+  gtmAuth?: string | null;
+  gtmPreview?: string | null;
+  fbEnabled: boolean;
+  fbPixelId?: string | null;
+  klaviyoEnabled: boolean;
+  klaviyoPublicKey?: string | null;
+  cookieConsentRequired?: boolean;
+  gscVerificationCode?: string | null;
+  fbDomainVerification?: string | null;
+  pinterest?: string | null;
+}
+
+interface MenuDTO {
+  slug: string;
+  isActive: boolean;
+  items: any;
+}
+
+interface BannerDTO {
+  id: string;
+  title: string;
+  image: string;
+  link?: string | null;
+  position: number;
+  isActive: boolean;
+  media?: {
+    url: string;
+  } | null;
+}
+
+interface PaymentMethodDTO {
+  identifier: string;
+  name: string;
+  isEnabled: boolean;
+  displayOrder: number;
+  mode: "TEST" | "LIVE";
+  icon?: string | null;
+  description?: string | null;
+  minOrderAmount?: number | string | null;
+  maxOrderAmount?: number | string | null;
+  surchargeEnabled?: boolean;
+  surchargeAmount?: number | string | null;
+  surchargeType?: string;
+}
+
+interface PickupLocationDTO {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state?: string | null;
+  postcode: string;
+  country: string;
+  instructions?: string | null;
+  isActive: boolean;
+  openingHours?: any;
+}
+
+interface ProviderSettings {
+  storeSettings: StoreSettingsDTO | null;
+  seoConfig: SeoConfigDTO | null;
+  marketingConfig: MarketingConfigDTO | null;
+}
 
 interface ProviderProps {
   children: ReactNode;
-  settings: any; 
-  // [ADDED] Optional props so existing usage doesn't break
-  menus?: any[]; 
-  banners?: any[];
-  paymentMethods?: any[];
+  settings: ProviderSettings;
+  menus?: MenuDTO[]; 
+  banners?: BannerDTO[];
+  paymentMethods?: PaymentMethodDTO[];
+  pickupLocations?: PickupLocationDTO[];
 }
 
 export function GlobalStoreProvider({ 
@@ -208,19 +333,31 @@ export function GlobalStoreProvider({
   settings, 
   menus = [], 
   banners = [], 
-  paymentMethods = [] 
+  paymentMethods = [],
+  pickupLocations = []
 }: ProviderProps) {
   
-  const s = settings || {};
-  const seoData = s.seoConfig || {};
-  const mktData = s.marketingIntegration || {};
-  
-  const activeLocale = s.generalConfig?.locale || "en-AU";
+  const s = settings?.storeSettings || {} as StoreSettingsDTO;
+  const seoData = settings?.seoConfig || {} as SeoConfigDTO;
+  const mktData = settings?.marketingConfig || {} as MarketingConfigDTO;
 
-  // [UPDATED] Use useMemo for performance, logic remains same
-  const formatPrice = useMemo(() => (price: number | string | null) => {
+  const generalConfig = (s.generalConfig as GeneralConfig) || {};
+  const taxSettings = (s.taxSettings as TaxSettings) || {};
+  const activeLocale = generalConfig.locale || "en-AU";
+
+  const formatPrice = useMemo(() => (price: number | string | { toNumber: () => number } | null | undefined) => {
     if (price === null || price === "" || price === undefined) return "";
-    const numPrice = typeof price === "string" ? parseFloat(price) : price;
+    
+    let numPrice: number = 0;
+    if (typeof price === 'object' && price !== null && 'toNumber' in price) {
+      numPrice = price.toNumber(); 
+    } else if (typeof price === 'string') {
+      numPrice = parseFloat(price);
+    } else if (typeof price === 'number') {
+      numPrice = price;
+    }
+
+    if (isNaN(numPrice)) numPrice = 0;
     
     return new Intl.NumberFormat(activeLocale, {
       style: "currency",
@@ -235,15 +372,16 @@ export function GlobalStoreProvider({
         altText: s.logoMedia.altText || s.storeName,
         width: s.logoMedia.width,
         height: s.logoMedia.height,
-        mimeType: s.logoMedia.mimeType // [ADDED]
+        mimeType: s.logoMedia.mimeType as string
       }
     : (s.logo ? { url: s.logo } : null);
 
-  // [ADDED] Logic to process Menus
+  const faviconUrl: string | null = s.faviconMedia?.url || s.favicon || null;
+
   const processedMenus = useMemo(() => {
     const map: Record<string, MenuItem[]> = {};
     if (Array.isArray(menus)) {
-        menus.forEach((menu: any) => {
+        menus.forEach((menu) => {
           if (menu.isActive) {
             map[menu.slug] = menu.items as MenuItem[];
           }
@@ -252,75 +390,97 @@ export function GlobalStoreProvider({
     return map;
   }, [menus]);
 
-  // [ADDED] Logic to process Banners
   const processedBanners = useMemo(() => {
     if (!Array.isArray(banners)) return [];
     return banners
-      .filter((b: any) => b.isActive)
-      .sort((a: any, b: any) => a.position - b.position)
-      .map((b: any) => ({
+      .filter((b) => b.isActive)
+      .sort((a, b) => a.position - b.position)
+      .map((b) => ({
         id: b.id,
         title: b.title,
         image: b.media?.url || b.image,
-        link: b.link,
+        link: b.link || null,
         position: b.position
       }));
   }, [banners]);
 
-  // [ADDED] Logic to process Payment Methods
   const processedPayments = useMemo(() => {
     if (!Array.isArray(paymentMethods)) return [];
     return paymentMethods
-      .filter((pm: any) => pm.isEnabled)
-      .sort((a: any, b: any) => a.displayOrder - b.displayOrder)
-      .map((pm: any) => ({
+      .filter((pm) => pm.isEnabled)
+      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .map((pm) => ({
         identifier: pm.identifier,
         name: pm.name,
-        icon: pm.icon,
-        description: pm.description
+        icon: pm.icon || null,
+        description: pm.description,
+        mode: pm.mode,
+        minOrderAmount: pm.minOrderAmount ? Number(pm.minOrderAmount) : null,
+        maxOrderAmount: pm.maxOrderAmount ? Number(pm.maxOrderAmount) : null,
+        surchargeEnabled: pm.surchargeEnabled || false,
+        surchargeAmount: pm.surchargeAmount ? Number(pm.surchargeAmount) : 0,
+        surchargeType: pm.surchargeType || 'fixed'
       }));
   }, [paymentMethods]);
 
-  const value = {
-    storeName: s.storeName || "GoBike",
+  const processedPickups = useMemo(() => {
+    if (!Array.isArray(pickupLocations)) return [];
+    return pickupLocations
+      .filter((pl) => pl.isActive)
+      .map((pl) => ({
+        id: pl.id,
+        name: pl.name,
+        address: pl.address,
+        city: pl.city,
+        state: pl.state || null,
+        postcode: pl.postcode,
+        country: pl.country,
+        instructions: pl.instructions || null,
+        openingHours: pl.openingHours
+      }));
+  }, [pickupLocations]);
+
+  const value: GlobalStoreContextType = {
+    storeName: s.storeName || "",
     storeEmail: s.storeEmail || "",
     storePhone: s.storePhone || "",
     
     logo: logoData,
-    favicon: s.favicon || null,
-    primaryColor: seoData.themeColor || s.emailConfig?.baseColor || "#2271b1",
+    favicon: faviconUrl,
+    primaryColor: seoData.themeColor || s.emailConfig?.baseColor || "", 
     
-    currency: s.currency || "AUD",
-    symbol: s.currencySymbol || "$",
+    currency: s.currency || "",
+    symbol: s.currencySymbol || "",
     locale: activeLocale,
-    weightUnit: s.weightUnit || "kg",
-    dimensionUnit: s.dimensionUnit || "cm",
+    weightUnit: s.weightUnit || "",
+    dimensionUnit: s.dimensionUnit || "",
     
     address: (s.storeAddress as StoreAddress) || {},
     socials: (s.socialLinks as SocialLinks) || {},
 
-    // [ADDED] New Values
     menus: processedMenus,
     activeBanners: processedBanners,
     activePaymentMethods: processedPayments,
+    pickupLocations: processedPickups,
     
     formatPrice,
 
     general: {
-      timezone: s.generalConfig?.timezone || defaultContext.general.timezone,
-      dateFormat: s.generalConfig?.dateFormat || defaultContext.general.dateFormat,
-      orderIdFormat: s.generalConfig?.orderIdFormat || defaultContext.general.orderIdFormat,
+      timezone: generalConfig.timezone || "UTC",
+      dateFormat: generalConfig.dateFormat || "dd/MM/yyyy",
+      orderIdFormat: generalConfig.orderIdFormat || "#",
       locale: activeLocale,
-      supportedLocales: s.generalConfig?.supportedLocales || ["en-AU"], // [ADDED]
-      headerScripts: s.generalConfig?.headerScripts || "", // [ADDED]
-      footerScripts: s.generalConfig?.footerScripts || "", // [ADDED]
+      supportedLocales: generalConfig.supportedLocales || [],
+      headerScripts: generalConfig.headerScripts || "",
+      footerScripts: generalConfig.footerScripts || "",
     },
 
-    tax: (s.taxSettings as TaxSettings) || defaultContext.tax,
+    tax: taxSettings,
     
     seo: {
-      siteName: seoData.siteName || "GoBike",
+      siteName: seoData.siteName || s.storeName || "",
       titleSeparator: seoData.titleSeparator || "|",
+      siteUrl: seoData.siteUrl || "",
       defaultMetaTitle: seoData.defaultMetaTitle || null,
       defaultMetaDesc: seoData.defaultMetaDesc || null,
       ogImage: seoData.ogMedia?.url || seoData.ogImage || null,
@@ -329,31 +489,35 @@ export function GlobalStoreProvider({
       themeColor: seoData.themeColor || null,
       robotsTxt: seoData.robotsTxtContent || null,
       organizationJson: seoData.organizationData || null,
+      manifestJson: seoData.manifestJson || null,
     },
     
     marketing: {
       gtmEnabled: mktData.gtmEnabled || false,
       gtmContainerId: mktData.gtmContainerId || null,
+      gtmAuth: mktData.gtmAuth || null,
+      gtmPreview: mktData.gtmPreview || null,
       fbEnabled: mktData.fbEnabled || false,
       fbPixelId: mktData.fbPixelId || null,
       klaviyoEnabled: mktData.klaviyoEnabled || false,
       klaviyoPublicKey: mktData.klaviyoPublicKey || null,
-      cookieConsentRequired: mktData.cookieConsentRequired || false, // [ADDED]
+      cookieConsentRequired: mktData.cookieConsentRequired || false,
     },
 
     verifications: {
       googleSearchConsole: mktData.gscVerificationCode || null,
       facebookDomain: mktData.fbDomainVerification || null,
+      pinterest: mktData.pinterest || null,
     },
 
     features: {
-      enableWishlist: true,
-      enableReviews: true,
-      enableBlog: true,
-      enableGuestCheckout: true,
+      enableWishlist: generalConfig.enableWishlist ?? false,
+      enableReviews: generalConfig.enableReviews ?? false,
+      enableBlog: generalConfig.enableBlog ?? false,
+      enableGuestCheckout: generalConfig.enableGuestCheckout ?? false,
       maintenanceMode: s.maintenance || false,
-      enableMultiCurrency: s.generalConfig?.enableMultiCurrency || false, // [ADDED]
-      enablePickup: s.generalConfig?.enablePickup || false, // [ADDED]
+      enableMultiCurrency: generalConfig.enableMultiCurrency ?? false,
+      enablePickup: generalConfig.enablePickup ?? false,
     }
   };
 
@@ -363,10 +527,6 @@ export function GlobalStoreProvider({
     </GlobalStoreContext.Provider>
   );
 }
-
-// ==========================================
-// 5. CUSTOM HOOK
-// ==========================================
 
 export function useGlobalStore() {
   const context = useContext(GlobalStoreContext);

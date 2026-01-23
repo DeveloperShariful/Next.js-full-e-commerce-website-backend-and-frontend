@@ -33,10 +33,14 @@ export async function getCartCalculation(cartId: string) {
     let subtotal = 0
 
     for (const item of cart.items) {
-      const price = item.variant 
+      // ✅ FIX: Get the Decimal Object first
+      const priceDecimal = item.variant 
         ? (item.variant.salePrice || item.variant.price) 
         : (item.product.salePrice || item.product.price)
       
+      // ✅ FIX: Convert Decimal Object to JavaScript Number before math
+      const price = Number(priceDecimal)
+
       subtotal += (price * item.quantity)
     }
 

@@ -23,10 +23,14 @@ export interface CouponData {
 export async function getCoupons() {
   try {
     const coupons = await db.discount.findMany({
-      
       orderBy: { startDate: 'desc' } 
     });
-    return { success: true, data: coupons };
+
+    // ✅ FIX: Serialize data to handle Decimal objects
+    // এটি Prisma-র Decimal অবজেক্টগুলোকে প্লেইন JSON এ কনভার্ট করে
+    const serializedCoupons = JSON.parse(JSON.stringify(coupons));
+
+    return { success: true, data: serializedCoupons };
   } catch (error) {
     return { success: false, error: "Failed to fetch coupons" };
   }

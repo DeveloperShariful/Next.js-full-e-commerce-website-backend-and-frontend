@@ -11,7 +11,6 @@ export async function POST(req: Request) {
   const body = await req.text();
   const signature = (await headers()).get("Stripe-Signature") as string;
 
-  // 1. Database theke Config ana
   const config = await db.stripeConfig.findFirst({
     where: { paymentMethod: { isEnabled: true } }
   });
@@ -20,11 +19,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Stripe config not found" }, { status: 500 });
   }
 
-  // 2. Secret Key Decrypt kora
   const isTest = config.testMode;
   const apiKey = decrypt(isTest ? config.testSecretKey! : config.liveSecretKey!);
-  // Note: Since we updated the setup file to encrypt the webhook secret, 
-  // decrypt() here will now work correctly.
   const webhookSecret = decrypt(isTest ? config.testWebhookSecret! : config.liveWebhookSecret!);
 
   if (!apiKey || !webhookSecret) {
@@ -38,22 +34,27 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
 
-  // 3. Signature Verify kora
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err: any) {
-    console.error(`⚠️ Webhook signature verification failed.`, err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 
-  // 4. Event Handle kora
   if (event.type === "payment_intent.succeeded") {
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
     
-    console.log(`💰 Stripe Payment succeeded: ${paymentIntent.id}`);
+    const existingTransaction = await db.orderTransaction.findFirst({
+        where: { 
+          transactionId: paymentIntent.id,
+          status: "COMPLETED"
+        }
+    });
+
+    if (existingTransaction) {
+        return NextResponse.json({ received: true });
+    }
 
     await db.$transaction(async (tx) => {
-        // Order khuje ber kora
         const order = await tx.order.findFirst({
             where: { paymentId: paymentIntent.id },
             include: { items: { include: { product: true, variant: true } } } 
@@ -61,14 +62,12 @@ export async function POST(req: Request) {
 
         if (order && order.paymentStatus !== "PAID") {
             
-            // ✅ FIX 3: Transaction Record তৈরি করা (অ্যাডমিন প্যানেলের জন্য জরুরি)
             await tx.orderTransaction.create({
                 data: {
                     orderId: order.id,
                     gateway: "STRIPE",
                     type: "SALE",
-                    // Stripe amount is in cents, convert to main currency unit
-                    amount: paymentIntent.amount / 100, 
+                    amount: (paymentIntent.amount / 100).toFixed(2),
                     currency: paymentIntent.currency.toUpperCase(),
                     transactionId: paymentIntent.id,
                     status: "COMPLETED",
@@ -80,21 +79,17 @@ export async function POST(req: Request) {
                 }
             });
 
-            // ✅ FIX 4: Stock Komanor Logic (Track Quantity চেক সহ)
             for (const item of order.items) {
-                // A. Variant Logic
                 if (item.variantId && item.variant) {
-                    if (item.variant.trackQuantity) { // শুধু যদি ট্র্যাকিং অন থাকে
+                    if (item.variant.trackQuantity) {
                         await tx.productVariant.update({
                             where: { id: item.variantId },
                             data: { stock: { decrement: item.quantity } }
                         });
                     }
                 }
-                
-                // B. Simple Product Logic
                 else if (item.productId && item.product) {
-                    if (item.product.trackQuantity) { // শুধু যদি ট্র্যাকিং অন থাকে
+                    if (item.product.trackQuantity) {
                         await tx.product.update({
                             where: { id: item.productId },
                             data: { stock: { decrement: item.quantity } }
@@ -103,7 +98,6 @@ export async function POST(req: Request) {
                 }
             }
 
-            // Order Status Update
             await tx.order.update({
                 where: { id: order.id },
                 data: { 
@@ -114,7 +108,6 @@ export async function POST(req: Request) {
                 }
             });
 
-            // Email Notification
             if (order.guestEmail) {
                 await sendNotification({
                     trigger: "PAYMENT_PAID",
@@ -122,13 +115,11 @@ export async function POST(req: Request) {
                     data: {
                         order_number: order.orderNumber,
                         customer_name: "Customer",
-                        // Stripe amount fix here too
                         total: `${(paymentIntent.amount / 100).toFixed(2)} ${paymentIntent.currency.toUpperCase()}`
                     },
                     orderId: order.id
                 });
             }
-            console.log(`✅ Order ${order.orderNumber} fully processed.`);
         }
     });
   }

@@ -1,12 +1,12 @@
-// app/admin/products/create/_components/Gallery_images.tsx
+// File: app/admin/products/create/_components/Gallery_images.tsx
 
 "use client";
 
 import { useState } from "react";
 import { useFormContext } from "react-hook-form";
-import { Plus, X, Image as ImageIcon } from "lucide-react";
+import { Plus, X, Image as ImageIcon, Type } from "lucide-react";
 import { ProductFormData } from "../types";
-import { MediaSelectorModal } from "@/components/media/media-selector-modal"; // নিশ্চিত করুন পাথ ঠিক আছে
+import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
 import Image from "next/image";
 
 export default function GalleryImages() {
@@ -14,20 +14,38 @@ export default function GalleryImages() {
     const galleryImages = watch("galleryImages") || [];
     const [open, setOpen] = useState(false);
 
-    // Handle Image Selection (Supports Single or Multi depending on your Modal Logic)
     const handleSelect = (media: any | any[]) => {
-        const newUrls = Array.isArray(media) ? media.map((m: any) => m.url) : [media.url];
+        const selected = Array.isArray(media) ? media : [media];
         
-        // Filter duplicates
-        const uniqueUrls = newUrls.filter((url: string) => !galleryImages.includes(url));
+        const newImages = selected.map((m: any) => ({
+            url: m.url,
+            mediaId: m.id,
+            altText: m.altText || "",
+            id: undefined 
+        }));
         
-        setValue("galleryImages", [...galleryImages, ...uniqueUrls], { shouldDirty: true, shouldValidate: true });
+        const existingUrls = galleryImages.map((img: any) => typeof img === 'string' ? img : img.url);
+        const uniqueImages = newImages.filter((img: any) => !existingUrls.includes(img.url));
+        
+        setValue("galleryImages", [...galleryImages, ...uniqueImages], { shouldDirty: true, shouldValidate: true });
         setOpen(false);
     };
 
     const handleRemove = (index: number) => {
         const newImages = galleryImages.filter((_, i) => i !== index);
         setValue("galleryImages", newImages, { shouldDirty: true, shouldValidate: true });
+    };
+
+    const updateAltText = (index: number, text: string) => {
+        const newImages = [...galleryImages];
+        const currentImg = newImages[index];
+
+        if (typeof currentImg === 'string') {
+            newImages[index] = { url: currentImg, altText: text };
+        } else {
+            newImages[index] = { ...currentImg, altText: text };
+        }
+        setValue("galleryImages", newImages, { shouldDirty: true });
     };
 
     return (
@@ -39,29 +57,43 @@ export default function GalleryImages() {
             
             <div className="p-4">
                 <div className="grid grid-cols-3 gap-3">
-                    {/* Render Selected Images */}
-                    {galleryImages.map((url, index) => (
-                        <div key={index} className="relative group aspect-square bg-gray-100 rounded-md border border-gray-200 overflow-hidden shadow-sm">
-                            <Image 
-                                src={url} 
-                                alt={`Gallery ${index}`} 
-                                fill
-                                className="object-cover"
-                            />
-                            
-                            {/* Always Visible Delete Button (Top Right) */}
-                            <button 
-                                type="button" 
-                                onClick={() => handleRemove(index)}
-                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition z-10"
-                                title="Remove image"
-                            >
-                                <X size={12} />
-                            </button>
-                        </div>
-                    ))}
+                    {galleryImages.map((img: any, index: number) => {
+                        const url = typeof img === 'string' ? img : img.url;
+                        const alt = typeof img === 'object' ? img.altText : "";
 
-                    {/* Add New Button (Last Item) */}
+                        return (
+                            <div key={index} className="relative group aspect-square bg-gray-100 rounded-md border border-gray-200 overflow-hidden shadow-sm">
+                                <Image 
+                                    src={url} 
+                                    alt={alt || `Gallery ${index}`} 
+                                    fill
+                                    className="object-cover"
+                                />
+                                
+                                <div className="absolute bottom-0 left-0 w-full bg-black/70 p-1.5 translate-y-full group-hover:translate-y-0 transition duration-200 flex items-center gap-1">
+                                    <Type size={10} className="text-gray-400 shrink-0"/>
+                                    <input 
+                                        type="text" 
+                                        value={alt || ""} 
+                                        onChange={(e) => updateAltText(index, e.target.value)}
+                                        placeholder="SEO Alt Text"
+                                        className="w-full text-[10px] bg-transparent text-white border-b border-white/30 outline-none px-1 placeholder:text-gray-400 focus:border-white"
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                </div>
+
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleRemove(index)}
+                                    className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition z-10 opacity-0 group-hover:opacity-100"
+                                    title="Remove image"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        );
+                    })}
+
                     <button 
                         type="button"
                         onClick={() => setOpen(true)}
@@ -84,7 +116,7 @@ export default function GalleryImages() {
                 <MediaSelectorModal 
                     onClose={() => setOpen(false)}
                     onSelect={handleSelect}
-                    allowMultiple={true} // যদি আপনার মডাল মাল্টিপল সাপোর্ট করে
+                    allowMultiple={true} 
                 />
             )}
         </div>

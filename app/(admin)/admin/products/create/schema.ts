@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 
-// Helper for converting empty strings to null/undefined
+// --- Helpers ---
 const emptyToNumber = z.preprocess(
   (val) => (val === "" || val === null || val === undefined ? null : Number(val)),
   z.number().nullable().optional()
@@ -23,8 +23,18 @@ const jsonString = z.string().optional().refine((val) => {
   }
 }, { message: "Invalid JSON format" });
 
+// 🔥 NEW: Image Object Schema (Supports both legacy string & new object)
+const imageSchema = z.object({
+  url: z.string(),
+  mediaId: z.string().optional().nullable(),
+  altText: z.string().optional(),
+  id: z.string().optional(),
+});
+
 export const productSchema = z.object({
   id: z.string().optional(),
+  version: z.number().optional(), 
+  
   name: z.string().min(1, "Product name is required"),
   slug: z.string().optional(),
   
@@ -49,20 +59,22 @@ export const productSchema = z.object({
   barcode: emptyToString,
   mpn: emptyToString,
   trackQuantity: z.boolean().default(true),
-  
-  // 🔥 Stock is now derived, but kept for legacy/display support
   stock: z.coerce.number().default(0),
 
-  // 🔥 NEW: Multi-Warehouse Inventory Data
   inventoryData: z.array(z.object({
     locationId: z.string(),
     quantity: z.number()
   })).default([]),
 
   lowStockThreshold: z.coerce.number().default(2),
-  
   backorderStatus: z.enum(["DO_NOT_ALLOW", "ALLOW", "ALLOW_BUT_NOTIFY"]).default("DO_NOT_ALLOW"),
   soldIndividually: z.boolean().default(false),
+
+  // 🔥 Pre-order Logic
+  isPreOrder: z.boolean().default(false),
+  preOrderReleaseDate: z.string().optional().nullable(),
+  preOrderMessage: emptyToString,
+  preOrderLimit: emptyToNumber,
 
   isVirtual: z.boolean().default(false),
   isDownloadable: z.boolean().default(false),
@@ -84,14 +96,22 @@ export const productSchema = z.object({
   downloadExpiry: emptyToNumber,
 
   category: z.string().optional(),
+  categoryId: z.string().optional().nullable(),
   vendor: z.string().optional(),
+  brandId: z.string().optional().nullable(),
+  
   tags: z.array(z.string()).default([]),
   collectionIds: z.array(z.string()).default([]),
   upsells: z.array(z.string()).default([]),
   crossSells: z.array(z.string()).default([]),
+  
+  // 🔥 Media Relations
   featuredMediaId: z.string().nullable().optional(),
   featuredImage: z.string().nullable().optional(),
-  galleryImages: z.array(z.string()).default([]),
+  
+  // 🔥 Updated to accept String OR Object Array
+  galleryImages: z.array(z.union([z.string(), imageSchema])).default([]),
+  
   videoUrl: emptyToString,
   videoThumbnail: emptyToString,
 
@@ -99,30 +119,34 @@ export const productSchema = z.object({
   ageGroup: emptyToString,
 
   attributes: z.array(z.object({
-    id: z.string(),
+    id: z.string().optional(),
     name: z.string(),
     values: z.array(z.string()),
     visible: z.boolean(),
     variation: z.boolean(),
-    position: z.number()
+    position: z.number().optional()
   })).default([]),
 
-  // 🔥 Variations Schema Updated for Inventory Data
   variations: z.array(z.object({
-    id: z.string(),
+    id: z.string().optional(),
     name: z.string(),
     price: z.coerce.number(),
+    salePrice: z.coerce.number().optional().nullable(),
     stock: z.coerce.number(),
     sku: emptyToString,
     barcode: emptyToString,
+    trackQuantity: z.boolean().default(true),
     attributes: z.record(z.string(), z.string()), 
-    images: z.array(z.string()).default([]),
     
-    // Variation specific inventory
+    images: z.array(z.union([z.string(), imageSchema])).default([]),
+    
     inventoryData: z.array(z.object({
         locationId: z.string(),
         quantity: z.number()
     })).optional(),
+
+    isPreOrder: z.boolean().default(false),
+    preOrderReleaseDate: z.string().optional().nullable(),
 
     costPerItem: emptyToNumber,
     weight: emptyToNumber,
@@ -162,31 +186,39 @@ export const productSchema = z.object({
     }
   }
 
+  // Pre-order Date Check
+  if (data.isPreOrder && !data.preOrderReleaseDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Release date is required for pre-order products",
+      path: ["preOrderReleaseDate"]
+    });
+  }
+
+  // Required Arrays Check
   if (data.productType === "VARIABLE") {
     if (data.attributes.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Attributes are required for variable products",
+        message: "Attributes are required",
         path: ["attributes"]
       });
     }
     if (data.variations.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Variations are required for variable products",
+        message: "Variations are required",
         path: ["variations"]
       });
     }
   }
 
-  if (data.productType === "BUNDLE") {
-    if (data.bundleItems.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Bundle items are required",
-        path: ["bundleItems"]
-      });
-    }
+  if (data.productType === "BUNDLE" && data.bundleItems.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Bundle items are required",
+      path: ["bundleItems"]
+    });
   }
 });
 

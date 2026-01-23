@@ -28,7 +28,7 @@ export async function duplicateProduct(id: string) {
         variants: { 
             include: { 
                 images: true,
-                inventoryLevels: true // 🔥 UPDATE: ভেরিয়েন্টের ইনভেন্টরিও আনতে হবে
+                inventoryLevels: true 
             } 
         }, 
       }
@@ -43,6 +43,20 @@ export async function duplicateProduct(id: string) {
 
     await db.$transaction(async (tx) => {
         
+        // কানেকশন লজিকগুলো ভেরিয়েবলে নেওয়া হলো
+        const categoryConnect = original.categoryId 
+            ? { connect: { id: original.categoryId } } 
+            : undefined;
+
+        const brandConnect = original.brandId 
+            ? { connect: { id: original.brandId } } 
+            : undefined;
+
+        // 🔥 FIX: Featured Media Connect Logic
+        const mediaConnect = original.featuredMediaId
+            ? { connect: { id: original.featuredMediaId } }
+            : undefined;
+
         // ২. প্রথমে মেইন প্রোডাক্ট তৈরি
         const newProduct = await tx.product.create({
             data: {
@@ -64,13 +78,23 @@ export async function duplicateProduct(id: string) {
                 height: original.height,
                 isVirtual: original.isVirtual,
                 isDownloadable: original.isDownloadable,
+                
+                // 🔥 FIX: সরাসরি featuredMediaId ব্যবহার না করে connect ব্যবহার করা হয়েছে
                 featuredImage: original.featuredImage,
+                ...(mediaConnect && { featuredMedia: mediaConnect }), 
+
+                // Pre-order Fields Copied
+                isPreOrder: original.isPreOrder,
+                preOrderReleaseDate: original.preOrderReleaseDate,
+                preOrderLimit: original.preOrderLimit,
+                preOrderMessage: original.preOrderMessage,
                 
                 upsellIds: original.upsellIds,
                 crossSellIds: original.crossSellIds,
                 
-                category: original.categoryId ? { connect: { id: original.categoryId } } : undefined,
-                brand: original.brandId ? { connect: { id: original.brandId } } : undefined,
+                // Relations
+                category: categoryConnect,
+                brand: brandConnect,
                 
                 tags: {
                     connect: original.tags.map(t => ({ id: t.id }))
@@ -81,7 +105,10 @@ export async function duplicateProduct(id: string) {
                         .filter(img => img.variantId === null)
                         .map(img => ({
                             url: img.url,
-                            position: img.position
+                            position: img.position,
+                            // Media connect for gallery images
+                            ...(img.mediaId && { media: { connect: { id: img.mediaId } } }),
+                            altText: img.altText
                         }))
                 },
 
@@ -97,7 +124,7 @@ export async function duplicateProduct(id: string) {
             }
         });
 
-        // 🔥 ৩. মেইন প্রোডাক্টের ইনভেন্টরি লেভেল কপি করা (Simple Product এর জন্য)
+        // ৩. মেইন প্রোডাক্টের ইনভেন্টরি লেভেল কপি করা
         if (original.inventoryLevels.length > 0) {
             await tx.inventoryLevel.createMany({
                 data: original.inventoryLevels.map(inv => ({
@@ -112,7 +139,6 @@ export async function duplicateProduct(id: string) {
         // ৪. ভেরিয়েন্ট এবং তাদের ইনভেন্টরি তৈরি
         if (original.variants.length > 0) {
             for (const v of original.variants) {
-                // ভেরিয়েন্ট তৈরি
                 const newVariant = await tx.productVariant.create({
                     data: {
                         productId: newProduct.id,
@@ -124,17 +150,23 @@ export async function duplicateProduct(id: string) {
                         trackQuantity: v.trackQuantity,
                         weight: v.weight,
                         
+                        // Pre-order for Variants
+                        isPreOrder: v.isPreOrder,
+                        preOrderReleaseDate: v.preOrderReleaseDate,
+                        
                         images: {
                             create: v.images.map(vImg => ({
                                 url: vImg.url,
                                 position: vImg.position,
-                                productId: newProduct.id
+                                productId: newProduct.id,
+                                // Media connect for variant images
+                                ...(vImg.mediaId && { media: { connect: { id: vImg.mediaId } } }) 
                             }))
                         }
                     }
                 });
 
-                // 🔥 ৫. ভেরিয়েন্টের ইনভেন্টরি লেভেল কপি করা (Variable Product এর জন্য)
+                // ভেরিয়েন্টের ইনভেন্টরি লেভেল
                 if (v.inventoryLevels && v.inventoryLevels.length > 0) {
                     await tx.inventoryLevel.createMany({
                         data: v.inventoryLevels.map(inv => ({

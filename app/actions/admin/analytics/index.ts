@@ -15,12 +15,6 @@ import { getSalesForecast } from "./forecasting";
 
 import { AnalyticsResponse, Period } from "./types";
 
-/**
- * MASTER ANALYTICS AGGREGATOR (UPDATED V2)
- * ---------------------------------------------------------
- * Now includes Traffic, Reputation, Brands, and AI Forecasting.
- * Fetches 7 parallel queries for maximum performance.
- */
 export async function getAnalyticsDashboardData(
   period: Period = "30d", 
   customStart?: Date, 

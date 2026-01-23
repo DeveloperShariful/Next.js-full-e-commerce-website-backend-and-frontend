@@ -1,4 +1,4 @@
-// app/admin/products/create/_components/ProductForm.tsx
+// File: app/admin/products/create/_components/ProductForm.tsx
 
 "use client";
 
@@ -8,11 +8,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-// Schema & Actions
 import { productSchema, ProductFormValues } from "../schema";
 import { createProduct, updateProduct } from "@/app/actions/admin/product/create-update-product";
 
-// Components
 import Header from "./header";
 import General from "./General";
 import Inventory from "./Inventory";
@@ -42,36 +40,35 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState("general");
 
-  // React Hook Form Setup
   const methods = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
     defaultValues: initialData as any ,
     mode: "onChange",
   });
 
-  const { handleSubmit, watch, formState: { isSubmitting } } = methods;
+  const { handleSubmit, watch, formState: { isSubmitting, isDirty } } = methods;
   
-  // Watch values for conditional tabs
   const productType = watch("productType");
   const isVirtual = watch("isVirtual");
 
   const onSubmit = async (data: ProductFormValues) => {
+    
+    if (isEdit && !isDirty) {
+        toast.success("No changes detected.");
+        return;
+    }
+
     const toastId = toast.loading(isEdit ? "Updating..." : "Publishing...");
     
-    // Prepare FormData for Server Action
     const formData = new FormData();
     if (isEdit && initialData.id) formData.append("id", initialData.id);
 
-    // Append simple fields
     Object.keys(data).forEach((key) => {
         const value = (data as any)[key];
         
-        // Handle Arrays/Objects with JSON.stringify
-        // 🔥 UPDATE: Added 'inventoryData' to this list so multi-warehouse stock saves correctly
         if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles', 'bundleItems', 'inventoryData'].includes(key)) {
             formData.append(key, JSON.stringify(value));
         } 
-        // Handle Booleans & Strings
         else if (value !== null && value !== undefined) {
             formData.append(key, String(value));
         }
@@ -108,7 +105,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
             
             <div className="w-full p-0 md:p-6 flex flex-col lg:flex-row gap-4 md:gap-5">
                 
-                {/* --- LEFT COLUMN --- */}
                 <div className="flex-1 min-w-0 space-y-4 md:space-y-5">
                     <div className="space-y-2 px-4 md:px-0 mt-4 md:mt-0">
                         <input 
@@ -133,10 +129,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     <ShortDescription />
                     <Description />
 
-                    {/* --- PRODUCT DATA BOX --- */}
                     <div className="bg-white border-y md:border border-gray-300 md:rounded-sm shadow-sm">
                         
-                        {/* Header Controls */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-50 gap-3 sm:gap-0">
                             <div className="flex items-center gap-3">
                                 <span className="font-semibold text-[#1d2327]">Product Data</span>
@@ -163,9 +157,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                             </div>
                         </div>
 
-                        {/* Tabs & Content */}
                         <div className="flex flex-col md:flex-row min-h-[300px]">
-                            {/* Sidebar Tabs */}
                             <ul className="w-full md:w-44 bg-gray-100 border-b md:border-b-0 md:border-r border-gray-300 pt-1 shrink-0 flex md:flex-col overflow-x-auto md:overflow-visible no-scrollbar">
                                 {[
                                     {id: 'general', label: 'General', show: productType !== 'BUNDLE'}, 
@@ -188,7 +180,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                 ))}
                             </ul>
 
-                            {/* Content Area */}
                             <div className="flex-1 p-5 bg-white">
                                 {activeTab === 'general' && <General />}
                                 {activeTab === 'inventory' && <Inventory />}
@@ -203,7 +194,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     </div>
                 </div>
 
-                {/* --- RIGHT COLUMN (Sidebar) --- */}
                 <div className="w-full lg:w-[280px] space-y-4 md:space-y-5 shrink-0 px-4 md:px-0 pb-10 md:pb-0">
                     <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
                     <Categories />

@@ -18,9 +18,14 @@ import { EmailLogs } from "./_components/email-logs";
 export default async function OrderDetailsPage(props: { params: Promise<{ orderId: string }> }) {
   const params = await props.params;
   
-  const { data: order } = await getOrderDetails(params.orderId);
+  // ১. ডাটা ফেচ করা
+  const { data: rawOrder } = await getOrderDetails(params.orderId);
 
-  if (!order) return notFound();
+  if (!rawOrder) return notFound();
+
+  // ✅ FIX: এখানে সরাসরি ডাটাকে প্লেইন অবজেক্টে কনভার্ট করা হলো
+  // এটি Prisma-র Decimal এবং Date অবজেক্টগুলোকে স্ট্রিং/নাম্বারে ভেঙে ফেলবে
+  const order = JSON.parse(JSON.stringify(rawOrder));
 
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto min-h-screen bg-[#F8F9FA] pb-20">
@@ -49,17 +54,14 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
         </div>
 
         {/* === RIGHT COLUMN (Sidebar) === */}
-        {/* ✅ FIX: 'space-y-6' এর বদলে 'gap-6' ব্যবহার করছি যাতে অর্ডার পাল্টালে মার্জিন ঠিক থাকে */}
         <div className="flex flex-col gap-6 h-full">
             
-            {/* ✅ ORDER ACTIONS (The Magic Logic) */}
-            {/* Mobile: order-last (সবার নিচে যাবে) */}
-            {/* Desktop (xl): order-first (সবার উপরে থাকবে) */}
+            {/* ✅ ORDER ACTIONS */}
             <div className="order-last xl:order-first">
                 <OrderActions order={order} />
             </div>
 
-            {/* Other Components (Default Order) */}
+            {/* Other Components */}
             <TransdirectBooking order={order} />
             
             <SecurityRisk order={order} />

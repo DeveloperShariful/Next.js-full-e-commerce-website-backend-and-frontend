@@ -43,7 +43,7 @@ export async function updateOrderStatus(formData: FormData) {
         await restockInventory(orderId);
     }
     if (paymentStatus === "PAID" && existingOrder.paymentStatus !== "PAID") {
-        await updateAnalytics(existingOrder.total);
+        await updateAnalytics(Number(existingOrder.total));
     }
 
     // ৪. ইমেইল ট্রিগার লজিক (15 Events + Admin Alerts)

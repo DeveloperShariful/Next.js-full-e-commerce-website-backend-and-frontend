@@ -43,7 +43,8 @@ export async function createPayPalOrder(cartId: string, shippingMethodId: string
 
     let subtotal = 0;
     cart.items.forEach(item => {
-        const price = item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price);
+        // ✅ FIX: Decimal to Number Conversion
+        const price = Number(item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price));
         subtotal += price * item.quantity;
     });
 
@@ -52,14 +53,14 @@ export async function createPayPalOrder(cartId: string, shippingMethodId: string
     if (shippingMethodId) {
         const rate = await db.shippingRate.findUnique({ where: { id: shippingMethodId } });
         // অথবা যদি Transdirect বা অন্য লজিক থাকে, সেটি এখানে কল করে প্রাইস আনতে হবে
-        if (rate) shippingCost = rate.price;
+        if (rate) shippingCost = Number(rate.price); // ✅ FIX: Decimal to Number Conversion
         // নোট: যদি Transdirect dynamic quote হয়, আপনাকে সেই ভ্যালুটি এখানে ভ্যালিডেট করতে হবে
     }
 
     const total = (subtotal + shippingCost).toFixed(2);
 
     // ৩. PayPal API কল (Order Creation)
-    const accessToken = await getAccessToken(clientId, clientSecret, isSandbox);
+    const accessToken = await getAccessToken(clientId!, clientSecret, isSandbox);
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 
     const response = await fetch(`${baseUrl}/v2/checkout/orders`, {

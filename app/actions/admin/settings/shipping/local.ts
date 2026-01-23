@@ -41,9 +41,12 @@ export async function getShippingData() {
         shippingCountries: config.shippingCountries || [],
     };
 
+    // ✅ FIX: Serialize data to handle Decimal objects
+    const serializedZones = JSON.parse(JSON.stringify(zones));
+
     return { 
       success: true, 
-      zones, 
+      zones: serializedZones, 
       classes, 
       options 
     };
@@ -98,7 +101,6 @@ export async function addShippingRate(formData: FormData) {
     const taxStatus = (formData.get("taxStatus") as string) || "taxable";
     const freeShippingRequirement = formData.get("freeShippingRequirement") as string || null;
 
-    // ✅ NEW: Receive Carrier ID
     const carrierServiceId = formData.get("carrierServiceId") as string || null;
 
     await db.shippingRate.create({
@@ -112,7 +114,7 @@ export async function addShippingRate(formData: FormData) {
         maxWeight,
         taxStatus,              
         freeShippingRequirement,
-        carrierServiceId // ✅ Save to DB
+        carrierServiceId 
       }
     });
 
@@ -137,8 +139,6 @@ export async function updateShippingRate(formData: FormData) {
     const taxStatus = (formData.get("taxStatus") as string) || "taxable";
     const freeShippingRequirement = formData.get("freeShippingRequirement") as string || null;
 
-    // We typically don't update carrierServiceId once created, but logic can be added here if needed
-    
     await db.shippingRate.update({
       where: { id },
       data: {

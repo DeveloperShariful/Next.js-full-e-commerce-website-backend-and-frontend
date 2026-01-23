@@ -17,10 +17,14 @@ export async function getPackagingData() {
       orderBy: { description: 'asc' }
     });
 
+    // ✅ FIX: Serialize data to handle Decimal objects
+    const serializedShippingBoxes = JSON.parse(JSON.stringify(shippingBoxes));
+    const serializedTransdirectBoxes = JSON.parse(JSON.stringify(transdirectBoxes));
+
     return { 
       success: true, 
-      shippingBoxes, 
-      transdirectBoxes 
+      shippingBoxes: serializedShippingBoxes, 
+      transdirectBoxes: serializedTransdirectBoxes 
     };
   } catch (error) {
     console.error("GET_PACKAGING_ERROR", error);

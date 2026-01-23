@@ -1,3 +1,5 @@
+// app/(admin)/layout.tsx
+
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
@@ -5,7 +7,7 @@ import { db } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import AdminSidebar from "@/app/(admin)/Header-Sideber/sidebar";
 import AdminHeader from "@/app/(admin)/Header-Sideber/header";
-import { GlobalStoreProvider } from "@/app/providers/global-store-provider"; // ✅ Import Provider
+import { GlobalStoreProvider } from "@/app/providers/global-store-provider"; 
 
 // --- Helper to fetch Global Data ---
 async function getGlobalData() {
@@ -15,7 +17,6 @@ async function getGlobalData() {
     db.marketingIntegration.findUnique({ where: { id: "marketing_config" } }),
   ]);
 
-  // Transform Prisma Data to Context Interface
   return {
     storeName: settings?.storeName || "GoBike",
     storeEmail: settings?.storeEmail || "",
@@ -77,10 +78,13 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   };
 
   // 2. Fetch Global Data
-  const globalData = await getGlobalData();
+  const rawGlobalData = await getGlobalData();
+
+  // ✅ FIX: Serialize data to remove Decimal objects before passing to Client Component
+  const globalData = JSON.parse(JSON.stringify(rawGlobalData));
 
   return (
-    // ✅ 3. Wrap everything with GlobalStoreProvider
+    // 3. Wrap everything with GlobalStoreProvider
     <GlobalStoreProvider settings={globalData}>
       <div className="flex h-screen bg-slate-50/50 font-sans text-slate-800 overflow-hidden">
         <AdminSidebar user={adminUser} />

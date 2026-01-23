@@ -75,8 +75,9 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
                             productId: item.productId,
                             variantId: item.variantId,
                             quantity: item.quantity,
-                            price: item.variant?.price || item.product.price,
-                            total: (item.variant?.price || item.product.price) * item.quantity
+                            // ✅ FIX: Decimal to Number Conversion
+                            price: Number(item.variant?.price || item.product.price),
+                            total: Number(item.variant?.price || item.product.price) * item.quantity
                         }))
                     }
                 }

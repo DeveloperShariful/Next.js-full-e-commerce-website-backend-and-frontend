@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { OrderStatus, Prisma } from "@prisma/client";
+import { OrderStatus } from "@prisma/client";
 import { DateRange, FinancialSummary, SalesChartData } from "./types";
 import { calculateGrowth, getTrend } from "./utils";
 
@@ -16,7 +16,6 @@ export async function getFinancialAnalytics(
     notIn: [OrderStatus.CANCELLED, OrderStatus.FAILED, OrderStatus.DRAFT] as OrderStatus[]
   };
 
-  // 1. Fetch Aggregates
   const [
     currentOrdersAgg, 
     previousOrdersAgg, 
@@ -43,8 +42,6 @@ export async function getFinancialAnalytics(
     }),
   ]);
 
-  // 2. Fetch Chart Data 
-  // IMPORTANT: Ensure Schema has 'variant' relation in OrderItem for this to work perfectly.
   const chartOrders = await db.order.findMany({
     where: { 
       createdAt: { gte: current.startDate, lte: current.endDate }, 
@@ -61,7 +58,6 @@ export async function getFinancialAnalytics(
           product: { 
             select: { costPerItem: true } 
           },
-          // If schema is updated, this will work. If not, TypeScript will complain.
           variant: { 
             select: { costPerItem: true } 
           }
@@ -71,23 +67,22 @@ export async function getFinancialAnalytics(
     orderBy: { createdAt: 'asc' }
   });
 
-  // 3. Process Summary Metrics
-  const curRev = currentOrdersAgg._sum.total || 0;
-  const prevRev = previousOrdersAgg._sum.total || 0;
+  // ✅ FIX: Decimal -> Number
+  const curRev = Number(currentOrdersAgg._sum.total || 0);
+  const prevRev = Number(previousOrdersAgg._sum.total || 0);
   
-  const curNet = (currentOrdersAgg._sum.subtotal || 0) - (currentRefundsAgg._sum.amount || 0); 
-  const prevNet = (previousOrdersAgg._sum.subtotal || 0) - (previousRefundsAgg._sum.amount || 0);
+  const curNet = (Number(currentOrdersAgg._sum.subtotal || 0)) - (Number(currentRefundsAgg._sum.amount || 0)); 
+  const prevNet = (Number(previousOrdersAgg._sum.subtotal || 0)) - (Number(previousRefundsAgg._sum.amount || 0));
 
   const curOrdersCount = currentOrdersAgg._count.id || 0;
   const prevOrdersCount = previousOrdersAgg._count.id || 0;
 
-  const curRefund = currentRefundsAgg._sum.amount || 0;
-  const prevRefund = previousRefundsAgg._sum.amount || 0;
+  const curRefund = Number(currentRefundsAgg._sum.amount || 0);
+  const prevRefund = Number(previousRefundsAgg._sum.amount || 0);
 
   const curAOV = curOrdersCount > 0 ? curRev / curOrdersCount : 0;
   const prevAOV = prevOrdersCount > 0 ? prevRev / prevOrdersCount : 0;
 
-  // 4. Process Chart Data
   let totalCostOfGoods = 0;
   const chartMap = new Map<string, SalesChartData>();
 
@@ -97,13 +92,11 @@ export async function getFinancialAnalytics(
 
     let orderCost = 0;
     
-    // Using 'any' type casting temporarily if Schema isn't updated yet to suppress error
-    // But PLEASE UPDATE SCHEMA for real data
     if (order.items) {
       for (const item of order.items) {
-        // Safe access
-        const variantCost = (item as any).variant?.costPerItem ?? 0;
-        const productCost = item.product?.costPerItem ?? 0;
+        // ✅ FIX: Decimal -> Number
+        const variantCost = Number((item as any).variant?.costPerItem ?? 0);
+        const productCost = Number(item.product?.costPerItem ?? 0);
         const unitCost = variantCost || productCost;
         
         orderCost += (unitCost * item.quantity);
@@ -112,19 +105,24 @@ export async function getFinancialAnalytics(
     
     totalCostOfGoods += orderCost;
 
-    const netSale = order.total - order.taxTotal - order.shippingTotal;
+    // ✅ FIX: Decimal -> Number
+    const orderTotal = Number(order.total);
+    const orderTax = Number(order.taxTotal);
+    const orderShipping = Number(order.shippingTotal);
+
+    const netSale = orderTotal - orderTax - orderShipping;
     const profit = netSale - orderCost;
 
     if (chartMap.has(dateKey)) {
       const existing = chartMap.get(dateKey)!;
-      existing.revenue += order.total;
+      existing.revenue += orderTotal;
       existing.profit += profit;
       existing.orders += 1;
     } else {
       chartMap.set(dateKey, {
         date: dateKey,
         fullDate,
-        revenue: order.total,
+        revenue: orderTotal,
         profit: profit,
         orders: 1
       });

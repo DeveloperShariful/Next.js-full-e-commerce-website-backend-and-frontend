@@ -4,12 +4,11 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, Package } from "lucide-react";
 
 interface CartItemsTableProps {
     items: any[];
     onRemoveItem: (index: number) => void;
-    // ✅ Dynamic Props
     formatPrice: (price: number) => string;
     weightUnit: string;
 }
@@ -22,37 +21,39 @@ export const CartItemsTable = ({ items, onRemoveItem, formatPrice, weightUnit }:
             </CardHeader>
             <CardContent>
                 {items.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 text-sm border border-dashed rounded-md">
-                        No items added yet.
+                    <div className="text-center py-10 text-slate-400 text-sm border border-dashed rounded-md bg-slate-50">
+                        No items added yet. Search products or add a custom item.
                     </div>
                 ) : (
                     <div className="space-y-4">
                         {items.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-100">
+                            <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-100 hover:border-slate-200 transition-colors">
                                 <div className="flex items-center gap-3">
-                                    {/* Image logic preserved */}
-                                    {item.image ? (
-                                        <div className="h-10 w-10 bg-white rounded border overflow-hidden relative">
+                                    <div className="h-10 w-10 bg-white rounded border overflow-hidden relative flex items-center justify-center">
+                                        {item.image ? (
                                             <img src={item.image} alt="" className="h-full w-full object-cover"/>
-                                        </div>
-                                    ) : (
-                                        <div className="h-10 w-10 bg-white rounded border flex items-center justify-center text-xs text-slate-300">Img</div>
-                                    )}
+                                        ) : (
+                                            <Package size={20} className="text-slate-300"/>
+                                        )}
+                                    </div>
                                     
                                     <div>
-                                        <p className="text-sm font-medium">{item.name}</p>
+                                        <p className="text-sm font-medium text-slate-900">
+                                            {item.name} 
+                                            {item.sku === 'CUSTOM' && <span className="text-[10px] ml-2 bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Custom</span>}
+                                        </p>
                                         <p className="text-xs text-slate-500">
-                                            {/* ✅ Dynamic Price & Unit */}
                                             {formatPrice(item.price)} x {item.quantity} 
-                                            <span className="ml-2 text-slate-400 border-l pl-2 border-slate-300">
-                                                {item.weight} {weightUnit}
-                                            </span>
+                                            {item.weight > 0 && (
+                                                <span className="ml-2 text-slate-400 border-l pl-2 border-slate-300">
+                                                    {item.weight} {weightUnit}
+                                                </span>
+                                            )}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <p className="font-bold text-sm">
-                                        {/* ✅ Dynamic Total */}
+                                    <p className="font-bold text-sm text-slate-900">
                                         {formatPrice(item.price * item.quantity)}
                                     </p>
                                     <Button 

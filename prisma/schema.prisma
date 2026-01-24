@@ -743,7 +743,6 @@ model ProductVariant {
   stock           Int              @default(0)
   trackQuantity   Boolean          @default(true)
   
-  // Pre-order Fields for Variants
   isPreOrder      Boolean          @default(false)
   preOrderReleaseDate DateTime?
   

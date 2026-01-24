@@ -16,7 +16,6 @@ interface ShippingSelectorProps {
   onCustomerNoteChange: (note: string) => void;
   address?: { city: string; postcode: string; state: string } | null;
   cartItems: any[];
-  // ✅ Dynamic Price Formatter passed from parent
   formatPrice: (price: number) => string;
 }
 
@@ -38,7 +37,6 @@ export const ShippingSelector = ({
   
   const [selectedMethod, setSelectedMethod] = useState<string>("");
 
-  // Helper to beautify service names
   const formatServiceName = (name: string) => {
     return name
       .replace(/_/g, " ")
@@ -47,7 +45,6 @@ export const ShippingSelector = ({
       .replace("Dhl", "DHL");
   };
 
-  // 1. Load Local Rates & Pickup Points
   useEffect(() => {
     const loadResources = async () => {
       setLoadingLocal(true);
@@ -57,7 +54,7 @@ export const ShippingSelector = ({
       const mappedRates = res.shippingRates.map((r: any) => ({
           id: r.id,
           name: r.name,
-          price: r.price,
+          price: Number(r.price),
           type: 'local',
           desc: r.zone?.name || "Flat Rate"
       }));
@@ -67,7 +64,6 @@ export const ShippingSelector = ({
     loadResources();
   }, []);
 
-  // 2. Fetch Live Quotes (Transdirect)
   useEffect(() => {
     if (!address?.postcode || !address?.city || cartItems.length === 0) {
         setLiveQuotes([]); 
@@ -76,7 +72,6 @@ export const ShippingSelector = ({
 
     const fetchLiveQuotes = async () => {
         setLoadingQuotes(true);
-        // Reset selection when inputs change
         setSelectedMethod(""); 
         onShippingCostChange(0);
 
@@ -95,7 +90,6 @@ export const ShippingSelector = ({
         setLoadingQuotes(false);
     };
 
-    // Debounce to avoid too many API calls
     const timeout = setTimeout(() => {
         fetchLiveQuotes();
     }, 1000);
@@ -103,13 +97,10 @@ export const ShippingSelector = ({
     return () => clearTimeout(timeout);
   }, [address, cartItems]); 
 
-  // 3. Merge & Sort Methods
   const allMethods = useMemo(() => {
-      // Filter out local rates that might duplicate live quotes if needed
       const filteredLocalRates = localRates.filter(r => {
           if (liveQuotes.length > 0) {
               const nameLower = r.name.toLowerCase();
-              // Example logic: hide generic local rates if live quotes exist
               return !nameLower.includes("transdirect") && !nameLower.includes("carrier");
           }
           return true;
@@ -122,7 +113,6 @@ export const ShippingSelector = ({
       ].sort((a, b) => a.price - b.price); 
   }, [localRates, liveQuotes, pickupPoints]);
 
-  // 4. Handle Selection
   const handleMethodClick = (methodId: string) => {
       const method = allMethods.find(m => m.id === methodId);
       if (method) {
@@ -158,7 +148,6 @@ export const ShippingSelector = ({
             </div>
         )}
 
-        {/* LIST OF METHODS */}
         {!loadingQuotes && allMethods.length > 0 && (
             <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
                 {allMethods.map((method) => (
@@ -171,7 +160,6 @@ export const ShippingSelector = ({
                         }`}
                         onClick={() => handleMethodClick(method.id)}
                     >
-                        {/* Custom Radio Circle */}
                         <div className={`h-4 w-4 rounded-full border flex items-center justify-center mr-3 ${selectedMethod === method.id ? "border-blue-600" : "border-slate-300"}`}>
                             {selectedMethod === method.id && <div className="h-2 w-2 rounded-full bg-blue-600" />}
                         </div>
@@ -190,13 +178,11 @@ export const ShippingSelector = ({
                             </div>
                             <div className="text-right">
                                 <span className={`text-sm font-bold ${selectedMethod === method.id ? 'text-blue-700' : 'text-slate-900'}`}>
-                                    {/* ✅ Dynamic Price */}
                                     {formatPrice(method.price)}
                                 </span>
                             </div>
                         </div>
 
-                        {/* Checkmark Icon for Active Item */}
                         {selectedMethod === method.id && (
                             <div className="absolute right-0 top-0 -mt-2 -mr-2 bg-white rounded-full p-0.5">
                                 <CheckCircle size={16} className="text-blue-600 fill-white"/>
@@ -208,7 +194,6 @@ export const ShippingSelector = ({
         )}
       </div>
 
-      {/* Pickup Location Select */}
       {selectedMethod === "pickup_only" && (
         <div className="space-y-2 animate-in fade-in slide-in-from-top-1 bg-green-50 p-3 rounded border border-green-100">
           <Label className="text-[11px] font-bold text-green-700 uppercase flex items-center gap-1">
@@ -230,7 +215,6 @@ export const ShippingSelector = ({
 
       <hr className="border-slate-100" />
 
-      {/* Notes Section */}
       <div className="space-y-4">
         <div className="space-y-2">
           <Label className="text-[11px] font-bold text-slate-500 uppercase">Customer Note</Label>

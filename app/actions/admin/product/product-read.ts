@@ -1,4 +1,5 @@
 // File: app/actions/admin/product/product-read.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -22,7 +23,8 @@ export async function getProductById(id: string) {
 
         images: { 
             where: { variantId: null },
-            orderBy: { position: 'asc' } 
+            orderBy: { position: 'asc' },
+            include: { media: true } 
         },
         attributes: { orderBy: { position: 'asc' } },
         

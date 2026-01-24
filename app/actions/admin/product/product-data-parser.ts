@@ -4,12 +4,10 @@ import { ProductType, TaxStatus, ProductStatus } from "@prisma/client";
 import { parseJSON, cleanPrice } from "@/app/actions/admin/product/product-utils"; 
 
 export const parseProductFormData = (formData: FormData) => {
-    // নাম এবং স্লাগের আগে-পরে স্পেস রিমুভ করা হয়েছে
     const name = (formData.get("name") as string)?.trim(); 
     const rawSlug = (formData.get("slug") as string)?.trim();
     const slug = rawSlug && rawSlug !== "" ? rawSlug : name; 
 
-    // Enum Conversions
     const statusInput = (formData.get("status") as string || "DRAFT").toUpperCase();
     const typeInput = (formData.get("productType") as string || "SIMPLE").toUpperCase();
     
@@ -20,6 +18,7 @@ export const parseProductFormData = (formData: FormData) => {
 
     return {
         id: formData.get("id") as string,
+        version: parseInt(formData.get("version") as string) || 1, // 🔥 Added Version
         name,
         slug,
         description: formData.get("description") as string,
@@ -28,23 +27,22 @@ export const parseProductFormData = (formData: FormData) => {
         productType: typeInput as ProductType,
         status: statusInput as ProductStatus, 
 
-        // Featured Flag
         isFeatured: formData.get("isFeatured") === "true",
 
-        // Bundle Items
         bundleItems: parseJSON<any[]>(formData.get("bundleItems") as string, []),
+        giftCardAmounts: parseJSON<number[]>(formData.get("giftCardAmounts") as string, []), // 🔥 Added Gift Card
 
-        // Media Fields
         videoUrl: formData.get("videoUrl") as string || null,
         videoThumbnail: formData.get("videoThumbnail") as string || null,
         
         featuredImage: formData.get("featuredImage") as string || null,
         featuredMediaId: formData.get("featuredMediaId") as string || null,
 
-        // Demographics & JSON Fields
         gender: formData.get("gender") as string || null,
         ageGroup: formData.get("ageGroup") as string || null,
-        metafields: parseJSON(formData.get("metafields") as string, null), 
+        
+        // 🔥 Updated JSON Parsers
+        metafields: parseJSON(formData.get("metafields") as string, []), 
         seoSchema: parseJSON(formData.get("seoSchema") as string, null),   
 
         price: cleanPrice(formData.get("price") as string),
@@ -57,7 +55,6 @@ export const parseProductFormData = (formData: FormData) => {
         trackQuantity: formData.get("trackQuantity") === "true",
         stock: parseInt(formData.get("stock") as string) || 0, 
 
-        // Multi-Warehouse Inventory Data Parsing
         inventoryData: parseJSON<any[]>(formData.get("inventoryData") as string, []),
 
         isVirtual: formData.get("isVirtual") === "true",
@@ -69,11 +66,9 @@ export const parseProductFormData = (formData: FormData) => {
         height: formData.get("height") ? parseFloat(formData.get("height") as string) : null,
 
         categoryName: formData.get("category") as string,
-        // 🔥 FIX: Added missing categoryId
         categoryId: formData.get("categoryId") as string || null,
         
         vendorName: formData.get("vendor") as string,
-        // 🔥 FIX: Added missing brandId
         brandId: formData.get("brandId") as string || null,
 
         purchaseNote: formData.get("purchaseNote") as string,

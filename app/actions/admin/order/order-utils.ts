@@ -1,10 +1,40 @@
 //app/actions/admin/order/order-utils.ts
 
 import { db } from "@/lib/prisma";
-// ✅ FIX: আপনার নির্দেশ অনুযায়ী সঠিক পাথ
 import { sendNotification } from "@/app/api/email/send-notification";
+import { Prisma } from "@prisma/client";
 
-// 1. ANALYTICS
+export const safeFloat = (val: any): number => {
+  if (!val) return 0;
+  const num = Number(val);
+  return isNaN(num) ? 0 : num;
+};
+
+export const toDecimal = (val: number | string | Prisma.Decimal): number => {
+  return Number(val);
+};
+
+export const add = (a: number, b: number): number => {
+  return Math.round((a + b) + Number.EPSILON * 100) / 100;
+};
+
+export const sub = (a: number, b: number): number => {
+  return Math.round((a - b) + Number.EPSILON * 100) / 100;
+};
+
+export const mul = (a: number, b: number): number => {
+  return Math.round((a * b) + Number.EPSILON * 100) / 100;
+};
+
+export const div = (a: number, b: number): number => {
+  if (b === 0) return 0;
+  return Math.round((a / b) + Number.EPSILON * 100) / 100;
+};
+
+export const round = (num: number): number => {
+  return Math.round(num * 100) / 100;
+};
+
 export async function updateAnalytics(amount: number) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -15,13 +45,11 @@ export async function updateAnalytics(amount: number) {
             create: { date: today, totalSales: amount, totalOrders: 1, visitors: 0 }
         });
     } catch (error) {
-        console.error("❌ Analytics Error:", error);
+        console.error("Analytics Error:", error);
     }
 }
 
-// 2. RESTOCK
 export async function restockInventory(orderId: string) {
-    console.log(`📦 Restocking Inventory for Order: ${orderId}`);
     const order = await db.order.findUnique({
         where: { id: orderId },
         include: { items: true }
@@ -45,12 +73,8 @@ export async function restockInventory(orderId: string) {
     }
 }
 
-// 3. EMAIL TRIGGER (UPDATED)
 export async function sendOrderEmail(orderId: string, eventType: string) {
-    console.log(`📩 [1/3] sendOrderEmail Called. Event: ${eventType}, OrderID: ${orderId}`);
-
     try {
-        // ১. অর্ডার এবং সেটিংস (Admin Email) একসাথে খোঁজা
         const [order, settings, emailConfig] = await Promise.all([
             db.order.findUnique({
                 where: { id: orderId },
@@ -67,54 +91,37 @@ export async function sendOrderEmail(orderId: string, eventType: string) {
         ]);
 
         if (!order) {
-            console.error("❌ Order not found for email.");
             return;
         }
 
-        // কাস্টমার ইমেইল
         const customerEmail = order.user?.email || order.guestEmail;
-
-        // ✅ অ্যাডমিন ইমেইল লজিক:
-        // প্রথমে Store Settings এর মেইল দেখবে, না পেলে Email Config এর Sender Email দেখবে।
         const adminEmail = settings?.storeEmail || emailConfig?.senderEmail;
 
-        // ============================================================
-        // 📧 CUSTOMER EMAIL SENDING
-        // ============================================================
         if (customerEmail) {
             await sendNotification({
-                trigger: eventType, // যেমন: ORDER_PLACED
+                trigger: eventType, 
                 recipient: customerEmail,
                 orderId: orderId, 
                 data: {}
             });
-            console.log(`✅ Customer email queued for: ${customerEmail}`);
         }
 
-        // ============================================================
-        // 👮 ADMIN EMAIL SENDING (Explicitly Set)
-        // ============================================================
         if (adminEmail) {
-            // অ্যাডমিন ট্রিগার নাম সেট করা (যেমন: ADMIN_ORDER_PLACED)
             let adminTrigger = `ADMIN_${eventType}`;
             
             if (eventType === "ORDER_CREATED") {
                 adminTrigger = "ORDER_CREATED_ADMIN";
             }
 
-            // ✅ এখানে সরাসরি Admin Email বসিয়ে দিলাম (আর ফাঁকা স্ট্রিং নয়)
             await sendNotification({
                 trigger: adminTrigger,
                 recipient: adminEmail, 
                 orderId: orderId,
                 data: {}
             });
-            console.log(`✅ Admin email queued for: ${adminEmail}`);
-        } else {
-            console.warn("⚠️ No Admin email found in Store Settings or Email Config.");
-        }
+        } 
 
     } catch (error) {
-        console.error("🔥 EMAIL_TRIGGER_ERROR:", error);
+        console.error("EMAIL_TRIGGER_ERROR:", error);
     }
 }

@@ -156,6 +156,8 @@ interface GlobalStoreContextType {
   locale: string;
   weightUnit: string;
   dimensionUnit: string;
+  dateFormat: string; 
+  timezone: string;   
   
   address: StoreAddress;
   socials: SocialLinks;
@@ -187,6 +189,8 @@ const defaultContext: GlobalStoreContextType = {
   locale: "en-US",
   weightUnit: "",
   dimensionUnit: "",
+  dateFormat: "dd/MM/yyyy",
+  timezone: "UTC",
   address: {},
   socials: {},
   menus: {},
@@ -215,8 +219,8 @@ interface StoreSettingsDTO {
   logo?: string | null;
   favicon?: string | null;
   maintenance: boolean;
-  storeAddress?: any;
-  socialLinks?: any;
+  storeAddress?: StoreAddress | null;
+  socialLinks?: SocialLinks | null;
   generalConfig?: any;
   taxSettings?: any;
   logoMedia?: {
@@ -418,7 +422,6 @@ export function GlobalStoreProvider({
         let maxAmt = 0;
         let surAmt = 0;
 
-        // Safe conversion for Decimal/String/Number
         const safeNum = (val: any) => {
            if(typeof val === 'number') return val;
            if(typeof val === 'string') return parseFloat(val);
@@ -476,6 +479,8 @@ export function GlobalStoreProvider({
     locale: activeLocale,
     weightUnit: s.weightUnit || "",
     dimensionUnit: s.dimensionUnit || "",
+    dateFormat: generalConfig.dateFormat || "dd/MM/yyyy",
+    timezone: generalConfig.timezone || "UTC",
     
     address: (s.storeAddress as StoreAddress) || {},
     socials: (s.socialLinks as SocialLinks) || {},

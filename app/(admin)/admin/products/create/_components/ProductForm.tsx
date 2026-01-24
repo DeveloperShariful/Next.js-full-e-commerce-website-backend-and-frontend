@@ -7,6 +7,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { productSchema, ProductFormValues } from "../schema";
 import { createProduct, updateProduct } from "@/app/actions/admin/product/create-update-product";
@@ -35,33 +36,73 @@ interface ProductFormProps {
   isEdit: boolean;
 }
 
+const STORAGE_KEY = "product_form_draft";
+
 export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState("general");
+  const [hasDraft, setHasDraft] = useState(false);
 
   const methods = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
-    defaultValues: initialData as any ,
+    defaultValues: initialData as any,
     mode: "onChange",
   });
 
-  const { handleSubmit, watch, setValue, formState: { isSubmitting, isDirty } } = methods;
+  const { handleSubmit, watch, reset, setValue, formState: { isSubmitting, isDirty } } = methods;
   
   const productType = watch("productType");
   const isVirtual = watch("isVirtual");
+  const formValues = watch();
 
+  // --- 1. Auto-Save Logic (Local Storage) ---
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isDirty]);
+    if (!isDirty) return;
+    
+    const handler = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(formValues));
+    }, 1000); // Debounce 1s
 
+    return () => clearTimeout(handler);
+  }, [formValues, isDirty]);
+
+  // --- 2. Check for Draft on Mount ---
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Don't restore if editing a different product
+          if (isEdit && parsed.id !== initialData.id) return;
+          if (!isEdit && parsed.id) return; // Don't restore edit draft to create page
+
+          setHasDraft(true);
+        } catch (e) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    }
+  }, [isEdit, initialData.id]);
+
+  const restoreDraft = () => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      reset(parsed);
+      setHasDraft(false);
+      toast.success("Draft restored from local storage");
+    }
+  };
+
+  const discardDraft = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setHasDraft(false);
+    toast.success("Draft discarded");
+  };
+
+  // --- 3. Submit Handler ---
   const onSubmit = async (data: ProductFormValues) => {
     if (isEdit && !isDirty) {
         toast.success("No changes detected.");
@@ -76,7 +117,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     Object.keys(data).forEach((key) => {
         const value = (data as any)[key];
         
-        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles', 'bundleItems', 'inventoryData'].includes(key)) {
+        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles', 'bundleItems', 'inventoryData', 'metafields', 'seoSchema', 'giftCardAmounts'].includes(key)) {
             formData.append(key, JSON.stringify(value));
         } 
         else if (value !== null && value !== undefined) {
@@ -90,6 +131,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
         const result = await action(formData);
 
         if (result.success) {
+          localStorage.removeItem(STORAGE_KEY); // Clear draft on success
           toast.success(isEdit ? "Updated successfully!" : "Product published!", { id: toastId });
           router.push("/admin/products");
           router.refresh();
@@ -106,6 +148,25 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   return (
     <FormProvider {...methods}>
         <div className="m-1 min-h-screen bg-[#f0f0f1] font-sans text-sm text-[#3c434a] relative">
+            <input type="hidden" {...methods.register("version")} />
+            {/* Draft Recovery Alert */}
+            {hasDraft && (
+                <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+                    <div className="flex items-center gap-2 text-yellow-800">
+                        <AlertTriangle size={16} />
+                        <span className="font-medium">Unsaved changes found from your last session.</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={restoreDraft} className="px-3 py-1 bg-yellow-600 text-white rounded text-xs font-bold hover:bg-yellow-700 flex items-center gap-1">
+                            <RefreshCw size={12}/> Restore
+                        </button>
+                        <button onClick={discardDraft} className="px-3 py-1 bg-white border border-yellow-300 text-yellow-800 rounded text-xs font-bold hover:bg-yellow-50">
+                            Discard
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <Header 
                 loading={isSubmitting || isPending} 
                 onSubmit={handleSubmit(onSubmit)} 
@@ -157,8 +218,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                     <option value="SIMPLE">Simple product</option>
                                     <option value="VARIABLE">Variable product</option>
                                     <option value="BUNDLE">Product Bundle</option> 
-                                    <option value="GROUPED">Grouped product</option>
-                                    <option value="EXTERNAL">External/Affiliate product</option>
                                     <option value="GIFT_CARD">Gift Card</option>
                                 </select>
                             </div>
@@ -172,7 +231,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                             </div>
                         </div>
 
-                        <div className="flex flex-col md:flex-row min-h-[300px]">
+                        <div className="flex flex-col md:flex-row min-h-[400px]">
                             <ul className="w-full md:w-44 bg-gray-100 border-b md:border-b-0 md:border-r border-gray-300 pt-1 shrink-0 flex md:flex-col overflow-x-auto md:overflow-visible no-scrollbar">
                                 {[
                                     {id: 'general', label: 'General', show: productType !== 'BUNDLE'}, 

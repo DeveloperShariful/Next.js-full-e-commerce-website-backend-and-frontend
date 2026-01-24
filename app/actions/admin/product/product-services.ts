@@ -38,15 +38,17 @@ export async function handleInventory(tx: any, product: any, data: any, defaultL
                 }
             });
 
-            const oldQty = existingEntry ? existingEntry.quantity : 0;
-            const diff = targetQty - oldQty;
+            const diff = targetQty - (existingEntry ? existingEntry.quantity : 0);
 
             if (existingEntry) {
                 if (diff !== 0) {
                     await tx.inventoryLevel.update({
-                        where: { id: existingEntry.id },
+                        where: { 
+                            id: existingEntry.id,
+                            version: existingEntry.version 
+                        },
                         data: { 
-                            quantity: { increment: diff },
+                            quantity: targetQty,
                             version: { increment: 1 }
                         }
                     });
@@ -272,7 +274,13 @@ export async function handleVariations(tx: any, productId: string, variationsDat
         let variantId = v.id;
 
         if (v.id && !v.id.toString().startsWith("temp_")) {
-            await tx.productVariant.update({ where: { id: v.id }, data: variantData });
+            await tx.productVariant.update({ 
+                where: { id: v.id }, 
+                data: {
+                    ...variantData,
+                    version: { increment: 1 }
+                } 
+            });
         } else {
             const newVar = await tx.productVariant.create({ data: { ...variantData, productId } });
             variantId = newVar.id;
@@ -328,15 +336,14 @@ export async function handleVariations(tx: any, productId: string, variationsDat
                 }
             });
 
-            const oldQty = existingInv ? existingInv.quantity : 0;
-            const diff = targetQty - oldQty;
+            const diff = targetQty - (existingInv ? existingInv.quantity : 0);
 
             if (existingInv) {
                 if (diff !== 0) {
                     await tx.inventoryLevel.update({
-                        where: { id: existingInv.id },
+                        where: { id: existingInv.id, version: existingInv.version },
                         data: { 
-                            quantity: { increment: diff },
+                            quantity: targetQty,
                             version: { increment: 1 }
                         }
                     });

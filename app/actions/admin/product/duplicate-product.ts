@@ -12,10 +12,8 @@ export async function duplicateProduct(id: string) {
     const user = await currentUser();
     if (!user) return { success: false, message: "Unauthorized" };
     
-    // Find internal DB user ID for logging
     const dbUser = await db.user.findUnique({ where: { clerkId: user.id } });
 
-    // ১. অরিজিনাল প্রোডাক্ট খুঁজে বের করা
     const original = await db.product.findUnique({
       where: { id },
       include: {
@@ -24,7 +22,7 @@ export async function duplicateProduct(id: string) {
         brand: true,
         images: true, 
         attributes: true,
-        inventoryLevels: true, // Main product inventory
+        inventoryLevels: true, 
         variants: { 
             include: { 
                 images: true,
@@ -43,7 +41,6 @@ export async function duplicateProduct(id: string) {
 
     await db.$transaction(async (tx) => {
         
-        // কানেকশন লজিকগুলো ভেরিয়েবলে নেওয়া হলো
         const categoryConnect = original.categoryId 
             ? { connect: { id: original.categoryId } } 
             : undefined;
@@ -52,12 +49,10 @@ export async function duplicateProduct(id: string) {
             ? { connect: { id: original.brandId } } 
             : undefined;
 
-        // 🔥 FIX: Featured Media Connect Logic
         const mediaConnect = original.featuredMediaId
             ? { connect: { id: original.featuredMediaId } }
             : undefined;
 
-        // ২. প্রথমে মেইন প্রোডাক্ট তৈরি
         const newProduct = await tx.product.create({
             data: {
                 name: newName,
@@ -78,12 +73,11 @@ export async function duplicateProduct(id: string) {
                 height: original.height,
                 isVirtual: original.isVirtual,
                 isDownloadable: original.isDownloadable,
+                version: 1, 
                 
-                // 🔥 FIX: সরাসরি featuredMediaId ব্যবহার না করে connect ব্যবহার করা হয়েছে
                 featuredImage: original.featuredImage,
                 ...(mediaConnect && { featuredMedia: mediaConnect }), 
 
-                // Pre-order Fields Copied
                 isPreOrder: original.isPreOrder,
                 preOrderReleaseDate: original.preOrderReleaseDate,
                 preOrderLimit: original.preOrderLimit,
@@ -92,7 +86,6 @@ export async function duplicateProduct(id: string) {
                 upsellIds: original.upsellIds,
                 crossSellIds: original.crossSellIds,
                 
-                // Relations
                 category: categoryConnect,
                 brand: brandConnect,
                 
@@ -106,7 +99,6 @@ export async function duplicateProduct(id: string) {
                         .map(img => ({
                             url: img.url,
                             position: img.position,
-                            // Media connect for gallery images
                             ...(img.mediaId && { media: { connect: { id: img.mediaId } } }),
                             altText: img.altText
                         }))
@@ -124,19 +116,18 @@ export async function duplicateProduct(id: string) {
             }
         });
 
-        // ৩. মেইন প্রোডাক্টের ইনভেন্টরি লেভেল কপি করা
         if (original.inventoryLevels.length > 0) {
             await tx.inventoryLevel.createMany({
                 data: original.inventoryLevels.map(inv => ({
                     productId: newProduct.id,
                     locationId: inv.locationId,
                     quantity: inv.quantity,
-                    variantId: null
+                    variantId: null,
+                    version: 1
                 }))
             });
         }
 
-        // ৪. ভেরিয়েন্ট এবং তাদের ইনভেন্টরি তৈরি
         if (original.variants.length > 0) {
             for (const v of original.variants) {
                 const newVariant = await tx.productVariant.create({
@@ -149,8 +140,8 @@ export async function duplicateProduct(id: string) {
                         attributes: v.attributes as any,
                         trackQuantity: v.trackQuantity,
                         weight: v.weight,
+                        version: 1,
                         
-                        // Pre-order for Variants
                         isPreOrder: v.isPreOrder,
                         preOrderReleaseDate: v.preOrderReleaseDate,
                         
@@ -159,28 +150,26 @@ export async function duplicateProduct(id: string) {
                                 url: vImg.url,
                                 position: vImg.position,
                                 productId: newProduct.id,
-                                // Media connect for variant images
                                 ...(vImg.mediaId && { media: { connect: { id: vImg.mediaId } } }) 
                             }))
                         }
                     }
                 });
 
-                // ভেরিয়েন্টের ইনভেন্টরি লেভেল
                 if (v.inventoryLevels && v.inventoryLevels.length > 0) {
                     await tx.inventoryLevel.createMany({
                         data: v.inventoryLevels.map(inv => ({
                             productId: newProduct.id,
                             variantId: newVariant.id,
                             locationId: inv.locationId,
-                            quantity: inv.quantity
+                            quantity: inv.quantity,
+                            version: 1
                         }))
                     });
                 }
             }
         }
 
-        // ৬. লগ অ্যাক্টিভিটি
         if (dbUser) {
             await tx.activityLog.create({
                 data: {

@@ -7,7 +7,6 @@ import { revalidatePath } from "next/cache";
 import { ProductStatus } from "@prisma/client";
 import { currentUser } from "@clerk/nextjs/server";
 
-// Helper to get DB User ID
 async function getDbUserId() {
     const user = await currentUser();
     if (!user) return null;
@@ -15,18 +14,15 @@ async function getDbUserId() {
     return dbUser?.id;
 }
 
-// --- ১. সিঙ্গেল প্রোডাক্ট ডিলিট (Smart Logic) ---
 export async function deleteProduct(id: string) {
     try {
         const userId = await getDbUserId();
 
-        // চেক: এই প্রোডাক্ট কি কখনো বিক্রি হয়েছে?
         const hasOrders = await db.orderItem.findFirst({
             where: { productId: id }
         });
 
         if (hasOrders) {
-            // A. বিক্রি হয়ে থাকলে => শুধু Archive করব (নিরাপদ)
             await db.product.update({
                 where: { id },
                 data: { 
@@ -50,9 +46,7 @@ export async function deleteProduct(id: string) {
             return { success: true, message: "Product archived (Has sales history)" };
 
         } else {
-            // B. বিক্রি না হয়ে থাকলে => সব ক্লিন করে পার্মানেন্ট ডিলিট
             await db.$transaction(async (tx) => {
-                // ১. ডিপেন্ডেন্সি ক্লিন করা
                 await tx.inventoryLevel.deleteMany({ where: { productId: id } });
                 await tx.cartItem.deleteMany({ where: { productId: id } });
                 await tx.wishlist.deleteMany({ where: { productId: id } });
@@ -64,7 +58,6 @@ export async function deleteProduct(id: string) {
                     where: { OR: [{ parentProductId: id }, { childProductId: id }] } 
                 });
 
-                // ২. মেইন প্রোডাক্ট ডিলিট
                 await tx.product.delete({ where: { id } });
             });
 
@@ -90,7 +83,6 @@ export async function deleteProduct(id: string) {
     }
 }
 
-// --- ২. বাল্ক অ্যাকশন (Smart Bulk Logic) ---
 export async function bulkProductAction(formData: FormData) {
     const ids = JSON.parse(formData.get("ids") as string);
     const action = formData.get("action") as string;
@@ -108,21 +100,17 @@ export async function bulkProductAction(formData: FormData) {
                 break;
             
             case "delete":
-                // 🔥 SMART DELETE LOGIC FOR BULK
-                // ১. চেক করা কোন কোন প্রোডাক্টের অর্ডার আছে
                 const soldItems = await db.orderItem.findMany({
                     where: { productId: { in: ids } },
                     select: { productId: true },
                     distinct: ['productId']
                 });
 
-                // ২. লিস্ট আলাদা করা
                 const soldProductIds = soldItems.map(item => item.productId).filter((id): id is string => id !== null);
                 const unsoldProductIds = ids.filter((id: string) => !soldProductIds.includes(id));
 
                 await db.$transaction(async (tx) => {
                     
-                    // A. যেগুলো বিক্রি হয়েছে => সেগুলোকে জোর করে ARCHIVED করা হবে
                     if (soldProductIds.length > 0) {
                         await tx.product.updateMany({
                             where: { id: { in: soldProductIds } },
@@ -133,9 +121,7 @@ export async function bulkProductAction(formData: FormData) {
                         });
                     }
 
-                    // B. যেগুলো বিক্রি হয়নি => সেগুলোকে পার্মানেন্ট ডিলিট করা হবে
                     if (unsoldProductIds.length > 0) {
-                        // ১. ইনভেন্টরি, কার্ট, উইশলিস্ট ডিলিট
                         await tx.inventoryLevel.deleteMany({ where: { productId: { in: unsoldProductIds } } });
                         await tx.cartItem.deleteMany({ where: { productId: { in: unsoldProductIds } } });
                         await tx.wishlist.deleteMany({ where: { productId: { in: unsoldProductIds } } });
@@ -146,7 +132,6 @@ export async function bulkProductAction(formData: FormData) {
                             where: { OR: [{ parentProductId: { in: unsoldProductIds } }, { childProductId: { in: unsoldProductIds } }] } 
                         });
 
-                        // ২. প্রোডাক্ট ডিলিট
                         await tx.product.deleteMany({
                             where: { id: { in: unsoldProductIds } }
                         });

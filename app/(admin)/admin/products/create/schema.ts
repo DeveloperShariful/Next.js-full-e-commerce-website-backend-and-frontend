@@ -2,7 +2,6 @@
 
 import { z } from "zod";
 
-// --- Helpers ---
 const emptyToNumber = z.preprocess(
   (val) => (val === "" || val === null || val === undefined ? null : Number(val)),
   z.number().nullable().optional()
@@ -13,17 +12,6 @@ const emptyToString = z.preprocess(
   z.string().optional()
 );
 
-const jsonString = z.string().optional().refine((val) => {
-  if (!val) return true;
-  try {
-    JSON.parse(val);
-    return true;
-  } catch (e) {
-    return false;
-  }
-}, { message: "Invalid JSON format" });
-
-// 🔥 NEW: Image Object Schema (Supports both legacy string & new object)
 const imageSchema = z.object({
   url: z.string(),
   mediaId: z.string().optional().nullable(),
@@ -33,7 +21,7 @@ const imageSchema = z.object({
 
 export const productSchema = z.object({
   id: z.string().optional(),
-  version: z.number().optional(), 
+  version: z.number().default(1),
   
   name: z.string().min(1, "Product name is required"),
   slug: z.string().optional(),
@@ -44,8 +32,17 @@ export const productSchema = z.object({
   metaDesc: emptyToString,
   seoCanonicalUrl: emptyToString,
   
-  metafields: jsonString,
-  seoSchema: jsonString,
+  metafields: z.array(z.object({
+      key: z.string().min(1, "Key required"),
+      value: z.string().min(1, "Value required")
+  })).default([]),
+
+  seoSchema: z.object({
+      ogTitle: z.string().optional(),
+      ogDescription: z.string().optional(),
+      ogImage: z.string().optional(),
+      robots: z.string().optional()
+  }).optional().nullable(),
 
   productType: z.enum(["SIMPLE", "VARIABLE", "VIRTUAL", "DOWNLOADABLE", "BUNDLE", "GIFT_CARD"]).default("SIMPLE"),
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).default("DRAFT"),
@@ -70,7 +67,6 @@ export const productSchema = z.object({
   backorderStatus: z.enum(["DO_NOT_ALLOW", "ALLOW", "ALLOW_BUT_NOTIFY"]).default("DO_NOT_ALLOW"),
   soldIndividually: z.boolean().default(false),
 
-  // 🔥 Pre-order Logic
   isPreOrder: z.boolean().default(false),
   preOrderReleaseDate: z.string().optional().nullable(),
   preOrderMessage: emptyToString,
@@ -89,7 +85,8 @@ export const productSchema = z.object({
   digitalFiles: z.array(z.object({
     id: z.string().optional(),
     name: z.string(),
-    url: z.string().url("Invalid URL")
+    url: z.string().url("Invalid URL"),
+    isSecure: z.boolean().default(false)
   })).default([]),
   
   downloadLimit: emptyToNumber,
@@ -105,11 +102,9 @@ export const productSchema = z.object({
   upsells: z.array(z.string()).default([]),
   crossSells: z.array(z.string()).default([]),
   
-  // 🔥 Media Relations
   featuredMediaId: z.string().nullable().optional(),
   featuredImage: z.string().nullable().optional(),
   
-  // 🔥 Updated to accept String OR Object Array
   galleryImages: z.array(z.union([z.string(), imageSchema])).default([]),
   
   videoUrl: emptyToString,
@@ -124,7 +119,8 @@ export const productSchema = z.object({
     values: z.array(z.string()),
     visible: z.boolean(),
     variation: z.boolean(),
-    position: z.number().optional()
+    position: z.number().optional(),
+    saveGlobally: z.boolean().optional()
   })).default([]),
 
   variations: z.array(z.object({
@@ -162,6 +158,8 @@ export const productSchema = z.object({
     quantity: z.coerce.number().min(1)
   })).default([]),
 
+  giftCardAmounts: z.array(z.number()).default([]),
+
   purchaseNote: emptyToString,
   menuOrder: z.coerce.number().default(0),
   enableReviews: z.boolean().default(true),
@@ -186,7 +184,6 @@ export const productSchema = z.object({
     }
   }
 
-  // Pre-order Date Check
   if (data.isPreOrder && !data.preOrderReleaseDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -195,7 +192,6 @@ export const productSchema = z.object({
     });
   }
 
-  // Required Arrays Check
   if (data.productType === "VARIABLE") {
     if (data.attributes.length === 0) {
       ctx.addIssue({

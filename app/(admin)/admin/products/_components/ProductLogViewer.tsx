@@ -1,8 +1,10 @@
 // File: app/admin/products/_components/ProductLogViewer.tsx
+
+
 "use client";
 
 import { useState, useEffect } from "react";
-import { History, X, RefreshCw, User, Loader2, Trash2, Filter, ArrowRight, Package } from "lucide-react";
+import { History, X, RefreshCw, User, Loader2, Trash2, Filter, Package, ArrowRight } from "lucide-react";
 import { getProductActivityLogs } from "@/app/actions/admin/product/get-logs"; 
 import { deleteActivityLogs } from "@/app/actions/admin/product/delete-log"; 
 import Image from "next/image";
@@ -83,10 +85,10 @@ export default function ProductLogViewer() {
     return String(val);
   };
 
+  // 🔥 Visual Diff Render Logic (Advanced Feature)
   const renderDetails = (details: any) => {
     if (!details || typeof details !== 'object') return null;
     
-    // 🔥 Remove productName from the loop so it doesn't show in diffs
     const { productName, ...rest } = details;
     
     const entries = Object.entries(rest);
@@ -100,23 +102,21 @@ export default function ProductLogViewer() {
                 if (isDiff) {
                     return (
                         <div key={key} className="flex flex-col border-b border-gray-200 last:border-0 pb-2 last:pb-0">
-                            <span className="font-bold capitalize text-gray-700 mb-1">
+                            <span className="font-bold capitalize text-gray-700 mb-1 text-xs">
                                 {key.replace(/([A-Z])/g, ' $1').trim()}
                             </span>
                             
-                            <div className="flex flex-col gap-1 pl-2">
-                                <div className="flex items-start gap-2 text-xs bg-green-50 border border-green-100 p-1.5 rounded">
-                                    <span className="font-bold text-green-700 min-w-[30px]">New:</span>
-                                    <span className="text-gray-800 break-all font-medium">
-                                        {formatValue(value.new)}
-                                    </span>
+                            <div className="flex items-center gap-2 text-xs">
+                                {/* OLD Value */}
+                                <div className="flex-1 bg-red-50 border border-red-100 p-1.5 rounded text-red-700 line-through decoration-red-400/50 break-all opacity-80">
+                                    {formatValue(value.old)}
                                 </div>
-
-                                <div className="flex items-start gap-2 text-xs bg-red-50 border border-red-100 p-1.5 rounded opacity-80">
-                                    <span className="font-bold text-red-600 min-w-[30px]">Old:</span>
-                                    <span className="text-gray-500 break-all line-through decoration-red-400">
-                                        {formatValue(value.old)}
-                                    </span>
+                                
+                                <ArrowRight size={14} className="text-gray-400 shrink-0"/>
+                                
+                                {/* NEW Value */}
+                                <div className="flex-1 bg-green-50 border border-green-100 p-1.5 rounded text-green-800 font-medium break-all">
+                                    {formatValue(value.new)}
                                 </div>
                             </div>
                         </div>
@@ -215,15 +215,11 @@ export default function ProductLogViewer() {
                 </div>
               )}
 
-              {logs.map((log) => {
-                // 🔥 EXTRACT PRODUCT NAME
-                const productName = log.details?.productName;
-
-                return (
-                    <div 
-                        key={log.id} 
-                        className={`bg-white p-3 rounded border shadow-sm text-sm transition-all ${selectedIds.includes(log.id) ? 'border-blue-400 ring-1 ring-blue-400 bg-blue-50/30' : 'border-gray-200 hover:border-gray-300'}`}
-                    >
+              {logs.map((log) => (
+                <div 
+                    key={log.id} 
+                    className={`bg-white p-3 rounded border shadow-sm text-sm transition-all ${selectedIds.includes(log.id) ? 'border-blue-400 ring-1 ring-blue-400 bg-blue-50/30' : 'border-gray-200 hover:border-gray-300'}`}
+                >
                     <div className="flex gap-3">
                         <div className="pt-1">
                             <input 
@@ -267,11 +263,11 @@ export default function ProductLogViewer() {
                                 }
                             </div>
 
-                            {/* 🔥 PRODUCT NAME DISPLAY (Updated Logic) */}
-                            {productName && (
+                            {/* Product Name */}
+                            {log.details?.productName && (
                                 <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-600">
                                     <Package size={14} className="text-gray-400"/>
-                                    <span className="font-bold text-gray-800">{productName}</span>
+                                    <span className="font-bold text-gray-800">{log.details.productName}</span>
                                 </div>
                             )}
 
@@ -279,9 +275,8 @@ export default function ProductLogViewer() {
                             
                         </div>
                     </div>
-                    </div>
-                );
-              })}
+                </div>
+              ))}
 
               {hasMore && (
                   <button 

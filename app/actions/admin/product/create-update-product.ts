@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData } from "@/app/actions/admin/product/product-utils"; 
+import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/admin/product/product-utils"; 
 import { currentUser } from "@clerk/nextjs/server"; 
 
 import { parseProductFormData } from "./product-data-parser";
@@ -47,6 +47,31 @@ async function syncSystemAttribute(tx: any, name: string, value: string | null) 
                 values: [value]
             }
         });
+    }
+}
+
+async function syncGlobalAttributeValues(tx: any, attributesData: any[]) {
+    for (const attr of attributesData) {
+        if (attr.saveGlobally && attr.name) {
+             const slug = attr.name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
+             const existing = await tx.attribute.findUnique({ where: { slug } });
+             if (existing) {
+                 const newValues = Array.from(new Set([...existing.values, ...attr.values]));
+                 await tx.attribute.update({
+                     where: { id: existing.id },
+                     data: { values: newValues }
+                 });
+             } else {
+                 await tx.attribute.create({
+                     data: {
+                         name: attr.name,
+                         slug,
+                         type: "TEXT",
+                         values: attr.values
+                     }
+                 });
+             }
+        }
     }
 }
 
@@ -99,7 +124,19 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         if (existingName) {
             return { success: false, message: `Product name "${data.name}" already exists.` };
         }
-    } 
+    } else if (type === "UPDATE" && data.id) {
+        const currentProduct = await db.product.findUnique({ where: { id: data.id }, select: { version: true } });
+         if (currentProduct && (data.version && currentProduct.version !== data.version)) { 
+            return { success: false, message: "Conflict: Product was updated by someone else. Please refresh." };
+          }
+    }
+
+    if (data.productType === 'BUNDLE' && data.bundleItems.length > 0 && data.id) {
+        const childIds = data.bundleItems.map((b: any) => b.childProductId);
+        if (await checkBundleCycle(data.id, childIds)) {
+             return { success: false, message: "Cyclic dependency detected in bundle items." };
+        }
+    }
 
     const finalSlug = await generateUniqueSlug(data.slug, "product", data.id);
 
@@ -116,35 +153,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             }
         }
 
-        await Promise.all(data.attributesData.map(async (attr) => {
-            if (!attr.name) return;
-            const attrSlug = attr.name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
-            const existingGlobal = await db.attribute.findUnique({ where: { slug: attrSlug } });
-            
-            if (existingGlobal) {
-                const mergedValues = Array.from(new Set([...existingGlobal.values, ...attr.values]));
-                if (mergedValues.length > existingGlobal.values.length) {
-                    await db.attribute.update({ where: { id: existingGlobal.id }, data: { values: mergedValues } });
-                }
-            } else {
-                await db.attribute.create({ data: { name: attr.name, slug: attrSlug, values: attr.values } });
-            }
-        }));
-
-        const tagMap = new Map<string, string>();
-        data.tagsList.forEach(tag => {
-            const trimmedTag = tag.trim();
-            if(!trimmedTag) return;
-            const slug = trimmedTag.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
-            if(slug) {
-                tagMap.set(slug, trimmedTag); 
-            }
+        const tagOperations = data.tagsList.map(tag => {
+            const slug = tag.trim().toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
+            return {
+                where: { slug },
+                create: { name: tag.trim(), slug }
+            };
         });
-
-        const tagOperations = Array.from(tagMap.entries()).map(([slug, name]) => ({
-            where: { slug: slug },
-            create: { name: name, slug: slug }
-        }));
 
         let oldProductData: any = null;
         if (type === "UPDATE" && data.id) {
@@ -183,9 +198,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
             await syncSystemAttribute(tx, "Gender", data.gender);
             await syncSystemAttribute(tx, "Age Group", data.ageGroup);
+            await syncGlobalAttributeValues(tx, data.attributesData);
 
-            // --- SMART SAVE & DIFF LOGIC ---
-            // Normalize Arrays for Comparison
+            let calculatedStock = data.stock;
+            if (data.productType === 'BUNDLE') {
+                calculatedStock = await calculateBundleStock(tx, data.bundleItems);
+            }
+
             const normalizeInventory = (items: any[]) => items?.map(i => ({ loc: i.locationId, qty: i.quantity })).sort((a,b) => a.loc.localeCompare(b.loc)) || [];
             const normalizeImages = (imgs: any[]) => imgs?.map(i => (typeof i === 'string' ? i : i.url)).sort() || [];
             const normalizeAttributes = (attrs: any[]) => attrs?.map(a => ({ n: a.name, v: [...(a.values || [])].sort() })).sort((a,b) => a.n.localeCompare(b.n)) || [];
@@ -239,7 +258,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 normalizeAttributes(data.attributesData)
             );
 
-            // Detailed Variation Check
             const variationsChanged = data.productType === 'VARIABLE' && (!oldProductData || (
                 oldProductData.variants.length !== data.variationsData.length ||
                 !isDeepEqual(
@@ -255,7 +273,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
             const anyChanges = scalarsChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged;
 
-            // 🔥 EARLY EXIT IF NO CHANGES
             if (type === "UPDATE" && !anyChanges) {
                 return { success: true, message: "No changes detected.", productId: data.id };
             }
@@ -301,6 +318,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 sku: data.sku,
                 barcode: data.barcode,
                 trackQuantity: data.trackQuantity,
+                stock: calculatedStock,
                 weight: data.weight,
                 length: data.length,
                 width: data.width,
@@ -345,6 +363,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 purchaseNote: data.purchaseNote,
                 menuOrder: data.menuOrder,
                 enableReviews: data.enableReviews,
+                version: { increment: 1 },
                 
                 taxStatus: data.taxStatus,
                 taxRate: taxRateRelation,
@@ -388,10 +407,9 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 });
             }
 
-            // --- EXECUTE ONLY NEEDED HANDLERS ---
             const promises = [];
 
-            if (inventoryChanged || type === "CREATE") {
+            if ((inventoryChanged || type === "CREATE") && data.productType !== 'BUNDLE') {
                 promises.push(handleInventory(tx, product, data, locationId, dbUser!.id));
             }
             if (imagesChanged || type === "CREATE") {
@@ -431,10 +449,9 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 });
             }
 
-            // 🔥 SERIALIZATION: Ensure Decimal/Date objects are clean for client
             return serializeData(product);
 
-        }, { maxWait: 10000, timeout: 30000 });
+        }, { maxWait: 20000, timeout: 120000 }); // 🔥 Timeout Increased to 120s (2 mins)
 
         if ("success" in savedProduct) {
             return savedProduct;
@@ -454,10 +471,15 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             const target = error.meta?.target;
             if (Array.isArray(target)) {
                 if (target.includes('name')) return { success: false, message: `The name "${data.name}" is already taken.` };
-                if (target.includes('slug')) return { success: false, message: "URL Slug collision." };
+                if (target.includes('slug')) return { success: false, message: "URL Slug collision. Please try again." };
                 if (target.includes('sku')) return { success: false, message: `SKU "${data.sku}" is already in use.` };
             }
             return { success: false, message: "Duplicate value found (Tags, SKU, or Name)." };
+        }
+
+        // Prisma Transaction Error Handling
+        if (error.code === 'P2028') {
+             return { success: false, message: "Operation timed out due to too many variations. Please try saving fewer variations at once." };
         }
 
         return { success: false, message: "Failed to save product. " + (error.message || "") };

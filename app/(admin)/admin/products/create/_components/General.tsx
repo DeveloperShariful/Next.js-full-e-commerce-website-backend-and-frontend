@@ -9,7 +9,7 @@ import { X, ChevronDown, Check, Plus, Info } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { ProductFormData } from "../types";
 
-// --- Creatable Select Component (Same as before) ---
+// Helper Component for Searchable Select
 const CreatableSelect = ({ 
     options, 
     value, 
@@ -105,15 +105,17 @@ const CreatableSelect = ({
 export default function General() {
     const { register, watch, setValue, formState: { errors } } = useFormContext<ProductFormData>();
     const data = watch();
+    const productType = watch("productType");
+    const giftCardAmounts = watch("giftCardAmounts") || [];
     
     const [taxClasses, setTaxClasses] = useState<{id: string, name: string}[]>([]);
     const [genderOptions, setGenderOptions] = useState<string[]>([]);
     const [ageGroupOptions, setAgeGroupOptions] = useState<string[]>([]);
     const [showSchedule, setShowSchedule] = useState(!!data.saleStart);
+    const [amountInput, setAmountInput] = useState("");
     
-    // 🔥 FIX: Add Fallback if symbol is missing (e.g. "$")
     const { symbol, tax } = useGlobalStore(); 
-    const currency = symbol || "$"; // ডিফল্ট কারেন্সি সিম্বল
+    const currency = symbol || "$";
 
     useEffect(() => {
         getTaxClasses().then(res => { if(res.success) setTaxClasses(res.data as any) });
@@ -127,12 +129,24 @@ export default function General() {
 
     const addFile = () => {
         const currentFiles = data.digitalFiles || [];
-        setValue("digitalFiles", [...currentFiles, { name: "", url: "" }], { shouldDirty: true });
+        setValue("digitalFiles", [...currentFiles, { name: "", url: "", isSecure: false }], { shouldDirty: true });
     };
 
     const removeFile = (index: number) => {
         const currentFiles = data.digitalFiles || [];
         setValue("digitalFiles", currentFiles.filter((_, i) => i !== index), { shouldDirty: true });
+    };
+
+    const addGiftAmount = () => {
+        const val = parseFloat(amountInput);
+        if (val > 0 && !giftCardAmounts.includes(val)) {
+            setValue("giftCardAmounts", [...giftCardAmounts, val].sort((a,b)=>a-b), { shouldDirty: true });
+            setAmountInput("");
+        }
+    };
+
+    const removeGiftAmount = (val: number) => {
+        setValue("giftCardAmounts", giftCardAmounts.filter(a => a !== val), { shouldDirty: true });
     };
 
     return (
@@ -150,7 +164,6 @@ export default function General() {
             </div>
 
             <div className="grid grid-cols-3 gap-4 items-center">
-                {/* 🔥 FIX: Using 'currency' variable which has fallback */}
                 <label className="text-right font-medium text-xs">Regular price ({currency})</label>
                 <div className="col-span-2">
                     <input 
@@ -164,59 +177,88 @@ export default function General() {
                 </div>
             </div>
 
-            <div>
-                <div className="grid grid-cols-3 gap-4 items-center">
-                    {/* 🔥 FIX: Using 'currency' variable */}
-                    <label className="text-right font-medium text-xs">Sale price ({currency})</label>
-                    <div className="col-span-2 flex items-center gap-2">
-                        <input 
-                            type="number" 
-                            step="0.01"
-                            {...register("salePrice")}
-                            className="w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
-                            placeholder="0.00"
-                        />
-                        <button 
-                            type="button" 
-                            onClick={() => {
-                                setShowSchedule(!showSchedule);
-                                if (showSchedule) {
-                                    setValue("saleStart", null, { shouldDirty: true });
-                                    setValue("saleEnd", null, { shouldDirty: true });
-                                }
-                            }}
-                            className="text-xs text-[#2271b1] hover:underline whitespace-nowrap"
-                        >
-                            {showSchedule ? "Cancel" : "Schedule"}
-                        </button>
-                    </div>
-                </div>
-
-                {showSchedule && (
-                    <div className="mt-2 grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-1">
-                        <div className="col-start-2 col-span-2 flex gap-2">
-                            <div className="w-1/2">
-                                <input 
-                                    type="date" 
-                                    {...register("saleStart")}
-                                    className="w-full border border-gray-400 px-2 py-1 rounded-sm text-xs outline-none focus:border-[#2271b1]"
-                                />
-                            </div>
-                            <div className="w-1/2">
-                                <input 
-                                    type="date" 
-                                    {...register("saleEnd")}
-                                    className="w-full border border-gray-400 px-2 py-1 rounded-sm text-xs outline-none focus:border-[#2271b1]"
-                                />
-                                {errors.saleEnd && <p className="text-red-500 text-[10px] mt-1">{errors.saleEnd.message}</p>}
-                            </div>
+            {/* Sale Price (Hidden for Gift Cards) */}
+            {productType !== 'GIFT_CARD' && (
+                <div>
+                    <div className="grid grid-cols-3 gap-4 items-center">
+                        <label className="text-right font-medium text-xs">Sale price ({currency})</label>
+                        <div className="col-span-2 flex items-center gap-2">
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                {...register("salePrice")}
+                                className="w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                                placeholder="0.00"
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => {
+                                    setShowSchedule(!showSchedule);
+                                    if (showSchedule) {
+                                        setValue("saleStart", null, { shouldDirty: true });
+                                        setValue("saleEnd", null, { shouldDirty: true });
+                                    }
+                                }}
+                                className="text-xs text-[#2271b1] hover:underline whitespace-nowrap"
+                            >
+                                {showSchedule ? "Cancel" : "Schedule"}
+                            </button>
                         </div>
                     </div>
-                )}
-            </div>
+
+                    {showSchedule && (
+                        <div className="mt-2 grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-1">
+                            <div className="col-start-2 col-span-2 flex gap-2">
+                                <div className="w-1/2">
+                                    <input 
+                                        type="date" 
+                                        {...register("saleStart")}
+                                        className="w-full border border-gray-400 px-2 py-1 rounded-sm text-xs outline-none focus:border-[#2271b1]"
+                                    />
+                                </div>
+                                <div className="w-1/2">
+                                    <input 
+                                        type="date" 
+                                        {...register("saleEnd")}
+                                        className="w-full border border-gray-400 px-2 py-1 rounded-sm text-xs outline-none focus:border-[#2271b1]"
+                                    />
+                                    {errors.saleEnd && <p className="text-red-500 text-[10px] mt-1">{errors.saleEnd.message}</p>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {productType === 'GIFT_CARD' && (
+                 <div className="bg-purple-50 border border-purple-200 rounded p-4 animate-in fade-in">
+                     <h3 className="text-xs font-bold text-purple-900 mb-2">Gift Card Configuration</h3>
+                     
+                     <label className="text-xs font-medium text-purple-800">Pre-defined Amounts</label>
+                     <div className="flex gap-2 mb-2">
+                         <input 
+                            type="number" 
+                            value={amountInput} 
+                            onChange={e => setAmountInput(e.target.value)}
+                            className="border border-purple-300 rounded px-2 py-1 text-sm outline-none focus:border-purple-500 w-24"
+                            placeholder="Amount"
+                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addGiftAmount())}
+                         />
+                         <button type="button" onClick={addGiftAmount} className="bg-purple-600 text-white px-3 text-xs rounded font-bold hover:bg-purple-700">Add</button>
+                     </div>
+
+                     <div className="flex flex-wrap gap-2">
+                         {giftCardAmounts.map(amt => (
+                             <span key={amt} className="bg-white border border-purple-300 text-purple-700 px-2 py-1 rounded text-xs flex items-center gap-1 font-mono">
+                                 {amt}
+                                 <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => removeGiftAmount(amt)}/>
+                             </span>
+                         ))}
+                     </div>
+                 </div>
+            )}
 
             <div className="grid grid-cols-3 gap-4 items-center">
-                {/* 🔥 FIX: Using 'currency' variable */}
                 <label className="text-right font-medium text-xs text-gray-500">Cost per item ({currency})</label>
                 <div className="col-span-2">
                     <input 
@@ -320,23 +362,31 @@ export default function General() {
                         </div>
                         
                         {data.digitalFiles?.map((file, i) => (
-                            <div key={i} className="mb-2 bg-white border border-gray-200 p-2 rounded flex gap-2 items-start shadow-sm">
-                                <div className="flex-1 space-y-2">
-                                    <input 
-                                        placeholder="File Name" 
-                                        {...register(`digitalFiles.${i}.name`)}
-                                        className="w-full border border-gray-300 px-2 py-1 text-xs rounded focus:border-[#2271b1] outline-none" 
-                                    />
-                                    <input 
-                                        placeholder="File URL" 
-                                        {...register(`digitalFiles.${i}.url`)}
-                                        className="w-full border border-gray-300 px-2 py-1 text-xs rounded focus:border-[#2271b1] outline-none" 
-                                    />
-                                    {errors.digitalFiles?.[i]?.url && (
-                                        <p className="text-red-500 text-[10px]">{errors.digitalFiles[i]?.url?.message}</p>
-                                    )}
+                            <div key={i} className="mb-2 bg-white border border-gray-200 p-2 rounded flex flex-col gap-2 shadow-sm">
+                                <div className="flex gap-2 items-start">
+                                    <div className="flex-1 space-y-2">
+                                        <input 
+                                            placeholder="File Name" 
+                                            {...register(`digitalFiles.${i}.name`)}
+                                            className="w-full border border-gray-300 px-2 py-1 text-xs rounded focus:border-[#2271b1] outline-none" 
+                                        />
+                                        <input 
+                                            placeholder="File URL" 
+                                            {...register(`digitalFiles.${i}.url`)}
+                                            className="w-full border border-gray-300 px-2 py-1 text-xs rounded focus:border-[#2271b1] outline-none" 
+                                        />
+                                        {errors.digitalFiles?.[i]?.url && (
+                                            <p className="text-red-500 text-[10px]">{errors.digitalFiles[i]?.url?.message}</p>
+                                        )}
+                                    </div>
+                                    <button type="button" onClick={() => removeFile(i)} className="text-red-400 hover:text-red-600 p-1"><X size={14}/></button>
                                 </div>
-                                <button type="button" onClick={() => removeFile(i)} className="text-red-400 hover:text-red-600 p-1"><X size={14}/></button>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <label className="text-[10px] flex items-center gap-1 cursor-pointer select-none text-gray-600">
+                                        <input type="checkbox" {...register(`digitalFiles.${i}.isSecure`)} />
+                                        Secure File (Require Login/Presigned URL)
+                                    </label>
+                                </div>
                             </div>
                         ))}
                     </div>

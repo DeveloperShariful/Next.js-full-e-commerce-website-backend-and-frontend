@@ -16,7 +16,7 @@ export default async function CreateProductPage(props: PageProps) {
   const searchParams = await props.searchParams;
   const productId = searchParams.id;
 
-  // Default Initial State
+  // Default Initial State based on new Schema
   let initialData: Partial<ProductFormValues> = {
     productType: "SIMPLE",
     status: "DRAFT",
@@ -24,7 +24,7 @@ export default async function CreateProductPage(props: PageProps) {
     stock: 0,
     attributes: [],
     variations: [],
-    galleryImages: [], // Now supports objects
+    galleryImages: [], 
     tags: [],
     collectionIds: [],
     digitalFiles: [],
@@ -41,14 +41,19 @@ export default async function CreateProductPage(props: PageProps) {
     isDownloadable: false,
     isDangerousGood: false,
     soldIndividually: false,
-    isPreOrder: false, // Default
+    isPreOrder: false,
+    
+    // 🔥 New Fields Defaults
+    metafields: [],
+    giftCardAmounts: [],
+    version: 1,
+    seoSchema: { ogTitle: "", ogDescription: "", robots: "", ogImage: "" }
   };
 
   if (productId) {
     const product = await db.product.findUnique({
       where: { id: productId },
       include: {
-        // 🔥 Include Media relations
         images: { orderBy: { position: "asc" }, include: { media: true } }, 
         featuredMedia: true,
         attributes: { orderBy: { position: "asc" } },
@@ -70,10 +75,25 @@ export default async function CreateProductPage(props: PageProps) {
 
     if (!product) return notFound();
 
+    // 🔥 Transform DB JSON to Metafields Array UI format
+    let parsedMetafields: { key: string; value: string }[] = [];
+    if (product.metafields && typeof product.metafields === 'object') {
+        if (Array.isArray(product.metafields)) {
+            parsedMetafields = product.metafields as { key: string; value: string }[];
+        } else {
+            // Legacy support: Convert Object { material: "cotton" } to Array
+            parsedMetafields = Object.entries(product.metafields).map(([key, value]) => ({ 
+                key, 
+                value: String(value) 
+            }));
+        }
+    }
+
     // ✅ Transform DB data to Form Schema
     initialData = {
       ...product,
       id: product.id,
+      version: product.version, // 🔥 Optimistic Locking
       description: product.description || "",
       shortDescription: product.shortDescription || "",
       
@@ -85,8 +105,8 @@ export default async function CreateProductPage(props: PageProps) {
       length: product.length ? Number(product.length) : null,
       width: product.width ? Number(product.width) : null,
       height: product.height ? Number(product.height) : null,
-      rating: Number(product.rating), 
-
+      rating: Number(product.rating),
+      
       // Relations
       category: product.category?.name,
       vendor: product.brand?.name,
@@ -97,7 +117,6 @@ export default async function CreateProductPage(props: PageProps) {
       featuredImage: product.featuredImage,
       featuredMediaId: product.featuredMediaId,
       
-      // 🔥 UPDATED: Gallery Images Mapping (Object Structure)
       galleryImages: product.images
         .filter((img) => !img.variantId)
         .map((img) => ({
@@ -107,9 +126,9 @@ export default async function CreateProductPage(props: PageProps) {
             id: img.id
         })),
       
-      // JSON Fields
-      metafields: product.metafields ? JSON.stringify(product.metafields, null, 2) : "",
-      seoSchema: product.seoSchema ? JSON.stringify(product.seoSchema, null, 2) : "",
+      // 🔥 New UI Compatible Data
+      metafields: parsedMetafields,
+      seoSchema: product.seoSchema ? product.seoSchema : { ogTitle: "", ogDescription: "", robots: "", ogImage: "" },
       
       // Dates & Pre-order
       saleStart: product.saleStart ? product.saleStart.toISOString().split("T")[0] : null,
@@ -125,7 +144,7 @@ export default async function CreateProductPage(props: PageProps) {
 
       // Nested Data
       digitalFiles: product.downloadFiles.map(d => ({ 
-        id: d.id, name: d.name, url: d.url 
+        id: d.id, name: d.name, url: d.url, isSecure: false // Default to false for legacy
       })),
       
       attributes: product.attributes.map((a) => ({
@@ -135,6 +154,7 @@ export default async function CreateProductPage(props: PageProps) {
         visible: a.visible,
         variation: a.variation,
         position: a.position,
+        saveGlobally: false // Default false
       })),
 
       variations: product.variants.map((v) => ({
@@ -168,10 +188,13 @@ export default async function CreateProductPage(props: PageProps) {
       
       upsells: product.upsellIds,
       crossSells: product.crossSellIds,
+      
+      // Note: If you don't have a column for this in DB yet, keep empty
+      giftCardAmounts: [] 
     } as any;
   }
 
-  // ✅ DOUBLE SAFETY: Serialize entire object
+  // ✅ DOUBLE SAFETY: Serialize entire object to handle Dates/Decimals for Client Component
   const sanitizedInitialData = JSON.parse(JSON.stringify(initialData));
 
   return <ProductForm initialData={sanitizedInitialData as ProductFormValues} isEdit={!!productId} />;

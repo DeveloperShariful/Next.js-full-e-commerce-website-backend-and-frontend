@@ -11,13 +11,13 @@ import { Search, User, Trash2, UserPlus, MapPin, Loader2 } from "lucide-react";
 import { searchCustomers } from "@/app/actions/admin/order/create_order/search-resources";
 import { searchTransdirectLocations } from "@/app/actions/admin/order/transdirect-locations"; 
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CustomerSelectorProps {
     onSelect: (customer: any, type: 'registered' | 'guest') => void;
     selectedCustomer: any;
     onRemove: () => void;
     onAddressChange?: (address: { city: string; postcode: string; state: string; country: string } | null) => void;
-    // ✅ Feature flag to enable/disable guest tab
     enableGuestCheckout: boolean;
 }
 
@@ -32,7 +32,6 @@ export const CustomerSelector = ({
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
     
-    // Guest States
     const [guestName, setGuestName] = useState("");
     const [guestEmail, setGuestEmail] = useState("");
     const [guestPhone, setGuestPhone] = useState("");
@@ -42,12 +41,12 @@ export const CustomerSelector = ({
     const [guestState, setGuestState] = useState("");
     const [guestPostcode, setGuestPostcode] = useState("");
     const [guestCountry, setGuestCountry] = useState("Australia");
+    const [createAccount, setCreateAccount] = useState(false);
 
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [searchingLoc, setSearchingLoc] = useState(false);
 
-    // Helper to notify parent
     const notifyAddressChange = (city: string, postcode: string, state: string) => {
         if (onAddressChange) {
             onAddressChange({
@@ -115,6 +114,7 @@ export const CustomerSelector = ({
             name: guestName,
             email: guestEmail,
             phone: guestPhone,
+            createAccount: createAccount,
             addresses: [{
                 firstName: guestName.split(" ")[0],
                 lastName: guestName.split(" ").slice(1).join(" ") || "",
@@ -126,7 +126,7 @@ export const CustomerSelector = ({
             }]
         };
         onSelect(guestData, 'guest');
-        toast.success("Guest customer set.");
+        toast.success(createAccount ? "New customer details set." : "Guest customer set.");
     };
 
     return (
@@ -149,7 +149,7 @@ export const CustomerSelector = ({
                         <div className="flex items-center gap-2 mb-2">
                             <User size={16} className="text-blue-600"/>
                             <span className="font-bold text-slate-800 text-sm">
-                                {selectedCustomer.name} {selectedCustomer.id ? "(Registered)" : "(Guest)"}
+                                {selectedCustomer.name} {selectedCustomer.id ? "(Registered)" : (selectedCustomer.createAccount ? "(New Account)" : "(Guest)")}
                             </span>
                         </div>
                         
@@ -171,7 +171,6 @@ export const CustomerSelector = ({
                     </div>
                 ) : (
                     <Tabs defaultValue="search" onValueChange={setActiveTab} className="w-full">
-                        {/* ✅ CONDITIONAL RENDERING based on Feature Flag */}
                         <TabsList className={`grid w-full mb-4 bg-slate-100 p-1 rounded-lg ${enableGuestCheckout ? 'grid-cols-2' : 'grid-cols-1'}`}>
                             <TabsTrigger value="search" className="text-xs font-medium">Search Existing</TabsTrigger>
                             {enableGuestCheckout && (
@@ -263,8 +262,15 @@ export const CustomerSelector = ({
                                     </div>
                                 </div>
 
+                                <div className="flex items-center space-x-2 border p-2 rounded bg-slate-50">
+                                    <Checkbox id="createAccount" checked={createAccount} onCheckedChange={(c) => setCreateAccount(!!c)} />
+                                    <label htmlFor="createAccount" className="text-xs font-medium leading-none cursor-pointer">
+                                        Save as new customer account
+                                    </label>
+                                </div>
+
                                 <Button onClick={handleGuestSubmit} className="w-full bg-slate-900 hover:bg-slate-800 text-white h-9 mt-2">
-                                    <UserPlus size={14} className="mr-2"/> Set Guest Customer
+                                    <UserPlus size={14} className="mr-2"/> Set Customer
                                 </Button>
                             </TabsContent>
                         )}

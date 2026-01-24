@@ -2,13 +2,14 @@
 
 "use client"
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Save, X } from "lucide-react";
+import { Save, X, FileText } from "lucide-react";
 
 import { createManualOrder } from "@/app/actions/admin/order/create_order/create-manual-order";
+import { getTaxRate } from "@/app/actions/admin/order/get-tax-rate";
 import { ProductSearch } from "./_components/product-search";
 import { CartItemsTable } from "./_components/cart-items-table";
 import { CustomerSelector } from "./_components/customer-selector";
@@ -16,11 +17,10 @@ import { OrderSummary } from "./_components/order-summary";
 import { Coupon } from "./_components/coupon"; 
 import { ShippingSelector } from "./_components/shipping-selector"; 
 import { GiftCardInput } from "./_components/gift-card-input"; 
-// ✅ Global Store Hook
 import { useGlobalStore } from "@/app/providers/global-store-provider"; 
 
 interface CartItem {
-  productId: string;
+  productId?: string;
   variantId?: string;
   name: string;
   price: number;
@@ -32,19 +32,19 @@ interface CartItem {
   length: number;
   width: number;
   height: number;
+  tax?: number;
 }
 
 export default function CreateOrderPage() {
   const router = useRouter();
   
-  // ✅ Fetch Dynamic Settings
   const { 
-    currency,       // e.g. "AUD"
-    symbol,         // e.g. "A$"
-    weightUnit,     // e.g. "kg"
-    dimensionUnit,  // e.g. "cm"
-    features,       // e.g. guestCheckout enabled/disabled
-    formatPrice     // Helper function
+    currency,       
+    symbol,         
+    weightUnit,     
+    dimensionUnit,  
+    features,       
+    formatPrice     
   } = useGlobalStore();
 
   const [loading, setLoading] = useState(false);
@@ -61,36 +61,9 @@ export default function CreateOrderPage() {
   const [adminNote, setAdminNote] = useState("");
   const [customerNote, setCustomerNote] = useState("");
   const [transitTime, setTransitTime] = useState("");
-
-  // --- Calculations ---
-  const totals = useMemo(() => {
-    const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    
-    // Discount Logic
-    let discountAmount = 0;
-    if (appliedDiscount) {
-      discountAmount = appliedDiscount.type === "PERCENTAGE" 
-        ? (subtotal * appliedDiscount.value) / 100 
-        : appliedDiscount.value;
-    }
-    
-    const taxableAmount = Math.max(0, subtotal - discountAmount + shippingCost);
-    
-    // Tax Logic (Simple 10% for now, can be enhanced with tax settings later)
-    const taxTotal = taxableAmount * 0.10; 
-    
-    const grossTotal = taxableAmount + taxTotal;
-
-    // Gift Card Logic
-    let giftCardDeduction = 0;
-    if (appliedGiftCard) {
-        giftCardDeduction = Math.min(appliedGiftCard.balance, grossTotal);
-    }
-
-    const finalTotal = Math.max(0, grossTotal - giftCardDeduction);
-
-    return { subtotal, discountAmount, taxTotal, grossTotal, finalTotal, giftCardDeduction };
-  }, [cartItems, appliedDiscount, shippingCost, appliedGiftCard]);
+  
+  const [paymentMethod, setPaymentMethod] = useState("Manual");
+  const [taxRateData, setTaxRateData] = useState({ rate: 0, name: "Tax" });
 
   const currentAddress = useMemo(() => {
       if (!selectedCustomer && !guestInputAddress) return null;
@@ -105,7 +78,42 @@ export default function CreateOrderPage() {
       return guestInputAddress;
   }, [selectedCustomer, guestInputAddress]);
 
-  // --- Handlers ---
+  useEffect(() => {
+    const fetchTax = async () => {
+        if (currentAddress?.country) {
+            const res = await getTaxRate(currentAddress.country, currentAddress.state);
+            setTaxRateData({ rate: res.rate, name: res.taxName });
+        } else {
+            setTaxRateData({ rate: 0, name: "Tax" });
+        }
+    };
+    fetchTax();
+  }, [currentAddress]);
+
+  const totals = useMemo(() => {
+    const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    
+    let discountAmount = 0;
+    if (appliedDiscount) {
+      discountAmount = appliedDiscount.type === "PERCENTAGE" 
+        ? (subtotal * appliedDiscount.value) / 100 
+        : appliedDiscount.value;
+    }
+    
+    const taxableAmount = Math.max(0, subtotal - discountAmount + shippingCost);
+    const taxTotal = taxableAmount * (taxRateData.rate / 100);
+    const grossTotal = taxableAmount + taxTotal;
+
+    let giftCardDeduction = 0;
+    if (appliedGiftCard) {
+        giftCardDeduction = Math.min(appliedGiftCard.balance, grossTotal);
+    }
+
+    const finalTotal = Math.max(0, grossTotal - giftCardDeduction);
+
+    return { subtotal, discountAmount, taxTotal, grossTotal, finalTotal, giftCardDeduction };
+  }, [cartItems, appliedDiscount, shippingCost, appliedGiftCard, taxRateData]);
+
   const addToCart = (product: any, variant?: any) => {
     const price = variant ? variant.price : product.price;
     const stock = variant ? variant.stock : product.stock;
@@ -137,7 +145,6 @@ export default function CreateOrderPage() {
         sku,
         image: product.featuredImage,
         maxStock: stock,
-        // Using DB values (assumed to match global units logic)
         weight: Number(variant?.weight || product.weight || 1),
         length: Number(variant?.length || product.length || 10),
         width: Number(variant?.width || product.width || 10),
@@ -147,21 +154,36 @@ export default function CreateOrderPage() {
     }
   };
 
+  const addCustomItem = (item: any) => {
+      setCartItems([...cartItems, {
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          sku: "CUSTOM",
+          maxStock: 9999,
+          weight: 0,
+          length: 0,
+          width: 0,
+          height: 0
+      }]);
+      toast.success("Custom item added");
+  };
+
   const removeCartItem = (index: number) => {
     const newItems = [...cartItems];
     newItems.splice(index, 1);
     setCartItems(newItems);
   };
 
-  const handleSubmit = async () => {
-    if (!selectedCustomer) return toast.error("Please set the customer first");
+  const handleSubmit = async (isDraft: boolean = false) => {
+    if (!selectedCustomer && !isDraft) return toast.error("Please set the customer first");
     if (cartItems.length === 0) return toast.error("Add at least one item");
 
     setLoading(true);
 
     const orderData = {
-      customerId: selectedCustomer.id || null,
-      guestInfo: !selectedCustomer.id ? {
+      customerId: selectedCustomer?.id || null,
+      guestInfo: !selectedCustomer?.id && selectedCustomer ? {
         name: selectedCustomer.name,
         email: selectedCustomer.email,
         phone: selectedCustomer.phone
@@ -178,24 +200,25 @@ export default function CreateOrderPage() {
       taxTotal: totals.taxTotal,
       total: totals.finalTotal,
       
-      address: selectedCustomer.addresses?.[0] || guestInputAddress,
+      address: selectedCustomer?.addresses?.[0] || guestInputAddress,
       pickupLocationId,
       estimatedTransitTime: transitTime || null,
 
       adminNote,
       customerNote,
+      paymentMethod,
       
-      // ✅ Dynamic Currency Code passed to backend
       currency: currency, 
       
-      status: "PENDING",
-      paymentStatus: (totals.finalTotal === 0 && totals.grossTotal > 0) ? "PAID" : "UNPAID"
+      status: isDraft ? "DRAFT" : "PENDING",
+      paymentStatus: isDraft ? "UNPAID" : (totals.finalTotal === 0 && totals.grossTotal > 0 ? "PAID" : "UNPAID"),
+      isDraft
     };
 
     const res = await createManualOrder(orderData);
 
     if (res.success) {
-      toast.success("Order created successfully!");
+      toast.success(isDraft ? "Draft saved successfully!" : "Order created successfully!");
       router.push(`/admin/orders/${res.orderId}`);
     } else {
       toast.error(res.error || "Failed to create order");
@@ -216,11 +239,19 @@ export default function CreateOrderPage() {
             <X size={16} className="mr-2"/> Cancel
           </Button>
           <Button 
-            className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white shadow-lg" 
-            onClick={handleSubmit}
+            variant="secondary"
+            className="flex-1 sm:flex-none bg-white border border-slate-200"
+            onClick={() => handleSubmit(true)}
             disabled={loading}
           >
-            <Save size={16} className="mr-2"/> {loading ? "Creating..." : "Create Order"}
+            <FileText size={16} className="mr-2"/> Save Draft
+          </Button>
+          <Button 
+            className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white shadow-lg" 
+            onClick={() => handleSubmit(false)}
+            disabled={loading}
+          >
+            <Save size={16} className="mr-2"/> Create Order
           </Button>
         </div>
       </div>
@@ -230,13 +261,12 @@ export default function CreateOrderPage() {
         <div className="lg:col-span-2 space-y-6">
           <ProductSearch 
              onAddProduct={addToCart} 
-             // ✅ No props needed, it uses context internally
+             onAddCustomItem={addCustomItem}
           />
           
           <CartItemsTable 
              items={cartItems} 
              onRemoveItem={removeCartItem} 
-             // ✅ Pass Dynamic Helpers
              formatPrice={formatPrice} 
              weightUnit={weightUnit} 
           />
@@ -251,7 +281,6 @@ export default function CreateOrderPage() {
                 setGuestInputAddress(null);
             }}
             onAddressChange={(addr) => setGuestInputAddress(addr)}
-            // ✅ Pass Feature Flag
             enableGuestCheckout={features.enableGuestCheckout}
           />
 
@@ -262,7 +291,6 @@ export default function CreateOrderPage() {
             onShippingCostChange={(cost) => setShippingCost(cost)}
             address={currentAddress}
             cartItems={cartItems}
-            // ✅ Pass Dynamic Helpers
             formatPrice={formatPrice}
           />
 
@@ -275,7 +303,6 @@ export default function CreateOrderPage() {
             onApply={setAppliedGiftCard}
             onRemove={() => setAppliedGiftCard(null)}
             appliedCard={appliedGiftCard}
-            // ✅ Pass Dynamic Helpers
             formatPrice={formatPrice}
           />
 
@@ -284,10 +311,13 @@ export default function CreateOrderPage() {
             shippingCost={shippingCost}
             discount={totals.discountAmount}
             tax={totals.taxTotal}
+            taxName={taxRateData.name}
+            taxRate={taxRateData.rate}
             total={totals.finalTotal}
-            // ✅ Dynamic Symbol
             currencySymbol={symbol} 
             setShippingCost={setShippingCost}
+            paymentMethod={paymentMethod}
+            setPaymentMethod={setPaymentMethod}
           />
 
           {totals.giftCardDeduction > 0 && (

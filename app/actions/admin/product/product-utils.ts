@@ -5,7 +5,7 @@ import _ from "lodash";
 import { Prisma } from "@prisma/client";
 
 export function serializeData<T>(data: T): T {
-  if (data === null || data === undefined) return data;
+  if (data === null || data === undefined) return null as unknown as T;
 
   if (typeof data === "object") {
     if (data instanceof Prisma.Decimal) {
@@ -22,7 +22,12 @@ export function serializeData<T>(data: T): T {
 
     const newObj: any = {};
     for (const key in data) {
-      newObj[key] = serializeData((data as any)[key]);
+      const value = (data as any)[key];
+      if (value === undefined) {
+        newObj[key] = null;
+      } else {
+        newObj[key] = serializeData(value);
+      }
     }
     return newObj;
   }
@@ -53,31 +58,59 @@ export async function generateUniqueSlug(name: string, model: "product" | "categ
     model === "category" ? db.category : 
     db.brand;
 
-  const collisions = await (delegate as any).findMany({
-    where: {
-      slug: { startsWith: baseSlug },
-      ...(ignoreId ? { id: { not: ignoreId } } : {}),
-    },
-    select: { slug: true },
-  });
+  let slug = baseSlug;
+  let count = 1;
 
-  if (collisions.length === 0) return baseSlug;
+  while (true) {
+      const existing = await (delegate as any).findFirst({
+          where: { 
+              slug: slug,
+              ...(ignoreId ? { id: { not: ignoreId } } : {})
+          },
+          select: { id: true }
+      });
 
-  const suffixes = collisions.map((c: any) => {
-    const parts = c.slug.split(`${baseSlug}-`);
-    if (parts.length === 1 && c.slug === baseSlug) return 0;
-    return parseInt(parts[1]) || 0;
-  });
-
-  const maxSuffix = Math.max(...suffixes);
-  
-  if (suffixes.includes(0)) {
-    return `${baseSlug}-${maxSuffix + 1}`;
-  } else if (collisions.some((c:any) => c.slug === baseSlug)) {
-     return `${baseSlug}-${maxSuffix + 1}`;
+      if (!existing) break;
+      slug = `${baseSlug}-${count++}`;
   }
 
-  return baseSlug;
+  return slug;
+}
+
+export async function checkBundleCycle(parentId: string, childIds: string[]): Promise<boolean> {
+    if (!parentId || childIds.length === 0) return false;
+
+    const childrenAsParents = await db.bundleItem.findMany({
+        where: { parentProductId: { in: childIds } },
+        select: { parentProductId: true, childProductId: true }
+    });
+
+    for (const relation of childrenAsParents) {
+        if (relation.childProductId === parentId) return true;
+    }
+    return false;
+}
+
+export async function calculateBundleStock(tx: any, bundleItems: any[]): Promise<number> {
+    if (!bundleItems || bundleItems.length === 0) return 0;
+    
+    let minStock = Number.MAX_SAFE_INTEGER;
+    
+    for (const item of bundleItems) {
+        const product = await tx.product.findUnique({
+            where: { id: item.childProductId },
+            select: { stock: true }
+        });
+        
+        if (!product) continue;
+        
+        const possibleSets = Math.floor(product.stock / item.quantity);
+        if (possibleSets < minStock) {
+            minStock = possibleSets;
+        }
+    }
+    
+    return minStock === Number.MAX_SAFE_INTEGER ? 0 : minStock;
 }
 
 export function parseJSON<T>(jsonString: string | null | undefined, fallback: T): T {
@@ -148,9 +181,16 @@ export function generateDiff(oldData: any, newData: any) {
         newVal = newVal === null || newVal === undefined ? 0 : Number(newVal);
     }
 
-    if (["name", "sku", "description", "shortDescription", "purchaseNote", "barcode", "mpn", "hsCode", "countryOfManufacture", "preOrderMessage", "videoUrl", "videoThumbnail"].includes(key)) {
+    if (["name", "sku", "purchaseNote", "barcode", "mpn", "hsCode", "countryOfManufacture", "preOrderMessage", "videoUrl", "videoThumbnail"].includes(key)) {
         oldVal = (oldVal || "").trim();
         newVal = (newVal || "").trim();
+    }
+
+    if (["description", "shortDescription"].includes(key)) {
+        if (oldVal !== newVal) {
+            diffs[key] = { old: "Content Changed", new: "Content Updated" };
+            return;
+        }
     }
 
     if (key === "preOrderReleaseDate") {
@@ -233,6 +273,14 @@ export function generateDiff(oldData: any, newData: any) {
       const oldStr = oldAttrs.map(a => `${a.name}: [${a.val}]`).join(" | ");
       const newStr = newAttrs.map(a => `${a.name}: [${a.val}]`).join(" | ");
       diffs["Attributes"] = { old: oldStr || "None", new: newStr || "None" };
+  }
+
+  if (JSON.stringify(oldData?.metafields) !== JSON.stringify(newData.metafields)) {
+      diffs["Metafields"] = { old: "Changed", new: "Updated" };
+  }
+
+  if (JSON.stringify(oldData?.seoSchema) !== JSON.stringify(newData.seoSchema)) {
+      diffs["SEO Settings"] = { old: "Changed", new: "Updated" };
   }
 
   if (newData.productType === 'VARIABLE') {

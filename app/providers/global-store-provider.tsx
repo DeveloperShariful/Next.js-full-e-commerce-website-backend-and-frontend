@@ -4,6 +4,10 @@
 
 import { createContext, useContext, ReactNode, useMemo } from "react";
 
+// ==========================================
+// 1. INTERFACES
+// ==========================================
+
 export interface MenuItem {
   id: string;
   label: string;
@@ -97,6 +101,7 @@ export interface GeneralConfig {
   enableGuestCheckout?: boolean;
   enableMultiCurrency?: boolean;
   enablePickup?: boolean;
+  enableAffiliateProgram?: boolean;
 }
 
 export interface SeoConfig {
@@ -140,7 +145,46 @@ export interface StoreFeatures {
   maintenanceMode: boolean;
   enableMultiCurrency?: boolean;
   enablePickup?: boolean;
+  enableAffiliateProgram: boolean;
 }
+
+// 🔥 UPDATED: Ultra Pro Affiliate Config Interface
+// Added granular controls for Tax, Shipping, Slugs, and Lifetime Logic
+export interface AffiliateGlobalConfig {
+  // --- Identity & Basics ---
+  programName: string;          // e.g., "GoBike Partner Program"
+  isActive: boolean;            // Global Kill-switch
+  referralParam: string;        // "ref" or "aff"
+  termsUrl?: string | null;     // Link to T&C page
+
+  // --- Tracking & Cookies ---
+  cookieDuration: number;       // e.g., 30 days
+  allowSelfReferral: boolean;   // false
+
+  // --- Commission Logic (Enterprise) ---
+  excludeShipping: boolean;     // Should shipping be deducted before calc commission?
+  excludeTax: boolean;          // Should tax be deducted before calc commission?
+  autoApplyCoupon: boolean;     // If true, affiliate's coupon applies automatically on click
+  zeroValueReferrals: boolean;  // Count referrals even if order value is $0
+
+  // --- Link Management ---
+  customSlugsEnabled: boolean;  // Can users create "gobike.au/ref/myname"?
+  autoCreateSlug: boolean;      // Auto generate slug from username on signup?
+  slugLimit: number;            // Max slugs per user (e.g. 10)
+
+  // --- Lifetime Commissions ---
+  isLifetimeLinkOnPurchase: boolean; // Link customer to affiliate permanently after first purchase?
+  lifetimeDuration: number | null;   // null = Forever, or number of days
+
+  // --- Payouts & Finance ---
+  holdingPeriod: number;        // e.g., 14 days (Refund period wait time)
+  minimumPayout: number;        // e.g., 50.00
+  payoutMethods: string[];      // ["PAYPAL", "BANK_TRANSFER", "STORE_CREDIT"]
+}
+
+// ==========================================
+// 2. CONTEXT & DTOs
+// ==========================================
 
 interface GlobalStoreContextType {
   storeName: string;
@@ -175,6 +219,9 @@ interface GlobalStoreContextType {
   marketing: MarketingConfig;
   verifications: VerificationConfig;
   features: StoreFeatures;
+  
+  // 🔥 Exposed Affiliate Config
+  affiliate: AffiliateGlobalConfig;
 }
 
 const defaultContext: GlobalStoreContextType = {
@@ -203,7 +250,34 @@ const defaultContext: GlobalStoreContextType = {
   seo: { siteName: "", titleSeparator: "|", siteUrl: "", defaultMetaTitle: null, defaultMetaDesc: null, ogImage: null, twitterCard: "summary", twitterSite: null },
   marketing: { gtmEnabled: false, gtmContainerId: null, gtmAuth: null, gtmPreview: null, fbEnabled: false, fbPixelId: null, klaviyoEnabled: false, klaviyoPublicKey: null },
   verifications: {},
-  features: { enableWishlist: false, enableReviews: false, enableBlog: false, enableGuestCheckout: false, maintenanceMode: false },
+  features: { enableWishlist: false, enableReviews: false, enableBlog: false, enableGuestCheckout: false, maintenanceMode: false, enableMultiCurrency: false, enablePickup: false, enableAffiliateProgram: false },
+  
+  // 🔥 Default Affiliate Config
+  affiliate: {
+    programName: "Affiliate Program",
+    isActive: false,
+    referralParam: "ref",
+    termsUrl: null,
+    
+    cookieDuration: 30,
+    allowSelfReferral: false,
+    
+    excludeShipping: true,
+    excludeTax: true,
+    autoApplyCoupon: false,
+    zeroValueReferrals: false,
+    
+    customSlugsEnabled: false,
+    autoCreateSlug: false,
+    slugLimit: 5,
+    
+    isLifetimeLinkOnPurchase: false,
+    lifetimeDuration: null,
+    
+    holdingPeriod: 14,
+    minimumPayout: 50,
+    payoutMethods: ["STORE_CREDIT"],
+  }
 };
 
 const GlobalStoreContext = createContext<GlobalStoreContextType>(defaultContext);
@@ -223,6 +297,7 @@ interface StoreSettingsDTO {
   socialLinks?: SocialLinks | null;
   generalConfig?: any;
   taxSettings?: any;
+  affiliateConfig?: any; // 🔥 Comes from Prisma JSON
   logoMedia?: {
     url: string;
     altText?: string | null;
@@ -332,6 +407,10 @@ interface ProviderProps {
   pickupLocations?: PickupLocationDTO[];
 }
 
+// ==========================================
+// 3. PROVIDER COMPONENT
+// ==========================================
+
 export function GlobalStoreProvider({ 
   children, 
   settings, 
@@ -349,6 +428,7 @@ export function GlobalStoreProvider({
   const taxSettings = (s.taxSettings as TaxSettings) || {};
   const activeLocale = generalConfig.locale || "en-AU";
 
+  // Price Formatting Utility
   const formatPrice = useMemo(() => (price: number | string | { toNumber: () => number } | null | undefined) => {
     if (price === null || price === "" || price === undefined) return "";
     
@@ -374,6 +454,7 @@ export function GlobalStoreProvider({
     }
   }, [activeLocale, s.currency, s.currencySymbol]);
 
+  // Media Processing
   const logoData: StoreMedia | null = s.logoMedia 
     ? {
         url: s.logoMedia.url,
@@ -386,6 +467,7 @@ export function GlobalStoreProvider({
 
   const faviconUrl: string | null = s.faviconMedia?.url || s.favicon || null;
 
+  // Data Processing
   const processedMenus = useMemo(() => {
     const map: Record<string, MenuItem[]> = {};
     if (Array.isArray(menus)) {
@@ -465,6 +547,45 @@ export function GlobalStoreProvider({
       }));
   }, [pickupLocations]);
 
+  // 🔥 PROCESS AFFILIATE CONFIGURATION (Updated for Enterprise Logic)
+  // Extracts data from DB StoreSettings.affiliateConfig JSON
+  const affiliateRaw = s.affiliateConfig || {};
+  
+  const affiliateConfig: AffiliateGlobalConfig = {
+    // Identity
+    programName: affiliateRaw.programName || "GoBike Partner Program",
+    isActive: generalConfig.enableAffiliateProgram ?? false,
+    referralParam: affiliateRaw.referralParam || "ref",
+    termsUrl: affiliateRaw.termsUrl || null,
+
+    // Cookies
+    cookieDuration: Number(affiliateRaw.cookieDuration) || 30,
+    allowSelfReferral: affiliateRaw.allowSelfReferral ?? false,
+
+    // Commission Logic (New)
+    excludeShipping: affiliateRaw.excludeShipping ?? true, // Default to true (Safe logic)
+    excludeTax: affiliateRaw.excludeTax ?? true,           // Default to true
+    autoApplyCoupon: affiliateRaw.autoApplyCoupon ?? false,
+    zeroValueReferrals: affiliateRaw.zeroValueReferrals ?? false,
+
+    // Link Management (New)
+    customSlugsEnabled: affiliateRaw.customSlugsEnabled ?? false,
+    autoCreateSlug: affiliateRaw.autoCreateSlug ?? false,
+    slugLimit: Number(affiliateRaw.slugLimit) || 5,
+
+    // Lifetime (New)
+    isLifetimeLinkOnPurchase: affiliateRaw.isLifetimeLinkOnPurchase ?? false,
+    lifetimeDuration: affiliateRaw.lifetimeDuration ? Number(affiliateRaw.lifetimeDuration) : null,
+
+    // Payouts
+    holdingPeriod: Number(affiliateRaw.holdingPeriod) || 14,
+    minimumPayout: Number(affiliateRaw.minimumPayout) || 50,
+    payoutMethods: Array.isArray(affiliateRaw.payoutMethods) 
+      ? affiliateRaw.payoutMethods 
+      : ["BANK_TRANSFER", "STORE_CREDIT"],
+  };
+
+  // Construct Final Context Value
   const value: GlobalStoreContextType = {
     storeName: s.storeName || "",
     storeEmail: s.storeEmail || "",
@@ -545,7 +666,11 @@ export function GlobalStoreProvider({
       maintenanceMode: s.maintenance || false,
       enableMultiCurrency: generalConfig.enableMultiCurrency ?? false,
       enablePickup: generalConfig.enablePickup ?? false,
-    }
+      enableAffiliateProgram: generalConfig.enableAffiliateProgram ?? false,
+    },
+
+    // 🔥 Injecting Affiliate Config into Context
+    affiliate: affiliateConfig
   };
 
   return (
@@ -554,6 +679,10 @@ export function GlobalStoreProvider({
     </GlobalStoreContext.Provider>
   );
 }
+
+// ==========================================
+// 4. HOOK
+// ==========================================
 
 export function useGlobalStore() {
   const context = useContext(GlobalStoreContext);

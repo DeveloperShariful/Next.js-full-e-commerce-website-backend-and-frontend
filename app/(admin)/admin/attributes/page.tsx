@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getAttributes } from "@/app/actions/admin/attribute";
+import { getAttributes } from "@/app/actions/admin/attribute/attribute";
 import { toast } from "react-hot-toast";
 import { AttributeHeader } from "./_components/attribute-header";
 import { AttributeForm } from "./_components/attribute-form";

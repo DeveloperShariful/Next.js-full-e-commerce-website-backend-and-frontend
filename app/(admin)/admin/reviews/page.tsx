@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getReviews, updateReviewStatus, deleteReview, ReviewData } from "@/app/actions/admin/review";
+import { getReviews, updateReviewStatus, deleteReview, ReviewData } from "@/app/actions/admin/review/review";
 import { toast } from "react-hot-toast";
 import { 
   Star, CheckCircle, XCircle, Trash2, 

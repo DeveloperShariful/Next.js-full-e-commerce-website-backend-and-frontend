@@ -1,4 +1,4 @@
-// app/actions/inventory.ts
+// app/actions/inventory/inventory.ts
 
 "use server";
 

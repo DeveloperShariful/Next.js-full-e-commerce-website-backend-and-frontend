@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCoupons, saveCoupon, deleteCoupon, CouponData } from "@/app/actions/admin/coupon";
+import { getCoupons, saveCoupon, deleteCoupon, CouponData } from "@/app/actions/admin/coupon/coupon";
 import { toast } from "react-hot-toast";
 import { 
   TicketPercent, Plus, Search, Trash2, Pencil, 

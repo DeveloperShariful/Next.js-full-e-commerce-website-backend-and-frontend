@@ -10,7 +10,7 @@ const CommunitySection = () => {
           <div className="w-full">
             <Image 
               loading="lazy" 
-              src="https://gobikes.au/wp-content/uploads/2025/08/electric-bike-ebike-for-kids-1.webp" 
+              src="https://res.cloudinary.com/dbij2wehz/image/upload/Gobike_kids_electric_bike_ebike_for_kids.webp" 
               alt="GoBike community" 
               width={2199} height={2560} 
               sizes="(max-width: 768px) 100vw, 50vw" 

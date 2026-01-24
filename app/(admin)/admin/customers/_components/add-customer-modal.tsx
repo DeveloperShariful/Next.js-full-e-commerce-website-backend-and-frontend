@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { createCustomer } from "@/app/actions/admin/customer";
+import { createCustomer } from "@/app/actions/admin/customer/customer";
 import { X, Loader2, Save } from "lucide-react";
 import { toast } from "react-hot-toast";
 

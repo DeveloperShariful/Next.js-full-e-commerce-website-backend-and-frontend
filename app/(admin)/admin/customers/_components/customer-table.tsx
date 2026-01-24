@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Mail, MapPin, Trash2, X } from 'lucide-react';
 import { CustomerActions } from './customer-actions';
 import { CustomerDetails } from './customer-details';
-import { bulkDeleteCustomers } from "@/app/actions/admin/customer";
+import { bulkDeleteCustomers } from "@/app/actions/admin/customer/customer";
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 

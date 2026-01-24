@@ -27,7 +27,7 @@ const DifferenceSection = () => {
                   <th className="bg-transparent border-b border-gray-900 p-4"></th>
                   <th className="border-b border-gray-900 p-4 bg-white">
                     <div className="flex justify-center">
-                        <Image src="https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids-1.webp" width={1880} height={410} alt="GoBike Logo" className="max-h-10 w-auto" />
+                        <Image src="https://res.cloudinary.com/dbij2wehz/image/upload/GOBIKE-Electric-Bike-for-kids.webp" width={1880} height={410} alt="GoBike Logo" className="max-h-10 w-auto" />
                     </div>
                   </th>
                   <th className="border-b border-gray-900 p-4 text-black text-base font-semibold">Others</th>

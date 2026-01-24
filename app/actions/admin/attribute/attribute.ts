@@ -1,3 +1,5 @@
+//app/actions/admin/attribute/attribute.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";

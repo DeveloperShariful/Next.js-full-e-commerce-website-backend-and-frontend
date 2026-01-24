@@ -10,16 +10,6 @@ import DifferenceSection from './_components/DifferenceSection';
 import CommunitySection from './_components/CommunitySection';
 import VideoReviews from './_components/VideoReviews';
 import FaqSection from './_components/FaqSection';
-import { getNewArrivals } from "@/app/actions/storefront/home/get-new-arrivals";
-
-
-
-// Components
-
-
-
-import NewArrivals from "./_components/new-arrivals";
-
 
 export default function HomePageClient() {
   const Divider = () => (

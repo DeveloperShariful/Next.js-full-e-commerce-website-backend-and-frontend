@@ -13,7 +13,7 @@ import {
   GlobalStoreProvider, 
   StoreAddress, 
   SocialLinks 
-} from "@/app/providers/global-store-provider"; // 🔥 টাইপগুলো ইম্পোর্ট করুন
+} from "@/app/providers/global-store-provider"; 
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -6,28 +6,28 @@ import { useRef } from 'react';
 
 const choices = [
     { 
-      imageSrc: "https://gobikes.au/wp-content/uploads/2025/08/Gobike-kids-electric-bikes-electric-bike-for-kids-ebike-kids-electric-bike-Final-1.webp", 
+      imageSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-scaled-1.webp", 
       width: 1500, height: 1200,
       label: "Safety Foundation", 
       title: "Safety is Our Foundation", 
       description: "From a gentle, slow-start mode for beginners to responsive, powerful brakes for confident riders, every detail is engineered to keep your child safe." 
     },
     { 
-      imageSrc: "https://gobikes.au/wp-content/uploads/2025/02/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-E-bike-Electric-bike-E-bike-review-Electric-bike-review-Buy-e-bike-Buy-electric-bike-E-bike-price-Electric-bike-price-E-b-scaled-2.webp", 
+      imageSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-E-bike-Electric-bike-E-bike-review-Electric-bike-review-Buy-e-bike-Buy-electric-bike-E-bike-price-Electric-bike-price-_1.webp", 
       width: 2560, height: 1706,
       label: "Durability", 
       title: "Built for Real Kids", 
       description: "Kids play hard. We get it. That's why GoBikes are built with durable, high-quality frames and components that can handle bumps, skids, and years of relentless fun."
     },
     { 
-      imageSrc: "https://gobikes.au/wp-content/uploads/2025/02/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-E-bike-Electric-bike-E-bike-review-Electric-bike-review-Buy-e-bike-Buy-electric-bike-E-bike-price-Electric-bike-price-E-b-1-1-2.webp", 
+      imageSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-scaled-1.webp", 
       width: 1941, height: 1294,
       label: "Battery Life", 
       title: "More Riding, Less Waiting", 
       description: "Our high-efficiency batteries offer the longest run-times available, so the adventure doesn't have to stop. More time on the bike, less time plugged into the wall."
     },
     { 
-      imageSrc: "https://gobikes.au/wp-content/uploads/2025/02/Electric-Balance-Bike-Electric-bike-Balance-Bike-scaled-1.webp", 
+      imageSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-Balance-Bike-scaled-1.webp", 
       width: 1920, height: 1370,
       label: "Aussie Owned", 
       title: "Aussie Owned & Supported", 

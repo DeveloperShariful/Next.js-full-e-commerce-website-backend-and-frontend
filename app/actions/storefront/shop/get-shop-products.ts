@@ -53,7 +53,24 @@ export async function getShopProducts(params: ShopParams) {
       },
       orderBy,
     });
-    return products;
+
+    // 🔥 FIX: Convert Prisma Decimal objects to plain Javascript Numbers
+    // This solves the "Decimal objects are not supported" error
+    const formattedProducts = products.map((product) => ({
+      ...product,
+      price: product.price.toNumber(),
+      salePrice: product.salePrice ? product.salePrice.toNumber() : null,
+      costPerItem: product.costPerItem ? product.costPerItem.toNumber() : null,
+      weight: product.weight ? product.weight.toNumber() : null,
+      length: product.length ? product.length.toNumber() : null,
+      width: product.width ? product.width.toNumber() : null,
+      height: product.height ? product.height.toNumber() : null,
+      rating: product.rating ? product.rating.toNumber() : 0,
+      affiliateCommissionRate: product.affiliateCommissionRate ? product.affiliateCommissionRate.toNumber() : null,
+    }));
+
+    return formattedProducts;
+
   } catch (error) {
     console.error("GET_SHOP_PRODUCTS_ERROR", error);
     return [];

@@ -1,5 +1,5 @@
 
-// app/actions/admin/customer.ts
+// app/actions/admin/customer/customer.ts
 
 "use server";
 

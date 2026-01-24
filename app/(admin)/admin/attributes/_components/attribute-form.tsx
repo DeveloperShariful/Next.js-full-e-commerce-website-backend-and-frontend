@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { createAttribute, updateAttribute, AttributeState } from "@/app/actions/admin/attribute";
+import { createAttribute, updateAttribute, AttributeState } from "@/app/actions/admin/attribute/attribute";
 import { Save, X, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "react-hot-toast";
 

@@ -1,8 +1,10 @@
 // File: app/actions/storefront/cart/get-cart-details.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
+// Import from new location if you moved it, otherwise keep path
 import { validateCoupon } from "./validate-coupon"; 
 
 export async function getCartDetails(cartId: string | undefined) {
@@ -39,6 +41,26 @@ export async function getCartDetails(cartId: string | undefined) {
         return { success: false, message: "Cart not found", data: null, appliedCoupon: null };
     }
 
+    // 🔥 FIX: Transform Prisma Decimal to Number for Client Compatibility
+    const formattedCart = {
+      ...cart,
+      items: cart.items.map((item) => ({
+        ...item,
+        product: {
+          ...item.product,
+          price: item.product.price.toNumber(),
+          salePrice: item.product.salePrice ? item.product.salePrice.toNumber() : null,
+        },
+        variant: item.variant
+          ? {
+              ...item.variant,
+              price: item.variant.price.toNumber(),
+              salePrice: item.variant.salePrice ? item.variant.salePrice.toNumber() : null,
+            }
+          : null,
+      })),
+    };
+
     // --- COUPON LOGIC (Safe Mode) ---
     const cookieStore = await cookies();
     const savedCoupon = cookieStore.get("coupon")?.value;
@@ -46,9 +68,7 @@ export async function getCartDetails(cartId: string | undefined) {
 
     if (savedCoupon) {
         try {
-            // 🔥 UPDATE: এখানে আমরা 'false' পাঠাচ্ছি।
-            // এর মানে হলো: "ভ্যালিডেট করো, কিন্তু কুকি সেট করতে যেও না।"
-            // এটি পেজ রিফ্রেশের সময় কুকি এরর আটকাতে সাহায্য করবে।
+            // Validate without setting cookies (read-only mode)
             const res = await validateCoupon(savedCoupon, cart.id, false);
 
             if (res.success) {
@@ -62,7 +82,7 @@ export async function getCartDetails(cartId: string | undefined) {
         }
     }
 
-    return { success: true, data: cart, appliedCoupon };
+    return { success: true, data: formattedCart, appliedCoupon };
 
   } catch (error) {
     console.error("Get Cart Error:", error);

@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSuppliers, saveSupplier, deleteSupplier } from "@/app/actions/admin/inventory";
+import { getSuppliers, saveSupplier, deleteSupplier } from "@/app/actions/admin/inventory/inventory";
 import { Plus, Pencil, Trash2, Users, MapPin, Mail, Phone, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 

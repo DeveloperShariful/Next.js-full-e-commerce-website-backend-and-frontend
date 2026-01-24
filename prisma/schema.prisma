@@ -24,6 +24,7 @@ enum Role {
   EDITOR
   SUPPORT
   CUSTOMER
+  AFFILIATE
 }
 
 enum ProductType {
@@ -203,105 +204,100 @@ enum EventStatus {
   FAILED
 }
 
+enum AffiliateStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PayoutMethod {
+  BANK_TRANSFER
+  PAYPAL
+  STORE_CREDIT
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ReferralStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum LedgerType {
+  COMMISSION
+  PAYOUT
+  ADJUSTMENT
+  BONUS
+  REFUND_DEDUCTION
+}
+
 // ==========================================
 // 3. USER, AUTH & SYSTEM
 // ==========================================
 
 model User {
-  id                  String    @id @default(uuid())
-  clerkId             String?   @unique
-  name                String?
-  email               String    @unique
-  emailVerified       DateTime?
-  password            String?
-  phone               String?   @unique
-  image               String?
-  mediaId             String?
-  media               Media?    @relation(fields: [mediaId], references: [id])
-  role                Role      @default(CUSTOMER)
-  isActive            Boolean   @default(true)
-  dateOfBirth         DateTime?
-  gender              String?
-  notes               String?
-  metafields          Json?
-  deletedAt           DateTime?
-  version             Int       @default(1)
+  id                    String    @id @default(uuid())
+  clerkId               String?   @unique
+  name                  String?
+  email                 String    @unique
+  emailVerified         DateTime?
+  password              String?
+  phone                 String?   @unique
+  image                 String?
+  mediaId               String?
+  media                 Media?    @relation(fields: [mediaId], references: [id])
+  role                  Role      @default(CUSTOMER)
+  isActive              Boolean   @default(true)
+  dateOfBirth           DateTime?
+  gender                String?
+  notes                 String?
+  metafields            Json?
+  deletedAt             DateTime?
+  version               Int       @default(1)
 
-  accounts            Account[]
-  sessions            Session[]
-  addresses           Address[]
-  paymentMethods      UserPaymentMethod[]
-  orders              Order[]
-  reviews             Review[]
-  wishlist            Wishlist[]
-  cart                Cart?
-  viewedProducts      RecentlyViewed[]
-  wallet              Wallet?
-  abandonedCheckouts AbandonedCheckout[]
+  addresses             Address[]
+  paymentMethods        UserPaymentMethod[]
+  orders                Order[]
+  reviews               Review[]
+  wishlist              Wishlist[]
+  cart                  Cart?
+  viewedProducts        RecentlyViewed[]
+  wallet                Wallet?
+  abandonedCheckouts    AbandonedCheckout[]
 
-  activityLogs        ActivityLog[]
-  blogPosts           BlogPost[]
-  notifications       Notification[]
+  activityLogs          ActivityLog[]
+  blogPosts             BlogPost[]
+  notifications         Notification[]
 
-  createdTickets      SupportTicket[] @relation("UserCreatedTickets")
-  assignedTickets     SupportTicket[] @relation("StaffTickets")
+  createdTickets        SupportTicket[] @relation("UserCreatedTickets")
+  assignedTickets       SupportTicket[] @relation("StaffTickets")
 
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  affiliateAccount      AffiliateAccount?
+  referredByAffiliateId String?
+  referredByAffiliate   AffiliateAccount? @relation("CustomerReferral", fields: [referredByAffiliateId], references: [id])
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([email])
   @@index([phone])
   @@index([role, createdAt(sort: Desc)])
   @@index([clerkId])
   @@index([role, isActive])
-}
-
-model Account {
-  id                String  @id @default(uuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-model Session {
-  id           String   @id @default(uuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([sessionToken])
-}
-
-model VerificationToken {
-  id      String   @id @default(uuid())
-  email   String
-  token   String   @unique
-  expires DateTime
-
-  @@unique([email, token])
-}
-
-model PasswordResetToken {
-  id      String   @id @default(uuid())
-  email   String
-  token   String   @unique
-  expires DateTime
-
-  @@unique([email, token])
 }
 
 model UserPaymentMethod {
@@ -388,26 +384,28 @@ model WalletTransaction {
 // ==========================================
 
 model Category {
-  id           String                @id @default(uuid())
-  name         String
-  slug         String                @unique
-  description  String?               @db.Text
-  image        String?
-  mediaId      String?
-  media        Media?                @relation(fields: [mediaId], references: [id])
-  isActive     Boolean               @default(true)
-  menuOrder    Int                   @default(0)
-  parentId     String?
-  parent       Category?             @relation("CategoryToCategory", fields: [parentId], references: [id])
-  children     Category[]            @relation("CategoryToCategory")
-  products     Product[]
-  translations CategoryTranslation[]
-  metafields   Json?
-  metaTitle    String?
-  metaDesc     String?
-  deletedAt    DateTime?
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  id                      String                @id @default(uuid())
+  name                    String
+  slug                    String                @unique
+  description             String?               @db.Text
+  image                   String?
+  mediaId                 String?
+  media                   Media?                @relation(fields: [mediaId], references: [id])
+  isActive                Boolean               @default(true)
+  menuOrder               Int                   @default(0)
+  parentId                String?
+  parent                  Category?             @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children                Category[]            @relation("CategoryToCategory")
+  products                Product[]
+  translations            CategoryTranslation[]
+  metafields              Json?
+  metaTitle               String?
+  metaDesc                String?
+  affiliateCommissionRate Decimal?
+  disableAffiliate        Boolean               @default(false)
+  deletedAt               DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 
   @@index([parentId])
   @@index([isActive, menuOrder(sort: Asc)])
@@ -494,107 +492,104 @@ model ShippingClass {
 }
 
 model Product {
-  id                   String                @id @default(uuid())
-  versions             ProductVersion[]
-  stockHistory         StockHistory[]
-  productCode          Int                   @unique @default(autoincrement())
-  name                 String
-  slug                 String                @unique
-  description          String?               @db.Text
-  shortDescription     String?               @db.Text
-  productType          ProductType           @default(SIMPLE)
-  status               ProductStatus         @default(DRAFT)
-  isFeatured           Boolean               @default(false)
-  categoryId           String?
-  category             Category?             @relation(fields: [categoryId], references: [id])
-  brandId              String?
-  brand                Brand?                @relation(fields: [brandId], references: [id])
-  tags                 Tag[]
-  collections          Collection[]
-  featuredImage        String?
-  featuredMediaId      String?
-  featuredMedia        Media?                @relation(fields: [featuredMediaId], references: [id])
-  images               ProductImage[]
-  videoUrl             String?
-  videoThumbnail       String?
-  price                Decimal               @default(0.00)
-  salePrice            Decimal?
-  saleStart            DateTime?
-  saleEnd              DateTime?
-  costPerItem          Decimal?
-  taxable              Boolean               @default(true)
-  taxStatus            TaxStatus             @default(TAXABLE)
-  taxRateId            String?
-  taxRate              TaxRate?              @relation(fields: [taxRateId], references: [id])
-  taxClassId           String?
-  sku                  String?               @unique
-  barcode              String?
-  mpn                  String?
-  trackQuantity        Boolean               @default(true)
-  stock                Int                   @default(0)
-  lowStockThreshold    Int                   @default(2)
-  backorderStatus      BackorderStatus       @default(DO_NOT_ALLOW)
-  soldIndividually     Boolean               @default(false)
-  
-  // Pre-order Fields
-  isPreOrder           Boolean               @default(false)
-  preOrderReleaseDate  DateTime?
-  preOrderMessage      String?
-  preOrderLimit        Int?
-
-  weight               Decimal?              @default(0)
-  length               Decimal?
-  width                Decimal?
-  height               Decimal?
-  weightUnit           String?               @default("kg")
-  dimensionUnit        String?               @default("cm")
-  shippingClassId      String?
-  shippingClass        ShippingClass?        @relation(fields: [shippingClassId], references: [id])
-  isVirtual            Boolean               @default(false)
-  isDownloadable       Boolean               @default(false)
-  downloadFiles        DigitalFile[]
-  downloadLimit        Int?
-  downloadExpiry       Int?
-  isDangerousGood      Boolean               @default(false)
-  dangerousGoodType    String?
-  hsCode               String?
-  countryOfManufacture String?
-  bundleItems          BundleItem[]          @relation("BundleParent")
-  partOfBundles        BundleItem[]          @relation("BundleChild")
-  attributes           ProductAttribute[]
-  variants             ProductVariant[]
-  reviews              Review[]
-  questions            QuestionAnswer[]
-  inventoryLevels      InventoryLevel[]
-  translations         ProductTranslation[]
-  upsellIds            String[]
-  crossSellIds         String[]
-  metaTitle            String?
-  metaDesc             String?
-  seoCanonicalUrl      String?
-  seoSchema            Json?
-  gender               String?
-  ageGroup             String?
-  viewCount            Int                   @default(0)
-  soldCount            Int                   @default(0)
-  rating               Decimal               @default(0)
-  reviewCount          Int                   @default(0)
-  metafields           Json?
-  menuOrder            Int                   @default(0)
-  purchaseNote         String?
-  enableReviews        Boolean               @default(true)
-  deletedAt            DateTime?
-  version              Int                   @default(1)
-   
-  descriptionEmbedding Unsupported("vector(1536)")?
-  imageEmbedding       Unsupported("vector(512)")?
-
-  wishlistedBy         Wishlist[]
-  recentViews          RecentlyViewed[]
-  orderItems           OrderItem[]
-  cartItems            CartItem[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id                       String                 @id @default(uuid())
+  versions                 ProductVersion[]
+  stockHistory             StockHistory[]
+  productCode              Int                    @unique @default(autoincrement())
+  name                     String
+  slug                     String                 @unique
+  description              String?                @db.Text
+  shortDescription         String?                @db.Text
+  productType              ProductType            @default(SIMPLE)
+  status                   ProductStatus          @default(DRAFT)
+  isFeatured               Boolean                @default(false)
+  categoryId               String?
+  category                 Category?              @relation(fields: [categoryId], references: [id])
+  brandId                  String?
+  brand                    Brand?                 @relation(fields: [brandId], references: [id])
+  tags                     Tag[]
+  collections              Collection[]
+  featuredImage            String?
+  featuredMediaId          String?
+  featuredMedia            Media?                 @relation(fields: [featuredMediaId], references: [id])
+  images                   ProductImage[]
+  videoUrl                 String?
+  videoThumbnail           String?
+  price                    Decimal                @default(0.00)
+  salePrice                Decimal?
+  saleStart                DateTime?
+  saleEnd                  DateTime?
+  costPerItem              Decimal?
+  taxable                  Boolean                @default(true)
+  taxStatus                TaxStatus              @default(TAXABLE)
+  taxRateId                String?
+  taxRate                  TaxRate?               @relation(fields: [taxRateId], references: [id])
+  taxClassId               String?
+  sku                      String?                @unique
+  barcode                  String?
+  mpn                      String?
+  trackQuantity            Boolean                @default(true)
+  stock                    Int                    @default(0)
+  lowStockThreshold        Int                    @default(2)
+  backorderStatus          BackorderStatus        @default(DO_NOT_ALLOW)
+  soldIndividually         Boolean                @default(false)
+  isPreOrder               Boolean                @default(false)
+  preOrderReleaseDate      DateTime?
+  preOrderMessage          String?
+  preOrderLimit            Int?
+  weight                   Decimal?               @default(0)
+  length                   Decimal?
+  width                    Decimal?
+  height                   Decimal?
+  weightUnit               String?                @default("kg")
+  dimensionUnit            String?                @default("cm")
+  shippingClassId          String?
+  shippingClass            ShippingClass?         @relation(fields: [shippingClassId], references: [id])
+  isVirtual                Boolean                @default(false)
+  isDownloadable           Boolean                @default(false)
+  downloadFiles            DigitalFile[]
+  downloadLimit            Int?
+  downloadExpiry           Int?
+  isDangerousGood          Boolean                @default(false)
+  dangerousGoodType        String?
+  hsCode                   String?
+  countryOfManufacture     String?
+  bundleItems              BundleItem[]           @relation("BundleParent")
+  partOfBundles            BundleItem[]           @relation("BundleChild")
+  attributes               ProductAttribute[]
+  variants                 ProductVariant[]
+  reviews                  Review[]
+  questions                QuestionAnswer[]
+  inventoryLevels          InventoryLevel[]
+  translations             ProductTranslation[]
+  upsellIds                String[]
+  crossSellIds             String[]
+  metaTitle                String?
+  metaDesc                 String?
+  seoCanonicalUrl          String?
+  seoSchema                Json?
+  gender                   String?
+  ageGroup                 String?
+  viewCount                Int                    @default(0)
+  soldCount                Int                    @default(0)
+  rating                   Decimal                @default(0)
+  reviewCount              Int                    @default(0)
+  metafields               Json?
+  menuOrder                Int                    @default(0)
+  purchaseNote             String?
+  enableReviews            Boolean                @default(true)
+  affiliateCommissionRate  Decimal?
+  disableAffiliate         Boolean                @default(false)
+  deletedAt                DateTime?
+  version                  Int                    @default(1)
+  descriptionEmbedding     Unsupported("vector(1536)")?
+  imageEmbedding           Unsupported("vector(512)")?
+  wishlistedBy             Wishlist[]
+  recentViews              RecentlyViewed[]
+  orderItems               OrderItem[]
+  cartItems                CartItem[]
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
 
   @@index([slug])
   @@index([categoryId, status])
@@ -605,8 +600,6 @@ model Product {
   @@index([createdAt(sort: Desc)])
   @@index([stock(sort: Asc), status])
   @@index([metafields(ops: JsonbPathOps)], type: Gin)
-   
-  // New Composite Indices
   @@index([categoryId, status, price])
   @@index([brandId, status, isFeatured])
   @@index([status, price, createdAt])
@@ -628,48 +621,46 @@ model ProductTranslation {
 }
 
 model ProductVersion {
-  id          String   @id @default(uuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  data        Json     // Full snapshot of product data before update
-  reason      String?  // e.g. "Price Update", "Bulk Edit"
-  createdBy   String?  // User ID
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  data      Json
+  reason    String?
+  createdBy String?
+  createdAt DateTime @default(now())
 
   @@index([productId])
 }
 
-// ✅ NEW MODEL: Inventory History (Why stock changed?)
 model StockHistory {
-  id          String   @id @default(uuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variantId   String?
-  locationId  String?
-  change      Int      // e.g. +10 or -5
-  finalStock  Int      // Stock after change
-  reason      String?  // "Order #123", "Restock", "Damage"
-  userId      String?  // Who changed it
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId  String?
+  locationId String?
+  change     Int
+  finalStock Int
+  reason     String?
+  userId     String?
+  createdAt  DateTime @default(now())
 
   @@index([productId, variantId])
 }
 
 model ProductImage {
-  id        String          @id @default(uuid())
-  url       String
-  title     String?
-  altText   String?
-  width     Int?
-  height    Int?
-  position  Int             @default(0)
-  productId String
-  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  mediaId   String?
-  media     Media?          @relation(fields: [mediaId], references: [id])
-  variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
-
+  id             String          @id @default(uuid())
+  url            String
+  title          String?
+  altText        String?
+  width          Int?
+  height         Int?
+  position       Int             @default(0)
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaId        String?
+  media          Media?          @relation(fields: [mediaId], references: [id])
+  variantId      String?
+  variant        ProductVariant? @relation(fields: [variantId], references: [id])
   imageEmbedding Unsupported("vector(512)")?
 
   @@index([productId, position(sort: Asc)])
@@ -714,55 +705,53 @@ model Attribute {
 }
 
 model ProductAttribute {
-  id         String   @id @default(uuid())
+  id         String  @id @default(uuid())
   name       String
-  position   Int      @default(0)
-  visible    Boolean  @default(true)
-  variation  Boolean  @default(true)
-  isFeatured Boolean  @default(false)
+  position   Int     @default(0)
+  visible    Boolean @default(true)
+  variation  Boolean @default(true)
+  isFeatured Boolean @default(false)
   brandId    String?
-  brand      Brand?   @relation(fields: [brandId], references: [id])
+  brand      Brand?  @relation(fields: [brandId], references: [id])
   values     String[]
   productId  String
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([brandId])
 }
 
 model ProductVariant {
-  id              String           @id @default(uuid())
-  productId       String
-  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name            String
-  sku             String?
-  barcode         String?
-  price           Decimal
-  salePrice       Decimal?
-  costPerItem     Decimal?
-  stock           Int              @default(0)
-  trackQuantity   Boolean          @default(true)
-  
-  isPreOrder      Boolean          @default(false)
+  id                  String           @id @default(uuid())
+  productId           String
+  product             Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name                String
+  sku                 String?
+  barcode             String?
+  price               Decimal
+  salePrice           Decimal?
+  costPerItem         Decimal?
+  stock               Int              @default(0)
+  trackQuantity       Boolean          @default(true)
+  isPreOrder          Boolean          @default(false)
   preOrderReleaseDate DateTime?
-  
-  image           String?
-  mediaId         String?
-  media           Media?           @relation(fields: [mediaId], references: [id])
-  images          ProductImage[]
-  weight          Decimal?
-  length          Decimal?
-  width           Decimal?
-  height          Decimal?
-  attributes      Json
-  metafields      Json?
-  version         Int              @default(1)
-  inventoryLevels InventoryLevel[]
-  wishlistedBy    Wishlist[]
-  recentViews     RecentlyViewed[]
-  cartItems       CartItem[]
-  orderItems      OrderItem[]
-  deletedAt       DateTime?
+  image               String?
+  mediaId             String?
+  media               Media?           @relation(fields: [mediaId], references: [id])
+  images              ProductImage[]
+  weight              Decimal?
+  length              Decimal?
+  width               Decimal?
+  height              Decimal?
+  attributes          Json
+  metafields          Json?
+  version             Int              @default(1)
+  inventoryLevels     InventoryLevel[]
+  wishlistedBy        Wishlist[]
+  recentViews         RecentlyViewed[]
+  cartItems           CartItem[]
+  orderItems          OrderItem[]
+  deletedAt           DateTime?
 
   @@index([productId])
   @@index([sku])
@@ -807,15 +796,15 @@ model PickupLocation {
 }
 
 model InventoryLevel {
-  id        String          @id @default(uuid())
-  quantity  Int             @default(0)
+  id         String          @id @default(uuid())
+  quantity   Int             @default(0)
   locationId String
-  location  Location        @relation(fields: [locationId], references: [id])
-  productId String
-  product   Product         @relation(fields: [productId], references: [id])
-  variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
-  version   Int             @default(1)
+  location   Location        @relation(fields: [locationId], references: [id])
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id])
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  version    Int             @default(1)
 
   @@unique([locationId, productId, variantId])
   @@index([productId, variantId])
@@ -880,10 +869,7 @@ model Order {
   status                 OrderStatus        @default(PENDING)
   paymentStatus          PaymentStatus      @default(UNPAID)
   fulfillmentStatus      FulfillmentStatus  @default(UNFULFILLED)
-  
-  // Pre-order Flag
   hasPreOrderItems       Boolean            @default(false)
-  
   currency               String             @default("AUD")
   exchangeRate           Decimal            @default(1.0)
   subtotal               Decimal
@@ -947,6 +933,11 @@ model Order {
   riskLevel              String?
   riskScore              Int?
   fraudAnalysis          Json?
+  
+  affiliateId            String?
+  affiliate              AffiliateAccount?  @relation("OrderAffiliate", fields: [affiliateId], references: [id])
+  referral               Referral?
+
   items                  OrderItem[]
   shipments              Shipment[]
   transactions           OrderTransaction[]
@@ -967,35 +958,31 @@ model Order {
   @@index([paymentId])
   @@index([orderDate])
   @@index([hasPreOrderItems])
-   
-  // New Composite Indices for Ultra Performance
   @@index([userId, status, createdAt])
   @@index([status, paymentStatus, fulfillmentStatus])
   @@index([status, createdAt, total])
+  @@index([affiliateId])
 }
 
 model OrderItem {
-  id          String   @id @default(uuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String?
-  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productName String
-  variantId   String?
-  variant     ProductVariant? @relation(fields: [variantId], references: [id])
-  variantName String?
-  sku         String?
-  
-  // Pre-order Snapshot
-  isPreOrder          Boolean   @default(false)
+  id                  String          @id @default(uuid())
+  orderId             String
+  order               Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId           String?
+  product             Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName         String
+  variantId           String?
+  variant             ProductVariant? @relation(fields: [variantId], references: [id])
+  variantName         String?
+  sku                 String?
+  isPreOrder          Boolean         @default(false)
   preOrderReleaseDate DateTime?
-  
-  image       String?
-  price       Decimal
-  quantity    Int
-  total       Decimal
-  tax         Decimal  @default(0)
-  metadata    Json?
+  image               String?
+  price               Decimal
+  quantity            Int
+  total               Decimal
+  tax                 Decimal         @default(0)
+  metadata            Json?
 
   @@index([orderId])
   @@index([productId])
@@ -1003,24 +990,24 @@ model OrderItem {
 }
 
 model OrderTransaction {
-  id                  String             @id @default(uuid())
+  id                  String            @id @default(uuid())
   orderId             String
-  order               Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order               Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   gateway             String
   type                TransactionType
   amount              Decimal
-  currency            String             @default("AUD")
+  currency            String            @default("AUD")
   transactionId       String
   idempotencyKey      String?
   status              String
   parentTransactionId String?
-  parentTransaction   OrderTransaction?  @relation("RefundOf", fields: [parentTransactionId], references: [id])
+  parentTransaction   OrderTransaction? @relation("RefundOf", fields: [parentTransactionId], references: [id])
   refunds             OrderTransaction[] @relation("RefundOf")
   rawResponse         Json?
   errorCode           String?
   errorMessage        String?
   metadata            Json?
-  createdAt           DateTime           @default(now())
+  createdAt           DateTime          @default(now())
 
   @@index([orderId, status])
   @@index([transactionId])
@@ -1091,8 +1078,8 @@ model Shipment {
   numberOfParcels    Int      @default(1)
   syncedToGateway    Boolean  @default(false)
   syncError          String?
-  lastSyncedAt       DateTime? 
-  rawStatus          Json?       
+  lastSyncedAt       DateTime?
+  rawStatus          Json?
 
   @@index([orderId])
 }
@@ -1146,13 +1133,13 @@ model OrderNote {
 // ==========================================
 
 model Cart {
-  id             String   @id @default(uuid())
-  userId         String?  @unique
-  user           User?    @relation(fields: [userId], references: [id])
+  id             String     @id @default(uuid())
+  userId         String?    @unique
+  user           User?      @relation(fields: [userId], references: [id])
   sessionId      String?
   items          CartItem[]
   reminderSentAt DateTime?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime   @updatedAt
 
   @@index([sessionId])
   @@index([userId])
@@ -1247,24 +1234,29 @@ model Discount {
   ruleLogic        Json?
   isActive         Boolean      @default(true)
   orders           Order[]
+  
+  affiliateId      String?
+  affiliate        AffiliateAccount? @relation(fields: [affiliateId], references: [id])
+
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   @@index([code])
   @@index([startDate, endDate])
   @@index([isActive])
+  @@index([affiliateId])
 }
 
 model GiftCard {
-  id             String   @id @default(uuid())
-  code           String   @unique
+  id             String    @id @default(uuid())
+  code           String    @unique
   initialValue   Decimal
   balance        Decimal
   userId         String?
   recipientEmail String?
   expiresAt      DateTime?
-  isEnabled      Boolean  @default(true)
-  createdAt      DateTime @default(now())
+  isEnabled      Boolean   @default(true)
+  createdAt      DateTime  @default(now())
 
   @@index([code])
 }
@@ -1398,26 +1390,27 @@ model TicketMessage {
 // ==========================================
 
 model StoreSettings {
-  id                String  @id @default("settings")
-  storeName         String  @default("My Store")
-  storeEmail        String?
-  storePhone        String?
-  currency          String  @default("AUD")
-  currencySymbol    String  @default("$")
-  storeAddress      Json?
-  taxSettings       Json?
-  generalConfig     Json?
-  weightUnit        String  @default("kg")
-  dimensionUnit     String  @default("cm")
-  logo              String?
-  favicon           String?
-  logoMediaId       String?
-  logoMedia         Media?  @relation("StoreLogo", fields: [logoMediaId], references: [id])
-  faviconMediaId     String?
-  faviconMedia       Media?  @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
-  socialLinks       Json?
-  smtpConfig        Json?
-  maintenance       Boolean @default(false)
+  id             String              @id @default("settings")
+  storeName      String              @default("My Store")
+  storeEmail     String?
+  storePhone     String?
+  currency       String              @default("AUD")
+  currencySymbol String              @default("$")
+  storeAddress   Json?
+  taxSettings    Json?
+  generalConfig  Json?
+  weightUnit     String              @default("kg")
+  dimensionUnit  String              @default("cm")
+  logo           String?
+  favicon        String?
+  logoMediaId    String?
+  logoMedia      Media?              @relation("StoreLogo", fields: [logoMediaId], references: [id])
+  faviconMediaId String?
+  faviconMedia   Media?              @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
+  socialLinks    Json?
+  smtpConfig     Json?
+  maintenance    Boolean             @default(false)
+  affiliateConfig Json?
 }
 
 // ==========================================
@@ -1468,18 +1461,18 @@ model ShippingRate {
 }
 
 model CarrierService {
-  id               String             @id @default(uuid())
+  id               String          @id @default(uuid())
   name             String
-  slug             String             @unique
-  isEnabled        Boolean            @default(false)
+  slug             String          @unique
+  isEnabled        Boolean         @default(false)
   apiKey           String?
   apiSecret        String?
-  isSandbox        Boolean            @default(true)
+  isSandbox        Boolean         @default(true)
   settings         Json?
   rates            ShippingRate[]
   shippingPackages ShippingBox[]
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 }
 
 model TransdirectConfig {
@@ -1680,38 +1673,38 @@ model MediaFolder {
 }
 
 model Media {
-  id            String          @id @default(uuid())
-  url           String
-  type          MediaType       @default(IMAGE)
-  filename      String
-  originalName  String?
-  publicId      String?
-  width         Int?
-  height        Int?
-  mimeType      String
-  size          Int
-  altText       String?
-  caption       String?
-  description   String?
-  folderId      String?
-  folder        MediaFolder?    @relation(fields: [folderId], references: [id])
-  uploadedBy    String
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  productImages ProductImage[]
-  categories    Category[]
-  brands        Brand[]
-  products      Product[]
-  variants      ProductVariant[]
-  blogPosts     BlogPost[]
-   
-  storeLogos    StoreSettings[] @relation("StoreLogo")
-  storeFavicons StoreSettings[] @relation("StoreFavicon")
-  users         User[]
-  collections   Collection[]
-  banners       Banner[]
-  emailConfigs  EmailConfiguration[]
-  seoConfigs    SeoGlobalConfig[]
+  id             String               @id @default(uuid())
+  url            String
+  type           MediaType            @default(IMAGE)
+  filename       String
+  originalName   String?
+  publicId       String?
+  width          Int?
+  height         Int?
+  mimeType       String
+  size           Int
+  altText        String?
+  caption        String?
+  description    String?
+  folderId       String?
+  folder         MediaFolder?         @relation(fields: [folderId], references: [id])
+  uploadedBy     String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  productImages  ProductImage[]
+  categories     Category[]
+  brands         Brand[]
+  products       Product[]
+  variants       ProductVariant[]
+  blogPosts      BlogPost[]
+  
+  storeLogos     StoreSettings[]      @relation("StoreLogo")
+  storeFavicons  StoreSettings[]      @relation("StoreFavicon")
+  users          User[]
+  collections    Collection[]
+  banners        Banner[]
+  emailConfigs   EmailConfiguration[]
+  seoConfigs     SeoGlobalConfig[]
 
   @@index([folderId])
   @@index([createdAt(sort: Desc)])
@@ -1728,31 +1721,31 @@ model UrlRedirect {
 }
 
 model SeoGlobalConfig {
-  id                 String   @id @default("global_seo")
-  siteName           String   @default("GoBike")
-  titleSeparator     String   @default("|")
-  siteUrl            String   @default("https://gobike.au")
-  organizationData   Json?    @db.JsonB
-  defaultMetaTitle   String?
-  defaultMetaDesc    String?  @db.Text
-  defaultKeywords    String[]
-  robotsTxtContent   String?  @db.Text
-  globalRobotsProps  Json?
-  sitemapEnabled     Boolean  @default(true)
-  isPublic           Boolean  @default(true)
-  ogImage            String?
-  ogMediaId          String?
-  ogMedia            Media?   @relation(fields: [ogMediaId], references: [id])
-  ogImageWidth       Int?     @default(1200)
-  ogImageHeight      Int?     @default(630)
-  ogType             String   @default("website")
-  ogLocale           String   @default("en_AU")
-  twitterCard        String   @default("summary_large_image")
-  twitterSite        String?
-  twitterCreator     String?
-  themeColor         String?  @default("#2271b1")
-  manifestJson       Json?
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default("global_seo")
+  siteName          String   @default("GoBike")
+  titleSeparator    String   @default("|")
+  siteUrl           String   @default("https://gobike.au")
+  organizationData  Json?    @db.JsonB
+  defaultMetaTitle  String?
+  defaultMetaDesc   String?  @db.Text
+  defaultKeywords   String[]
+  robotsTxtContent  String?  @db.Text
+  globalRobotsProps Json?
+  sitemapEnabled    Boolean  @default(true)
+  isPublic          Boolean  @default(true)
+  ogImage           String?
+  ogMediaId         String?
+  ogMedia           Media?   @relation(fields: [ogMediaId], references: [id])
+  ogImageWidth      Int?     @default(1200)
+  ogImageHeight     Int?     @default(630)
+  ogType            String   @default("website")
+  ogLocale          String   @default("en_AU")
+  twitterCard       String   @default("summary_large_image")
+  twitterSite       String?
+  twitterCreator    String?
+  themeColor        String?  @default("#2271b1")
+  manifestJson      Json?
+  updatedAt         DateTime @updatedAt
 }
 
 model MarketingIntegration {
@@ -1816,27 +1809,27 @@ model SystemLog {
 // ==========================================
 
 model PaymentMethodConfig {
-  id                 String                @id @default(uuid())
-  identifier         String                @unique
-  name               String
-  isEnabled          Boolean               @default(false)
-  mode               PaymentMode           @default(TEST)
-  displayOrder       Int                   @default(0)
-  description        String?
-  instructions       String?
-  icon               String?
-  minOrderAmount     Decimal?
-  maxOrderAmount     Decimal?
-  surchargeEnabled   Boolean               @default(false)
-  surchargeType      String                @default("fixed")
-  surchargeAmount    Decimal               @default(0)
-  taxableSurcharge   Boolean               @default(false)
-  needsSetup         Boolean               @default(true)
-  stripeConfig       StripeConfig?
-  paypalConfig       PaypalConfig?
-  offlineConfig      OfflinePaymentConfig?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  id                   String                @id @default(uuid())
+  identifier           String                @unique
+  name                 String
+  isEnabled            Boolean               @default(false)
+  mode                 PaymentMode           @default(TEST)
+  displayOrder         Int                   @default(0)
+  description          String?
+  instructions         String?
+  icon                 String?
+  minOrderAmount       Decimal?
+  maxOrderAmount       Decimal?
+  surchargeEnabled     Boolean               @default(false)
+  surchargeType        String                @default("fixed")
+  surchargeAmount      Decimal               @default(0)
+  taxableSurcharge     Boolean               @default(false)
+  needsSetup           Boolean               @default(true)
+  stripeConfig         StripeConfig?
+  paypalConfig         PaypalConfig?
+  offlineConfig        OfflinePaymentConfig?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   @@index([isEnabled, displayOrder(sort: Asc)])
 }
@@ -1966,4 +1959,316 @@ model OutboxEvent {
   processedAt DateTime?
 
   @@index([status, createdAt])
+}
+
+// ==========================================
+// 17. AFFILIATE SYSTEM (ULTRA & MLM)
+// ==========================================
+
+model AffiliateAccount {
+  id              String           @id @default(uuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug            String           @unique
+  customSlug      String?          @unique 
+  status          AffiliateStatus  @default(PENDING)
+  commissionRate  Decimal?         
+  balance         Decimal          @default(0.00)
+  totalEarnings   Decimal          @default(0.00)
+  storeCredit     Decimal          @default(0.00)
+  
+  isLifetime        Boolean   @default(false)      
+  cookieDuration    Int?      @default(30)         
+  riskScore         Float     @default(0.0)        
+  autoApprovePayout Boolean   @default(false)      
+  
+  campaigns         AffiliateCampaign[]        
+  shortLinks        AffiliateLink[]              
+  ledger            AffiliateLedger[] 
+  
+  tierId          String?
+  tier            AffiliateTier?   @relation(fields: [tierId], references: [id])
+  tags            String[]
+  
+  parentId        String?
+  parent          AffiliateAccount? @relation("AffiliateMLM", fields: [parentId], references: [id])
+  downlines       AffiliateAccount[] @relation("AffiliateMLM")
+  
+  referrals       Referral[]
+  customerReferrals User[]         @relation("CustomerReferral")
+  clicks          AffiliateClick[]
+  payouts         AffiliatePayout[]
+  pixels          AffiliatePixel[]
+  domains         AffiliateDomain[]
+  orders          Order[]          @relation("OrderAffiliate")
+  coupons         Discount[]
+  creativeUsages  AffiliateCreativeUsage[] 
+  
+  bankDetails     Json?
+  paypalEmail     String?
+  registrationNotes String?        @db.Text
+  adminNotes        String?        @db.Text
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([slug])
+  @@index([status])
+  @@index([parentId])
+  @@index([customSlug])
+}
+
+model AffiliateTier {
+  id              String             @id @default(uuid())
+  name            String             @unique
+  description     String?
+  commissionRate  Decimal
+  commissionType  CommissionType     @default(PERCENTAGE)
+  minSalesAmount  Decimal            @default(0)
+  minSalesCount   Int                @default(0)
+  color           String?
+  icon            String?
+  isDefault       Boolean            @default(false)
+  affiliates      AffiliateAccount[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+model AffiliateClick {
+  id              String           @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  ipAddress       String?
+  userAgent       String?
+  referrer        String?
+  landingPage     String?
+  subId           String?
+  campaign        String?
+  country         String?
+  deviceType      String?
+  converted       Boolean          @default(false)
+  orderId         String?
+  utmSource         String?                       
+  utmMedium         String?                    
+  utmCampaign       String?                    
+  deviceFingerprint String?                     
+  city              String?                    
+  processingTime    Int? 
+  createdAt       DateTime         @default(now())
+
+  @@index([affiliateId])
+  @@index([subId])
+  @@index([createdAt])
+}
+
+model Referral {
+  id              String           @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id])
+  orderId         String           @unique
+  order           Order            @relation(fields: [orderId], references: [id])
+  totalOrderAmount Decimal
+  netOrderAmount  Decimal
+  commissionAmount Decimal
+  currency        String           @default("AUD")
+  status          ReferralStatus   @default(PENDING)
+  tierSnapshot    String?
+  commissionType  CommissionType   @default(PERCENTAGE)
+  commissionRate  Decimal
+  isMlmReward     Boolean          @default(false)
+  isLifetime      Boolean          @default(false)
+  isManual        Boolean          @default(false) 
+  adminNote       String?
+  fromDownlineId  String?
+  metadata        Json?
+
+  commissionRuleId  String?                       
+  matchedRule       AffiliateCommissionRule?      @relation(fields: [commissionRuleId], references: [id])
+  
+  isRecurring       Boolean   @default(false)    
+  recurringCycle    Int?      @default(1)         
+  
+  deviceFingerprint String?                       
+  isFlagged         Boolean   @default(false)     
+  flagReason        String?   
+
+  paidAt          DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([affiliateId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AffiliatePayout {
+  id              String           @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id])
+  amount          Decimal
+  method          PayoutMethod
+  status          PayoutStatus     @default(PENDING)
+  bulkPayoutId    String?
+  transactionId   String?
+  invoiceUrl      String?
+  note            String?
+  processedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([affiliateId])
+  @@index([status])
+}
+
+model AffiliateDomain {
+  id              String           @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  
+  domain          String           @unique // e.g. "rahim-reviews.com"
+  isVerified      Boolean          @default(false)
+  verificationToken String?
+  
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  
+  @@index([domain])
+}
+
+model AffiliateCreative {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  type            MediaType @default(IMAGE)
+  url             String
+  width           Int?
+  height          Int?
+  targetUrl       String?
+  textContent     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  usages          AffiliateCreativeUsage[]
+  usageCount      Int      @default(0)
+}
+
+model AffiliateCreativeUsage {
+  id          String           @id @default(uuid())
+  creativeId  String
+  creative    AffiliateCreative @relation(fields: [creativeId], references: [id])
+  affiliateId String
+  affiliate   AffiliateAccount  @relation(fields: [affiliateId], references: [id])
+  copiedAt    DateTime          @default(now())
+  
+  @@index([creativeId])
+  @@index([affiliateId])
+}
+
+model AffiliatePixel {
+  id              String           @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  type            String           // e.g., "FACEBOOK", "GOOGLE_TAG", "TIKTOK"
+  pixelId         String
+  accessToken     String?          @db.Text
+  testCode        String?
+  isEnabled       Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([affiliateId])
+}
+
+model AffiliateContest {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean  @default(true)
+  prizes          Json?
+  criteria        String   @default("sales_amount") // or sales_count
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AffiliateCommissionRule {
+  id              String    @id @default(uuid())
+  name            String    // e.g., "New Customer Bonus", "Black Friday Electronics"
+  priority        Int       @default(0) // যার priority বেশি, সেই রুল আগে চেক হবে
+  isActive        Boolean   @default(true)
+  
+  // Conditions (JSON Logic)
+  // Example: { "customerType": "NEW", "categoryIds": ["xyz"], "minOrderValue": 100 }
+  conditions      Json      
+  
+  // Action (Reward)
+  // Example: { "type": "PERCENTAGE", "value": 10, "tierBonus": 2 }
+  action          Json      
+  
+  startDate       DateTime?
+  endDate         DateTime?
+  
+  affiliateSpecificIds String[] // যদি স্পেসিফিক কোনো অ্যাফিলিয়েটের জন্য এই রুল হয়
+  
+  referrals       Referral[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([isActive, priority(sort: Desc)])
+}
+
+model AffiliateLink {
+  id              String           @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  
+  slug            String           @unique // e.g., "summer-deal"
+  destinationUrl  String           // মেইন প্রোডাক্ট বা পেজের লিংক
+  
+  campaignId      String?
+  campaign        AffiliateCampaign? @relation(fields: [campaignId], references: [id])
+  
+  clickCount      Int              @default(0)
+  isActive        Boolean          @default(true)
+  
+  createdAt       DateTime         @default(now())
+  
+  @@index([slug])
+}
+
+model AffiliateCampaign {
+  id              String           @id @default(uuid())
+  name            String           // e.g., "Facebook Ads 2025"
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  
+  clicks          Int              @default(0)
+  conversions     Int              @default(0)
+  revenue         Decimal          @default(0.00)
+  
+  links           AffiliateLink[]
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([affiliateId])
+}
+
+model AffiliateLedger {
+  id              String           @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  
+  type            LedgerType       // ENUM: COMMISSION, PAYOUT, ADJUSTMENT, REFUND_DEDUCTION
+  amount          Decimal
+  balanceBefore   Decimal
+  balanceAfter    Decimal
+  
+  referenceId     String?          // Order ID or Payout ID
+  description     String?
+  
+  createdAt       DateTime         @default(now())
+  
+  @@index([affiliateId])
 }

@@ -10,7 +10,7 @@ const OurStory = () => {
           <div className="w-full">
             <Image 
               loading="lazy" 
-              src="https://gobikes.au/wp-content/uploads/2025/08/gobike-scaled-1.webp" 
+              src="https://res.cloudinary.com/dbij2wehz/image/upload/gobike-scaled.webp" 
               alt="Founders of GoBike" 
               width={2049} height={2560} 
               sizes="(max-width: 768px) 100vw, 50vw" 

@@ -1,4 +1,4 @@
-// app/actions/log.ts
+// app/actions/all-activity-log/all-activity-log.ts
 
 "use server";
 

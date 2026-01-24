@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { deleteCustomer, toggleCustomerStatus } from "@/app/actions/admin/customer";
+import { deleteCustomer, toggleCustomerStatus } from "@/app/actions/admin/customer/customer";
 import { Trash2, Ban, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 

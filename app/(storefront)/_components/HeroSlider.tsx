@@ -28,7 +28,7 @@ const HeroSlider = () => {
           <div className="min-w-full flex flex-col lg:flex-row min-h-[550px] lg:h-[70vh]">
             <div className="w-full lg:w-[55%] flex items-center justify-center order-1 lg:order-2">
               <Image 
-                src="https://gobikes.au/wp-content/uploads/2025/12/Slider-1-scaled.webp" 
+                src="https://res.cloudinary.com/dbij2wehz/image/upload/Slider.webp" 
                 alt="GoBike 24 Inch Electric Dirt Bike" 
                 width={1000} height={774} 
                 priority 
@@ -49,7 +49,7 @@ const HeroSlider = () => {
           <div className="min-w-full flex flex-col lg:flex-row min-h-[550px] lg:h-[70vh]">
             <div className="w-full lg:w-[55%] flex items-center justify-center order-1 lg:order-2">
               <Image 
-                src="https://gobikes.au/wp-content/uploads/2025/08/Gobike-electric-bike-kids-ebike20-inch-ages-for10-16-1-1.webp" 
+                src="https://res.cloudinary.com/dbij2wehz/image/upload/Gobike-electric-bike-kids-ebike20-inch-ages-for10-16-1-1.webp" 
                 alt="GoBike 20 Electric Bike" 
                 width={1000} height={774} 
                 priority 
@@ -70,7 +70,7 @@ const HeroSlider = () => {
           <div className="min-w-full flex flex-col lg:flex-row min-h-[550px] lg:h-[70vh]">
             <div className="w-full lg:w-[55%] flex items-center justify-center order-1 lg:order-2">
               <Image 
-                src="https://gobikes.au/wp-content/uploads/2025/08/Gobike-electric-bike-kids-ebike20-inch-ages-for10-16-2.webp" 
+                src="https://res.cloudinary.com/dbij2wehz/image/upload/Gobike-electric-bike-kids-ebike20-inch-ages-for10-16-2.webp" 
                 alt="GoBike 16 Electric Bike" 
                 width={1000} height={849} 
                 className="w-full h-auto max-h-[400px] lg:max-h-full object-contain"
@@ -90,7 +90,7 @@ const HeroSlider = () => {
           <div className="min-w-full flex flex-col lg:flex-row min-h-[550px] lg:h-[70vh]">
             <div className="w-full lg:w-[55%] flex items-center justify-center order-1 lg:order-2">
               <Image 
-                src="https://gobikes.au/wp-content/uploads/2025/08/Gobike-electric-bike-kids-ebike12-inch-ages-for-2-5-1.webp" 
+                src="https://res.cloudinary.com/dbij2wehz/image/upload/Gobike-electric-bike-kids-ebike12-inch-ages-for-2-5-1.webp" 
                 alt="GoBike 12 Electric Bike" 
                 width={1000} height={803} 
                 className="w-full h-auto max-h-[400px] lg:max-h-full object-contain"

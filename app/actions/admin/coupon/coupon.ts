@@ -1,4 +1,4 @@
-// app/actions/admin/coupon.ts
+// app/actions/admin/coupon/coupon.ts
 
 "use server";
 

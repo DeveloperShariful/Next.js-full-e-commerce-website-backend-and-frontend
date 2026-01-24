@@ -1,5 +1,7 @@
 // File: app/(admin)/admin/settings/page.tsx
 
+// File: app/(admin)/admin/settings/page.tsx
+
 import Link from "next/link";
 import { 
   Store, 
@@ -10,7 +12,8 @@ import {
   ShieldCheck,
   Globe,
   Mail,
-  Megaphone // ✅ NEW ICON IMPORT FOR MARKETING
+  Megaphone,
+  Users // ✅ ADDED USERS ICON FOR AFFILIATE
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -48,7 +51,6 @@ export default function SettingsDashboard() {
       color: "text-purple-600",
       bgColor: "bg-purple-50",
     },
-    // ✅ NEW MARKETING MODULE ADDED HERE
     {
       title: "Integrations & Marketing",
       description: "Connect Google GTM, Facebook Pixel, and Klaviyo settings.",
@@ -56,6 +58,15 @@ export default function SettingsDashboard() {
       href: "/admin/settings/marketing-settings",
       color: "text-pink-600",
       bgColor: "bg-pink-50",
+    },
+    // ✅ NEW AFFILIATE MODULE ADDED HERE
+    {
+      title: "Affiliate Program",
+      description: "Manage referrals, MLM tiers, commission rules, and assets.",
+      icon: Users,
+      href: "/admin/settings/affiliate",
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-50",
     },
   ];
 

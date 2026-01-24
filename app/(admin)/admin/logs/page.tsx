@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getActivityLogs, deleteLog, clearAllLogs } from "@/app/actions/admin/log";
+import { getActivityLogs, deleteLog, clearAllLogs } from "@/app/actions/admin/all-activity-log/all-activity-log";
 import { toast } from "react-hot-toast";
 import { 
   ScrollText, Search, RefreshCcw, Loader2, 

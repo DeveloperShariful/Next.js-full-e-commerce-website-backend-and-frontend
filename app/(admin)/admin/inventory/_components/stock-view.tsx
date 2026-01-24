@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getInventory } from "@/app/actions/admin/inventory";
+import { getInventory } from "@/app/actions/admin/inventory/inventory";
 import { Search, MapPin, Box, Loader2 } from "lucide-react";
 import { AdjustStockModal } from "./adjust-stock-modal";
 

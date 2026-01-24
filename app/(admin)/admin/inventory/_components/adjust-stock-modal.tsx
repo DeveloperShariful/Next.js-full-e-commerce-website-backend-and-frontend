@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { adjustStock } from "@/app/actions/admin/inventory";
+import { adjustStock } from "@/app/actions/admin/inventory/inventory";
 import { toast } from "react-hot-toast";
 import { X, Loader2 } from "lucide-react";
 

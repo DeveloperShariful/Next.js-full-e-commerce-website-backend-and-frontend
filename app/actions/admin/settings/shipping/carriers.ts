@@ -1,4 +1,4 @@
-// File: app/actions/settings/shipping/carriers.ts
+// File: app/actions/admin/settings/shipping/carriers.ts
 
 "use server";
 

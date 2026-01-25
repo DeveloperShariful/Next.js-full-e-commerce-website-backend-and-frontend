@@ -3,9 +3,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const products = [
-    { imgSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Gobike_kids_electric_bikes-_electric_bike_for_kids-_ebike_kids_electric_bike_Final.webp", altText: "GoBike 12 Kids Electric Balance Bike", name: "GoBike 12-inch", feature: "Perfect for Ages 2-5 | Featuring a Slow Safety Mode for new riders.", link: "product/ebike-for-kids-12-inch-electric-bike-ages-2-5" },
-    { imgSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bikes-1-scaled-2.webp", altText: "GoBike 16 Kids Electric Bike", name: "GoBike 16-inch", feature: "Best for Ages 5-9 | With 3-Speed Modes, Dual Hydraulic Brakes and Front Suspension.", link: "product/ebike-for-sale-16-inch-gobike-ages-5-9" },
-    { imgSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-1-1-scaled-2.webp", altText: "GoBike 20 All-Terrain Kids Electric Bike", name: "GoBike 20-inch", feature: "Serious Bike for Ages 9-16 | A powerful and reliable bike for the bigger kids.", link: "product/20-inch-electric-bikes-for-sale-ebike-for-kids" }
+    { imgSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Gobike_kids_electric_bikes-_electric_bike_for_kids-_ebike_kids_electric_bike_Final.webp", altText: "GoBike 12 Kids Electric Balance Bike", name: "GoBike 12-inch", feature: "Perfect for Ages 2-5 | Featuring a Slow Safety Mode for new riders.", link: "product/gobike-12-inch-ebike-for-kids-perfect-first-ride-for-ages-25-798" },
+    { imgSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bikes-1-scaled-2.webp", altText: "GoBike 16 Kids Electric Bike", name: "GoBike 16-inch", feature: "Best for Ages 5-9 | With 3-Speed Modes, Dual Hydraulic Brakes and Front Suspension.", link: "gobike-16-inch-electric-bike-for-kids-riding-fun-for-ages-59-222" },
+    { imgSrc: "https://res.cloudinary.com/dbij2wehz/image/upload/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-1-1-scaled-2.webp", altText: "GoBike 20 All-Terrain Kids Electric Bike", name: "GoBike 20-inch", feature: "Serious Bike for Ages 9-16 | A powerful and reliable bike for the bigger kids.", link: "product/gobike-24-inch-electric-bike-for-teens-high-speed-performance-for-ages-12-420" }
 ];
 
 const ProductCollection = () => {

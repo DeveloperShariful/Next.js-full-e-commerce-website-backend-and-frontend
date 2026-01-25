@@ -41,7 +41,7 @@ const HeroSlider = () => {
               <p className="text-lg leading-relaxed mb-6 max-w-lg lg:ml-0 text-gray-100">
                 The ultimate electric dirt bike for teens and adults aged 12+. Unleash raw power with a massive 2500W motor hitting top speeds of 61km/h.
               </p>
-              <Link href="product/gobike-24-inch-electric-bike-teens-high-speed-performance-for-ages-13" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
+              <Link href="product/gobike-24-inch-electric-bike-for-teens-high-speed-performance-for-ages-12-420" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
             </div>
           </div>
 
@@ -62,7 +62,7 @@ const HeroSlider = () => {
               <p className="text-lg leading-relaxed mb-6 max-w-lg lg:ml-0 text-gray-100">
                 The best 20-inch kids electric bike on the market. Built tough for young adventurers and teens, it delivers powerful performance.
               </p>
-              <Link href="product/20-inch-electric-bikes-for-sale-ebike-for-kids" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
+              <Link href="/product/gobike-20-inch-electric-bike-for-kids-teens-for-ages-916-518" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
             </div>
           </div>
 
@@ -82,7 +82,7 @@ const HeroSlider = () => {
               <p className="text-lg leading-relaxed mb-6 max-w-lg lg:ml-0 text-gray-100">
                 The fastest 16-inch kids electric bike on the market! Designed for confident young riders with 3 speed modes.
               </p>
-              <Link href="product/ebike-for-sale-16-inch-gobike-ages-5-9" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
+              <Link href="product/gobike-16-inch-electric-bike-for-kids-riding-fun-for-ages-59-222" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
             </div>
           </div>
 
@@ -102,7 +102,7 @@ const HeroSlider = () => {
               <p className="text-lg leading-relaxed mb-6 max-w-lg lg:ml-0 text-gray-100">
                 The perfect first electric bike for toddlers aged 2 years and above transitioning from a balance bike.
               </p>
-              <Link href="product/ebike-for-kids-12-inch-electric-bike-ages-2-5" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
+              <Link href="product/gobike-12-inch-ebike-for-kids-perfect-first-ride-for-ages-25-798" className="bg-white text-black px-9 py-3.5 rounded-full font-bold text-base hover:bg-gray-200 transition-transform hover:scale-105">Shop Now</Link>
             </div>
           </div>
         </div>

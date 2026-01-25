@@ -1972,7 +1972,8 @@ model AffiliateAccount {
   slug            String           @unique
   customSlug      String?          @unique 
   status          AffiliateStatus  @default(PENDING)
-  commissionRate  Decimal?         
+  commissionRate  Decimal?   
+  commissionType  CommissionType @default(PERCENTAGE)      
   balance         Decimal          @default(0.00)
   totalEarnings   Decimal          @default(0.00)
   storeCredit     Decimal          @default(0.00)
@@ -1980,7 +1981,11 @@ model AffiliateAccount {
   isLifetime        Boolean   @default(false)      
   cookieDuration    Int?      @default(30)         
   riskScore         Float     @default(0.0)        
-  autoApprovePayout Boolean   @default(false)      
+  autoApprovePayout Boolean   @default(false)
+  
+  kycStatus       String   @default("NOT_SUBMITTED")
+  taxId           String?
+  documents       AffiliateDocument[]
   
   campaigns         AffiliateCampaign[]        
   shortLinks        AffiliateLink[]              
@@ -2018,6 +2023,22 @@ model AffiliateAccount {
   @@index([customSlug])
 }
 
+model AffiliateDocument {
+  id              String   @id @default(uuid())
+  affiliateId     String
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  type            String
+  documentNumber  String?
+  fileUrl         String
+  status          String   @default("PENDING")
+  rejectionReason String?
+  verifiedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([affiliateId])
+}
+
 model AffiliateTier {
   id              String             @id @default(uuid())
   name            String             @unique
@@ -2029,7 +2050,9 @@ model AffiliateTier {
   color           String?
   icon            String?
   isDefault       Boolean            @default(false)
+  payoutDelayDays Int                @default(30)
   affiliates      AffiliateAccount[]
+  announcements   AffiliateAnnouncement[]
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 }
@@ -2081,6 +2104,7 @@ model Referral {
   adminNote       String?
   fromDownlineId  String?
   metadata        Json?
+  availableAt     DateTime?
 
   commissionRuleId  String?                       
   matchedRule       AffiliateCommissionRule?      @relation(fields: [commissionRuleId], references: [id])
@@ -2125,7 +2149,7 @@ model AffiliateDomain {
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   
-  domain          String           @unique // e.g. "rahim-reviews.com"
+  domain          String           @unique 
   isVerified      Boolean          @default(false)
   verificationToken String?
   
@@ -2168,7 +2192,7 @@ model AffiliatePixel {
   id              String           @id @default(uuid())
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  type            String           // e.g., "FACEBOOK", "GOOGLE_TAG", "TIKTOK"
+  type            String           
   pixelId         String
   accessToken     String?          @db.Text
   testCode        String?
@@ -2187,30 +2211,21 @@ model AffiliateContest {
   endDate         DateTime
   isActive        Boolean  @default(true)
   prizes          Json?
-  criteria        String   @default("sales_amount") // or sales_count
+  criteria        String   @default("sales_amount")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 
 model AffiliateCommissionRule {
   id              String    @id @default(uuid())
-  name            String    // e.g., "New Customer Bonus", "Black Friday Electronics"
-  priority        Int       @default(0) // যার priority বেশি, সেই রুল আগে চেক হবে
+  name            String    
+  priority        Int       @default(0)
   isActive        Boolean   @default(true)
-  
-  // Conditions (JSON Logic)
-  // Example: { "customerType": "NEW", "categoryIds": ["xyz"], "minOrderValue": 100 }
   conditions      Json      
-  
-  // Action (Reward)
-  // Example: { "type": "PERCENTAGE", "value": 10, "tierBonus": 2 }
   action          Json      
-  
   startDate       DateTime?
   endDate         DateTime?
-  
-  affiliateSpecificIds String[] // যদি স্পেসিফিক কোনো অ্যাফিলিয়েটের জন্য এই রুল হয়
-  
+  affiliateSpecificIds String[]
   referrals       Referral[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -2222,16 +2237,12 @@ model AffiliateLink {
   id              String           @id @default(uuid())
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  
-  slug            String           @unique // e.g., "summer-deal"
-  destinationUrl  String           // মেইন প্রোডাক্ট বা পেজের লিংক
-  
+  slug            String           @unique
+  destinationUrl  String           
   campaignId      String?
   campaign        AffiliateCampaign? @relation(fields: [campaignId], references: [id])
-  
   clickCount      Int              @default(0)
   isActive        Boolean          @default(true)
-  
   createdAt       DateTime         @default(now())
   
   @@index([slug])
@@ -2239,16 +2250,13 @@ model AffiliateLink {
 
 model AffiliateCampaign {
   id              String           @id @default(uuid())
-  name            String           // e.g., "Facebook Ads 2025"
+  name            String           
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  
   clicks          Int              @default(0)
   conversions     Int              @default(0)
   revenue         Decimal          @default(0.00)
-  
   links           AffiliateLink[]
-  
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -2259,16 +2267,34 @@ model AffiliateLedger {
   id              String           @id @default(uuid())
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  
-  type            LedgerType       // ENUM: COMMISSION, PAYOUT, ADJUSTMENT, REFUND_DEDUCTION
+  type            LedgerType       
   amount          Decimal
   balanceBefore   Decimal
   balanceAfter    Decimal
-  
-  referenceId     String?          // Order ID or Payout ID
+  referenceId     String?          
   description     String?
-  
   createdAt       DateTime         @default(now())
   
   @@index([affiliateId])
+}
+
+model AffiliateAnnouncement {
+  id          String   @id @default(uuid())
+  title       String
+  content     String   @db.Text
+  type        String   @default("INFO")
+  isActive    Boolean  @default(true)
+  targetTiers AffiliateTier[]
+  startsAt    DateTime @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model AffiliateFraudRule {
+  id          String   @id @default(uuid())
+  type        String   
+  value       String   
+  action      String   @default("BLOCK")
+  reason      String?
+  createdAt   DateTime @default(now())
 }

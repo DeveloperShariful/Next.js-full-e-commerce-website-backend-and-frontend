@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 import RuleModal from "./rule-modal";
-import { deleteRuleAction } from "@/app/actions/admin/settings/affiliate/mutations/manage-rules";
+import { deleteRuleAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-rules";
 
 interface Props {
   initialRules: AffiliateCommissionRule[];

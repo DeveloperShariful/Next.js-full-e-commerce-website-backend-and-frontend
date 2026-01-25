@@ -15,7 +15,7 @@ interface OrderSummaryProps {
     taxName: string;
     taxRate: number;
     total: number;
-    currencySymbol?: string;
+    formatPrice: (price: number) => string; // ✅ Changed to Dynamic Formatter
     paymentMethod: string;
     setPaymentMethod: (val: string) => void;
 }
@@ -26,10 +26,10 @@ export const OrderSummary = ({
     setShippingCost, 
     discount, 
     tax, 
-    taxName,
+    taxName, 
     taxRate,
     total,
-    currencySymbol = "$",
+    formatPrice, // ✅ Using Global Formatter
     paymentMethod,
     setPaymentMethod
 }: OrderSummaryProps) => {
@@ -40,7 +40,7 @@ export const OrderSummary = ({
             <div className="space-y-3 pb-3 border-b border-slate-100">
                 <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Subtotal</span>
-                    <span className="font-medium">{currencySymbol}{subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{formatPrice(subtotal)}</span>
                 </div>
                 
                 <div className="flex justify-between text-sm items-center">
@@ -56,18 +56,18 @@ export const OrderSummary = ({
                 
                 <div className="flex justify-between text-sm items-center">
                     <span className="text-slate-600">Discount</span>
-                    <span className="text-red-600 font-medium">-{currencySymbol}{discount.toFixed(2)}</span>
+                    <span className="text-red-600 font-medium">-{formatPrice(discount)}</span>
                 </div>
 
                 <div className="flex justify-between text-sm items-center">
                     <span className="text-slate-600">{taxName} ({taxRate}%)</span>
-                    <span className="font-medium">{currencySymbol}{tax.toFixed(2)}</span>
+                    <span className="font-medium">{formatPrice(tax)}</span>
                 </div>
             </div>
             
             <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>{currencySymbol}{total.toFixed(2)}</span>
+                <span>{formatPrice(total)}</span>
             </div>
 
             <div className="pt-2">

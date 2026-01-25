@@ -5,10 +5,8 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from "@prisma/client";
-import { restockInventory, updateAnalytics } from "./order-utils"; 
-
-// ✅ FIX: Correct Import Path
-import { sendNotification } from "@/app/api/email/send-notification"; 
+// 🔥 FIX: Import centralized email utility
+import { restockInventory, updateAnalytics, sendOrderEmail } from "./order-utils"; 
 
 export async function updateOrderStatus(formData: FormData) {
   try {
@@ -19,16 +17,13 @@ export async function updateOrderStatus(formData: FormData) {
 
     if (!orderId) return { success: false, error: "Order ID is missing" };
 
-    // ১. আগের ডাটা চেক
     const existingOrder = await db.order.findUnique({ 
         where: { id: orderId },
-        select: { status: true, paymentStatus: true, fulfillmentStatus: true, total: true, user: true, guestEmail: true }
+        select: { status: true, paymentStatus: true, fulfillmentStatus: true, total: true }
     });
     if (!existingOrder) return { success: false, error: "Order not found" };
 
-    const recipient = existingOrder.user?.email || existingOrder.guestEmail || "";
-
-    // ২. আপডেট এক্সিকিউট
+    // Update
     await db.order.update({
       where: { id: orderId },
       data: { 
@@ -38,7 +33,7 @@ export async function updateOrderStatus(formData: FormData) {
       }
     });
 
-    // ৩. বিজনেস লজিক
+    // Business Logic
     if ((status === "CANCELLED" || status === "REFUNDED") && existingOrder.status !== "CANCELLED" && existingOrder.status !== "REFUNDED") {
         await restockInventory(orderId);
     }
@@ -46,26 +41,26 @@ export async function updateOrderStatus(formData: FormData) {
         await updateAnalytics(Number(existingOrder.total));
     }
 
-    // ৪. ইমেইল ট্রিগার লজিক (15 Events + Admin Alerts)
+    // 🔥 FIXED: Centralized Email Logic
     const emailPromises = [];
 
     // A. Order Status Changed?
     if (status && status !== existingOrder.status) {
         // Customer Email
-        emailPromises.push(sendNotification({ trigger: `ORDER_${status}`, recipient, orderId, data: {} }));
+        emailPromises.push(sendOrderEmail(orderId, `ORDER_${status}`));
         
-        // Admin Alert (Only for Cancelled/Pending)
+        // Admin Alert (Example Logic)
         if (status === 'CANCELLED' || status === 'PENDING') {
-            emailPromises.push(sendNotification({ trigger: `ADMIN_ORDER_${status}`, recipient: '', orderId, data: {} }));
+            emailPromises.push(sendOrderEmail(orderId, `ADMIN_ORDER_${status}`));
         }
     }
 
     // B. Payment Status Changed?
     if (paymentStatus && paymentStatus !== existingOrder.paymentStatus) {
-        emailPromises.push(sendNotification({ trigger: `PAYMENT_${paymentStatus}`, recipient, orderId, data: {} }));
+        emailPromises.push(sendOrderEmail(orderId, `PAYMENT_${paymentStatus}`));
         
         if (paymentStatus === 'REFUNDED') {
-            emailPromises.push(sendNotification({ trigger: `ADMIN_PAYMENT_${paymentStatus}`, recipient: '', orderId, data: {} }));
+            emailPromises.push(sendOrderEmail(orderId, `ADMIN_PAYMENT_${paymentStatus}`));
         }
     }
 
@@ -74,17 +69,16 @@ export async function updateOrderStatus(formData: FormData) {
         let trigger = `FULFILLMENT_${fulfillmentStatus}`;
         if (fulfillmentStatus === 'PARTIALLY_FULFILLED') trigger = 'FULFILLMENT_PARTIALLY_FULFILLED';
         
-        emailPromises.push(sendNotification({ trigger: trigger, recipient, orderId, data: {} }));
+        emailPromises.push(sendOrderEmail(orderId, trigger));
 
         if (fulfillmentStatus === 'RETURNED') {
-            emailPromises.push(sendNotification({ trigger: `ADMIN_FULFILLMENT_RETURNED`, recipient: '', orderId, data: {} }));
+            emailPromises.push(sendOrderEmail(orderId, `ADMIN_FULFILLMENT_RETURNED`));
         }
     }
 
-    // Execute all emails
     await Promise.all(emailPromises);
 
-    // ৫. লগ নোট তৈরি
+    // Logging
     const changes = [];
     if (status && status !== existingOrder.status) changes.push(`Status: ${status}`);
     if (paymentStatus && paymentStatus !== existingOrder.paymentStatus) changes.push(`Payment: ${paymentStatus}`);

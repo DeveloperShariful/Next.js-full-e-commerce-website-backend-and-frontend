@@ -8,7 +8,7 @@ import { Edit, Trash2, Image as ImageIcon, Link as LinkIcon, Copy, Plus, Externa
 import { toast } from "sonner";
 
 import CreativeModal from "./creative-modal";
-import { deleteCreativeAction } from "@/app/actions/admin/settings/affiliate/mutations/manage-creatives";
+import { deleteCreativeAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-creatives";
 
 interface Props {
   initialCreatives: AffiliateCreative[];

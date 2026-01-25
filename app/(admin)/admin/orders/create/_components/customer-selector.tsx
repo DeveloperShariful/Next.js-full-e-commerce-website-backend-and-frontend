@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,20 +18,19 @@ interface CustomerSelectorProps {
     selectedCustomer: any;
     onRemove: () => void;
     onAddressChange?: (address: { city: string; postcode: string; state: string; country: string } | null) => void;
-    enableGuestCheckout: boolean;
 }
 
 export const CustomerSelector = ({ 
     onSelect, 
     selectedCustomer, 
     onRemove, 
-    onAddressChange,
-    enableGuestCheckout 
+    onAddressChange
 }: CustomerSelectorProps) => {
     const [activeTab, setActiveTab] = useState("search");
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
     
+    // Guest States
     const [guestName, setGuestName] = useState("");
     const [guestEmail, setGuestEmail] = useState("");
     const [guestPhone, setGuestPhone] = useState("");
@@ -47,16 +46,23 @@ export const CustomerSelector = ({
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [searchingLoc, setSearchingLoc] = useState(false);
 
-    const notifyAddressChange = (city: string, postcode: string, state: string) => {
-        if (onAddressChange) {
-            onAddressChange({
-                city,
-                postcode,
-                state,
-                country: "Australia"
-            });
+    // 🔥 REAL-TIME SYNC: যখনই গেস্ট ইনপুট চেঞ্জ হবে, প্যারেন্টকে জানাবে
+    useEffect(() => {
+        if (!selectedCustomer && onAddressChange) {
+            // শুধুমাত্র যদি মিনিমাম ডাটা থাকে তবেই রিকোয়েস্ট পাঠাবে
+            if (guestCity && guestPostcode) {
+                const timeoutId = setTimeout(() => {
+                    onAddressChange({
+                        city: guestCity,
+                        postcode: guestPostcode,
+                        state: guestState,
+                        country: guestCountry
+                    });
+                }, 500); // 500ms Debounce to avoid too many API calls
+                return () => clearTimeout(timeoutId);
+            }
         }
-    };
+    }, [guestCity, guestPostcode, guestState, guestCountry, selectedCustomer]);
 
     const handleSearch = async (val: string) => {
         setQuery(val);
@@ -86,29 +92,27 @@ export const CustomerSelector = ({
     const selectLocation = (loc: any) => {
         setGuestCity(loc.city);
         setGuestState(loc.state);
-        setGuestPostcode(loc.postcode);
+        setGuestPostcode(String(loc.postcode)); // Ensure string
         setGuestCountry("Australia");
         setShowSuggestions(false);
-        notifyAddressChange(loc.city, loc.postcode, loc.state);
-    };
-
-    const handlePostcodeChange = (val: string) => {
-        setGuestPostcode(val);
-        if (guestCity && guestState) {
-            notifyAddressChange(guestCity, val, guestState);
+        
+        // 🔥 Force Immediate Update (No Debounce for selection)
+        if (onAddressChange) {
+            onAddressChange({
+                city: loc.city,
+                postcode: String(loc.postcode),
+                state: loc.state,
+                country: "Australia"
+            });
         }
     };
 
     const handleGuestSubmit = () => {
-        if(!guestName || !guestEmail || !guestPhone) {
-            toast.error("Name, Email and Phone are required.");
+        if(!guestName || !guestEmail) {
+            toast.error("Name and Email are required.");
             return;
         }
-        if(!guestAddress || !guestCity || !guestPostcode) {
-            toast.error("Address, City and Postcode are required.");
-            return;
-        }
-
+        
         const guestData = {
             id: null,
             name: guestName,
@@ -125,8 +129,9 @@ export const CustomerSelector = ({
                 country: guestCountry
             }]
         };
+        
         onSelect(guestData, 'guest');
-        toast.success(createAccount ? "New customer details set." : "Guest customer set.");
+        toast.success(createAccount ? "New customer details ready." : "Guest details set.");
     };
 
     return (
@@ -149,7 +154,10 @@ export const CustomerSelector = ({
                         <div className="flex items-center gap-2 mb-2">
                             <User size={16} className="text-blue-600"/>
                             <span className="font-bold text-slate-800 text-sm">
-                                {selectedCustomer.name} {selectedCustomer.id ? "(Registered)" : (selectedCustomer.createAccount ? "(New Account)" : "(Guest)")}
+                                {selectedCustomer.name} 
+                                <span className="ml-2 text-xs font-normal text-slate-500 bg-white px-2 py-0.5 rounded border">
+                                    {selectedCustomer.id ? "Registered" : "Guest"}
+                                </span>
                             </span>
                         </div>
                         
@@ -171,13 +179,12 @@ export const CustomerSelector = ({
                     </div>
                 ) : (
                     <Tabs defaultValue="search" onValueChange={setActiveTab} className="w-full">
-                        <TabsList className={`grid w-full mb-4 bg-slate-100 p-1 rounded-lg ${enableGuestCheckout ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        <TabsList className="grid w-full mb-4 bg-slate-100 p-1 rounded-lg grid-cols-2">
                             <TabsTrigger value="search" className="text-xs font-medium">Search Existing</TabsTrigger>
-                            {enableGuestCheckout && (
-                                <TabsTrigger value="guest" className="text-xs font-medium">New / Guest</TabsTrigger>
-                            )}
+                            <TabsTrigger value="guest" className="text-xs font-medium">New / Guest</TabsTrigger>
                         </TabsList>
 
+                        {/* SEARCH TAB */}
                         <TabsContent value="search" className="relative space-y-2">
                             <div className="relative">
                                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -197,6 +204,16 @@ export const CustomerSelector = ({
                                                     onSelect(cust, 'registered');
                                                     setQuery("");
                                                     setResults([]);
+                                                    // Trigger shipping calc for existing customer
+                                                    if(cust.addresses?.[0] && onAddressChange) {
+                                                        const addr = cust.addresses[0];
+                                                        onAddressChange({
+                                                            city: addr.city,
+                                                            postcode: addr.postcode,
+                                                            state: addr.state,
+                                                            country: addr.country
+                                                        });
+                                                    }
                                                 }}
                                             >
                                                 <p className="font-medium text-sm text-slate-800 group-hover:text-blue-700">{cust.name}</p>
@@ -209,71 +226,70 @@ export const CustomerSelector = ({
                             </div>
                         </TabsContent>
 
-                        {enableGuestCheckout && (
-                            <TabsContent value="guest" className="space-y-4">
-                                <div className="space-y-3">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Personal Info</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Input placeholder="Full Name *" className="h-8 text-xs" value={guestName} onChange={e=>setGuestName(e.target.value)} />
-                                        <Input placeholder="Email *" className="h-8 text-xs" value={guestEmail} onChange={e=>setGuestEmail(e.target.value)} />
-                                    </div>
-                                    <Input placeholder="Phone Number *" className="h-8 text-xs" value={guestPhone} onChange={e=>setGuestPhone(e.target.value)} />
+                        {/* GUEST TAB */}
+                        <TabsContent value="guest" className="space-y-4">
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Personal Info</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Input placeholder="Full Name *" className="h-8 text-xs" value={guestName} onChange={e=>setGuestName(e.target.value)} />
+                                    <Input placeholder="Email *" className="h-8 text-xs" value={guestEmail} onChange={e=>setGuestEmail(e.target.value)} />
                                 </div>
+                                <Input placeholder="Phone Number" className="h-8 text-xs" value={guestPhone} onChange={e=>setGuestPhone(e.target.value)} />
+                            </div>
 
-                                <div className="space-y-3 pt-2 border-t border-slate-100">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shipping Address</p>
-                                    <Input placeholder="Address Line 1 *" className="h-8 text-xs" value={guestAddress} onChange={e=>setGuestAddress(e.target.value)} />
-                                    
-                                    <div className="grid grid-cols-2 gap-3 relative">
-                                        <div className="relative">
-                                            <Input 
-                                                placeholder="City / Suburb *" 
-                                                className="h-8 text-xs" 
-                                                value={guestCity} 
-                                                onChange={e=>handleCityChange(e.target.value)} 
-                                                autoComplete="off"
-                                            />
-                                            {searchingLoc && (
-                                                <Loader2 size={12} className="absolute right-2 top-2.5 animate-spin text-slate-400"/>
-                                            )}
+                            <div className="space-y-3 pt-2 border-t border-slate-100">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shipping Address</p>
+                                <Input placeholder="Address Line 1" className="h-8 text-xs" value={guestAddress} onChange={e=>setGuestAddress(e.target.value)} />
+                                
+                                <div className="grid grid-cols-2 gap-3 relative">
+                                    <div className="relative">
+                                        <Input 
+                                            placeholder="City / Suburb *" 
+                                            className="h-8 text-xs" 
+                                            value={guestCity} 
+                                            onChange={e=>handleCityChange(e.target.value)} 
+                                            autoComplete="off"
+                                        />
+                                        {searchingLoc && (
+                                            <Loader2 size={12} className="absolute right-2 top-2.5 animate-spin text-slate-400"/>
+                                        )}
 
-                                            {showSuggestions && suggestions.length > 0 && (
-                                                <div className="absolute top-full left-0 w-[200%] bg-white border border-slate-200 shadow-xl rounded-md z-50 max-h-48 overflow-y-auto mt-1">
-                                                    {suggestions.map((item, idx) => (
-                                                        <div 
-                                                            key={idx}
-                                                            onClick={() => selectLocation(item)}
-                                                            className="p-2 hover:bg-blue-50 cursor-pointer text-xs border-b border-slate-50 last:border-0"
-                                                        >
-                                                            <span className="font-bold text-slate-700">{item.city}</span>, 
-                                                            <span className="text-slate-500 ml-1">{item.state} {item.postcode}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <Input placeholder="Postcode *" className="h-8 text-xs" value={guestPostcode} onChange={e=>handlePostcodeChange(e.target.value)} />
+                                        {showSuggestions && suggestions.length > 0 && (
+                                            <div className="absolute top-full left-0 w-[200%] bg-white border border-slate-200 shadow-xl rounded-md z-50 max-h-48 overflow-y-auto mt-1">
+                                                {suggestions.map((item, idx) => (
+                                                    <div 
+                                                        key={idx}
+                                                        onClick={() => selectLocation(item)}
+                                                        className="p-2 hover:bg-blue-50 cursor-pointer text-xs border-b border-slate-50 last:border-0"
+                                                    >
+                                                        <span className="font-bold text-slate-700">{item.city}</span>, 
+                                                        <span className="text-slate-500 ml-1">{item.state} {item.postcode}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Input placeholder="State" className="h-8 text-xs" value={guestState} onChange={e=>setGuestState(e.target.value)} />
-                                        <Input placeholder="Country" className="h-8 text-xs" value={guestCountry} onChange={e=>setGuestCountry(e.target.value)} />
-                                    </div>
+                                    <Input placeholder="Postcode *" className="h-8 text-xs" value={guestPostcode} onChange={e=>setGuestPostcode(e.target.value)} />
                                 </div>
 
-                                <div className="flex items-center space-x-2 border p-2 rounded bg-slate-50">
-                                    <Checkbox id="createAccount" checked={createAccount} onCheckedChange={(c) => setCreateAccount(!!c)} />
-                                    <label htmlFor="createAccount" className="text-xs font-medium leading-none cursor-pointer">
-                                        Save as new customer account
-                                    </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Input placeholder="State" className="h-8 text-xs" value={guestState} onChange={e=>setGuestState(e.target.value)} />
+                                    <Input placeholder="Country" className="h-8 text-xs" value={guestCountry} onChange={e=>setGuestCountry(e.target.value)} />
                                 </div>
+                            </div>
 
-                                <Button onClick={handleGuestSubmit} className="w-full bg-slate-900 hover:bg-slate-800 text-white h-9 mt-2">
-                                    <UserPlus size={14} className="mr-2"/> Set Customer
-                                </Button>
-                            </TabsContent>
-                        )}
+                            <div className="flex items-center space-x-2 border p-2 rounded bg-slate-50">
+                                <Checkbox id="createAccount" checked={createAccount} onCheckedChange={(c) => setCreateAccount(!!c)} />
+                                <label htmlFor="createAccount" className="text-xs font-medium leading-none cursor-pointer">
+                                    Save as new customer account
+                                </label>
+                            </div>
+
+                            <Button onClick={handleGuestSubmit} className="w-full bg-slate-900 hover:bg-slate-800 text-white h-9 mt-2">
+                                <UserPlus size={14} className="mr-2"/> Set Customer
+                            </Button>
+                        </TabsContent>
                     </Tabs>
                 )}
             </CardContent>

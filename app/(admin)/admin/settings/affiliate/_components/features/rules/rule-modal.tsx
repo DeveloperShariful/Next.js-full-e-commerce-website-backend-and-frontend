@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { X, Loader2, Save, Plus, Calculator  } from "lucide-react";
 import { AffiliateCommissionRule } from "@prisma/client";
 
-import { upsertRule } from "@/app/actions/admin/settings/affiliate/mutations/manage-rules";
+import { upsertRule } from "@/app/actions/admin/settings/affiliates/mutations/manage-rules";
 
 interface Props {
   isOpen: boolean;

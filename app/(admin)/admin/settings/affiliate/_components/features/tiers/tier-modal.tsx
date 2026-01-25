@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { X, Loader2, Save } from "lucide-react";
 import { AffiliateTier, CommissionType } from "@prisma/client";
 
-import { upsertTier } from "@/app/actions/admin/settings/affiliate/mutations/manage-tiers";
+import { upsertTier } from "@/app/actions/admin/settings/affiliates/mutations/manage-tiers";
 
 interface Props {
   isOpen: boolean;

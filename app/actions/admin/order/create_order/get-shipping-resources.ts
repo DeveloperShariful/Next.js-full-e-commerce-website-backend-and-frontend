@@ -4,6 +4,15 @@
 
 import { db } from "@/lib/prisma";
 
+// Helper to safely convert Decimal to Number
+const toNumber = (val: any) => {
+    if (!val) return 0;
+    if (typeof val === 'object' && 'toNumber' in val) {
+        return val.toNumber();
+    }
+    return Number(val);
+};
+
 export async function getShippingResources() {
   try {
     // ১. পিকআপ লোকেশনগুলো আনা
@@ -18,7 +27,7 @@ export async function getShippingResources() {
     });
 
     // ২. শিপিং রেটগুলো আনা
-    const shippingRates = await db.shippingRate.findMany({
+    const rawRates = await db.shippingRate.findMany({
       include: {
         zone: true,
         carrierService: {
@@ -29,6 +38,15 @@ export async function getShippingResources() {
         }
       }
     });
+
+    // 🔥 Serialize Decimals to Numbers
+    const shippingRates = rawRates.map(rate => ({
+        ...rate,
+        price: toNumber(rate.price),
+        minWeight: toNumber(rate.minWeight),
+        maxWeight: toNumber(rate.maxWeight),
+        minPrice: toNumber(rate.minPrice)
+    }));
 
     return {
       pickupLocations,

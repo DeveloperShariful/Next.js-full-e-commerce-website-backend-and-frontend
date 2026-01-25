@@ -1,3 +1,5 @@
+//app/actions/admin/order/import-export.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -5,8 +7,6 @@ import Papa from "papaparse";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { currentUser } from "@clerk/nextjs/server";
-
-// --- HELPERS ---
 
 const safeFloat = (val: any) => {
     if (!val) return 0;
@@ -27,7 +27,6 @@ const mapStatus = (wcStatus: string): OrderStatus => {
     return "PENDING";
 };
 
-// Address Parser
 const parseAddress = (fullAddress: string, name: string, email: string, phone: string) => {
     if (!fullAddress) return {};
     const parts = fullAddress.split(",").map(p => p.trim());
@@ -54,7 +53,6 @@ const parseAddress = (fullAddress: string, name: string, email: string, phone: s
     };
 };
 
-// Product Parser (Regex Logic)
 const parseProducts = (productString: string) => {
     if (!productString) return [];
     const rawItems = productString.split(" || ");
@@ -87,7 +85,6 @@ const parseProducts = (productString: string) => {
     return parsedItems;
 };
 
-// Shipping Parser
 const parseShipping = (shipString: string) => {
     if (!shipString) return { method: "Standard", cost: 0 };
     const lastDashIndex = shipString.lastIndexOf(" - ");
@@ -99,7 +96,6 @@ const parseShipping = (shipString: string) => {
     return { method: shipString, cost: 0 };
 };
 
-// Coupon Parser
 const parseCoupon = (couponStr: string) => {
     if (!couponStr) return { code: null, amount: 0 };
     const parts = couponStr.split(" ($");
@@ -111,8 +107,6 @@ const parseCoupon = (couponStr: string) => {
     }
     return { code: couponStr, amount: 0 };
 };
-
-// --- 1. IMPORT FUNCTION ---
 
 export async function importOrdersCSV(csvString: string) {
     try {
@@ -221,17 +215,41 @@ export async function importOrdersCSV(csvString: string) {
     }
 }
 
-// --- 2. EXPORT FUNCTION (UPDATED) ---
+interface ExportFilters {
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    paymentMethod?: string;
+    query?: string;
+}
 
-export async function exportOrdersCSV() {
+export async function exportOrdersCSV(filters?: ExportFilters) {
   try {
+    const whereCondition: any = {
+        AND: [
+            { deletedAt: null },
+            filters?.status && filters.status !== 'all' ? { status: filters.status as OrderStatus } : {},
+            filters?.startDate ? { createdAt: { gte: new Date(filters.startDate) } } : {},
+            filters?.endDate ? { createdAt: { lte: new Date(filters.endDate) } } : {},
+            filters?.paymentMethod && filters.paymentMethod !== 'all' ? { paymentGateway: filters.paymentMethod } : {},
+            filters?.query ? {
+                OR: [
+                    { orderNumber: { contains: filters.query, mode: 'insensitive' } },
+                    { user: { name: { contains: filters.query, mode: 'insensitive' } } },
+                    { guestEmail: { contains: filters.query, mode: 'insensitive' } }
+                ]
+            } : {}
+        ]
+    };
+
     const orders = await db.order.findMany({
+      where: whereCondition,
       include: {
         user: true,
         items: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 2000
+      take: 5000 
     });
 
     const csvRows: any[] = [];
@@ -240,7 +258,6 @@ export async function exportOrdersCSV() {
         const billing: any = order.billingAddress || {};
         const shipping: any = order.shippingAddress || {};
 
-        // Flatten Items logic
         if (order.items.length > 0) {
             order.items.forEach((item) => {
                 csvRows.push({
@@ -261,7 +278,6 @@ export async function exportOrdersCSV() {
                 });
             });
         } else {
-            // Order without items
             csvRows.push({
                 "Order ID": order.orderNumber,
                 "Date": order.createdAt.toISOString(),
@@ -273,7 +289,6 @@ export async function exportOrdersCSV() {
 
     const csvString = Papa.unparse(csvRows);
     
-    // ✅ This return structure fixes the TypeScript error
     return { success: true, csv: csvString };
 
   } catch (error) {

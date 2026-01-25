@@ -1,6 +1,6 @@
 // File: app/(admin)/admin/settings/affiliate/creatives/page.tsx
 
-import { creativeService } from "@/app/actions/admin/settings/affiliate/_services/creative-service";
+import { creativeService } from "@/app/actions/admin/settings/affiliates/_services/creative-service";
 import CreativeList from "../_components/features/creatives/creative-list";
 
 export const metadata = {

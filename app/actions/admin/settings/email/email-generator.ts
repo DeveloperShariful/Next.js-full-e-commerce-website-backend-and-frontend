@@ -3,12 +3,11 @@
 import { format } from "date-fns";
 
 interface EmailGeneratorProps {
-  order: any; // Full Order Object with items, user, etc.
-  config: any; // EmailConfiguration from DB
-  template: any; // EmailTemplate from DB
+  order: any; 
+  config: any; 
+  template: any; 
 }
 
-// ✅ HELPER: পেমেন্ট মেথডের নাম সুন্দর করার জন্য
 const getReadablePaymentMethod = (method: string | null) => {
   if (!method) return "N/A";
   
@@ -23,30 +22,46 @@ const getReadablePaymentMethod = (method: string | null) => {
   return formattedMap[method] || method.replace(/_/g, " ").toUpperCase();
 };
 
+const safeReplace = (text: string, variables: Record<string, string | number | null | undefined>) => {
+    if (!text) return "";
+    let result = text;
+    Object.keys(variables).forEach(key => {
+        const value = variables[key];
+        const safeValue = value === null || value === undefined ? "" : String(value);
+        const regex = new RegExp(`{${key}}`, "g");
+        result = result.replace(regex, safeValue);
+    });
+    return result;
+};
+
 export const generateEmailHtml = ({ order, config, template }: EmailGeneratorProps) => {
-  // 1. Basic Settings & Colors
   const baseColor = config.baseColor || "#7f54b3"; 
   const bgColor = config.backgroundColor || "#f7f7f7";
   const bodyColor = config.bodyBackgroundColor || "#ffffff";
   const currency = order.currency || "$";
 
-  // Helper for Price Formatting
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount).replace('USD', currency);
   };
 
   const paymentMethodName = getReadablePaymentMethod(order.paymentMethod);
+  const billing = order.billingAddress || {};
+  const shipping = order.shippingAddress || {};
 
-  // 2. Process Template Variables (Replace {customer_name}, etc.)
-  let introText = template.content
-    .replace(/{customer_name}/g, order.user?.name || order.guestEmail || "Customer") 
-    .replace(/{order_number}/g, order.orderNumber)
-    .replace(/{total_amount}/g, formatMoney(order.total))
-    .replace(/{payment_method}/g, paymentMethodName) 
-    .replace(/{tracking_number}/g, order.shippingTrackingNumber || "N/A")
-    .replace(/{courier}/g, order.shippingProvider || "Courier");
+  const variables = {
+      customer_name: order.user?.name || billing.firstName || "Customer",
+      order_number: order.orderNumber,
+      total_amount: formatMoney(order.total),
+      payment_method: paymentMethodName,
+      tracking_number: order.shippingTrackingNumber || "N/A",
+      courier: order.shippingProvider || "Courier",
+      order_date: format(new Date(order.createdAt), "MMMM do, yyyy"),
+      shipping_address: `${shipping.address1 || ''} ${shipping.city || ''}`,
+      billing_address: `${billing.address1 || ''} ${billing.city || ''}`
+  };
 
-  // 3. GENERATE PRODUCT ROWS
+  let introText = safeReplace(template.content, variables);
+
   const productRows = order.items.map((item: any) => `
     <tr style="border-bottom: 1px solid #eee;">
       <td style="padding: 12px; font-family: 'Helvetica Neue', Helvetica, Roboto, Arial, sans-serif; color: #636363;">
@@ -63,7 +78,6 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
     </tr>
   `).join("");
 
-  // 4. GENERATE TOTALS SECTION
   let totalsHtml = `
     <tr>
       <td colspan="2" style="padding: 12px; border-top: 1px solid #eee; font-weight: 600; color: #636363;">Subtotal:</td>
@@ -91,7 +105,6 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
     </tr>`;
   }
 
-  // Refund Logic
   if (order.refundedAmount > 0) {
     totalsHtml += `
     <tr>
@@ -100,7 +113,6 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
     </tr>`;
   }
 
-  // ✅ FIX: Payment Method display updated
   totalsHtml += `
     <tr>
       <td colspan="2" style="padding: 12px; font-weight: 600; color: #636363;">Payment method:</td>
@@ -112,10 +124,8 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
     </tr>
   `;
 
-  // 5. EVENT SPECIFIC BUTTONS
   let actionButton = "";
   
-  // Shipped -> Track Button
   if (template.triggerEvent === "ORDER_SHIPPED" && order.shippingTrackingUrl) {
     actionButton = `
       <div style="text-align: center; margin: 30px 0;">
@@ -124,9 +134,7 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
     `;
   }
   
-  // Payment Failed -> Pay Button
   if (template.triggerEvent === "PAYMENT_FAILED") {
-    // You need to have a route like /checkout/pay/[orderId]
     const payLink = `${process.env.NEXT_PUBLIC_APP_URL || ''}/checkout/pay/${order.id}`;
     actionButton = `
       <div style="text-align: center; margin: 30px 0;">
@@ -135,11 +143,6 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
     `;
   }
 
-  // 6. ADDRESS SECTION
-  const billing = order.billingAddress || {};
-  const shipping = order.shippingAddress || {};
-
-  // 7. FINAL HTML STRUCTURE
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -153,16 +156,12 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
         <tr>
             <td align="center" style="padding: 40px 0;">
                 
-                <!-- LOGO -->
                 ${config.headerImage ? `
                 <div style="margin-bottom: 20px;">
                     <img src="${config.headerImage}" alt="${config.senderName}" style="max-width: 150px; height: auto;">
                 </div>` : `<h1 style="color: ${baseColor}; margin-bottom: 20px;">${config.senderName}</h1>`}
 
-                <!-- MAIN CARD -->
                 <table border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: ${bodyColor}; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
-                    
-                    <!-- HEADER BAR -->
                     <tr>
                         <td style="background-color: ${baseColor}; padding: 30px; text-align: center; color: #ffffff;">
                             <h1 style="margin: 0; font-size: 24px; font-weight: 300;">${template.heading || "Order Notification"}</h1>
@@ -172,18 +171,15 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
                         </td>
                     </tr>
 
-                    <!-- CONTENT BODY -->
                     <tr>
                         <td style="padding: 40px 30px;">
                             
-                            <!-- Custom Message -->
                             <div style="color: #636363; font-size: 14px; line-height: 150%; margin-bottom: 20px;">
                                 ${introText}
                             </div>
 
                             ${actionButton}
 
-                            <!-- ORDER TABLE -->
                             <h2 style="color: ${baseColor}; font-size: 18px; margin-bottom: 15px;">Order Details</h2>
                             <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid #e5e5e5; border-collapse: collapse;">
                                 <thead>
@@ -201,7 +197,6 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
                                 </tfoot>
                             </table>
 
-                            <!-- ADDRESSES -->
                             <br/><br/>
                             <table border="0" cellpadding="0" cellspacing="0" width="100%">
                                 <tr>
@@ -232,7 +227,6 @@ export const generateEmailHtml = ({ order, config, template }: EmailGeneratorPro
                     </tr>
                 </table>
 
-                <!-- FOOTER -->
                 <div style="margin-top: 20px; text-align: center; color: #999; font-size: 12px;">
                     <p>${config.footerText}</p>
                 </div>

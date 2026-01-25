@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import nodemailer from "nodemailer";
-import { generateEmailHtml } from "@/app/actions/admin/settings/email/email-generator"; 
+import { generateEmailHtml } from "@/app/actions/admin/settings/email/email-generator";
 
 export async function GET(req: Request) {
   try {
@@ -18,15 +18,13 @@ export async function GET(req: Request) {
         status: "PENDING",
         attempts: { lt: 3 } 
       },
-      take: 10,
+      take: 5,
       orderBy: { createdAt: 'asc' } 
     });
 
     if (pendingItems.length === 0) {
       return NextResponse.json({ message: "No pending emails in queue." }, { status: 200 });
     }
-
-    console.log(`🔄 [WORKER] Processing ${pendingItems.length} emails...`);
 
     const transporter = nodemailer.createTransport({
       host: config.smtpHost || "smtp.gmail.com",
@@ -59,14 +57,18 @@ export async function GET(req: Request) {
 
           if (order) {
             htmlBody = generateEmailHtml({ order, config, template });
-            subject = subject.replace(/{order_number}/g, order.orderNumber);
+            
+            subject = subject
+                .replace(/{order_number}/g, order.orderNumber)
+                .replace(/{customer_name}/g, order.user?.name || order.guestEmail || "Customer");
           }
         } 
         
         if (!htmlBody) {
            htmlBody = template.content; 
            const meta = item.metadata as any;
-           if(meta) {
+           
+           if (meta) {
              Object.keys(meta).forEach(key => {
                 const regex = new RegExp(`{${key}}`, "g");
                 htmlBody = htmlBody.replace(regex, meta[key]);
@@ -75,7 +77,7 @@ export async function GET(req: Request) {
            }
         }
 
-        const info = await transporter.sendMail({
+        await transporter.sendMail({
           from: `"${config.senderName}" <${config.senderEmail}>`,
           to: item.recipient,
           subject: subject,
@@ -97,7 +99,7 @@ export async function GET(req: Request) {
               templateSlug: template.slug,
               status: "SENT",
               orderId: item.orderId,
-              metadata: info as any
+              metadata: item.metadata || {}
             }
           })
         ]);
@@ -105,7 +107,7 @@ export async function GET(req: Request) {
         processedCount++;
 
       } catch (error: any) {
-        console.error(`❌ [WORKER FAIL] ID: ${item.id} - ${error.message}`);
+        console.error(`Queue Item Fail ID: ${item.id} - ${error.message}`);
       
         await db.notificationQueue.update({
           where: { id: item.id },
@@ -125,7 +127,6 @@ export async function GET(req: Request) {
     });
 
   } catch (error: any) {
-    console.error("🔥 [WORKER CRITICAL ERROR]", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

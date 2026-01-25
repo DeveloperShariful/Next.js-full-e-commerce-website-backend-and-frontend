@@ -10,28 +10,38 @@ interface OrdersPageProps {
     query?: string;
     status?: string;
     limit?: string; 
+    startDate?: string;
+    endDate?: string;
+    paymentMethod?: string;
   }>;
 }
 
 export default async function OrdersPage(props: OrdersPageProps) {
   const searchParams = await props.searchParams;
   
-  // ✅ Dynamic Params Handling
   const page = Number(searchParams.page) || 1;
   const limit = Number(searchParams.limit) || 20; 
   const query = searchParams.query || "";
   const status = searchParams.status || "all";
+  const startDate = searchParams.startDate;
+  const endDate = searchParams.endDate;
+  const paymentMethod = searchParams.paymentMethod;
   
-  const { data: orders, meta } = await getOrders(page, limit, status, query);
+  const { data: orders, meta } = await getOrders(
+    page, 
+    limit, 
+    status, 
+    query, 
+    startDate, 
+    endDate, 
+    paymentMethod
+  );
 
-  // ✅ FIX: Serialize data to handle Decimal/Date issues before passing to Client Component
-  // এটি Prisma-র জটিল অবজেক্টগুলোকে প্লেইন JSON-এ কনভার্ট করে ফেলে
   const serializedOrders = JSON.parse(JSON.stringify(orders || []));
 
   return (
     <div className="p-4 md:p-6 max-w-[1920px] mx-auto min-h-screen bg-[#F8F9FA]">
       
-      {/* Header */}
       <OrdersHeader counts={meta?.counts || {}} />
       
       <OrderListTable 

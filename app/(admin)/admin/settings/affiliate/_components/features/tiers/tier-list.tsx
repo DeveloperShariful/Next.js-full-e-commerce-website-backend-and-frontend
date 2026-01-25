@@ -8,7 +8,7 @@ import { Edit, Trash2, Users, Trophy, Plus, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import TierModal from "./tier-modal";
-import { deleteTierAction } from "@/app/actions/admin/settings/affiliate/mutations/manage-tiers";
+import { deleteTierAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-tiers";
 
 interface TierWithCount extends AffiliateTier {
   _count?: { affiliates: number };

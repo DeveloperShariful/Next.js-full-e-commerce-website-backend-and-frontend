@@ -44,7 +44,7 @@ export default function CreateOrderPage() {
     weightUnit,     
     dimensionUnit,  
     features,       
-    formatPrice     
+    formatPrice // ✅ This dynamic function comes from Global Store    
   } = useGlobalStore();
 
   const [loading, setLoading] = useState(false);
@@ -281,7 +281,7 @@ export default function CreateOrderPage() {
                 setGuestInputAddress(null);
             }}
             onAddressChange={(addr) => setGuestInputAddress(addr)}
-            enableGuestCheckout={features.enableGuestCheckout}
+            
           />
 
           <ShippingSelector 
@@ -314,7 +314,7 @@ export default function CreateOrderPage() {
             taxName={taxRateData.name}
             taxRate={taxRateData.rate}
             total={totals.finalTotal}
-            currencySymbol={symbol} 
+            formatPrice={formatPrice} // ✅ Passing formatPrice
             setShippingCost={setShippingCost}
             paymentMethod={paymentMethod}
             setPaymentMethod={setPaymentMethod}

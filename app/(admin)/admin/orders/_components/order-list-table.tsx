@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Eye, MoreHorizontal, ShoppingCart, CheckSquare, 
-  Box, X, Trash2, RefreshCcw, AlertTriangle, Loader2 
+  Box, X, Trash2, RefreshCcw, AlertTriangle, Loader2, Printer 
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -20,8 +20,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-// ✅ FIX: Switched back to react-hot-toast (matches your product page)
-import { toast } from "react-hot-toast"; 
+import { toast } from "sonner"; 
 import { bulkUpdateOrderStatus } from "@/app/actions/admin/order/bulk-update";
 import { deleteOrder } from "@/app/actions/admin/order/delete-order";
 import { restoreOrder } from "@/app/actions/admin/order/restore-order";
@@ -34,16 +33,14 @@ interface OrderListTableProps {
 
 export const OrderListTable = ({ orders, isTrashView = false }: OrderListTableProps) => {
   const router = useRouter();
-  const { formatPrice } = useGlobalStore(); 
+  const { formatPrice, dateFormat } = useGlobalStore(); 
   
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   
-  // Specific Loading States
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [bulkLoadingAction, setBulkLoadingAction] = useState<string | null>(null);
 
-  // --- Selection Logic ---
   const toggleSelect = (id: string) => {
     if (selectedOrders.includes(id)) {
       setSelectedOrders(prev => prev.filter(oid => oid !== id));
@@ -60,9 +57,8 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
     }
   };
 
-  // --- Bulk Actions (FIXED) ---
   const handleBulkStatus = (status: string) => {
-    setBulkLoadingAction(status); // Start Loading
+    setBulkLoadingAction(status);
     
     startTransition(async () => {
         try {
@@ -78,7 +74,6 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
         } catch (error) {
             toast.error("Something went wrong");
         } finally {
-            // ✅ FIX: Stop Loading
             setBulkLoadingAction(null);
         }
     });
@@ -91,7 +86,7 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
       
       if(!confirm(msg)) return;
 
-      setBulkLoadingAction("DELETE"); // Start Loading
+      setBulkLoadingAction("DELETE");
 
       startTransition(async () => {
           try {
@@ -103,15 +98,22 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
           } catch (error) {
               toast.error("Bulk action failed");
           } finally {
-              // ✅ FIX: Stop Loading
               setBulkLoadingAction(null);
           }
       });
   };
 
-  // --- Single Actions (FIXED) ---
+  const handleBulkPrint = () => {
+      if (selectedOrders.length > 50) {
+          return toast.error("Cannot print more than 50 invoices at once.");
+      }
+      
+      const url = `/admin/orders/print-batch?ids=${selectedOrders.join(",")}`;
+      window.open(url, '_blank');
+  };
+
   const handleSingleAction = (id: string, action: 'restore' | 'delete' | 'trash') => {
-      setLoadingId(id); // Start Loading Specific Row
+      setLoadingId(id);
       
       startTransition(async () => {
           try {
@@ -129,13 +131,11 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
           } catch (error) {
               toast.error("An error occurred");
           } finally {
-              // ✅ FIX: Stop Loading
               setLoadingId(null);
           }
       });
   };
 
-  // --- UI Helpers ---
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING': return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200";
@@ -160,7 +160,6 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
 
   return (
     <div className="relative pb-20">
-        {/* Table Container */}
         <div className={`bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -203,7 +202,7 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                             )}
                         </td>
                         <td className="px-6 py-4 text-slate-500 whitespace-nowrap">
-                            {format(new Date(order.createdAt), "MMM d, yyyy")}
+                            {format(new Date(order.createdAt), dateFormat || "MMM d, yyyy")}
                         </td>
                         <td className="px-6 py-4">
                             <div className="font-medium text-slate-900">{order.user?.name || "Guest"}</div>
@@ -222,7 +221,6 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                             <span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold text-slate-600">{order._count.items}</span>
                         </td>
                         <td className="px-6 py-4 text-right font-medium text-slate-900 whitespace-nowrap">
-                            {/* ✅ Currency Formatting Check */}
                             {formatPrice(order.total)}
                         </td>
                         <td className="px-6 py-4 text-right">
@@ -276,7 +274,6 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
         </div>
         </div>
 
-        {/* Floating Bulk Actions Bar */}
         {selectedOrders.length > 0 && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 z-50 animate-in slide-in-from-bottom-4 border border-slate-700">
                 <div className="flex items-center gap-3 border-r border-slate-700 pr-6">
@@ -292,7 +289,6 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                                 onClick={() => handleBulkStatus("PROCESSING")}
                                 disabled={isPending}
                             >
-                                {/* ✅ Specific Spinner Logic */}
                                 {bulkLoadingAction === 'PROCESSING' ? <Loader2 size={14} className="mr-2 animate-spin"/> : <Box size={14} className="mr-2"/>}
                                 Mark Processing
                             </Button>
@@ -304,6 +300,14 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                             >
                                 {bulkLoadingAction === 'SHIPPED' ? <Loader2 size={14} className="mr-2 animate-spin"/> : <CheckSquare size={14} className="mr-2"/>}
                                 Mark Shipped
+                            </Button>
+                            <Button 
+                                size="sm" variant="ghost" 
+                                className="text-white hover:bg-slate-800 h-8 text-xs transition-colors" 
+                                onClick={handleBulkPrint}
+                                disabled={isPending}
+                            >
+                                <Printer size={14} className="mr-2"/> Print Invoices
                             </Button>
                         </>
                     ) : null}

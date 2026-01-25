@@ -64,6 +64,7 @@ export const ShippingSelector = ({
     loadResources();
   }, []);
 
+  // 🔥 FIX: address অবজেক্টের বদলে স্পেসিফিক ফিল্ড এবং cartItems কে স্ট্রিংফাই করে চেক করা হচ্ছে
   useEffect(() => {
     if (!address?.postcode || !address?.city || cartItems.length === 0) {
         setLiveQuotes([]); 
@@ -95,7 +96,15 @@ export const ShippingSelector = ({
     }, 1000);
 
     return () => clearTimeout(timeout);
-  }, [address, cartItems]); 
+    
+    // ✅ ডিপেন্ডেন্সি অ্যারে আপডেট করা হয়েছে
+  }, [
+    address?.city, 
+    address?.postcode, 
+    address?.state, 
+    // কার্ট আইটেম চেঞ্জ হলে শুধু তখনই কল হবে, অবজেক্ট রেফারেন্স চেঞ্জ হলে নয়
+    JSON.stringify(cartItems.map(i => ({ id: i.productId, qty: i.quantity })))
+  ]); 
 
   const allMethods = useMemo(() => {
       const filteredLocalRates = localRates.filter(r => {

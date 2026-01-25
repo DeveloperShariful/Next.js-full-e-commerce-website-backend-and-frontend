@@ -1,6 +1,6 @@
 // File: app/(admin)/admin/settings/affiliate/rules/page.tsx
 
-import { ruleEngineService } from "@/app/actions/admin/settings/affiliate/_services/rule-engine-service";
+import { ruleEngineService } from "@/app/actions/admin/settings/affiliates/_services/rule-engine-service";
 import RuleList from "../_components/features/rules/rule-list";
 import { Plus, Calculator } from "lucide-react";
 

@@ -46,7 +46,10 @@ export async function getOrders(
         } : {},
 
         paymentMethod && paymentMethod !== "all" ? {
-            paymentGateway: paymentMethod
+            OR: [
+                { paymentGateway: { contains: paymentMethod, mode: 'insensitive' } },
+                { paymentMethod: { contains: paymentMethod, mode: 'insensitive' } }
+            ]
         } : {}
       ]
     };
@@ -77,6 +80,17 @@ export async function getOrders(
       })
     ]);
 
+    // 🔥 Serialize Decimals to Numbers
+    const serializedOrders = orders.map(order => ({
+        ...order,
+        total: Number(order.total),
+        subtotal: Number(order.subtotal),
+        taxTotal: Number(order.taxTotal),
+        shippingTotal: Number(order.shippingTotal),
+        discountTotal: Number(order.discountTotal),
+        refundedAmount: Number(order.refundedAmount || 0),
+    }));
+
     const counts = {
       all: statusCounts.reduce((acc, curr) => acc + curr._count.status, 0),
       pending: statusCounts.find(s => s.status === 'PENDING')?._count.status || 0,
@@ -88,7 +102,7 @@ export async function getOrders(
 
     return { 
       success: true, 
-      data: orders, 
+      data: serializedOrders, 
       meta: { total: totalCount, pages: Math.ceil(totalCount / limit), counts } 
     };
 

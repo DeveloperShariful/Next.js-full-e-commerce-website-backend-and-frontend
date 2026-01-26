@@ -1,7 +1,7 @@
 //app/(admin)/admin/settings/affiliate/contests/page.tsx
 
 import { contestService } from "@/app/actions/admin/settings/affiliates/_services/contest-service";
-import ContestList from "../_components/features/contests/contest-list";
+import ContestList from "./_components/contest-list";
 import { Trophy } from "lucide-react";
 
 export const metadata = {

@@ -1,7 +1,5 @@
 // app/layout.tsx
 
-// app/layout.tsx
-
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -14,6 +12,7 @@ import {
   StoreAddress, 
   SocialLinks 
 } from "@/app/providers/global-store-provider"; 
+import { AffiliateTrackerProvider } from "@/app/providers/affiliate-tracker-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -92,6 +91,7 @@ export default async function RootLayout({
           
           {/* 3. Pass the structured object */}
           <GlobalStoreProvider settings={providerSettings}>
+            <AffiliateTrackerProvider />
             {children}
           </GlobalStoreProvider>
           

@@ -25,7 +25,7 @@ const MENU = [
   { label: "Creatives", href: "/affiliates/marketing/creatives", icon: ImageIcon },
   { label: "My Network", href: "/affiliates/network", icon: Network },
   { label: "Finances & Payouts", href: "/affiliates/finance/payouts", icon: CreditCard },
-  { label: "Reports", href: "/affiliates/reports/conversions", icon: PieChart },
+  { label: "Reports", href: "/affiliates/reports", icon: PieChart },
   { label: "Settings", href: "/affiliates/settings", icon: Settings },
 ];
 

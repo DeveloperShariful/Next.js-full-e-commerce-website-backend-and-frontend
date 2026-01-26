@@ -2,7 +2,7 @@
 
 import { fraudService } from "@/app/actions/admin/settings/affiliates/_services/fraud-service";
 import { fraudRuleService } from "@/app/actions/admin/settings/affiliates/_services/fraud-rule-service";
-import FraudRuleManager from "@/app/(admin)/admin/settings/affiliate/_components/features/fraud/fraud-rule-manager";
+import FraudRuleManager from "@/app/(admin)/admin/settings/affiliate/fraud/_components/fraud-rule-manager";
 import { ShieldAlert, AlertTriangle, Search, Ban, Settings, Activity } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";

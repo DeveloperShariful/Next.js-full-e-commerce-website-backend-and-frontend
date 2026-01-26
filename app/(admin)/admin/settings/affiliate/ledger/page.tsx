@@ -1,7 +1,7 @@
 //app/(admin)/admin/settings/affiliate/ledger/page.tsx
 
 import { ledgerService } from "@/app/actions/admin/settings/affiliates/_services/ledger-service";
-import LedgerTable from "@/app/(admin)/admin/settings/affiliate/_components/management/ledger/ledger-table";
+import LedgerTable from "@/app/(admin)/admin/settings/affiliate/ledger/_components/ledger-table";
 import { ScrollText, FileSpreadsheet } from "lucide-react";
 
 export const metadata = {

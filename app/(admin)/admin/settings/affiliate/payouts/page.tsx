@@ -1,7 +1,7 @@
 // File: app/(admin)/admin/settings/affiliate/payouts/page.tsx
 
 import { payoutService } from "@/app/actions/admin/settings/affiliates/_services/payout-service";
-import PayoutsTable from "../_components/management/payouts/payouts-table";
+import PayoutsTable from "./_components/payouts-table";
 import { PayoutStatus } from "@prisma/client";
 
 export const metadata = {

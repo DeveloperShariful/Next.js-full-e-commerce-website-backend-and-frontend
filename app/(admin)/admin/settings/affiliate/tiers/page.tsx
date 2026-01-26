@@ -1,7 +1,7 @@
 // File: app/(admin)/admin/settings/affiliate/tiers/page.tsx
 
 import { tierService } from "@/app/actions/admin/settings/affiliates/_services/tier-service";
-import TierList from "../_components/features/tiers/tier-list";
+import TierList from "./_components/tier-list";
 import { Plus } from "lucide-react";
 
 export const metadata = {

@@ -1,7 +1,7 @@
 //app/(admin)/admin/settings/affiliate/reports/page.tsx
 
 import { analyticsService } from "@/app/actions/admin/settings/affiliates/_services/analytics-service";
-import ReportsDashboard from "@/app/(admin)/admin/settings/affiliate/_components/features/analytics/reports-dashboard";
+import ReportsDashboard from "@/app/(admin)/admin/settings/affiliate/reports/_components/reports-dashboard";
 import { BarChart2 } from "lucide-react";
 
 export const metadata = {

@@ -1,7 +1,7 @@
 //app/(admin)/admin/settings/affiliate/campaigns/page.tsx
 
 import { campaignService } from "@/app/actions/admin/settings/affiliates/_services/campaign-service";
-import CampaignList from "../_components/features/campaigns/campaign-list";
+import CampaignList from "./_components/campaign-list";
 import { Megaphone } from "lucide-react";
 
 export const metadata = {

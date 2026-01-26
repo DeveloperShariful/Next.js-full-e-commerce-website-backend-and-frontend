@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { CheckCircle2, Package } from 'lucide-react';
 import { db } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
+import AffiliatePixelRenderer from './_components/affiliate-pixel-renderer';
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -17,10 +19,21 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
     return notFound();
   }
 
-  // Fetch Order Details
+  // 1. Fetch Order Details with Items (Items needed for commission calculation)
   const order = await db.order.findUnique({
     where: { id: orderId },
-    select: { orderNumber: true, total: true, guestEmail: true }
+    select: { 
+      id: true,
+      orderNumber: true, 
+      total: true, 
+      subtotal: true,
+      guestEmail: true,
+      userId: true,
+      referral: { select: { affiliateId: true } }, // Check if already attributed
+      items: {
+        select: { productId: true, total: true } 
+      }
+    }
   });
 
   if (!order) {
@@ -32,8 +45,55 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
     );
   }
 
+  // 2. Affiliate Logic: Check Cookie & Trigger Processing
+  const cookieStore = await cookies();
+  const affiliateSlug = cookieStore.get("affiliate_token")?.value;
+  
+  let finalAffiliateId = order.referral?.affiliateId || null;
+
+  // যদি অর্ডারটিতে এখনো রেফারাল সেট না থাকে এবং আমাদের কাছে কুকি থাকে
+  if (!finalAffiliateId && affiliateSlug) {
+    try {
+      // Internal API Call to process commission
+      // Note: We use full URL because server components need absolute path
+      const apiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/internal/affiliate/process-order`;
+      
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          userId: order.userId,
+          affiliateSlug: affiliateSlug,
+          totalAmount: Number(order.total),
+          subtotal: Number(order.subtotal),
+          items: order.items
+        }),
+        cache: 'no-store' // Ensure we don't cache this trigger
+      });
+
+      const result = await response.json();
+      if (result.success && result.affiliateId) {
+        finalAffiliateId = result.affiliateId;
+      }
+    } catch (error) {
+      console.error("Failed to process affiliate commission:", error);
+    }
+  }
+
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 bg-gray-50">
+      
+      {/* 3. Pixel Renderer (Hidden Logic) */}
+      {finalAffiliateId && (
+        <AffiliatePixelRenderer 
+          affiliateId={finalAffiliateId}
+          orderTotal={Number(order.total)}
+          orderId={order.id}
+          currency="AUD"
+        />
+      )}
+
       <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-sm text-center border border-gray-100">
         
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -52,7 +112,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500 text-sm">Total Amount</span>
-            <span className="font-medium text-gray-900">${order.total.toFixed(2)}</span>
+            <span className="font-medium text-gray-900">${Number(order.total).toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500 text-sm">Email</span>

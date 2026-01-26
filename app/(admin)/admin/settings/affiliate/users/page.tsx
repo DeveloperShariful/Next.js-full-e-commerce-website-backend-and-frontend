@@ -1,7 +1,7 @@
 // File: app/(admin)/admin/settings/affiliate/users/page.tsx
 
 import { accountService } from "@/app/actions/admin/settings/affiliates/_services/account-service";
-import AffiliateUsersTable from "../_components/management/users/users-table";
+import AffiliateUsersTable from "./_components/users-table";
 import { AffiliateStatus } from "@prisma/client";
 
 export const metadata = {

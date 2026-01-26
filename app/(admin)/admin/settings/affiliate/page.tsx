@@ -1,7 +1,7 @@
 // File: app/(admin)/admin/settings/affiliate/page.tsx
 
 import { statsService } from "@/app/actions/admin/settings/affiliates/_services/stats-service";
-import MainOverview from "./_components/dashboard/main-overview"; 
+import MainOverview from "./_components/main-overview"; 
 import { DateRange } from "@/app/actions/admin/settings/affiliates/types";
 import { subDays } from "date-fns";
 

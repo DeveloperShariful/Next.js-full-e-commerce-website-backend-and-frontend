@@ -1,7 +1,7 @@
 //app/(admin)/admin/settings/affiliate/domains/page.tsx
 
 import { domainService } from "@/app/actions/admin/settings/affiliates/_services/domain-service";
-import DomainList from "../_components/features/domains/domain-list";
+import DomainList from "./_components/domain-list";
 import { Globe, ShieldCheck } from "lucide-react";
 
 export const metadata = {

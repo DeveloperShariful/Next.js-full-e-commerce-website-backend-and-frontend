@@ -1,7 +1,7 @@
 //app/(admin)/admin/settings/affiliate/pixels/page.tsx
 
 import { pixelService } from "@/app/actions/admin/settings/affiliates/_services/pixel-service";
-import PixelList from "@/app/(admin)/admin/settings/affiliate/_components/features/pixels/pixel-list";
+import PixelList from "@/app/(admin)/admin/settings/affiliate/pixels/_components/pixel-list";
 import { Code2, Info } from "lucide-react";
 
 export const metadata = {

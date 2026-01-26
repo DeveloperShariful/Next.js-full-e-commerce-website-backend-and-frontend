@@ -1,7 +1,7 @@
 //app/(admin)/admin/settings/affiliate/network/page.tsx
 
 import { networkService } from "@/app/actions/admin/settings/affiliates/_services/network-service";
-import NetworkTree from "../_components/features/network/network-tree";
+import NetworkTree from "./_components/network-tree";
 import { Network } from "lucide-react";
 
 export const metadata = {

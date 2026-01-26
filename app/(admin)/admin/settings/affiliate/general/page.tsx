@@ -1,7 +1,7 @@
 // File: app/(admin)/admin/settings/affiliate/general/page.tsx
 
 import { configService } from "@/app/actions/admin/settings/affiliates/_services/config-service";
-import AffiliateGeneralConfigForm from "../_components/features/general/config-form";
+import AffiliateGeneralConfigForm from "./_components/config-form";
 import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliates/types";
 
 export const metadata = {

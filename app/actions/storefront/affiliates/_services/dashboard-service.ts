@@ -1,16 +1,13 @@
 //app/actions/storefront/affiliates/_services/dashboard-service.ts
 
 import { db } from "@/lib/prisma";
-import { startOfMonth, subMonths, format, eachDayOfInterval, subDays } from "date-fns";
+import { format, eachDayOfInterval, subDays, startOfDay, endOfDay } from "date-fns";
 import { AffiliateProfileDTO, DashboardStats, RecentActivityItem, ChartData } from "../types";
 
-/**
- * SERVICE: Affiliate Dashboard Data
- */
 export const dashboardService = {
 
   /**
-   * Get Current Affiliate Profile by User ID
+   * Get Current Affiliate Profile
    */
   async getProfile(userId: string): Promise<AffiliateProfileDTO | null> {
     const affiliate = await db.affiliateAccount.findUnique({
@@ -57,7 +54,6 @@ export const dashboardService = {
     const totalReferrals = referrals._count.id;
     const totalEarnings = referrals._sum.commissionAmount?.toNumber() || 0;
     
-    // Balance comes directly from account
     const account = await db.affiliateAccount.findUnique({
       where: { id: affiliateId },
       select: { balance: true }
@@ -69,41 +65,47 @@ export const dashboardService = {
       conversionRate: clicks > 0 ? (totalReferrals / clicks) * 100 : 0,
       unpaidEarnings: account?.balance.toNumber() || 0,
       totalEarnings,
-      nextPayoutDate: null // Can be calculated based on payout schedule if needed
+      nextPayoutDate: null 
     };
   },
 
   /**
-   * Get Chart Data (Last 30 Days)
+   * Get Chart Data (Last 30 Days) - FULLY DYNAMIC & FILLED
    */
   async getPerformanceChart(affiliateId: string): Promise<ChartData[]> {
-    const end = new Date();
-    const start = subDays(end, 30);
+    const end = endOfDay(new Date());
+    const start = startOfDay(subDays(end, 29)); // Last 30 days including today
 
-    const rawData = await db.referral.groupBy({
-      by: ['createdAt'],
+    // Group by Date using Prisma is tricky for missing dates, so we fetch raw and map in JS
+    const rawReferrals = await db.referral.findMany({
       where: {
         affiliateId,
-        createdAt: { gte: start },
+        createdAt: { gte: start, lte: end },
         status: { in: ["APPROVED", "PAID"] }
       },
-      _sum: { commissionAmount: true }
+      select: { createdAt: true, commissionAmount: true }
     });
 
-    // Normalize dates
+    // Create array of all dates in interval
     const days = eachDayOfInterval({ start, end });
     
+    // Map and Fill 0 for missing days
     return days.map(day => {
-      const dateStr = format(day, "MMM dd");
-      // Aggregate items matching this day
-      const match = rawData.find(d => 
-        format(d.createdAt, "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
+      const dateKey = format(day, "yyyy-MM-dd");
+      
+      // Filter transactions for this specific day
+      const dayTransactions = rawReferrals.filter(r => 
+        format(r.createdAt, "yyyy-MM-dd") === dateKey
+      );
+
+      const dailyEarnings = dayTransactions.reduce((sum, item) => 
+        sum + item.commissionAmount.toNumber(), 0
       );
       
       return {
-        date: dateStr,
-        earnings: match?._sum.commissionAmount?.toNumber() || 0,
-        clicks: 0 // Fetch clicks separately if needed
+        date: format(day, "MMM dd"), // For Display (e.g. "Jan 25")
+        earnings: dailyEarnings,
+        clicks: 0 // Optional: Can implement separate click query if needed
       };
     });
   },
@@ -112,6 +114,7 @@ export const dashboardService = {
    * Recent Activity Feed
    */
   async getRecentActivity(affiliateId: string): Promise<RecentActivityItem[]> {
+    // We combine Referrals and Payouts for a better activity feed
     const referrals = await db.referral.findMany({
       where: { affiliateId },
       orderBy: { createdAt: "desc" },
@@ -122,7 +125,7 @@ export const dashboardService = {
     return referrals.map(r => ({
       id: r.id,
       type: "REFERRAL",
-      description: `Commission from Order #${r.order.orderNumber}`,
+      description: `Commission earned #${r.order.orderNumber}`,
       amount: r.commissionAmount.toNumber(),
       date: r.createdAt,
       status: r.status

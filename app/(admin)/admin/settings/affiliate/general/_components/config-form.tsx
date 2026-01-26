@@ -11,17 +11,14 @@ import {
   Save, 
   Settings, 
   AlertTriangle,
-  ChevronRight
 } from "lucide-react";
 import { z } from "zod";
-import { useSearchParams } from "next/navigation";
 
 import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliates/schemas";
 import { updateGeneralSettings } from "@/app/actions/admin/settings/affiliates/mutations/update-config";
 import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliates/types";
 import { cn } from "@/lib/utils";
 
-// Type inference
 type FormValues = z.infer<typeof affiliateGeneralSchema>;
 
 interface Props {
@@ -29,10 +26,6 @@ interface Props {
 }
 
 export default function AffiliateGeneralConfigForm({ initialData }: Props) {
-  const searchParams = useSearchParams();
-  // 🔥 Read tab from URL, default to 'general'
-  const activeTab = searchParams.get("tab") || "general";
-  
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<FormValues>({
@@ -51,13 +44,10 @@ export default function AffiliateGeneralConfigForm({ initialData }: Props) {
     });
   };
 
-  // ----------------------------------------------------------------------
-  // REUSABLE COMPONENTS
-  // ----------------------------------------------------------------------
-
+  // Reusable Components
   const SectionHeader = ({ title, description }: { title: string; description?: string }) => (
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+    <div className="mb-6 mt-8 first:mt-0">
+      <h3 className="text-lg font-bold text-gray-900">{title}</h3>
       {description && <p className="text-sm text-gray-500 mt-1">{description}</p>}
     </div>
   );
@@ -109,28 +99,26 @@ export default function AffiliateGeneralConfigForm({ initialData }: Props) {
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="w-full">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="w-full pb-20">
       
       <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-sm min-h-[600px] relative overflow-hidden">
         
-        {/* Dynamic Header based on URL Tab */}
-        <div className="bg-gray-50/50 border-b px-8 py-6 flex items-center gap-2">
+        {/* Header */}
+        <div className="bg-gray-50/50 border-b px-8 py-6 sticky top-0 z-10 backdrop-blur-md bg-white/80">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight capitalize">
-              {activeTab.replace("-", " ")} Settings
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+              Global Configuration
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Configure your program preferences.</p>
+            <p className="text-sm text-gray-500 mt-1">Manage all affiliate settings from one place.</p>
           </div>
         </div>
 
-        <div className="p-8 pb-32">
-          <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500" key={activeTab}>
+        <div className="p-8 space-y-10 max-w-4xl mx-auto">
             
-            {/* === TAB 1: GENERAL === */}
-            {activeTab === "general" && (
-              <>
+            {/* === SECTION 1: GENERAL === */}
+            <section>
                 <div className={cn(
-                  "p-6 rounded-2xl border transition-all duration-300",
+                  "p-6 rounded-2xl border transition-all duration-300 mb-8",
                   form.watch("isActive") 
                     ? "bg-green-50 border-green-200 shadow-sm" 
                     : "bg-gray-50 border-gray-200"
@@ -161,91 +149,76 @@ export default function AffiliateGeneralConfigForm({ initialData }: Props) {
                   </div>
                 </div>
 
-                <div className="w-full h-px bg-gray-100" />
-
                 <SectionHeader title="Brand Identity" description="How the program appears to your users." />
-                
                 <div className="grid gap-6">
-                  <InputField 
-                    name="programName" 
-                    label="Program Name" 
-                    placeholder="e.g. GoBike Partner Program" 
-                  />
-                  <InputField 
-                    name="termsUrl" 
-                    label="Terms URL" 
-                    placeholder="https://gobike.au/terms" 
-                    type="url"
-                  />
+                  <InputField name="programName" label="Program Name" placeholder="e.g. GoBike Partner Program" />
+                  <InputField name="termsUrl" label="Terms URL" placeholder="https://gobike.au/terms" type="url" />
                 </div>
-              </>
-            )}
+            </section>
 
-            {/* === TAB 2: COMMISSIONS === */}
-            {activeTab === "commissions" && (
-              <>
-                <SectionHeader title="Calculation Logic" />
+            <div className="w-full h-px bg-gray-100" />
+
+            {/* === SECTION 2: COMMISSIONS === */}
+            <section>
+                <SectionHeader title="Commission Logic" description="Define how earnings are calculated." />
                 <div className="grid gap-4">
                   <ToggleField name="excludeShipping" label="Exclude Shipping" description="Deduct shipping from total." />
                   <ToggleField name="excludeTax" label="Exclude Taxes" description="Deduct tax from total." />
                   <ToggleField name="zeroValueReferrals" label="Track Zero Value" description="Record free orders." />
+                  <ToggleField name="autoApplyCoupon" label="Auto-Apply Coupon" description="Apply coupon on link click." />
                 </div>
-                <div className="w-full h-px bg-gray-100 my-4" />
-                <SectionHeader title="Coupon Behavior" />
-                <ToggleField name="autoApplyCoupon" label="Auto-Apply Coupon" description="Apply coupon on link click." />
-              </>
-            )}
+            </section>
 
-            {/* === TAB 3: LINKS === */}
-            {activeTab === "links" && (
-              <>
-                <SectionHeader title="Link Structure" />
+            <div className="w-full h-px bg-gray-100" />
+
+            {/* === SECTION 3: LINKS === */}
+            <section>
+                <SectionHeader title="Link Structure" description="Customize referral link appearance." />
                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl mb-6">
                   <InputField name="referralParam" label="Query Parameter" placeholder="ref" prefix="?" />
                 </div>
-                <div className="w-full h-px bg-gray-100 my-2" />
-                <SectionHeader title="Custom Slugs" />
+                
                 <ToggleField name="customSlugsEnabled" label="Enable Custom Slugs" />
                 {form.watch("customSlugsEnabled") && (
-                  <div className="ml-8 mt-4 space-y-4">
-                     <InputField name="slugLimit" label="Max Slugs" type="number" />
+                  <div className="ml-8 mt-4 space-y-4 border-l-2 border-gray-100 pl-4">
+                     <InputField name="slugLimit" label="Max Slugs per User" type="number" />
                      <ToggleField name="autoCreateSlug" label="Auto-Create on Signup" />
                   </div>
                 )}
-              </>
-            )}
+            </section>
 
-            {/* === TAB 4: FRAUD & TRACKING === */}
-            {activeTab === "fraud" && (
-              <>
-                <SectionHeader title="Cookies" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="w-full h-px bg-gray-100" />
+
+            {/* === SECTION 4: FRAUD & TRACKING === */}
+            <section>
+                <SectionHeader title="Tracking & Fraud" description="Set limits and cookie behavior." />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <InputField name="cookieDuration" label="Cookie Days" type="number" suffix="Days" />
                 </div>
-                <div className="w-full h-px bg-gray-100 my-4" />
-                <SectionHeader title="Lifetime Commissions" />
-                <ToggleField name="isLifetimeLinkOnPurchase" label="Enable Lifetime Linking" />
+                
+                <ToggleField name="isLifetimeLinkOnPurchase" label="Enable Lifetime Linking" description="Customers are permanently linked after first purchase." />
                 {form.watch("isLifetimeLinkOnPurchase") && (
-                   <div className="ml-8 mt-4">
-                      <InputField name="lifetimeDuration" label="Link Duration (Days)" type="number" helperText="Empty = Forever" />
+                   <div className="ml-8 mt-4 mb-4">
+                      <InputField name="lifetimeDuration" label="Link Duration (Days)" type="number" helperText="Leave empty for Forever" />
                    </div>
                 )}
-                <div className="w-full h-px bg-gray-100 my-4" />
-                <ToggleField name="allowSelfReferral" label="Allow Self-Referral" />
-              </>
-            )}
+                <div className="mt-4">
+                    <ToggleField name="allowSelfReferral" label="Allow Self-Referral" description="Affiliates can earn from their own purchases." />
+                </div>
+            </section>
 
-            {/* === TAB 5: PAYOUTS === */}
-            {activeTab === "payouts" && (
-              <>
-                <SectionHeader title="Withdrawal Rules" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputField name="minimumPayout" label="Min Payout" type="number" prefix="$" />
+            <div className="w-full h-px bg-gray-100" />
+
+            {/* === SECTION 5: PAYOUTS === */}
+            <section>
+                <SectionHeader title="Withdrawal Rules" description="Configure how affiliates get paid." />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <InputField name="minimumPayout" label="Min Payout Amount" type="number" prefix="$" />
                   <InputField name="holdingPeriod" label="Holding Period" type="number" suffix="Days" />
                 </div>
-                <div className="w-full h-px bg-gray-100 my-4" />
-                <label className="text-sm font-semibold text-gray-700">Methods</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+                
+                <label className="text-sm font-semibold text-gray-700 block mb-2">Allowed Payment Methods</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {["BANK_TRANSFER", "PAYPAL", "STORE_CREDIT"].map((method) => (
                     <label key={method} className="relative flex items-center justify-center gap-2 border px-4 py-3 rounded-xl bg-white cursor-pointer hover:border-black transition-all select-none group">
                       <input type="checkbox" value={method} {...form.register("payoutMethods")} className="peer sr-only" />
@@ -255,23 +228,22 @@ export default function AffiliateGeneralConfigForm({ initialData }: Props) {
                   ))}
                 </div>
                 <div className="mt-8">
-                  <ToggleField name="autoApprovePayout" label="Auto-Approve Requests" />
+                  <ToggleField name="autoApprovePayout" label="Auto-Approve Requests" description="Skip manual review for payouts." />
                 </div>
-              </>
-            )}
-          </div>
+            </section>
+
         </div>
 
         {/* Footer Actions */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 bg-white border-t flex justify-between items-center z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <p className="text-xs text-gray-400 hidden sm:block">Configuration applies globally.</p>
+        <div className="sticky bottom-0 left-0 right-0 p-6 bg-white border-t flex justify-between items-center z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+          <p className="text-xs text-gray-400 hidden sm:block">All changes are applied globally immediately.</p>
           <button
             type="submit"
             disabled={isPending}
-            className="flex items-center gap-2 bg-black text-white px-8 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-800 disabled:opacity-50 transition-all shadow-lg active:scale-95"
+            className="flex items-center gap-2 bg-black text-white px-8 py-3 rounded-xl font-medium text-sm hover:bg-gray-800 disabled:opacity-50 transition-all shadow-lg active:scale-95 ml-auto"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save Configuration
+            Save All Configuration
           </button>
         </div>
 

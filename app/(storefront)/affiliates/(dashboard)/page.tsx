@@ -2,6 +2,7 @@
 
 import { dashboardService } from "@/app/actions/storefront/affiliates/_services/dashboard-service";
 import StatsCard from "./_components/stats-card";
+import PerformanceChart from "./_components/performance-chart";
 import { requireUser } from "@/app/actions/storefront/affiliates/auth-helper";
 import { 
   MousePointer, 
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
-
+import { db } from "@/lib/prisma";
 
 export const metadata = {
   title: "Dashboard | Partner Program",
@@ -24,10 +25,18 @@ export default async function AffiliateDashboard() {
   const userId = await requireUser();
   const profile = await dashboardService.getProfile(userId);
   
-  if (!profile) return null; // Should be handled by layout
+  if (!profile) return null; 
 
-  const stats = await dashboardService.getStats(profile.id);
-  const recentActivity = await dashboardService.getRecentActivity(profile.id);
+  // 1. Parallel Data Fetching
+  const [stats, recentActivity, chartData, settings] = await Promise.all([
+    dashboardService.getStats(profile.id),
+    dashboardService.getRecentActivity(profile.id),
+    dashboardService.getPerformanceChart(profile.id),
+    db.storeSettings.findUnique({ where: { id: "settings" } })
+  ]);
+
+  // 2. Dynamic Currency from DB (Fallback to $)
+  const currencySymbol = settings?.currencySymbol || "$";
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -54,18 +63,18 @@ export default async function AffiliateDashboard() {
         </div>
       </div>
 
-      {/* KPI Grid */}
+      {/* KPI Grid (Currency Dynamic) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard 
           title="Total Earnings"
-          value={`$${stats.totalEarnings.toFixed(2)}`}
+          value={`${currencySymbol}${stats.totalEarnings.toFixed(2)}`}
           icon={DollarSign}
           color="green"
           description="Lifetime commission"
         />
         <StatsCard 
           title="Unpaid Balance"
-          value={`$${stats.unpaidEarnings.toFixed(2)}`}
+          value={`${currencySymbol}${stats.unpaidEarnings.toFixed(2)}`}
           icon={Wallet}
           color="blue"
           description="Available for payout"
@@ -89,18 +98,17 @@ export default async function AffiliateDashboard() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Chart Area (Placeholder for now, Recharts can be added here like Admin) */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px]">
+        {/* Chart Area (Fixed) */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-sm min-h-[400px] flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-gray-400" />
               Performance (Last 30 Days)
             </h3>
-            {/* You can add a date filter dropdown here */}
           </div>
           
-          <div className="h-[300px] flex items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200 text-gray-400 text-sm">
-            Chart Component Loading... (Will use Recharts)
+          <div className="flex-1 w-full min-h-[300px]">
+            <PerformanceChart data={chartData} currencySymbol={currencySymbol} />
           </div>
         </div>
 
@@ -108,7 +116,7 @@ export default async function AffiliateDashboard() {
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col">
           <h3 className="font-semibold text-gray-900 mb-6">Recent Activity</h3>
           
-          <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+          <div className="flex-1 overflow-y-auto pr-2 space-y-6 max-h-[350px]">
             {recentActivity.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-10">No recent activity.</p>
             ) : (
@@ -128,7 +136,7 @@ export default async function AffiliateDashboard() {
                         {format(new Date(activity.date), "MMM d, h:mm a")}
                       </span>
                       <span className="text-xs font-bold text-green-600 bg-green-50 px-1.5 rounded">
-                        +${activity.amount?.toFixed(2)}
+                        +{currencySymbol}{activity.amount?.toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -137,8 +145,12 @@ export default async function AffiliateDashboard() {
             )}
           </div>
           
+          {/* Fixed Link */}
           <div className="mt-6 pt-4 border-t">
-            <Link href="/affiliates/reports/conversions" className="text-sm text-black font-medium hover:underline">
+            <Link 
+              href="/affiliates/reports" 
+              className="text-sm text-black font-medium hover:underline flex items-center gap-1"
+            >
               View all transactions &rarr;
             </Link>
           </div>

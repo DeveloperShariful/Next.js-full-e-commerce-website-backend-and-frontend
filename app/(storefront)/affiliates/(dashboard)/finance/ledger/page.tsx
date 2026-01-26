@@ -1,10 +1,10 @@
 //app/(storefront)/affiliates/finance/ledger/page.tsx
 
 import { financeService } from "@/app/actions/storefront/affiliates/_services/finance-service";
-import LedgerTable from "../_components/ledger-table";
+// ✅ পাথ আপডেট: প্যারেন্ট ফোল্ডারের কম্পোনেন্ট থেকে ইম্পোর্ট
+import LedgerTable from "./_components/ledger-table"; 
 import { ScrollText, Download } from "lucide-react";
 import { db } from "@/lib/prisma";
-// ✅ আপডেট করা ইম্পোর্ট পাথ
 import { requireUser } from "@/app/actions/storefront/affiliates/auth-helper";
 
 export const metadata = {
@@ -12,17 +12,24 @@ export const metadata = {
 };
 
 export default async function LedgerPage() {
-  // ✅ ডাইনামিক ইউজার চেকিং
   const userId = await requireUser();
   
-  const affiliate = await db.affiliateAccount.findUnique({ 
-      where: { userId },
-      select: { id: true }
-  });
+  // 1. Parallel Data Fetching (User & Settings)
+  const [affiliate, settings] = await Promise.all([
+    db.affiliateAccount.findUnique({ 
+        where: { userId },
+        select: { id: true }
+    }),
+    db.storeSettings.findUnique({ where: { id: "settings" } })
+  ]);
 
   if (!affiliate) return null;
 
-  const ledger = await financeService.getLedger(affiliate.id, 100); // Last 100 transactions
+  // 2. Get Dynamic Currency
+  const currency = settings?.currencySymbol || "$";
+
+  // 3. Fetch Transactions
+  const ledger = await financeService.getLedger(affiliate.id, 100); 
 
   return (
     <div className="space-y-6">
@@ -45,7 +52,8 @@ export default async function LedgerPage() {
         </button>
       </div>
 
-      <LedgerTable data={ledger} />
+      {/* ✅ Pass Dynamic Currency */}
+      <LedgerTable data={ledger} currencySymbol={currency} />
     </div>
   );
 }

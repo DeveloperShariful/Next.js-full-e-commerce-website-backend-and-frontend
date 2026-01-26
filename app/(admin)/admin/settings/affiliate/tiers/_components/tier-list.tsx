@@ -3,12 +3,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AffiliateTier } from "@prisma/client"; // Prisma Type
-import { Edit, Trash2, Users, Trophy, Plus, ShieldAlert } from "lucide-react";
+import { AffiliateTier } from "@prisma/client";
+import { Edit, Trash2, Users, Trophy, Plus } from "lucide-react";
 import { toast } from "sonner";
-
 import TierModal from "./tier-modal";
 import { deleteTierAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-tiers";
+// ✅ Global Store Hook ব্যবহার করছি (যদি Parent এ Fetch না করেন)
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface TierWithCount extends AffiliateTier {
   _count?: { affiliates: number };
@@ -22,6 +23,9 @@ export default function TierList({ initialTiers }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<TierWithCount | null>(null);
   const [isDeleting, startDelete] = useTransition();
+  
+  // ✅ Get Dynamic Currency
+  const { symbol } = useGlobalStore(); // symbol = $, ৳, € etc.
 
   const handleCreate = () => {
     setEditingTier(null);
@@ -35,21 +39,16 @@ export default function TierList({ initialTiers }: Props) {
 
   const handleDelete = (id: string) => {
     if (!confirm("Are you sure? This action cannot be undone.")) return;
-    
     startDelete(async () => {
       const result = await deleteTierAction(id);
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
+      if (result.success) toast.success(result.message);
+      else toast.error(result.message);
     });
   };
 
   return (
     <>
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-        {/* Header Actions */}
         <div className="p-4 border-b bg-gray-50 flex justify-end">
           <button
             onClick={handleCreate}
@@ -60,7 +59,6 @@ export default function TierList({ initialTiers }: Props) {
           </button>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-semibold">
@@ -94,13 +92,16 @@ export default function TierList({ initialTiers }: Props) {
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                        {/* ✅ FIX: Fixed amount হলে কারেন্সি দেখাবে */}
+                        {tier.commissionType === "FIXED" ? symbol : ""}
                         {Number(tier.commissionRate)}
-                        {tier.commissionType === "PERCENTAGE" ? "%" : " Fixed"}
+                        {tier.commissionType === "PERCENTAGE" ? "%" : ""}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-600">
+                      {/* ✅ FIX: Dynamic Currency */}
                       {Number(tier.minSalesAmount) > 0 
-                        ? `$${Number(tier.minSalesAmount)} Sales` 
+                        ? `${symbol}${Number(tier.minSalesAmount)} Sales` 
                         : "No Min. Amount"}
                       <span className="mx-2 text-gray-300">|</span>
                       {tier.minSalesCount} Orders
@@ -113,19 +114,10 @@ export default function TierList({ initialTiers }: Props) {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEdit(tier)}
-                          className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-all"
-                          title="Edit"
-                        >
+                        <button onClick={() => handleEdit(tier)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(tier.id)}
-                          disabled={isDeleting}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all disabled:opacity-50"
-                          title="Delete"
-                        >
+                        <button onClick={() => handleDelete(tier.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -138,13 +130,8 @@ export default function TierList({ initialTiers }: Props) {
         </div>
       </div>
 
-      {/* Modal Form */}
       {isModalOpen && (
-        <TierModal 
-          isOpen={isModalOpen} 
-          onClose={() => setIsModalOpen(false)} 
-          initialData={editingTier} 
-        />
+        <TierModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={editingTier} />
       )}
     </>
   );

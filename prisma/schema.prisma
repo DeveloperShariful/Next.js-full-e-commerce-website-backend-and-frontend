@@ -580,6 +580,7 @@ model Product {
   enableReviews            Boolean                @default(true)
   affiliateCommissionRate  Decimal?
   disableAffiliate         Boolean                @default(false)
+  affiliateRates           AffiliateProductRate[]
   deletedAt                DateTime?
   version                  Int                    @default(1)
   descriptionEmbedding     Unsupported("vector(1536)")?
@@ -1411,6 +1412,7 @@ model StoreSettings {
   smtpConfig     Json?
   maintenance    Boolean             @default(false)
   affiliateConfig Json?
+  mlmConfig       Json?
 }
 
 // ==========================================
@@ -1985,15 +1987,18 @@ model AffiliateAccount {
   
   kycStatus       String   @default("NOT_SUBMITTED")
   taxId           String?
+  groupId         String?
+  group           AffiliateGroup?   @relation(fields: [groupId], references: [id])
   documents       AffiliateDocument[]
   
   campaigns         AffiliateCampaign[]        
   shortLinks        AffiliateLink[]              
   ledger            AffiliateLedger[] 
+  productRates      AffiliateProductRate[]
+  tags              AffiliateTag[]
   
   tierId          String?
   tier            AffiliateTier?   @relation(fields: [tierId], references: [id])
-  tags            String[]
   
   parentId        String?
   parent          AffiliateAccount? @relation("AffiliateMLM", fields: [parentId], references: [id])
@@ -2078,6 +2083,7 @@ model AffiliateClick {
   city              String?                    
   processingTime    Int? 
   createdAt       DateTime         @default(now())
+  conversionStatus String          @default("PENDING")
 
   @@index([affiliateId])
   @@index([subId])
@@ -2284,10 +2290,11 @@ model AffiliateAnnouncement {
   content     String   @db.Text
   type        String   @default("INFO")
   isActive    Boolean  @default(true)
-  targetTiers AffiliateTier[]
   startsAt    DateTime @default(now())
   expiresAt   DateTime?
   createdAt   DateTime @default(now())
+  targetTiers     AffiliateTier[]
+  targetGroups    AffiliateGroup[]
 }
 
 model AffiliateFraudRule {
@@ -2297,4 +2304,68 @@ model AffiliateFraudRule {
   action      String   @default("BLOCK")
   reason      String?
   createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// NEW: AFFILIATE GROUPS & TAGS (For Image 1 & 2)
+// ==========================================
+
+model AffiliateGroup {
+  id             String             @id @default(uuid())
+  name           String             @unique
+  slug           String             @unique
+  description    String?
+  commissionRate Decimal?           // Global override for this group
+  isDefault      Boolean            @default(false)
+  isActive       Boolean            @default(true)
+  
+  affiliates     AffiliateAccount[]
+  productRates   AffiliateProductRate[] // Group specific product rates
+  announcements  AffiliateAnnouncement[]
+  
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model AffiliateTag {
+  id         String             @id @default(uuid())
+  name       String             @unique
+  affiliates AffiliateAccount[] // Many-to-Many relation with Affiliates
+  createdAt  DateTime           @default(now())
+}
+
+// ==========================================
+// NEW: PRODUCT SPECIFIC RATES (For Image 3)
+// ==========================================
+
+model AffiliateProductRate {
+  id             String           @id @default(uuid())
+  productId      String
+  product        Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  affiliateId    String?
+  affiliate      AffiliateAccount? @relation(fields: [affiliateId], references: [id])
+  groupId        String?
+  group          AffiliateGroup?   @relation(fields: [groupId], references: [id])
+  rate           Decimal
+  type           CommissionType   @default(FIXED) 
+  isDisabled     Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([productId])
+  @@index([affiliateId])
+  @@index([groupId])
+}
+
+// ==========================================
+// NEW: MLM CONFIGURATION (Dynamic Levels)
+// ==========================================
+
+model AffiliateMLMConfig {
+  id             String   @id @default("mlm_config")
+  isEnabled      Boolean  @default(false)
+  maxLevels      Int      @default(3) // How deep the tree goes
+  levelRates     Json     
+  commissionBasis String  @default("SALES_AMOUNT") 
+  updatedAt      DateTime @updatedAt
 }

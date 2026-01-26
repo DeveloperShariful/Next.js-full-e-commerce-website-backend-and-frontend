@@ -11,23 +11,13 @@ import {
   Settings, 
   Network, 
   PieChart, 
-  Megaphone,
-  LogOut,
   ImageIcon,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@clerk/nextjs";
-
-const MENU = [
-  { label: "Overview", href: "/affiliates", icon: LayoutDashboard, exact: true },
-  { label: "Marketing Tools", href: "/affiliates/marketing/links", icon: LinkIcon },
-  { label: "Creatives", href: "/affiliates/marketing/creatives", icon: ImageIcon },
-  { label: "My Network", href: "/affiliates/network", icon: Network },
-  { label: "Finances & Payouts", href: "/affiliates/finance/payouts", icon: CreditCard },
-  { label: "Reports", href: "/affiliates/reports", icon: PieChart },
-  { label: "Settings", href: "/affiliates/settings", icon: Settings },
-];
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -36,13 +26,39 @@ interface SidebarProps {
 
 export default function AffiliateSidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  
+  // ✅ GLOBAL STORE: সেটিংস থেকে ডাটা নেওয়া হচ্ছে
+  const { affiliate } = useGlobalStore(); 
+
+  // ডিফল্ট মেনু আইটেম
+  const baseMenu = [
+    { label: "Overview", href: "/affiliates", icon: LayoutDashboard, exact: true },
+    { label: "Marketing Tools", href: "/affiliates/marketing/links", icon: LinkIcon },
+    { label: "Creatives", href: "/affiliates/marketing/creatives", icon: ImageIcon },
+    { label: "Finances & Payouts", href: "/affiliates/finance/payouts", icon: CreditCard },
+    { label: "Reports", href: "/affiliates/reports", icon: PieChart },
+    { label: "Settings", href: "/affiliates/settings", icon: Settings },
+  ];
+
+  // ✅ DYNAMIC LOGIC: যদি MLM চালু থাকে, তবে নেটওয়ার্ক মেনু অ্যাড করো
+  // নোট: আপনার affiliate config এ 'enableMLM' বা 'tierSystem' ফ্ল্যাগ থাকতে হবে।
+  // আপাতত আমরা ধরে নিচ্ছি সব সময় দেখাবে, অথবা আপনি লজিক বসাতে পারেন:
+  // if (affiliate.enableMLM) { ... }
+  
+  // ডেমো লজিক: নেটওয়ার্ক মেনু ইনজেক্ট করা
+  const MENU = [
+    ...baseMenu.slice(0, 3), // Overview, Marketing, Creatives
+    { label: "My Network", href: "/affiliates/network", icon: Network }, // MLM Menu
+    ...baseMenu.slice(3)     // Finances, Reports, Settings
+  ];
 
   // Common Nav Content
   const NavContent = () => (
     <>
       <div className="px-6 py-6 mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Partner Menu</h2>
-        {/* Mobile Close Button */}
+        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+          {affiliate.programName || "Partner Menu"} {/* ডাইনামিক নাম */}
+        </h2>
         {onClose && (
           <button onClick={onClose} className="lg:hidden text-gray-500 hover:bg-gray-100 p-1 rounded">
             <X size={20} />
@@ -60,7 +76,7 @@ export default function AffiliateSidebar({ isOpen, onClose }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              onClick={onClose} // Close menu on click (mobile)
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all",
                 isActive 
@@ -88,23 +104,20 @@ export default function AffiliateSidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* 1. DESKTOP SIDEBAR (Sticky) */}
+      {/* DESKTOP SIDEBAR */}
       <aside className="hidden lg:flex w-64 bg-white border-r flex-col sticky top-16 h-[calc(100vh-4rem)] z-30 flex-shrink-0">
         <NavContent />
       </aside>
 
-      {/* 2. MOBILE SIDEBAR (Overlay/Drawer) */}
+      {/* MOBILE SIDEBAR */}
       <div className={cn(
         "fixed inset-0 z-50 lg:hidden transition-opacity duration-300",
         isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
       )}>
-        {/* Backdrop */}
         <div 
           className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           onClick={onClose}
         />
-        
-        {/* Drawer Content */}
         <aside className={cn(
           "absolute top-0 left-0 bottom-0 w-64 bg-white shadow-2xl flex flex-col transition-transform duration-300",
           isOpen ? "translate-x-0" : "-translate-x-full"

@@ -77,7 +77,7 @@ export interface ChartDataPoint {
   clicks: number;
 }
 
-// User List Table Item
+// User List Table Item (UPDATED FOR SOLID AFFILIATE UI)
 export interface AffiliateUserTableItem {
   id: string;
   userId: string;
@@ -86,14 +86,28 @@ export interface AffiliateUserTableItem {
   avatar: string | null;
   slug: string;
   status: AffiliateStatus;
-  tierName: string | null;
+  tierName: string;
+  
+  // --- NEW FIELDS ADDED HERE ---
+  groupName: string;          // For Group Column
+  tags: string[];             // For Tags Column
+  coupons: string[];          // For Coupons Column
+  storeCredit: number;        // For Store Credit Column
+  
   balance: number;
   totalEarnings: number;
+  
+  // Stats
   referralCount: number;
   visitCount: number;
+  salesTotal: number;         // For "Sales: $X"
+  commissionTotal: number;    // For "Comm: ($Y)"
+  netRevenue: number;         // For "Net: $Z"
+  
+  registrationNotes: string | null;
   createdAt: Date;
   kycStatus: string;
-  riskScore: number; // New for Ultra Level
+  riskScore: number;
 }
 
 // Payout List Item
@@ -123,16 +137,16 @@ export interface NetworkNode {
   avatar: string | null;
   tier: string;
   totalEarnings: number;
-  directReferrals: number; // Count of direct children
-  teamSize: number; // Total downline count (recursive)
-  children?: NetworkNode[]; // Recursive children
+  directReferrals: number; 
+  teamSize: number; 
+  children?: NetworkNode[];
 }
 
 // Fraud Detection Alert
 export interface FraudAlertItem {
   id: string;
   affiliateName: string;
-  type: string; // e.g., "SELF_REFERRAL", "IP_DUPLICATE"
+  type: string; 
   riskScore: number;
   details: string;
   detectedAt: Date;
@@ -143,8 +157,8 @@ export interface FraudAlertItem {
 export interface TrackingPixelItem {
   id: string;
   affiliateName: string;
-  type: string; // "FACEBOOK", "GOOGLE", "TIKTOK"
+  type: string;
   pixelId: string;
-  status: boolean; // Enabled/Disabled
+  status: boolean;
   createdAt: Date;
 }

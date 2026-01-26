@@ -6,9 +6,10 @@ import { ArrowUpRight, ArrowDownLeft, FileText } from "lucide-react";
 
 interface Props {
   data: AffiliateLedger[];
+  currencySymbol: string; // ✅ New Prop
 }
 
-export default function LedgerTable({ data }: Props) {
+export default function LedgerTable({ data, currencySymbol }: Props) {
   
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -64,11 +65,13 @@ export default function LedgerTable({ data }: Props) {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className={`font-mono font-medium ${config.color}`}>
-                        {config.sign}${item.amount.toNumber().toFixed(2)}
+                        {/* ✅ DYNAMIC CURRENCY */}
+                        {config.sign}{currencySymbol}{item.amount.toNumber().toFixed(2)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-gray-600">
-                      ${item.balanceAfter.toNumber().toFixed(2)}
+                      {/* ✅ DYNAMIC CURRENCY */}
+                      {currencySymbol}{item.balanceAfter.toNumber().toFixed(2)}
                     </td>
                     <td className="px-6 py-4 text-right text-gray-500 text-xs">
                       {format(new Date(item.createdAt), "MMM d, HH:mm")}

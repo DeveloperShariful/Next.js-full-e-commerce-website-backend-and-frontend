@@ -18,23 +18,26 @@ export default async function ConversionsPage() {
 
   if (!affiliate) return null;
 
-  // Fetch conversions with safer selection
-  const conversions = await db.referral.findMany({
-    where: { 
-      affiliateId: affiliate.id,
-    },
-    include: {
-      order: {
-        select: { 
-          id: true,
-          orderNumber: true, 
-          total: true, 
-          // user: { select: { name: true } } // Removing relations to be safe
+  // 1. Fetch Data Parallelly (Conversions + Settings)
+  const [conversions, settings] = await Promise.all([
+    db.referral.findMany({
+      where: { affiliateId: affiliate.id },
+      include: {
+        order: {
+          select: { 
+            id: true,
+            orderNumber: true, 
+            total: true, 
+          }
         }
-      }
-    },
-    orderBy: { createdAt: "desc" }
-  });
+      },
+      orderBy: { createdAt: "desc" }
+    }),
+    db.storeSettings.findUnique({ where: { id: "settings" } })
+  ]);
+
+  // 2. Get Currency Symbol
+  const currency = settings?.currencySymbol || "$";
 
   return (
     <div className="space-y-6">
@@ -73,7 +76,6 @@ export default async function ConversionsPage() {
                 conversions.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
-                      {/* Safe Check for Order */}
                       {item.order ? (
                         <>
                           <div className="font-medium text-gray-900">#{item.order.orderNumber}</div>
@@ -87,13 +89,14 @@ export default async function ConversionsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-gray-900 font-medium">
-                        {/* Safe check for total */}
-                        ${item.order?.total ? Number(item.order.total).toFixed(2) : "0.00"}
+                        {/* ✅ DYNAMIC CURRENCY */}
+                        {currency}{item.order?.total ? Number(item.order.total).toFixed(2) : "0.00"}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-green-600 font-bold bg-green-50 px-2 py-1 rounded text-xs">
-                        +${Number(item.commissionAmount).toFixed(2)}
+                        {/* ✅ DYNAMIC CURRENCY */}
+                        +{currency}{Number(item.commissionAmount).toFixed(2)}
                       </span>
                     </td>
                     <td className="px-6 py-4">

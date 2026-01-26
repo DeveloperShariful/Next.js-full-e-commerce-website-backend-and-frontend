@@ -5,21 +5,18 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/prisma";
-import { financeService } from "../_services/finance-service";
 import { PayoutMethod } from "@prisma/client";
+import { AffiliateConfigDTO } from "@/app/actions/admin/settings/affiliates/types";
 
 const payoutSchema = z.object({
   userId: z.string(),
-  amount: z.coerce.number().min(1, "Amount must be at least $1"),
+  amount: z.coerce.number().min(1, "Amount must be positive"),
   method: z.nativeEnum(PayoutMethod),
   note: z.string().optional(),
 });
 
 type PayoutInput = z.infer<typeof payoutSchema>;
 
-/**
- * SERVER ACTION: Request Withdrawal
- */
 export async function requestPayoutAction(data: PayoutInput) {
   try {
     // 1. Validate Input
@@ -30,25 +27,33 @@ export async function requestPayoutAction(data: PayoutInput) {
 
     const { userId, amount, method, note } = result.data;
 
-    // 2. Fetch Account & Validate Rules
-    const affiliate = await db.affiliateAccount.findUnique({
-      where: { userId },
-    });
+    // 2. Fetch Account & Global Settings
+    const [affiliate, settings] = await Promise.all([
+      db.affiliateAccount.findUnique({ where: { userId } }),
+      db.storeSettings.findUnique({ where: { id: "settings" } })
+    ]);
 
     if (!affiliate) return { success: false, message: "Account not found." };
 
-    // Check Balance
-    const currentBalance = affiliate.balance.toNumber();
-    if (currentBalance < amount) {
-      return { success: false, message: `Insufficient balance. Available: $${currentBalance}` };
+    // ✅ DYNAMIC: কনফিগ থেকে মিনিমাম এমাউন্ট নেওয়া
+    const config = (settings?.affiliateConfig as AffiliateConfigDTO) || {};
+    const minPayout = Number(config.minimumPayout) || 50; // Fallback if missing
+    const currency = settings?.currencySymbol || "$";
+
+    // 3. Validation Rules
+    if (amount < minPayout) {
+      return { 
+        success: false, 
+        message: `Minimum withdrawal amount is ${currency}${minPayout}` 
+      };
     }
 
-    // Check Minimum Payout (Fetch fresh config)
-    const walletData = await financeService.getWalletData(affiliate.id);
-    const minPayout = walletData.config.minimumPayout;
-
-    if (amount < minPayout) {
-      return { success: false, message: `Minimum withdrawal amount is $${minPayout}` };
+    const currentBalance = affiliate.balance.toNumber();
+    if (currentBalance < amount) {
+      return { 
+        success: false, 
+        message: `Insufficient balance. Available: ${currency}${currentBalance}` 
+      };
     }
 
     // Check Payment Details Presence
@@ -59,7 +64,7 @@ export async function requestPayoutAction(data: PayoutInput) {
       return { success: false, message: "Please set your Bank Details in Settings first." };
     }
 
-    // 3. EXECUTE TRANSACTION (Atomic)
+    // 4. EXECUTE TRANSACTION (Atomic)
     await db.$transaction(async (tx) => {
       // A. Deduct Balance
       const updatedAffiliate = await tx.affiliateAccount.update({
@@ -85,7 +90,7 @@ export async function requestPayoutAction(data: PayoutInput) {
           type: "PAYOUT",
           amount: amount,
           balanceBefore: currentBalance,
-          balanceAfter: updatedAffiliate.balance.toNumber(), // Should match calc
+          balanceAfter: updatedAffiliate.balance.toNumber(),
           referenceId: payout.id,
           description: `Withdrawal Request (${method.replace("_", " ")})`
         }

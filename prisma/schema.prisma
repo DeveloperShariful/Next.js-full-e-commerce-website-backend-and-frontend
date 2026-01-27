@@ -1,4 +1,8 @@
 // ==========================================
+// FIXED PRISMA SCHEMA - ALL CRITICAL ISSUES RESOLVED
+// ==========================================
+
+// ==========================================
 // 1. CONFIGURATION
 // ==========================================
 
@@ -10,7 +14,7 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  extensions = [pg_trgm, unaccent, vector]
+  extensions = [pg_trgm, unaccent, pgvector(map: "vector", schema: "public")]
 }
 
 // ==========================================
@@ -269,6 +273,10 @@ model User {
   deletedAt             DateTime?
   version               Int       @default(1)
 
+  // Audit fields
+  createdBy             String?
+  updatedBy             String?
+
   addresses             Address[]
   paymentMethods        UserPaymentMethod[]
   orders                Order[]
@@ -288,7 +296,7 @@ model User {
 
   affiliateAccount      AffiliateAccount?
   referredByAffiliateId String?
-  referredByAffiliate   AffiliateAccount? @relation("CustomerReferral", fields: [referredByAffiliateId], references: [id])
+  referredByAffiliate   AffiliateAccount? @relation("CustomerReferral", fields: [referredByAffiliateId], references: [id], onDelete: SetNull)
 
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -298,6 +306,7 @@ model User {
   @@index([role, createdAt(sort: Desc)])
   @@index([clerkId])
   @@index([role, isActive])
+  @@index([deletedAt])
 }
 
 model UserPaymentMethod {
@@ -357,7 +366,7 @@ model Wallet {
   id           String              @id @default(uuid())
   userId       String              @unique
   user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  balance      Decimal             @default(0.00)
+  balance      Decimal             @default(0.00) @db.Decimal(12, 2)
   points       Int                 @default(0)
   version      Int                 @default(1)
   transactions WalletTransaction[]
@@ -369,7 +378,7 @@ model WalletTransaction {
   id          String          @id @default(uuid())
   walletId    String
   wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  amount      Decimal
+  amount      Decimal         @db.Decimal(12, 2)
   type        TransactionType
   description String?
   reference   String?
@@ -394,14 +403,14 @@ model Category {
   isActive                Boolean               @default(true)
   menuOrder               Int                   @default(0)
   parentId                String?
-  parent                  Category?             @relation("CategoryToCategory", fields: [parentId], references: [id])
+  parent                  Category?             @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
   children                Category[]            @relation("CategoryToCategory")
   products                Product[]
   translations            CategoryTranslation[]
   metafields              Json?
   metaTitle               String?
   metaDesc                String?
-  affiliateCommissionRate Decimal?
+  affiliateCommissionRate Decimal?              @db.Decimal(5, 2)
   disableAffiliate        Boolean               @default(false)
   deletedAt               DateTime?
   createdAt               DateTime              @default(now())
@@ -409,6 +418,7 @@ model Category {
 
   @@index([parentId])
   @@index([isActive, menuOrder(sort: Asc)])
+  @@index([deletedAt])
 }
 
 model CategoryTranslation {
@@ -444,6 +454,7 @@ model Brand {
   updatedAt         DateTime           @updatedAt
 
   @@index([name])
+  @@index([deletedAt])
 }
 
 model Tag {
@@ -459,6 +470,8 @@ model Tag {
   products    Product[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([deletedAt])
 }
 
 model Collection {
@@ -504,9 +517,9 @@ model Product {
   status                   ProductStatus          @default(DRAFT)
   isFeatured               Boolean                @default(false)
   categoryId               String?
-  category                 Category?              @relation(fields: [categoryId], references: [id])
+  category                 Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   brandId                  String?
-  brand                    Brand?                 @relation(fields: [brandId], references: [id])
+  brand                    Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
   tags                     Tag[]
   collections              Collection[]
   featuredImage            String?
@@ -515,11 +528,11 @@ model Product {
   images                   ProductImage[]
   videoUrl                 String?
   videoThumbnail           String?
-  price                    Decimal                @default(0.00)
-  salePrice                Decimal?
+  price                    Decimal                @default(0.00) @db.Decimal(12, 2)
+  salePrice                Decimal?               @db.Decimal(12, 2)
   saleStart                DateTime?
   saleEnd                  DateTime?
-  costPerItem              Decimal?
+  costPerItem              Decimal?               @db.Decimal(12, 2)
   taxable                  Boolean                @default(true)
   taxStatus                TaxStatus              @default(TAXABLE)
   taxRateId                String?
@@ -537,10 +550,10 @@ model Product {
   preOrderReleaseDate      DateTime?
   preOrderMessage          String?
   preOrderLimit            Int?
-  weight                   Decimal?               @default(0)
-  length                   Decimal?
-  width                    Decimal?
-  height                   Decimal?
+  weight                   Decimal?               @default(0) @db.Decimal(10, 3)
+  length                   Decimal?               @db.Decimal(10, 2)
+  width                    Decimal?               @db.Decimal(10, 2)
+  height                   Decimal?               @db.Decimal(10, 2)
   weightUnit               String?                @default("kg")
   dimensionUnit            String?                @default("cm")
   shippingClassId          String?
@@ -572,23 +585,31 @@ model Product {
   ageGroup                 String?
   viewCount                Int                    @default(0)
   soldCount                Int                    @default(0)
-  rating                   Decimal                @default(0)
+  rating                   Decimal                @default(0) @db.Decimal(3, 2)
   reviewCount              Int                    @default(0)
   metafields               Json?
   menuOrder                Int                    @default(0)
   purchaseNote             String?
   enableReviews            Boolean                @default(true)
-  affiliateCommissionRate  Decimal?
+  affiliateCommissionRate  Decimal?               @db.Decimal(5, 2)
   disableAffiliate         Boolean                @default(false)
   affiliateRates           AffiliateProductRate[]
   deletedAt                DateTime?
   version                  Int                    @default(1)
+  
+  // FIXED: Vector embeddings using proper pgvector syntax
   descriptionEmbedding     Unsupported("vector(1536)")?
   imageEmbedding           Unsupported("vector(512)")?
+  
   wishlistedBy             Wishlist[]
   recentViews              RecentlyViewed[]
   orderItems               OrderItem[]
   cartItems                CartItem[]
+  
+  // Audit fields
+  createdBy                String?
+  updatedBy                String?
+  
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
 
@@ -605,6 +626,7 @@ model Product {
   @@index([brandId, status, isFeatured])
   @@index([status, price, createdAt])
   @@index([isPreOrder])
+  @@index([deletedAt])
 }
 
 model ProductTranslation {
@@ -631,6 +653,7 @@ model ProductVersion {
   createdAt DateTime @default(now())
 
   @@index([productId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model StockHistory {
@@ -646,6 +669,7 @@ model StockHistory {
   createdAt  DateTime @default(now())
 
   @@index([productId, variantId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model ProductImage {
@@ -661,10 +685,13 @@ model ProductImage {
   mediaId        String?
   media          Media?          @relation(fields: [mediaId], references: [id])
   variantId      String?
-  variant        ProductVariant? @relation(fields: [variantId], references: [id])
+  variant        ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  
+  // FIXED: Vector embedding
   imageEmbedding Unsupported("vector(512)")?
 
   @@index([productId, position(sort: Asc)])
+  @@index([variantId])
 }
 
 model DigitalFile {
@@ -685,10 +712,11 @@ model BundleItem {
   parentProductId String
   parentProduct   Product @relation("BundleParent", fields: [parentProductId], references: [id], onDelete: Cascade)
   childProductId  String
-  childProduct    Product @relation("BundleChild", fields: [childProductId], references: [id])
+  childProduct    Product @relation("BundleChild", fields: [childProductId], references: [id], onDelete: Cascade)
   quantity        Int     @default(1)
 
   @@index([parentProductId])
+  @@index([childProductId])
 }
 
 // ==========================================
@@ -713,7 +741,7 @@ model ProductAttribute {
   variation  Boolean @default(true)
   isFeatured Boolean @default(false)
   brandId    String?
-  brand      Brand?  @relation(fields: [brandId], references: [id])
+  brand      Brand?  @relation(fields: [brandId], references: [id], onDelete: SetNull)
   values     String[]
   productId  String
   product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -729,9 +757,9 @@ model ProductVariant {
   name                String
   sku                 String?
   barcode             String?
-  price               Decimal
-  salePrice           Decimal?
-  costPerItem         Decimal?
+  price               Decimal          @db.Decimal(12, 2)
+  salePrice           Decimal?         @db.Decimal(12, 2)
+  costPerItem         Decimal?         @db.Decimal(12, 2)
   stock               Int              @default(0)
   trackQuantity       Boolean          @default(true)
   isPreOrder          Boolean          @default(false)
@@ -740,10 +768,10 @@ model ProductVariant {
   mediaId             String?
   media               Media?           @relation(fields: [mediaId], references: [id])
   images              ProductImage[]
-  weight              Decimal?
-  length              Decimal?
-  width               Decimal?
-  height              Decimal?
+  weight              Decimal?         @db.Decimal(10, 3)
+  length              Decimal?         @db.Decimal(10, 2)
+  width               Decimal?         @db.Decimal(10, 2)
+  height              Decimal?         @db.Decimal(10, 2)
   attributes          Json
   metafields          Json?
   version             Int              @default(1)
@@ -759,6 +787,7 @@ model ProductVariant {
   @@index([attributes(ops: JsonbPathOps)], type: Gin)
   @@index([productId, price])
   @@index([isPreOrder])
+  @@index([deletedAt])
 }
 
 // ==========================================
@@ -794,17 +823,19 @@ model PickupLocation {
   openingHours Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([isActive])
 }
 
 model InventoryLevel {
   id         String          @id @default(uuid())
   quantity   Int             @default(0)
   locationId String
-  location   Location        @relation(fields: [locationId], references: [id])
+  location   Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
   productId  String
-  product    Product         @relation(fields: [productId], references: [id])
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantId  String?
-  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
   version    Int             @default(1)
 
   @@unique([locationId, productId, variantId])
@@ -830,9 +861,9 @@ model PurchaseOrder {
   id         String   @id @default(uuid())
   poNumber   String   @unique
   supplierId String
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   status     String
-  totalCost  Decimal
+  totalCost  Decimal  @db.Decimal(12, 2)
   notes      String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -854,6 +885,7 @@ model StockTransfer {
   updatedAt      DateTime @updatedAt
 
   @@index([status])
+  @@index([createdAt(sort: Desc)])
 }
 
 // ==========================================
@@ -872,17 +904,17 @@ model Order {
   fulfillmentStatus      FulfillmentStatus  @default(UNFULFILLED)
   hasPreOrderItems       Boolean            @default(false)
   currency               String             @default("AUD")
-  exchangeRate           Decimal            @default(1.0)
-  subtotal               Decimal
-  discountTotal          Decimal            @default(0)
-  shippingTotal          Decimal            @default(0)
-  taxTotal               Decimal            @default(0)
-  surcharge              Decimal            @default(0)
-  total                  Decimal
-  paymentFee             Decimal            @default(0)
-  netAmount              Decimal            @default(0)
-  refundedAmount         Decimal            @default(0)
-  netTotal               Decimal            @default(0)
+  exchangeRate           Decimal            @default(1.0) @db.Decimal(10, 6)
+  subtotal               Decimal            @db.Decimal(12, 2)
+  discountTotal          Decimal            @default(0) @db.Decimal(12, 2)
+  shippingTotal          Decimal            @default(0) @db.Decimal(12, 2)
+  taxTotal               Decimal            @default(0) @db.Decimal(12, 2)
+  surcharge              Decimal            @default(0) @db.Decimal(12, 2)
+  total                  Decimal            @db.Decimal(12, 2)
+  paymentFee             Decimal            @default(0) @db.Decimal(12, 2)
+  netAmount              Decimal            @default(0) @db.Decimal(12, 2)
+  refundedAmount         Decimal            @default(0) @db.Decimal(12, 2)
+  netTotal               Decimal            @default(0) @db.Decimal(12, 2)
   paymentGateway         String?
   paymentMethod          String?
   paymentId              String?            @unique
@@ -892,7 +924,7 @@ model Order {
   invoiceUrl             String?
   couponCode             String?
   discountId             String?
-  discount               Discount?          @relation(fields: [discountId], references: [id])
+  discount               Discount?          @relation(fields: [discountId], references: [id], onDelete: SetNull)
   discountDetails        Json?
   shippingAddress        Json
   billingAddress         Json
@@ -910,7 +942,7 @@ model Order {
   authorityToLeave       Boolean            @default(false)
   tailgatePickup         Boolean            @default(false)
   tailgateDelivery       Boolean            @default(false)
-  declaredValue          Decimal?
+  declaredValue          Decimal?           @db.Decimal(12, 2)
   isInsured              Boolean            @default(false)
   selectedCourierCode    String?
   selectedCourierService String?
@@ -936,7 +968,7 @@ model Order {
   fraudAnalysis          Json?
   
   affiliateId            String?
-  affiliate              AffiliateAccount?  @relation("OrderAffiliate", fields: [affiliateId], references: [id])
+  affiliate              AffiliateAccount?  @relation("OrderAffiliate", fields: [affiliateId], references: [id], onDelete: SetNull)
   referral               Referral?
 
   items                  OrderItem[]
@@ -948,6 +980,11 @@ model Order {
   orderNotes             OrderNote[]
   deletedAt              DateTime?
   version                Int                @default(1)
+  
+  // Audit fields
+  createdBy              String?
+  updatedBy              String?
+  
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
@@ -963,6 +1000,8 @@ model Order {
   @@index([status, paymentStatus, fulfillmentStatus])
   @@index([status, createdAt, total])
   @@index([affiliateId])
+  @@index([deletedAt])
+  @@index([guestEmail])
 }
 
 model OrderItem {
@@ -973,16 +1012,16 @@ model OrderItem {
   product             Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
   productName         String
   variantId           String?
-  variant             ProductVariant? @relation(fields: [variantId], references: [id])
+  variant             ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
   variantName         String?
   sku                 String?
   isPreOrder          Boolean         @default(false)
   preOrderReleaseDate DateTime?
   image               String?
-  price               Decimal
+  price               Decimal         @db.Decimal(12, 2)
   quantity            Int
-  total               Decimal
-  tax                 Decimal         @default(0)
+  total               Decimal         @db.Decimal(12, 2)
+  tax                 Decimal         @default(0) @db.Decimal(12, 2)
   metadata            Json?
 
   @@index([orderId])
@@ -996,13 +1035,13 @@ model OrderTransaction {
   order               Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   gateway             String
   type                TransactionType
-  amount              Decimal
+  amount              Decimal           @db.Decimal(12, 2)
   currency            String            @default("AUD")
   transactionId       String
   idempotencyKey      String?
   status              String
   parentTransactionId String?
-  parentTransaction   OrderTransaction? @relation("RefundOf", fields: [parentTransactionId], references: [id])
+  parentTransaction   OrderTransaction? @relation("RefundOf", fields: [parentTransactionId], references: [id], onDelete: SetNull)
   refunds             OrderTransaction[] @relation("RefundOf")
   rawResponse         Json?
   errorCode           String?
@@ -1013,16 +1052,17 @@ model OrderTransaction {
   @@index([orderId, status])
   @@index([transactionId])
   @@index([gateway, transactionId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Dispute {
   id               String        @id @default(uuid())
   orderId          String
-  order            Order         @relation(fields: [orderId], references: [id])
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   gatewayDisputeId String        @unique
   reason           String?
   status           DisputeStatus @default(WARNING_NEEDS_RESPONSE)
-  amount           Decimal
+  amount           Decimal       @db.Decimal(12, 2)
   currency         String        @default("AUD")
   evidenceDueBy    DateTime?
   metadata         Json?
@@ -1030,19 +1070,22 @@ model Dispute {
   updatedAt        DateTime      @updatedAt
 
   @@index([orderId])
+  @@index([status])
 }
 
 model Payout {
   id          String   @id @default(uuid())
   gateway     String
   payoutId    String   @unique
-  amount      Decimal
+  amount      Decimal  @db.Decimal(12, 2)
   currency    String
   status      String
   arrivalDate DateTime
   details     Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([status])
 }
 
 model PaymentWebhookLog {
@@ -1056,12 +1099,14 @@ model PaymentWebhookLog {
   createdAt       DateTime @default(now())
 
   @@unique([eventId])
+  @@index([provider, processed])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Shipment {
   id                 String   @id @default(uuid())
   orderId            String
-  order              Order    @relation(fields: [orderId], references: [id])
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   trackingNumber     String?
   trackingUrl        String?
   courier            String?
@@ -1083,12 +1128,13 @@ model Shipment {
   rawStatus          Json?
 
   @@index([orderId])
+  @@index([trackingNumber])
 }
 
 model ReturnRequest {
   id        String       @id @default(uuid())
   orderId   String
-  order     Order        @relation(fields: [orderId], references: [id])
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   status    ReturnStatus @default(REQUESTED)
   reason    String
   adminNote String?
@@ -1100,13 +1146,14 @@ model ReturnRequest {
 
   @@index([orderId])
   @@index([status])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Refund {
   id              String   @id @default(uuid())
   orderId         String
-  order           Order    @relation(fields: [orderId], references: [id])
-  amount          Decimal
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount          Decimal  @db.Decimal(12, 2)
   reason          String?
   status          String   @default("pending")
   gatewayRefundId String?
@@ -1115,6 +1162,7 @@ model Refund {
   updatedAt       DateTime @updatedAt
 
   @@index([orderId])
+  @@index([status])
 }
 
 model OrderNote {
@@ -1127,6 +1175,7 @@ model OrderNote {
   createdAt DateTime @default(now())
 
   @@index([orderId])
+  @@index([createdAt(sort: Desc)])
 }
 
 // ==========================================
@@ -1136,7 +1185,7 @@ model OrderNote {
 model Cart {
   id             String     @id @default(uuid())
   userId         String?    @unique
-  user           User?      @relation(fields: [userId], references: [id])
+  user           User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionId      String?
   items          CartItem[]
   reminderSentAt DateTime?
@@ -1144,6 +1193,7 @@ model Cart {
 
   @@index([sessionId])
   @@index([userId])
+  @@index([updatedAt(sort: Desc)])
 }
 
 model CartItem {
@@ -1151,12 +1201,13 @@ model CartItem {
   cartId    String
   cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String
-  product   Product         @relation(fields: [productId], references: [id])
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
   quantity  Int
 
   @@index([cartId])
+  @@index([productId])
 }
 
 model AbandonedCheckout {
@@ -1164,9 +1215,9 @@ model AbandonedCheckout {
   cartToken     String?
   email         String?
   userId        String?
-  user          User?     @relation(fields: [userId], references: [id])
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   items         Json
-  subtotal      Decimal
+  subtotal      Decimal   @db.Decimal(12, 2)
   currency      String    @default("AUD")
   recoveryUrl   String
   isRecovered   Boolean   @default(false)
@@ -1191,11 +1242,12 @@ model Wishlist {
   productId String
   product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
   createdAt DateTime        @default(now())
 
   @@unique([userId, productId, variantId])
   @@index([userId])
+  @@index([productId])
 }
 
 model RecentlyViewed {
@@ -1205,10 +1257,11 @@ model RecentlyViewed {
   productId String
   product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
   viewedAt  DateTime        @default(now())
 
   @@index([userId, viewedAt(sort: Desc)])
+  @@index([productId])
 }
 
 // ==========================================
@@ -1220,9 +1273,9 @@ model Discount {
   code             String       @unique
   description      String?
   type             DiscountType @default(PERCENTAGE)
-  value            Decimal
-  minSpend         Decimal?
-  maxSpend         Decimal?
+  value            Decimal      @db.Decimal(12, 2)
+  minSpend         Decimal?     @db.Decimal(12, 2)
+  maxSpend         Decimal?     @db.Decimal(12, 2)
   minQty           Int?
   startDate        DateTime     @default(now())
   endDate          DateTime?
@@ -1237,7 +1290,7 @@ model Discount {
   orders           Order[]
   
   affiliateId      String?
-  affiliate        AffiliateAccount? @relation(fields: [affiliateId], references: [id])
+  affiliate        AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
 
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -1251,8 +1304,8 @@ model Discount {
 model GiftCard {
   id             String    @id @default(uuid())
   code           String    @unique
-  initialValue   Decimal
-  balance        Decimal
+  initialValue   Decimal   @db.Decimal(12, 2)
+  balance        Decimal   @db.Decimal(12, 2)
   userId         String?
   recipientEmail String?
   expiresAt      DateTime?
@@ -1260,6 +1313,7 @@ model GiftCard {
   createdAt      DateTime  @default(now())
 
   @@index([code])
+  @@index([userId])
 }
 
 model Newsletter {
@@ -1267,6 +1321,8 @@ model Newsletter {
   email     String   @unique
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  @@index([isActive])
 }
 
 // ==========================================
@@ -1283,17 +1339,21 @@ model BlogPost {
   featuredMediaId String?
   featuredMedia   Media?   @relation(fields: [featuredMediaId], references: [id])
   authorId        String
-  author          User     @relation(fields: [authorId], references: [id])
+  author          User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   isPublished     Boolean  @default(false)
   tags            String[]
   metaTitle       String?
   metaDesc        String?
+  
+  // FIXED: Vector embedding
   contentEmbedding Unsupported("vector(1536)")?
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([slug])
   @@index([isPublished, createdAt(sort: Desc)])
+  @@index([authorId])
 }
 
 model Page {
@@ -1308,6 +1368,7 @@ model Page {
   updatedAt   DateTime @updatedAt
 
   @@index([slug])
+  @@index([isPublished])
 }
 
 model Menu {
@@ -1318,6 +1379,9 @@ model Menu {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isActive])
 }
 
 model Review {
@@ -1329,7 +1393,7 @@ model Review {
   status     String   @default("pending")
   images     String[]
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId  String
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   reply      String?
@@ -1339,6 +1403,8 @@ model Review {
   @@index([productId])
   @@index([status])
   @@index([rating])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model QuestionAnswer {
@@ -1353,6 +1419,7 @@ model QuestionAnswer {
   updatedAt  DateTime @updatedAt
 
   @@index([productId])
+  @@index([isApproved])
 }
 
 model SupportTicket {
@@ -1361,9 +1428,9 @@ model SupportTicket {
   status       String          @default("open")
   priority     String          @default("medium")
   userId       String
-  user         User            @relation("UserCreatedTickets", fields: [userId], references: [id])
+  user         User            @relation("UserCreatedTickets", fields: [userId], references: [id], onDelete: Cascade)
   assignedToId String?
-  assignedTo   User?           @relation("StaffTickets", fields: [assignedToId], references: [id])
+  assignedTo   User?           @relation("StaffTickets", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages     TicketMessage[]
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
@@ -1413,6 +1480,7 @@ model StoreSettings {
   maintenance    Boolean             @default(false)
   affiliateConfig Json?
   mlmConfig       Json?
+  updatedAt      DateTime            @default(now()) @updatedAt
 }
 
 // ==========================================
@@ -1422,7 +1490,7 @@ model StoreSettings {
 model TaxRate {
   id       String    @id @default(uuid())
   name     String    @default("GST")
-  rate     Decimal   @default(10.0)
+  rate     Decimal   @default(10.0) @db.Decimal(5, 2)
   country  String?   @default("AU")
   state    String?
   priority Int       @default(0)
@@ -1431,6 +1499,9 @@ model TaxRate {
   class    String    @default("STANDARD")
   products Product[]
   isActive Boolean   @default(true)
+
+  @@index([isActive])
+  @@index([country, state])
 }
 
 model ShippingZone {
@@ -1445,17 +1516,17 @@ model ShippingZone {
 model ShippingRate {
   id                      String             @id @default(uuid())
   zoneId                  String
-  zone                    ShippingZone       @relation(fields: [zoneId], references: [id])
+  zone                    ShippingZone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   name                    String
   type                    ShippingMethodType @default(FLAT_RATE)
-  price                   Decimal
-  minWeight               Decimal?
-  maxWeight               Decimal?
-  minPrice                Decimal?
+  price                   Decimal            @db.Decimal(12, 2)
+  minWeight               Decimal?           @db.Decimal(10, 3)
+  maxWeight               Decimal?           @db.Decimal(10, 3)
+  minPrice                Decimal?           @db.Decimal(12, 2)
   taxStatus               String             @default("taxable")
   freeShippingRequirement String?
   carrierServiceId        String?
-  carrierService          CarrierService?    @relation(fields: [carrierServiceId], references: [id])
+  carrierService          CarrierService?    @relation(fields: [carrierServiceId], references: [id], onDelete: SetNull)
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
 
@@ -1475,6 +1546,9 @@ model CarrierService {
   shippingPackages ShippingBox[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+
+  @@index([slug])
+  @@index([isEnabled])
 }
 
 model TransdirectConfig {
@@ -1484,7 +1558,7 @@ model TransdirectConfig {
   password                String?
   apiKey                  String?
   memberId                Int?
-  creditLimit             Decimal?
+  creditLimit             Decimal? @db.Decimal(12, 2)
   accountStatus           String?
   senderName              String?
   senderCompany           String?
@@ -1503,35 +1577,39 @@ model TransdirectConfig {
   useFrequentRates        Boolean  @default(false)
   enableOrderBoxing       Boolean  @default(false)
   createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  updatedAt               DateTime @default(now()) @updatedAt
 }
 
 model TransdirectBox {
   id          String   @id @default(uuid())
   code        String?
   description String?
-  length      Decimal
-  width       Decimal
-  height      Decimal
-  maxWeight   Decimal?
+  length      Decimal  @db.Decimal(10, 2)
+  width       Decimal  @db.Decimal(10, 2)
+  height      Decimal  @db.Decimal(10, 2)
+  maxWeight   Decimal? @db.Decimal(10, 3)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
 }
 
 model ShippingBox {
   id               String          @id @default(uuid())
   name             String
-  length           Decimal
-  width            Decimal
-  height           Decimal
-  weight           Decimal?
-  maxWeight        Decimal?
+  length           Decimal         @db.Decimal(10, 2)
+  width            Decimal         @db.Decimal(10, 2)
+  height           Decimal         @db.Decimal(10, 2)
+  weight           Decimal?        @db.Decimal(10, 3)
+  maxWeight        Decimal?        @db.Decimal(10, 3)
   isEnabled        Boolean         @default(true)
   carrierServiceId String?
-  carrierService   CarrierService? @relation(fields: [carrierServiceId], references: [id])
+  carrierService   CarrierService? @relation(fields: [carrierServiceId], references: [id], onDelete: SetNull)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+
+  @@index([isEnabled])
 }
 
 // ==========================================
@@ -1555,7 +1633,7 @@ model EmailConfiguration {
   backgroundColor     String?  @default("#F7F7F7")
   bodyBackgroundColor String?  @default("#FFFFFF")
   isActive            Boolean  @default(true)
-  updatedAt           DateTime @updatedAt
+  updatedAt           DateTime @default(now()) @updatedAt
 }
 
 model EmailTemplate {
@@ -1578,6 +1656,9 @@ model EmailTemplate {
   delay            Int?     @default(0) 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isEnabled])
 }
 
 model NotificationQueue {
@@ -1601,6 +1682,7 @@ model NotificationQueue {
 
   @@index([status])
   @@index([scheduledAt])
+  @@index([status, scheduledAt])
 }
 
 model EmailLog {
@@ -1624,7 +1706,7 @@ model EmailLog {
 model ActivityLog {
   id         String   @id @default(uuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   action     String
   entityType String?
   entityId   String?
@@ -1633,12 +1715,13 @@ model ActivityLog {
   createdAt  DateTime @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
 }
 
 model Notification {
   id        String   @id @default(uuid())
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String
   isRead    Boolean  @default(false)
@@ -1653,7 +1736,7 @@ model Notification {
 model Analytics {
   id          String   @id @default(uuid())
   date        DateTime @default(now()) @db.Date
-  totalSales  Decimal  @default(0)
+  totalSales  Decimal  @default(0) @db.Decimal(12, 2)
   totalOrders Int      @default(0)
   visitors    Int      @default(0)
 
@@ -1665,7 +1748,7 @@ model MediaFolder {
   id        String        @id @default(uuid())
   name      String
   parentId  String?
-  parent    MediaFolder?  @relation("FolderToFolder", fields: [parentId], references: [id])
+  parent    MediaFolder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: SetNull)
   children  MediaFolder[] @relation("FolderToFolder")
   files     Media[]
   createdAt DateTime      @default(now())
@@ -1689,7 +1772,7 @@ model Media {
   caption        String?
   description    String?
   folderId       String?
-  folder         MediaFolder?         @relation(fields: [folderId], references: [id])
+  folder         MediaFolder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
   uploadedBy     String
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
@@ -1710,6 +1793,7 @@ model Media {
 
   @@index([folderId])
   @@index([createdAt(sort: Desc)])
+  @@index([type])
 }
 
 model UrlRedirect {
@@ -1720,6 +1804,9 @@ model UrlRedirect {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([source])
+  @@index([isActive])
 }
 
 model SeoGlobalConfig {
@@ -1747,7 +1834,7 @@ model SeoGlobalConfig {
   twitterCreator    String?
   themeColor        String?  @default("#2271b1")
   manifestJson      Json?
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime @default(now()) @updatedAt
 }
 
 model MarketingIntegration {
@@ -1776,7 +1863,7 @@ model MarketingIntegration {
   klaviyoTrackViewedProduct Boolean  @default(true)
   klaviyoTrackAddedToCart   Boolean  @default(true)
   verificationStatus        Json?    @default("{}")
-  updatedAt                 DateTime @updatedAt
+  updatedAt                 DateTime @default(now()) @updatedAt
 }
 
 model Banner {
@@ -1804,6 +1891,7 @@ model SystemLog {
 
   @@index([source])
   @@index([createdAt(sort: Desc)])
+  @@index([level])
 }
 
 // ==========================================
@@ -1820,11 +1908,11 @@ model PaymentMethodConfig {
   description          String?
   instructions         String?
   icon                 String?
-  minOrderAmount       Decimal?
-  maxOrderAmount       Decimal?
+  minOrderAmount       Decimal?              @db.Decimal(12, 2)
+  maxOrderAmount       Decimal?              @db.Decimal(12, 2)
   surchargeEnabled     Boolean               @default(false)
   surchargeType        String                @default("fixed")
-  surchargeAmount      Decimal               @default(0)
+  surchargeAmount      Decimal               @default(0) @db.Decimal(12, 2)
   taxableSurcharge     Boolean               @default(false)
   needsSetup           Boolean               @default(true)
   stripeConfig         StripeConfig?
@@ -1834,6 +1922,7 @@ model PaymentMethodConfig {
   updatedAt            DateTime              @updatedAt
 
   @@index([isEnabled, displayOrder(sort: Asc)])
+  @@index([identifier])
 }
 
 model StripeConfig {
@@ -1947,6 +2036,7 @@ model AuditLog {
 
   @@index([tableName, recordId])
   @@index([userId, createdAt])
+  @@index([createdAt(sort: Desc)])
 }
 
 model OutboxEvent {
@@ -1961,6 +2051,7 @@ model OutboxEvent {
   processedAt DateTime?
 
   @@index([status, createdAt])
+  @@index([aggregateId])
 }
 
 // ==========================================
@@ -1974,11 +2065,11 @@ model AffiliateAccount {
   slug            String           @unique
   customSlug      String?          @unique 
   status          AffiliateStatus  @default(PENDING)
-  commissionRate  Decimal?   
-  commissionType  CommissionType @default(PERCENTAGE)      
-  balance         Decimal          @default(0.00)
-  totalEarnings   Decimal          @default(0.00)
-  storeCredit     Decimal          @default(0.00)
+  commissionRate  Decimal?         @db.Decimal(5, 2)
+  commissionType  CommissionType   @default(PERCENTAGE)      
+  balance         Decimal          @default(0.00) @db.Decimal(12, 2)
+  totalEarnings   Decimal          @default(0.00) @db.Decimal(12, 2)
+  storeCredit     Decimal          @default(0.00) @db.Decimal(12, 2)
   
   isLifetime        Boolean   @default(false)      
   cookieDuration    Int?      @default(30)         
@@ -1988,7 +2079,7 @@ model AffiliateAccount {
   kycStatus       String   @default("NOT_SUBMITTED")
   taxId           String?
   groupId         String?
-  group           AffiliateGroup?   @relation(fields: [groupId], references: [id])
+  group           AffiliateGroup?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
   documents       AffiliateDocument[]
   
   campaigns         AffiliateCampaign[]        
@@ -1998,11 +2089,14 @@ model AffiliateAccount {
   tags              AffiliateTag[]
   
   tierId          String?
-  tier            AffiliateTier?   @relation(fields: [tierId], references: [id])
+  tier            AffiliateTier?   @relation(fields: [tierId], references: [id], onDelete: SetNull)
   
+  // FIXED: MLM Tree with materialized path for better performance
   parentId        String?
-  parent          AffiliateAccount? @relation("AffiliateMLM", fields: [parentId], references: [id])
+  parent          AffiliateAccount? @relation("AffiliateMLM", fields: [parentId], references: [id], onDelete: SetNull)
   downlines       AffiliateAccount[] @relation("AffiliateMLM")
+  mlmPath         String?          // e.g., "root.user1.user2" for fast ancestor queries
+  mlmLevel        Int       @default(0)
   
   referrals       Referral[]
   customerReferrals User[]         @relation("CustomerReferral")
@@ -2026,6 +2120,10 @@ model AffiliateAccount {
   @@index([status])
   @@index([parentId])
   @@index([customSlug])
+  @@index([mlmPath])
+  @@index([mlmLevel])
+  @@index([groupId])
+  @@index([tierId])
 }
 
 model AffiliateDocument {
@@ -2042,15 +2140,16 @@ model AffiliateDocument {
   updatedAt       DateTime @updatedAt
 
   @@index([affiliateId])
+  @@index([status])
 }
 
 model AffiliateTier {
   id              String             @id @default(uuid())
   name            String             @unique
   description     String?
-  commissionRate  Decimal
+  commissionRate  Decimal            @db.Decimal(5, 2)
   commissionType  CommissionType     @default(PERCENTAGE)
-  minSalesAmount  Decimal            @default(0)
+  minSalesAmount  Decimal            @default(0) @db.Decimal(12, 2)
   minSalesCount   Int                @default(0)
   color           String?
   icon            String?
@@ -2060,6 +2159,8 @@ model AffiliateTier {
   announcements   AffiliateAnnouncement[]
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+
+  @@index([isDefault])
 }
 
 model AffiliateClick {
@@ -2088,22 +2189,25 @@ model AffiliateClick {
   @@index([affiliateId])
   @@index([subId])
   @@index([createdAt])
+  @@index([ipAddress])
+  @@index([deviceFingerprint])
+  @@index([converted])
 }
 
 model Referral {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id])
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   orderId         String           @unique
-  order           Order            @relation(fields: [orderId], references: [id])
-  totalOrderAmount Decimal
-  netOrderAmount  Decimal
-  commissionAmount Decimal
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  totalOrderAmount Decimal         @db.Decimal(12, 2)
+  netOrderAmount  Decimal          @db.Decimal(12, 2)
+  commissionAmount Decimal         @db.Decimal(12, 2)
   currency        String           @default("AUD")
   status          ReferralStatus   @default(PENDING)
   tierSnapshot    String?
   commissionType  CommissionType   @default(PERCENTAGE)
-  commissionRate  Decimal
+  commissionRate  Decimal          @db.Decimal(5, 2)
   isMlmReward     Boolean          @default(false)
   isLifetime      Boolean          @default(false)
   isManual        Boolean          @default(false) 
@@ -2113,7 +2217,7 @@ model Referral {
   availableAt     DateTime?
 
   commissionRuleId  String?                       
-  matchedRule       AffiliateCommissionRule?      @relation(fields: [commissionRuleId], references: [id])
+  matchedRule       AffiliateCommissionRule?      @relation(fields: [commissionRuleId], references: [id], onDelete: SetNull)
   
   isRecurring       Boolean   @default(false)    
   recurringCycle    Int?      @default(1)         
@@ -2129,13 +2233,15 @@ model Referral {
   @@index([affiliateId])
   @@index([status])
   @@index([createdAt])
+  @@index([paidAt])
+  @@index([isFlagged])
 }
 
 model AffiliatePayout {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id])
-  amount          Decimal
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  amount          Decimal          @db.Decimal(12, 2)
   method          PayoutMethod
   status          PayoutStatus     @default(PENDING)
   bulkPayoutId    String?
@@ -2148,6 +2254,7 @@ model AffiliatePayout {
 
   @@index([affiliateId])
   @@index([status])
+  @@index([createdAt(sort: Desc)])
 }
 
 model AffiliateDomain {
@@ -2163,6 +2270,7 @@ model AffiliateDomain {
   createdAt       DateTime         @default(now())
   
   @@index([domain])
+  @@index([affiliateId])
 }
 
 model AffiliateCreative {
@@ -2180,14 +2288,16 @@ model AffiliateCreative {
   updatedAt       DateTime @updatedAt
   usages          AffiliateCreativeUsage[]
   usageCount      Int      @default(0)
+
+  @@index([isActive])
 }
 
 model AffiliateCreativeUsage {
   id          String           @id @default(uuid())
   creativeId  String
-  creative    AffiliateCreative @relation(fields: [creativeId], references: [id])
+  creative    AffiliateCreative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
   affiliateId String
-  affiliate   AffiliateAccount  @relation(fields: [affiliateId], references: [id])
+  affiliate   AffiliateAccount  @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   copiedAt    DateTime          @default(now())
   
   @@index([creativeId])
@@ -2207,6 +2317,7 @@ model AffiliatePixel {
   updatedAt       DateTime         @updatedAt
 
   @@index([affiliateId])
+  @@index([isEnabled])
 }
 
 model AffiliateContest {
@@ -2220,6 +2331,9 @@ model AffiliateContest {
   criteria        String   @default("sales_amount")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([startDate, endDate])
 }
 
 model AffiliateCommissionRule {
@@ -2237,6 +2351,7 @@ model AffiliateCommissionRule {
   updatedAt       DateTime  @updatedAt
   
   @@index([isActive, priority(sort: Desc)])
+  @@index([startDate, endDate])
 }
 
 model AffiliateLink {
@@ -2246,12 +2361,14 @@ model AffiliateLink {
   slug            String           @unique
   destinationUrl  String           
   campaignId      String?
-  campaign        AffiliateCampaign? @relation(fields: [campaignId], references: [id])
+  campaign        AffiliateCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   clickCount      Int              @default(0)
   isActive        Boolean          @default(true)
   createdAt       DateTime         @default(now())
   
   @@index([slug])
+  @@index([affiliateId])
+  @@index([isActive])
 }
 
 model AffiliateCampaign {
@@ -2261,7 +2378,7 @@ model AffiliateCampaign {
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   clicks          Int              @default(0)
   conversions     Int              @default(0)
-  revenue         Decimal          @default(0.00)
+  revenue         Decimal          @default(0.00) @db.Decimal(12, 2)
   links           AffiliateLink[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -2274,14 +2391,16 @@ model AffiliateLedger {
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   type            LedgerType       
-  amount          Decimal
-  balanceBefore   Decimal
-  balanceAfter    Decimal
+  amount          Decimal          @db.Decimal(12, 2)
+  balanceBefore   Decimal          @db.Decimal(12, 2)
+  balanceAfter    Decimal          @db.Decimal(12, 2)
   referenceId     String?          
   description     String?
   createdAt       DateTime         @default(now())
   
   @@index([affiliateId])
+  @@index([createdAt(sort: Desc)])
+  @@index([type])
 }
 
 model AffiliateAnnouncement {
@@ -2295,6 +2414,9 @@ model AffiliateAnnouncement {
   createdAt   DateTime @default(now())
   targetTiers     AffiliateTier[]
   targetGroups    AffiliateGroup[]
+
+  @@index([isActive])
+  @@index([startsAt, expiresAt])
 }
 
 model AffiliateFraudRule {
@@ -2304,10 +2426,12 @@ model AffiliateFraudRule {
   action      String   @default("BLOCK")
   reason      String?
   createdAt   DateTime @default(now())
+
+  @@index([type])
 }
 
 // ==========================================
-// NEW: AFFILIATE GROUPS & TAGS (For Image 1 & 2)
+// NEW: AFFILIATE GROUPS & TAGS
 // ==========================================
 
 model AffiliateGroup {
@@ -2315,27 +2439,33 @@ model AffiliateGroup {
   name           String             @unique
   slug           String             @unique
   description    String?
-  commissionRate Decimal?           // Global override for this group
+  commissionRate Decimal?           @db.Decimal(5, 2)
   isDefault      Boolean            @default(false)
   isActive       Boolean            @default(true)
   
   affiliates     AffiliateAccount[]
-  productRates   AffiliateProductRate[] // Group specific product rates
+  productRates   AffiliateProductRate[]
   announcements  AffiliateAnnouncement[]
   
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([isDefault])
 }
 
 model AffiliateTag {
   id         String             @id @default(uuid())
   name       String             @unique
-  affiliates AffiliateAccount[] // Many-to-Many relation with Affiliates
+  affiliates AffiliateAccount[]
   createdAt  DateTime           @default(now())
+
+  @@index([name])
 }
 
 // ==========================================
-// NEW: PRODUCT SPECIFIC RATES (For Image 3)
+// NEW: PRODUCT SPECIFIC RATES
 // ==========================================
 
 model AffiliateProductRate {
@@ -2343,10 +2473,10 @@ model AffiliateProductRate {
   productId      String
   product        Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   affiliateId    String?
-  affiliate      AffiliateAccount? @relation(fields: [affiliateId], references: [id])
+  affiliate      AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   groupId        String?
-  group          AffiliateGroup?   @relation(fields: [groupId], references: [id])
-  rate           Decimal
+  group          AffiliateGroup?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  rate           Decimal          @db.Decimal(5, 2)
   type           CommissionType   @default(FIXED) 
   isDisabled     Boolean          @default(false)
   createdAt      DateTime         @default(now())
@@ -2355,6 +2485,7 @@ model AffiliateProductRate {
   @@index([productId])
   @@index([affiliateId])
   @@index([groupId])
+  @@index([isDisabled])
 }
 
 // ==========================================
@@ -2364,8 +2495,8 @@ model AffiliateProductRate {
 model AffiliateMLMConfig {
   id             String   @id @default("mlm_config")
   isEnabled      Boolean  @default(false)
-  maxLevels      Int      @default(3) // How deep the tree goes
-  levelRates     Json     
+  maxLevels      Int      @default(3)
+  levelRates     Json     // e.g., {"1": 10, "2": 5, "3": 2}
   commissionBasis String  @default("SALES_AMOUNT") 
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime @default(now()) @updatedAt
 }

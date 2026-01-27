@@ -1,14 +1,15 @@
-//app/api/cron/affiliate-check/route.ts
+// File: app/api/cron/affiliate-check/route.ts
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { fraudService } from "@/app/actions/admin/settings/affiliates/_services/fraud-service";
+import { sendNotification } from "@/app/api/email/send-notification"; // Ensure correct path
 
-export const dynamic = 'force-dynamic'; // No caching
+export const dynamic = 'force-dynamic'; // Prevent caching
 
 export async function GET(req: Request) {
   try {
-    // 1. Security Check (CRON_SECRET should be in .env)
+    // 1. Security Check
     const { searchParams } = new URL(req.url);
     const secret = searchParams.get('secret');
     
@@ -18,18 +19,16 @@ export async function GET(req: Request) {
 
     console.log("🔄 Starting Affiliate Cron Job...");
 
-    // ====================================================
-    // TASK 1: AUTO TIER UPGRADE
-    // ====================================================
-    
-    // Fetch all tiers ordered by requirements (Higher first)
+    // ==========================================
+    // JOB 1: AUTO TIER UPGRADE
+    // ==========================================
     const tiers = await db.affiliateTier.findMany({
-      orderBy: { minSalesAmount: 'desc' }
+      orderBy: { minSalesAmount: 'desc' } // Highest tier first
     });
 
     const affiliates = await db.affiliateAccount.findMany({
       where: { status: "ACTIVE" },
-      include: { tier: true }
+      include: { tier: true, user: true }
     });
 
     let upgradeCount = 0;
@@ -40,37 +39,47 @@ export async function GET(req: Request) {
         where: { affiliateId: affiliate.id, status: "PAID" }
       });
 
-      // Find the highest tier they qualify for
+      // Find best eligible tier
       const eligibleTier = tiers.find(t => 
         earnings >= t.minSalesAmount.toNumber() && 
         salesCount >= t.minSalesCount
       );
 
-      // If eligible and not already on that tier (or higher)
+      // If eligible and better than current
       if (eligibleTier && eligibleTier.id !== affiliate.tierId) {
-        // Prevent downgrading if they are already on a special tier? 
-        // Logic: Only upgrade if the new tier requires MORE sales than current
         const currentReq = affiliate.tier?.minSalesAmount.toNumber() || 0;
         
+        // Ensure we are upgrading, not downgrading
         if (eligibleTier.minSalesAmount.toNumber() > currentReq) {
+          
           await db.affiliateAccount.update({
             where: { id: affiliate.id },
             data: { tierId: eligibleTier.id }
           });
+          
           upgradeCount++;
           console.log(`🚀 Upgraded ${affiliate.slug} to ${eligibleTier.name}`);
+
+          // Notify Affiliate
+          await sendNotification({
+            trigger: "TIER_UPGRADED",
+            recipient: affiliate.user.email,
+            data: {
+                affiliate_name: affiliate.user.name,
+                tier_name: eligibleTier.name
+            },
+            userId: affiliate.userId
+          });
         }
       }
     }
 
-    // ====================================================
-    // TASK 2: FRAUD RISK ANALYSIS
-    // ====================================================
-    
-    // Check recently active affiliates only to save resources
+    // ==========================================
+    // JOB 2: FRAUD ANALYSIS
+    // ==========================================
     const activeAffiliates = await db.affiliateClick.findMany({
       where: { 
-        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24h
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24h activity
       },
       select: { affiliateId: true },
       distinct: ['affiliateId']

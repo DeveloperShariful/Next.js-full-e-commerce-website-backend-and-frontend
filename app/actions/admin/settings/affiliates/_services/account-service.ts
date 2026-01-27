@@ -3,6 +3,7 @@
 import { db } from "@/lib/prisma";
 import { AffiliateUserTableItem } from "../types";
 import { AffiliateStatus, Prisma } from "@prisma/client";
+import { sendNotification } from "@/app/api/email/send-notification"; 
 
 export const accountService = {
   async getAffiliates(
@@ -104,23 +105,48 @@ export const accountService = {
   },
 
   async approveAffiliate(affiliateId: string, tierId?: string) {
-    return await db.affiliateAccount.update({
+    const updated = await db.affiliateAccount.update({
       where: { id: affiliateId },
+      include: { user: true },
       data: { 
         status: "ACTIVE",
         tierId: tierId || undefined,
       }
     });
+
+    // Notify User
+    await sendNotification({
+        trigger: "AFFILIATE_APPROVED",
+        recipient: updated.user.email,
+        data: { affiliate_name: updated.user.name || "Partner" },
+        userId: updated.userId
+    });
+
+    return updated;
   },
 
   async rejectAffiliate(affiliateId: string, reason: string) {
-    return await db.affiliateAccount.update({
+    const updated = await db.affiliateAccount.update({
       where: { id: affiliateId },
+      include: { user: true },
       data: { 
         status: "REJECTED",
         adminNotes: reason
       }
     });
+
+    // Notify User
+    await sendNotification({
+        trigger: "AFFILIATE_REJECTED",
+        recipient: updated.user.email,
+        data: { 
+            affiliate_name: updated.user.name || "Partner",
+            rejection_reason: reason 
+        },
+        userId: updated.userId
+    });
+
+    return updated;
   },
 
   async bulkUpdateStatus(ids: string[], status: AffiliateStatus) {

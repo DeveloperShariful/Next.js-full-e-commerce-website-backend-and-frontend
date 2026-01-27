@@ -1,13 +1,10 @@
-//lib/services/affiliate-engine.ts
+// File: lib/services/affiliate-engine.ts
 
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { mlmService } from "@/app/actions/admin/settings/affiliates/_services/mlm-service";
+import { sendNotification } from "@/app/api/email/send-notification"; // Ensure correct path
 
-/**
- * THE BRAIN: Calculates Commission based on Priority
- * Priority: Product Rule (User) > Product Rule (Group) > Group Rate > Tier Rate > Global Rate
- */
 export const affiliateEngine = {
   
   async processOrder(orderId: string) {
@@ -19,7 +16,8 @@ export const affiliateEngine = {
           include: {
             group: true,
             tier: true,
-            tags: true
+            tags: true,
+            user: true
           }
         }
       }
@@ -33,35 +31,32 @@ export const affiliateEngine = {
         select: { affiliateConfig: true } 
     });
     
-    // Fallback defaults
+    // Default fallback
     const config = (globalSettings?.affiliateConfig as any) || { commissionRate: 10, excludeShipping: true, excludeTax: true };
     
     let totalCommission = new Prisma.Decimal(0);
     const logDetails: any[] = [];
 
-    // 1. Calculate Line Item Commissions
+    // Calculate Commission per Item
     for (const item of order.items) {
       let rate = new Prisma.Decimal(0);
       let type = "PERCENTAGE";
       let source = "GLOBAL";
 
-      // A. Check Product Specific Rate (User Specific)
+      // 1. User Specific Product Rate
       const userProductRate = await db.affiliateProductRate.findFirst({
         where: { productId: item.productId!, affiliateId: affiliate.id, isDisabled: false }
       });
 
-      // B. Check Product Specific Rate (Group Specific)
+      // 2. Group Specific Product Rate
       const groupProductRate = !userProductRate && affiliate.groupId ? await db.affiliateProductRate.findFirst({
         where: { productId: item.productId!, groupId: affiliate.groupId, isDisabled: false }
       }) : null;
 
-      // C. Check Group Global Override
+      // 3. General Rules
       const groupRate = affiliate.group?.commissionRate;
-
-      // D. Check Tier Rate
       const tierRate = affiliate.tier?.commissionRate;
 
-      // --- LOGIC TREE ---
       if (userProductRate) {
         rate = userProductRate.rate;
         type = userProductRate.type;
@@ -72,7 +67,7 @@ export const affiliateEngine = {
         source = "PRODUCT_GROUP_OVERRIDE";
       } else if (groupRate) {
         rate = groupRate;
-        type = "PERCENTAGE"; // Groups usually %
+        type = "PERCENTAGE";
         source = "GROUP_DEFAULT";
       } else if (tierRate) {
         rate = tierRate;
@@ -84,9 +79,8 @@ export const affiliateEngine = {
         source = "GLOBAL_DEFAULT";
       }
 
-      // Calculate Item Commission
       let itemBasePrice = item.total; 
-      // Note: Real app should subtract tax/shipping from item.total based on config here
+      // Note: Add logic to subtract tax/shipping here based on `config.excludeTax`
       
       let itemComm = new Prisma.Decimal(0);
       if (type === "FIXED") {
@@ -99,35 +93,33 @@ export const affiliateEngine = {
       logDetails.push({ itemId: item.id, source, rate, amount: itemComm });
     }
 
-    // 2. Save Transaction
+    // Database Transaction
     await db.$transaction(async (tx) => {
-      // A. Create Referral Record
+      // 1. Create Referral Record
       await tx.referral.create({
         data: {
           affiliateId: affiliate.id,
           orderId: order.id,
           totalOrderAmount: order.total,
-          netOrderAmount: order.subtotal, // Adjusted based on settings
+          netOrderAmount: order.subtotal,
           commissionAmount: totalCommission,
-          status: "PENDING", // PENDING until holding period is over
-          commissionType: "PERCENTAGE", // Since calculated per line item
-          commissionRate: new Prisma.Decimal(0), // Mixed
+          status: "PENDING", // Subject to holding period
+          commissionType: "PERCENTAGE", 
+          commissionRate: new Prisma.Decimal(0), // Variable rates
           metadata: { calculationLog: logDetails }
         }
       });
 
-      // B. Update Affiliate Balance (If instant, otherwise scheduled job does this later)
-      // Usually, we add to "Pending Balance" or just track via Referral status.
-      // For this system, let's assume we update balance but user can't withdraw PENDING.
+      // 2. Update Affiliate Balance
       await tx.affiliateAccount.update({
         where: { id: affiliate.id },
         data: {
           totalEarnings: { increment: totalCommission },
-          balance: { increment: totalCommission } // Logic: Balance includes pending
+          balance: { increment: totalCommission } 
         }
       });
 
-      // C. Ledger Entry
+      // 3. Create Ledger Entry
       await tx.affiliateLedger.create({
         data: {
           affiliateId: affiliate.id,
@@ -141,10 +133,20 @@ export const affiliateEngine = {
       });
     });
 
-    // 3. Trigger MLM Distribution (Async)
-    // Only if total order qualifies
+    // MLM Distribution
     await mlmService.distributeMLMCommission(order.id, affiliate.id, order.subtotal.toNumber());
     
+    // Send Notification
+    await sendNotification({
+        trigger: "COMMISSION_EARNED",
+        recipient: affiliate.user.email,
+        data: {
+            commission_amount: totalCommission.toString(),
+            order_number: order.orderNumber
+        },
+        userId: affiliate.userId
+    });
+
     return { success: true, commission: totalCommission };
   }
 };

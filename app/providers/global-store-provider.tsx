@@ -180,6 +180,16 @@ export interface AffiliateGlobalConfig {
   holdingPeriod: number;        
   minimumPayout: number;        
   payoutMethods: string[];      
+
+  enableMLM?: boolean;
+  enableCreatives?: boolean;
+  enableCampaigns?: boolean;
+  enableAnnouncements?: boolean;
+  enableContests?: boolean;
+  enableFraudProtection?: boolean;
+  enableGroups?: boolean;
+  enableProductRates?: boolean;
+  enableTiers?: boolean;
 }
 
 // ==========================================
@@ -286,6 +296,16 @@ const defaultContext: GlobalStoreContextType = {
     holdingPeriod: 14,
     minimumPayout: 50,
     payoutMethods: ["STORE_CREDIT"],
+
+    enableMLM: false,
+    enableCreatives: true,
+    enableCampaigns: true,
+    enableAnnouncements: true,
+    enableContests: false,
+    enableFraudProtection: true,
+    enableGroups: false,
+    enableProductRates: false,
+    enableTiers: true,
   }
 };
 
@@ -581,6 +601,17 @@ export function GlobalStoreProvider({
     payoutMethods: Array.isArray(affiliateRaw.payoutMethods) 
       ? affiliateRaw.payoutMethods 
       : ["BANK_TRANSFER", "STORE_CREDIT"],
+
+    // --- UPDATED DYNAMIC FIELDS ---
+    enableMLM: affiliateRaw.enableMLM ?? false,
+    enableCreatives: affiliateRaw.enableCreatives ?? true,
+    enableCampaigns: affiliateRaw.enableCampaigns ?? true,
+    enableAnnouncements: affiliateRaw.enableAnnouncements ?? true,
+    enableContests: affiliateRaw.enableContests ?? false,
+    enableFraudProtection: affiliateRaw.enableFraudProtection ?? true,
+    enableGroups: affiliateRaw.enableGroups ?? false,
+    enableProductRates: affiliateRaw.enableProductRates ?? false,
+    enableTiers: affiliateRaw.enableTiers ?? true,
   };
 
   const value: GlobalStoreContextType = {

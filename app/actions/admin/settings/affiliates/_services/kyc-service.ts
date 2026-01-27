@@ -1,7 +1,8 @@
-//File: app/actions/admin/settings/affiliates/_services/kyc-service.ts
+// File: app/actions/admin/settings/affiliates/_services/kyc-service.ts
 
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { sendNotification } from "@/app/api/email/send-notification"; // ✅ Import Notification System
 
 export const kycService = {
   async getDocuments(page: number = 1, limit: number = 20, status?: string) {
@@ -39,14 +40,21 @@ export const kycService = {
   },
 
   async verifyDocument(documentId: string, adminId: string) {
-    return await db.$transaction(async (tx) => {
+    // 1. Transaction to update DB
+    const result = await db.$transaction(async (tx) => {
+      // Need user email for notification
       const doc = await tx.affiliateDocument.findUnique({
         where: { id: documentId },
-        include: { affiliate: true }
+        include: { 
+            affiliate: { 
+                include: { user: true } 
+            } 
+        }
       });
 
       if (!doc) throw new Error("Document not found");
 
+      // Update Document Status
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
@@ -56,6 +64,7 @@ export const kycService = {
         }
       });
 
+      // Check if any other docs are pending
       const pendingDocs = await tx.affiliateDocument.count({
         where: {
           affiliateId: doc.affiliateId,
@@ -63,6 +72,7 @@ export const kycService = {
         }
       });
 
+      // If all docs verified, update Main Account Status
       if (pendingDocs === 0) {
         await tx.affiliateAccount.update({
           where: { id: doc.affiliateId },
@@ -70,18 +80,38 @@ export const kycService = {
         });
       }
 
-      return { success: true };
+      return doc; // Return doc to use outside transaction
     });
+
+    // 2. Send Email Notification (Outside Transaction to keep DB fast)
+    await sendNotification({
+        trigger: "KYC_VERIFIED",
+        recipient: result.affiliate.user.email,
+        data: { 
+            affiliate_name: result.affiliate.user.name || "Partner",
+            document_type: result.type.replace("_", " ") 
+        },
+        userId: result.affiliate.userId
+    });
+
+    return { success: true };
   },
 
   async rejectDocument(documentId: string, reason: string) {
-    return await db.$transaction(async (tx) => {
+    // 1. Transaction
+    const result = await db.$transaction(async (tx) => {
       const doc = await tx.affiliateDocument.findUnique({
-        where: { id: documentId }
+        where: { id: documentId },
+        include: { 
+            affiliate: { 
+                include: { user: true } 
+            } 
+        }
       });
 
       if (!doc) throw new Error("Document not found");
 
+      // Update Document
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
@@ -91,13 +121,28 @@ export const kycService = {
         }
       });
 
+      // Update Account Status immediately to Rejected/Pending
       await tx.affiliateAccount.update({
         where: { id: doc.affiliateId },
         data: { kycStatus: "REJECTED" }
       });
 
-      return { success: true };
+      return doc;
     });
+
+    // 2. Send Email Notification
+    await sendNotification({
+        trigger: "KYC_REJECTED",
+        recipient: result.affiliate.user.email,
+        data: { 
+            affiliate_name: result.affiliate.user.name || "Partner",
+            document_type: result.type.replace("_", " "),
+            rejection_reason: reason
+        },
+        userId: result.affiliate.userId
+    });
+
+    return { success: true };
   },
 
   async getPendingCount() {

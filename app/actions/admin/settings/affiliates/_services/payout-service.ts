@@ -3,17 +3,14 @@
 import { db } from "@/lib/prisma";
 import { PayoutQueueItem } from "../types";
 import { PayoutStatus, Prisma } from "@prisma/client";
-import { sendNotification } from "@/app/api/email/send-notification"; // Ensure correct path
+import { sendNotification } from "@/app/api/email/send-notification";
+// ✅ Wallet Service Import
+import { walletService } from "@/app/actions/admin/settings/affiliates/_services/wallet-service";
 
 export const payoutService = {
   
-  async getPayouts(
-    page: number = 1,
-    limit: number = 20,
-    status?: PayoutStatus
-  ) {
+  async getPayouts(page: number = 1, limit: number = 20, status?: PayoutStatus) {
     const skip = (page - 1) * limit;
-    
     const where: Prisma.AffiliatePayoutWhereInput = status ? { status } : {};
 
     const [total, data] = await Promise.all([
@@ -50,7 +47,6 @@ export const payoutService = {
   },
 
   async markAsPaid(payoutId: string, transactionId?: string, note?: string) {
-    // Check Existence
     const payout = await db.affiliatePayout.findUnique({ 
         where: { id: payoutId },
         include: { affiliate: { include: { user: true } } } 
@@ -59,25 +55,35 @@ export const payoutService = {
     if (!payout) throw new Error("Payout not found");
     if (payout.status === "COMPLETED") throw new Error("Payout is already completed.");
 
-    // Update DB
-    await db.affiliatePayout.update({
-      where: { id: payoutId },
-      data: {
-        status: "COMPLETED",
-        transactionId,
-        note,
-        processedAt: new Date()
-      }
-    });
+    // 🔥 ULTRA UPDATE: Wallet Integration
+    if (payout.method === "STORE_CREDIT") {
+        // ১. ওয়ালেটে টাকা যোগ হবে এবং পেমেন্ট কমপ্লিট হবে (Transaction এর ভেতরে)
+        await walletService.processStoreCreditPayout(
+            payout.id, 
+            payout.affiliate.userId, 
+            payout.amount.toNumber()
+        );
+    } else {
+        // ২. সাধারণ পেমেন্ট (ব্যাংক/পেপাল) ম্যানুয়াল আপডেট
+        await db.affiliatePayout.update({
+            where: { id: payoutId },
+            data: {
+                status: "COMPLETED",
+                transactionId,
+                note,
+                processedAt: new Date()
+            }
+        });
+    }
 
-    // Notify Affiliate
+    // ৩. নোটিফিকেশন পাঠানো
     await sendNotification({
         trigger: "PAYOUT_PROCESSED",
         recipient: payout.affiliate.user.email,
         data: {
             affiliate_name: payout.affiliate.user.name,
             payout_amount: payout.amount.toString(),
-            transaction_id: transactionId || "N/A"
+            transaction_id: transactionId || (payout.method === "STORE_CREDIT" ? "WALLET_CREDIT" : "N/A")
         },
         userId: payout.affiliate.userId
     });
@@ -86,6 +92,7 @@ export const payoutService = {
   },
 
   async rejectPayout(payoutId: string, reason: string) {
+    // ... (Reject logic remains same as previous code) ...
     const payout = await db.affiliatePayout.findUnique({ 
       where: { id: payoutId },
       include: { affiliate: { include: { user: true } } } 
@@ -95,24 +102,8 @@ export const payoutService = {
     if (payout.status !== "PENDING") throw new Error("Can only reject pending payouts");
 
     return await db.$transaction(async (tx) => {
-      // 1. Cancel Payout
-      await tx.affiliatePayout.update({
-        where: { id: payoutId },
-        data: { 
-          status: "CANCELLED",
-          note: reason 
-        }
-      });
-
-      // 2. Refund to Balance
-      await tx.affiliateAccount.update({
-        where: { id: payout.affiliateId },
-        data: {
-          balance: { increment: payout.amount }
-        }
-      });
-
-      // 3. Log Return
+      await tx.affiliatePayout.update({ where: { id: payoutId }, data: { status: "CANCELLED", note: reason } });
+      await tx.affiliateAccount.update({ where: { id: payout.affiliateId }, data: { balance: { increment: payout.amount } } });
       await tx.affiliateLedger.create({
         data: {
           affiliateId: payout.affiliateId,
@@ -124,16 +115,10 @@ export const payoutService = {
           referenceId: payout.id
         }
       });
-
-      // 4. Notify Affiliate
       await sendNotification({
         trigger: "PAYOUT_REJECTED",
         recipient: payout.affiliate.user.email,
-        data: {
-            affiliate_name: payout.affiliate.user.name,
-            payout_amount: payout.amount.toString(),
-            rejection_reason: reason
-        },
+        data: { affiliate_name: payout.affiliate.user.name, payout_amount: payout.amount.toString(), rejection_reason: reason },
         userId: payout.affiliate.userId
       });
     });

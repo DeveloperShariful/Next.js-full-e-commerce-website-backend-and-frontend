@@ -7,14 +7,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, Users, CreditCard, Settings, Trophy, Calculator, 
   Image as ImageIcon, Network, ShieldAlert, Code2, 
-  Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2
+  Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2, BarChart2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ✅ Import Notification Center
 import { NotificationCenter } from "./notification-center";
 
-// Import all Tab Components
+// Import Components
 import MainOverview from "./main-overview";
 import AffiliateUsersTable from "./users-table";
 import PayoutsTable from "./payouts-table";
@@ -32,8 +31,8 @@ import ProductRateManager from "./product-rate-manager";
 import KycManager from "./kyc-manager";
 import LedgerTable from "./ledger-table";
 import GroupManager from "./group-manager";
-import MLMForm from "./mlm-form";
 import AffiliateGeneralConfigForm from "./general-config-form";
+import ReportsDashboard from "./reports-dashboard";
 
 interface Props {
   initialData: any;
@@ -63,8 +62,10 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
     });
   };
 
+  // ✅ MLM Config মেনু ডিলিট করা হয়েছে
   const MENU_ITEMS = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "reports", label: "Adv. Reports", icon: BarChart2 },
     { id: "users", label: "Affiliates", icon: Users },
     { id: "groups", label: "Groups", icon: Users },
     { id: "payouts", label: "Payouts", icon: CreditCard },
@@ -81,14 +82,16 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
     { id: "kyc", label: "KYC Verify", icon: ShieldCheck },
     { id: "domains", label: "Domains", icon: Globe },
     { id: "pixels", label: "Pixels", icon: Code2 },
-    { id: "mlm-configuration", label: "MLM Config", icon: Network },
+    // { id: "mlm-configuration", label: "MLM Config", icon: Network }, // ❌ DELETED
     { id: "general", label: "Settings", icon: Settings },
   ];
 
   const ActiveComponent = () => {
     if (!initialData) return null;
+
     switch (activeTab) {
       case "overview": return initialData.dashboard ? <MainOverview kpi={initialData.dashboard.kpi} charts={initialData.dashboard.charts} /> : null;
+      case "reports": return initialData.reports ? <ReportsDashboard topProducts={initialData.reports.topProducts} trafficSources={initialData.reports.trafficSources} topAffiliates={initialData.reports.topAffiliates} monthlyStats={initialData.reports.monthlyStats} /> : null;
       case "users": return initialData.users ? <AffiliateUsersTable data={initialData.users.affiliates} totalEntries={initialData.users.total} totalPages={initialData.users.totalPages} currentPage={Number(searchParams.get("page")) || 1} groups={initialData.groups} tags={initialData.tags} /> : null;
       case "payouts": return initialData.payouts ? <PayoutsTable data={initialData.payouts.items} totalEntries={initialData.payouts.total} totalPages={initialData.payouts.totalPages} currentPage={Number(searchParams.get("page")) || 1} /> : null;
       case "tiers": return initialData.tiers ? <TierList initialTiers={initialData.tiers} /> : null;
@@ -105,8 +108,15 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
       case "kyc": return initialData.kyc ? <KycManager initialDocuments={initialData.kyc.documents} /> : null;
       case "ledger": return initialData.ledger ? <LedgerTable data={initialData.ledger.transactions} totalEntries={initialData.ledger.total} totalPages={initialData.ledger.totalPages} currentPage={Number(searchParams.get("page")) || 1} /> : null;
       case "groups": return initialData.groupsList ? <GroupManager initialGroups={initialData.groupsList} /> : null;
-      case "mlm-configuration": return <MLMForm initialData={initialData.mlmConfig || { isEnabled: false, maxLevels: 3, levelRates: {"1": 10}, commissionBasis: "SALES_AMOUNT" }} />;
-      case "general": return initialData.config ? <AffiliateGeneralConfigForm initialData={initialData.config} /> : null;
+      
+      // ✅ Settings এ MLM Config ডাটাও পাস করা হচ্ছে
+      case "general": return initialData.config ? (
+        <AffiliateGeneralConfigForm 
+            initialData={initialData.config} 
+            mlmInitialData={initialData.mlmConfig || { isEnabled: false, maxLevels: 3, levelRates: {"1": 10}, commissionBasis: "SALES_AMOUNT" }}
+        /> 
+      ) : null;
+      
       default: return null;
     }
   };
@@ -114,7 +124,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
   return (
     <div className="flex flex-col lg:flex-row w-full min-h-screen">
       
-      {/* MOBILE HEADER (Fixed Top) */}
+      {/* MOBILE HEADER */}
       <div className="lg:hidden w-full bg-white border-b border-gray-200 h-16 px-4 flex justify-between items-center sticky top-0 z-1 shadow-sm">
         <span className="font-bold text-gray-800 flex items-center gap-2">
           {MENU_ITEMS.find(m => m.id === activeTab)?.icon && <span className="text-black"><Settings className="w-5 h-5"/></span>}
@@ -122,9 +132,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         </span>
         
         <div className="flex items-center gap-3">
-            {/* Notification Center in Mobile */}
             <NotificationCenter />
-            
             <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
                 className="p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
@@ -134,7 +142,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         </div>
       </div>
 
-      {/* MOBILE OVERLAY (Starts below header) */}
+      {/* MOBILE OVERLAY */}
       <div 
         className={cn(
             "fixed inset-0 top-16 z-1 bg-black/50 lg:hidden transition-opacity", 
@@ -143,22 +151,21 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         onClick={() => setIsMobileMenuOpen(false)} 
       />
 
-      {/* SIDEBAR (Responsive) */}
+      {/* SIDEBAR */}
       <aside className={cn(
         "fixed top-16 left-0 bottom-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-auto lg:top-0 lg:z-0 overflow-y-auto custom-scrollbar shadow-xl lg:shadow-none",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        {/* Desktop Sidebar Header */}
         <div className="p-5 border-b border-gray-100 hidden lg:flex justify-between items-center bg-gray-50/50">
           <div>
             <h2 className="font-bold text-lg text-gray-900">Affiliate Menu</h2>
             <p className="text-xs text-gray-500">Program Management</p>
           </div>
-          {/* Notification Center in Desktop Sidebar Header (Optional, or keep in global nav) */}
-          <NotificationCenter /> 
+          <div className="hidden lg:block">
+             <NotificationCenter /> 
+          </div>
         </div>
         
-        {/* Menu Items */}
         <div className="p-2 space-y-0.5 pb-20 lg:pb-2">
           {MENU_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -170,7 +177,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
                 className={cn(
                   "flex items-center gap-3 w-full px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200",
                   isActive 
-                    ? "bg-gray-100 text-gray-900 border-l-4 border-black pl-2" // Table Style Active
+                    ? "bg-gray-100 text-gray-900 border-l-4 border-black pl-2"
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                 )}
               >
@@ -184,8 +191,6 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
 
       {/* CONTENT AREA */}
       <main className="flex-1 w-full min-w-0 bg-gray-50/30 relative min-h-screen">
-        
-        {/* Loading Overlay */}
         {isPending && (
             <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-800" />
@@ -202,7 +207,6 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
                 <ActiveComponent />
             </div>
         </div>
-
       </main>
     </div>
   );

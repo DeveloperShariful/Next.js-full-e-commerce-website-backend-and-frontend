@@ -2,11 +2,11 @@
 
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Save, Settings, AlertTriangle, Link as LinkIcon, DollarSign, Shield, Clock } from "lucide-react";
+import { Loader2, Save, Settings, AlertTriangle, Link as LinkIcon, DollarSign, Shield, Clock, Network } from "lucide-react";
 import { z } from "zod";
 
 import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliates/schemas";
@@ -14,13 +14,18 @@ import { updateGeneralSettings } from "@/app/actions/admin/settings/affiliates/m
 import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliates/types";
 import { cn } from "@/lib/utils";
 
+// ✅ Import MLM Form
+import MLMForm from "./mlm-form";
+
 type FormValues = z.infer<typeof affiliateGeneralSchema>;
 
 interface Props {
   initialData: AffiliateGeneralSettings;
+  mlmInitialData: any; // Added MLM Data Prop
 }
 
-export default function AffiliateGeneralConfigForm({ initialData }: Props) {
+export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData }: Props) {
+  const [activeTab, setActiveTab] = useState<"GENERAL" | "MLM">("GENERAL");
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<FormValues>({
@@ -39,6 +44,7 @@ export default function AffiliateGeneralConfigForm({ initialData }: Props) {
     });
   };
 
+  // Helper Components
   const SectionHeader = ({ title, description, icon: Icon }: { title: string; description?: string; icon: any }) => (
     <div className="mb-4 flex items-start gap-3 border-b border-gray-100 pb-3">
       <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-500">
@@ -98,135 +104,149 @@ export default function AffiliateGeneralConfigForm({ initialData }: Props) {
   );
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-6">
-      
-      {/* Top Header with Save Button */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-6">
-        <div>
-            <h2 className="text-xl font-bold text-gray-900">General Configuration</h2>
-            <p className="text-sm text-gray-500">Global settings for the affiliate program.</p>
-        </div>
-        <button
-          type="submit"
-          disabled={isPending}
-          className="flex items-center gap-2 bg-black text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-gray-800 disabled:opacity-50 transition-all shadow-md active:scale-95 w-full sm:w-auto justify-center"
-        >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save Changes
-        </button>
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="w-full max-w-5xl mx-auto pb-20">
         
-        {/* Left Column */}
-        <div className="space-y-6">
-            
-            {/* Status Card */}
-            <div className={cn(
-              "p-5 rounded-xl border transition-all duration-300 flex items-center justify-between",
-              form.watch("isActive") 
-                ? "bg-green-50 border-green-200" 
-                : "bg-gray-50 border-gray-200"
-            )}>
-              <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg", form.watch("isActive") ? "bg-green-200 text-green-800" : "bg-gray-200 text-gray-500")}>
-                  <Settings className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900">Program Status</h4>
-                  <p className="text-xs text-gray-600">{form.watch("isActive") ? "Active & Running" : "Disabled"}</p>
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" {...form.register("isActive")} />
-                <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-              </label>
-            </div>
-
-            {/* Brand Identity */}
-            <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <SectionHeader title="Brand Identity" description="How the program appears." icon={Settings} />
-                <div className="grid gap-4">
-                  <InputField name="programName" label="Program Name" placeholder="e.g. GoBike Partner Program" />
-                  <InputField name="termsUrl" label="Terms URL" placeholder="https://gobike.au/terms" type="url" />
-                </div>
-            </section>
-
-            {/* Commission Logic */}
-            <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <SectionHeader title="Commission Logic" description="Calculation rules." icon={DollarSign} />
-                <div className="grid gap-3">
-                  <ToggleField name="excludeShipping" label="Exclude Shipping" description="Deduct shipping from total." />
-                  <ToggleField name="excludeTax" label="Exclude Taxes" description="Deduct tax from total." />
-                  <ToggleField name="zeroValueReferrals" label="Track Zero Value" description="Record orders with $0 total." />
-                  <ToggleField name="autoApplyCoupon" label="Auto-Apply Coupon" description="Apply coupon on link click." />
-                </div>
-            </section>
+        {/* TABS SWITCHER */}
+        <div className="flex border-b border-gray-200 mb-6 space-x-6">
+            <button 
+                onClick={() => setActiveTab("GENERAL")}
+                className={cn("pb-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2", activeTab === "GENERAL" ? "border-black text-black" : "border-transparent text-gray-500 hover:text-gray-800")}
+            >
+                <Settings className="w-4 h-4" /> General Config
+            </button>
+            <button 
+                onClick={() => setActiveTab("MLM")}
+                className={cn("pb-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2", activeTab === "MLM" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800")}
+            >
+                <Network className="w-4 h-4" /> Network (MLM)
+            </button>
         </div>
 
-        {/* Right Column */}
-        <div className="space-y-6">
-            
-            {/* Link Structure */}
-            <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <SectionHeader title="Link Structure" description="URL configuration." icon={LinkIcon} />
-                <div className="space-y-4">
-                    <InputField name="referralParam" label="Query Parameter" placeholder="ref" prefix="?" />
-                    
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-                        <ToggleField name="customSlugsEnabled" label="Allow Custom Slugs" />
-                        {form.watch("customSlugsEnabled") && (
-                            <div className="grid grid-cols-2 gap-4 animate-in fade-in">
-                                <InputField name="slugLimit" label="Slugs per User" type="number" />
-                                <div className="flex items-end">
-                                    <ToggleField name="autoCreateSlug" label="Auto-Create" />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </section>
-
-            {/* Tracking & Fraud */}
-            <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <SectionHeader title="Tracking & Fraud" description="Cookie & Fraud rules." icon={Shield} />
-                <div className="grid gap-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <InputField name="cookieDuration" label="Cookie Duration" type="number" suffix="Days" />
-                    <InputField name="lifetimeDuration" label="Lifetime Link" type="number" suffix="Days" placeholder="∞" />
-                  </div>
-                  <ToggleField name="isLifetimeLinkOnPurchase" label="Lifetime Linking" description="Lock customer to affiliate after purchase." />
-                  <ToggleField name="allowSelfReferral" label="Allow Self-Referral" description="Affiliates earn from own purchases." />
-                </div>
-            </section>
-
-            {/* Payouts */}
-            <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <SectionHeader title="Payouts" description="Withdrawal configuration." icon={Clock} />
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <InputField name="minimumPayout" label="Min Payout" type="number" prefix="$" />
-                        <InputField name="holdingPeriod" label="Holding Period" type="number" suffix="Days" />
-                    </div>
-                    
-                    <div>
-                        <label className="text-xs font-bold text-gray-700 uppercase mb-2 block">Allowed Methods</label>
-                        <div className="flex flex-wrap gap-2">
-                        {["BANK_TRANSFER", "PAYPAL", "STORE_CREDIT"].map((method) => (
-                            <label key={method} className="relative flex items-center justify-center gap-1.5 border px-3 py-1.5 rounded-md bg-gray-50 cursor-pointer hover:border-black transition-all select-none has-[:checked]:bg-black has-[:checked]:text-white">
-                                <input type="checkbox" value={method} {...form.register("payoutMethods")} className="peer sr-only" />
-                                <span className="text-[10px] font-bold capitalize">{method.replace("_", " ").toLowerCase()}</span>
-                            </label>
-                        ))}
+        {/* === TAB 1: GENERAL CONFIG FORM === */}
+        {activeTab === "GENERAL" && (
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 animate-in fade-in slide-in-from-left-2">
+                
+                {/* Status Card */}
+                <div className={cn(
+                    "p-5 rounded-xl border transition-all duration-300 flex items-center justify-between",
+                    form.watch("isActive") ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
+                )}>
+                    <div className="flex items-center gap-3">
+                        <div className={cn("p-2 rounded-lg", form.watch("isActive") ? "bg-green-200 text-green-800" : "bg-gray-200 text-gray-500")}>
+                            <Settings className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-gray-900">Program Status</h4>
+                            <p className="text-xs text-gray-600">{form.watch("isActive") ? "Active & Running" : "Disabled"}</p>
                         </div>
                     </div>
-                    
-                    <ToggleField name="autoApprovePayout" label="Auto-Approve Payouts" description="Skip manual review step." />
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" {...form.register("isActive")} />
+                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                    </label>
                 </div>
-            </section>
-        </div>
-      </div>
-    </form>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-6">
+                        <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                            <SectionHeader title="Brand Identity" description="How the program appears." icon={Settings} />
+                            <div className="grid gap-4">
+                                <InputField name="programName" label="Program Name" placeholder="e.g. GoBike Partner Program" />
+                                <InputField name="termsUrl" label="Terms URL" placeholder="https://gobike.au/terms" type="url" />
+                            </div>
+                        </section>
+
+                        <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                            <SectionHeader title="Commission Logic" description="Calculation rules." icon={DollarSign} />
+                            <div className="grid gap-3">
+                                <ToggleField name="excludeShipping" label="Exclude Shipping" description="Deduct shipping from total." />
+                                <ToggleField name="excludeTax" label="Exclude Taxes" description="Deduct tax from total." />
+                                <ToggleField name="zeroValueReferrals" label="Track Zero Value" description="Record orders with $0 total." />
+                                <ToggleField name="autoApplyCoupon" label="Auto-Apply Coupon" description="Apply coupon on link click." />
+                            </div>
+                        </section>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-6">
+                        <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                            <SectionHeader title="Link Structure" description="URL configuration." icon={LinkIcon} />
+                            <div className="space-y-4">
+                                <InputField name="referralParam" label="Query Parameter" placeholder="ref" prefix="?" />
+                                
+                                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                                    <ToggleField name="customSlugsEnabled" label="Allow Custom Slugs" />
+                                    {form.watch("customSlugsEnabled") && (
+                                        <div className="grid grid-cols-2 gap-4 animate-in fade-in">
+                                            <InputField name="slugLimit" label="Slugs per User" type="number" />
+                                            <div className="flex items-end">
+                                                <ToggleField name="autoCreateSlug" label="Auto-Create" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                            <SectionHeader title="Tracking & Fraud" description="Cookie & Fraud rules." icon={Shield} />
+                            <div className="grid gap-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <InputField name="cookieDuration" label="Cookie Duration" type="number" suffix="Days" />
+                                    <InputField name="lifetimeDuration" label="Lifetime Link" type="number" suffix="Days" placeholder="∞" />
+                                </div>
+                                <ToggleField name="isLifetimeLinkOnPurchase" label="Lifetime Linking" description="Lock customer to affiliate after purchase." />
+                                <ToggleField name="allowSelfReferral" label="Allow Self-Referral" description="Affiliates earn from own purchases." />
+                            </div>
+                        </section>
+
+                        <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                            <SectionHeader title="Payouts" description="Withdrawal configuration." icon={Clock} />
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <InputField name="minimumPayout" label="Min Payout" type="number" prefix="$" />
+                                    <InputField name="holdingPeriod" label="Holding Period" type="number" suffix="Days" />
+                                </div>
+                                
+                                <div>
+                                    <label className="text-xs font-bold text-gray-700 uppercase mb-2 block">Allowed Methods</label>
+                                    <div className="flex flex-wrap gap-2">
+                                    {["BANK_TRANSFER", "PAYPAL", "STORE_CREDIT"].map((method) => (
+                                        <label key={method} className="relative flex items-center justify-center gap-1.5 border px-3 py-1.5 rounded-md bg-gray-50 cursor-pointer hover:border-black transition-all select-none has-[:checked]:bg-black has-[:checked]:text-white">
+                                            <input type="checkbox" value={method} {...form.register("payoutMethods")} className="peer sr-only" />
+                                            <span className="text-[10px] font-bold capitalize">{method.replace("_", " ").toLowerCase()}</span>
+                                        </label>
+                                    ))}
+                                    </div>
+                                </div>
+                                
+                                <ToggleField name="autoApprovePayout" label="Auto-Approve Payouts" description="Skip manual review step." />
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-200 flex justify-end items-center z-50 lg:pl-72 shadow-lg">
+                    <button
+                        type="submit"
+                        disabled={isPending}
+                        className="flex items-center gap-2 bg-black text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-gray-800 disabled:opacity-50 transition-all shadow-lg active:scale-95"
+                    >
+                        {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Save General Config
+                    </button>
+                </div>
+            </form>
+        )}
+
+        {/* === TAB 2: MLM CONFIG FORM === */}
+        {activeTab === "MLM" && (
+            <div className="animate-in fade-in slide-in-from-right-2">
+                <MLMForm initialData={mlmInitialData} />
+            </div>
+        )}
+
+    </div>
   );
 }

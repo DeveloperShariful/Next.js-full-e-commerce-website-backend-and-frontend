@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react"; // Removed unused ArrowRight
+import { Loader2 } from "lucide-react"; 
 import { registerAffiliateAction } from "@/app/actions/storefront/affiliates/mutations/register-affiliate";
 import { useRouter } from "next/navigation";
 

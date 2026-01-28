@@ -27,7 +27,7 @@ export default function CopyButton({ text, className, variant = "solid" }: CopyB
     }
   };
 
-  const baseStyles = "inline-flex items-center justify-center gap-2 rounded-md text-xs font-medium transition-all duration-200";
+  const baseStyles = "inline-flex items-center justify-center gap-2 rounded-md text-xs font-medium transition-all duration-200 cursor-pointer";
   
   const variants = {
     solid: "bg-white border border-gray-200 shadow-sm text-gray-700 hover:bg-gray-50 px-3 py-1.5",
@@ -38,6 +38,7 @@ export default function CopyButton({ text, className, variant = "solid" }: CopyB
   return (
     <button
       onClick={handleCopy}
+      type="button"
       className={cn(baseStyles, variants[variant], className)}
       title="Copy to clipboard"
     >

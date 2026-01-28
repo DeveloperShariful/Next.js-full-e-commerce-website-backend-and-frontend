@@ -7,9 +7,11 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { Save, Plus, Trash2, Loader2, GitGraph, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { updateMlmConfigAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-mlm-config";
 
-// Types
+// ✅ Correct Import Path
+// ✅ Use Named Import
+import { updateMlmConfigAction } from "@/app/actions/admin/settings/affiliates/_services/mlm-service";
+
 interface MLMFormValues {
   isEnabled: boolean;
   commissionBasis: "SALES_AMOUNT" | "PROFIT";
@@ -28,7 +30,6 @@ interface Props {
 export default function MLMForm({ initialData }: Props) {
   const [isPending, startTransition] = useTransition();
 
-  // Transform Object to Array for Field Array
   const initialLevels = Object.entries(initialData.levelRates).map(([lvl, rate]) => ({
     level: Number(lvl),
     rate: Number(rate)
@@ -61,6 +62,7 @@ export default function MLMForm({ initialData }: Props) {
     };
 
     startTransition(async () => {
+      // ✅ Call Service Method Directly
       const res = await updateMlmConfigAction(payload);
       if(res.success) toast.success(res.message);
       else toast.error("Failed to update");
@@ -70,7 +72,6 @@ export default function MLMForm({ initialData }: Props) {
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-4xl space-y-8 animate-in fade-in">
       
-      {/* 1. Master Toggle */}
       <div className={cn("p-6 rounded-xl border transition-all shadow-sm flex items-start gap-4", 
         form.watch("isEnabled") ? "bg-indigo-50 border-indigo-200" : "bg-white border-gray-200"
       )}>
@@ -96,7 +97,6 @@ export default function MLMForm({ initialData }: Props) {
       {form.watch("isEnabled") && (
         <div className="space-y-8 animate-in slide-in-from-top-4">
             
-            {/* 2. Basis Config */}
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Commission Basis</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -122,7 +122,6 @@ export default function MLMForm({ initialData }: Props) {
                 </div>
             </div>
 
-            {/* 3. Level Config (Dynamic) */}
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tier Structure</h4>
@@ -185,7 +184,6 @@ export default function MLMForm({ initialData }: Props) {
         </div>
       )}
 
-      {/* Footer */}
       <div className="flex justify-end pt-4 border-t border-gray-200">
         <button 
             type="submit" 

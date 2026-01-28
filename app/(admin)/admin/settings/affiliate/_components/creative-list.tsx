@@ -8,7 +8,9 @@ import { Edit, Trash2, Image as ImageIcon, Link as LinkIcon, Copy, Plus, Externa
 import { toast } from "sonner";
 
 import CreativeModal from "./creative-modal";
-import { deleteCreativeAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-creatives";
+// ✅ Correct Import Path
+// ✅ Use Named Import
+import { deleteCreativeAction } from "@/app/actions/admin/settings/affiliates/_services/creative-service";
 
 interface Props {
   initialCreatives: AffiliateCreative[];
@@ -34,6 +36,7 @@ export default function CreativeList({ initialCreatives }: Props) {
     if (!confirm("Are you sure you want to delete this asset?")) return;
     
     startDelete(async () => {
+      // ✅ Call Service Method
       const result = await deleteCreativeAction(id);
       if (result.success) toast.success(result.message);
       else toast.error(result.message);

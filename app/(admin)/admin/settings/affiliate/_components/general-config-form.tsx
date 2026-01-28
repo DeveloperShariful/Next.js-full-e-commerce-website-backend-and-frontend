@@ -9,19 +9,19 @@ import { toast } from "sonner";
 import { Loader2, Save, Settings, AlertTriangle, Link as LinkIcon, DollarSign, Shield, Clock, Network } from "lucide-react";
 import { z } from "zod";
 
+// ✅ Correct Import Path
 import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliates/schemas";
-import { updateGeneralSettings } from "@/app/actions/admin/settings/affiliates/mutations/update-config";
+import { updateGeneralSettingsAction } from "@/app/actions/admin/settings/affiliates/_services/config-service";
 import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliates/types";
 import { cn } from "@/lib/utils";
 
-// ✅ Import MLM Form
 import MLMForm from "./mlm-form";
 
 type FormValues = z.infer<typeof affiliateGeneralSchema>;
 
 interface Props {
   initialData: AffiliateGeneralSettings;
-  mlmInitialData: any; // Added MLM Data Prop
+  mlmInitialData: any;
 }
 
 export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData }: Props) {
@@ -35,7 +35,8 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
 
   const onSubmit = (data: FormValues) => {
     startTransition(async () => {
-      const result = await updateGeneralSettings(data);
+      // ✅ Call Service Method
+      const result = await updateGeneralSettingsAction(data);
       if (result.success) {
         toast.success("Settings updated successfully");
       } else {
@@ -44,7 +45,6 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
     });
   };
 
-  // Helper Components
   const SectionHeader = ({ title, description, icon: Icon }: { title: string; description?: string; icon: any }) => (
     <div className="mb-4 flex items-start gap-3 border-b border-gray-100 pb-3">
       <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-500">
@@ -106,7 +106,6 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
   return (
     <div className="w-full max-w-5xl mx-auto pb-20">
         
-        {/* TABS SWITCHER */}
         <div className="flex border-b border-gray-200 mb-6 space-x-6">
             <button 
                 onClick={() => setActiveTab("GENERAL")}
@@ -122,11 +121,9 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
             </button>
         </div>
 
-        {/* === TAB 1: GENERAL CONFIG FORM === */}
         {activeTab === "GENERAL" && (
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 animate-in fade-in slide-in-from-left-2">
                 
-                {/* Status Card */}
                 <div className={cn(
                     "p-5 rounded-xl border transition-all duration-300 flex items-center justify-between",
                     form.watch("isActive") ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"
@@ -147,7 +144,6 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Left Column */}
                     <div className="space-y-6">
                         <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                             <SectionHeader title="Brand Identity" description="How the program appears." icon={Settings} />
@@ -168,7 +164,6 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                         </section>
                     </div>
 
-                    {/* Right Column */}
                     <div className="space-y-6">
                         <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                             <SectionHeader title="Link Structure" description="URL configuration." icon={LinkIcon} />
@@ -240,7 +235,6 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
             </form>
         )}
 
-        {/* === TAB 2: MLM CONFIG FORM === */}
         {activeTab === "MLM" && (
             <div className="animate-in fade-in slide-in-from-right-2">
                 <MLMForm initialData={mlmInitialData} />

@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { X, Loader2, Save } from "lucide-react";
 import { AffiliateTier, CommissionType } from "@prisma/client";
 
-import { upsertTier } from "@/app/actions/admin/settings/affiliates/mutations/manage-tiers";
+// ✅ CORRECTED IMPORT
+import { upsertTierAction } from "@/app/actions/admin/settings/affiliates/_services/tier-service";
 
 interface Props {
   isOpen: boolean;
@@ -36,11 +37,10 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
       commissionType: "PERCENTAGE",
       minSalesAmount: 0,
       minSalesCount: 0,
-      color: "#2271b1", // Default Blue
+      color: "#2271b1",
     },
   });
 
-  // Load data when opening for Edit
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -66,10 +66,12 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
 
   const onSubmit = (data: FormValues) => {
     startTransition(async () => {
-      const result = await upsertTier(data);
+      // ✅ Using Service Method Directly
+      const result = await upsertTierAction(data);
       if (result.success) {
         toast.success(result.message);
         onClose();
+        // In a real app, trigger a refresh or cache invalidation here
       } else {
         toast.error(result.message);
       }
@@ -79,8 +81,8 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
@@ -95,7 +97,6 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
         {/* Form */}
         <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-4">
           
-          {/* Name & Color */}
           <div className="grid grid-cols-4 gap-4">
             <div className="col-span-3 space-y-2">
               <label className="text-sm font-medium text-gray-700">Tier Name</label>
@@ -116,7 +117,6 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
             </div>
           </div>
 
-          {/* Commission */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Commission Rate</label>
@@ -146,7 +146,6 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
             <p className="text-xs text-gray-400">Affiliates are auto-promoted when they hit these targets.</p>
           </div>
 
-          {/* Requirements */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Min. Sales Amount ($)</label>
@@ -166,7 +165,6 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
             </div>
           </div>
 
-          {/* Footer Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t mt-4">
             <button
               type="button"

@@ -6,7 +6,10 @@ import { useState, useTransition } from "react";
 import { AffiliatePixel } from "@prisma/client";
 import { Code2, Trash2, AlertCircle, ToggleLeft, ToggleRight, Facebook, Chrome } from "lucide-react";
 import { toast } from "sonner";
-import { togglePixelStatusAction, deletePixelAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-pixels";
+
+// ✅ CORRECTED IMPORT
+// ✅ Use Named Imports
+import { deletePixelAction, togglePixelStatusAction } from "@/app/actions/admin/settings/affiliates/_services/pixel-service";
 
 interface PixelWithUser extends AffiliatePixel {
   affiliate: {
@@ -27,6 +30,7 @@ export default function PixelList({ pixels }: Props) {
 
   const handleToggle = (id: string, currentStatus: boolean) => {
     startTransition(async () => {
+      // ✅ Call Service Method Directly
       const res = await togglePixelStatusAction(id, !currentStatus);
       if (res.success) toast.success(res.message);
       else toast.error(res.message);
@@ -36,6 +40,7 @@ export default function PixelList({ pixels }: Props) {
   const handleDelete = (id: string) => {
     if (!confirm("Delete this tracking pixel?")) return;
     startTransition(async () => {
+      // ✅ Call Service Method Directly
       const res = await deletePixelAction(id);
       if (res.success) toast.success(res.message);
       else toast.error(res.message);

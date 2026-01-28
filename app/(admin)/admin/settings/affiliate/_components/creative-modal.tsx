@@ -7,8 +7,11 @@ import { useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import { X, Loader2, Save } from "lucide-react";
 import { AffiliateCreative, MediaType } from "@prisma/client";
-import { upsertCreative } from "@/app/actions/admin/settings/affiliates/mutations/manage-creatives";
-import { MediaPicker } from "@/components/media/media-picker"; // ✅ Your existing component
+import { MediaPicker } from "@/components/media/media-picker"; 
+
+// ✅ Correct Import Path
+// ✅ Use Named Import
+import { upsertCreativeAction } from "@/app/actions/admin/settings/affiliates/_services/creative-service";
 
 interface Props {
   isOpen: boolean;
@@ -69,10 +72,12 @@ export default function CreativeModal({ isOpen, onClose, initialData }: Props) {
 
   const onSubmit = (data: CreativeFormValues) => {
     startTransition(async () => {
-      const result = await upsertCreative(data);
+      // ✅ Call Service Method Directly
+      const result = await upsertCreativeAction(data);
       if (result.success) {
         toast.success(result.message);
         onClose();
+        window.location.reload(); 
       } else {
         toast.error(result.message);
       }

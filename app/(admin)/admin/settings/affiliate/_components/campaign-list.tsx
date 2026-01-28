@@ -3,11 +3,14 @@
 "use client";
 
 import { useTransition } from "react";
-import { Trash2, Megaphone, DollarSign, Calendar, MousePointer, Percent } from "lucide-react";
+import { Trash2, Megaphone, Calendar, MousePointer, Percent } from "lucide-react";
 import { toast } from "sonner";
-import { deleteCampaignAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-campaigns";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format } from "date-fns";
+
+// ✅ Correct Import Path
+// ✅ Use Named Import
+import { deleteCampaignAction } from "@/app/actions/admin/settings/affiliates/_services/campaign-service";
 
 interface CampaignItem {
   id: string;
@@ -32,12 +35,13 @@ interface Props {
 
 export default function CampaignList({ data, totalEntries }: Props) {
   const [isPending, startTransition] = useTransition();
-  const { formatPrice } = useGlobalStore(); // ✅ Ultra: Dynamic Currency
+  const { formatPrice } = useGlobalStore();
 
   const handleDelete = (id: string) => {
-    if (!confirm("Delete this campaign? All associated links will stop tracking.")) return;
+    if (!confirm("Delete this campaign?")) return;
     
     startTransition(async () => {
+      // ✅ Call Function Directly
       const res = await deleteCampaignAction(id);
       if (res.success) toast.success(res.message);
       else toast.error(res.message);
@@ -132,11 +136,6 @@ export default function CampaignList({ data, totalEntries }: Props) {
             )}
           </tbody>
         </table>
-      </div>
-      
-      <div className="p-4 border-t bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-        <span>Total Campaigns: {totalEntries}</span>
-        <span>Stats update every hour</span>
       </div>
     </div>
   );

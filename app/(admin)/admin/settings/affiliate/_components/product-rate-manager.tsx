@@ -8,12 +8,15 @@ import { AffiliateProductRate, CommissionType } from "@prisma/client";
 import { Plus, Search, Edit, Trash2, X, Loader2, Package, User, Users, CheckCircle, Ban, DollarSign, Percent } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { upsertRateAction, deleteRateAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-product-rates";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+
+// ✅ Correct Import Path
+// ✅ Use Named Imports
+import { deleteRateAction, upsertRateAction } from "@/app/actions/admin/settings/affiliates/_services/product-rate-service";
 
 // Types
 interface ProductRateWithRelations extends AffiliateProductRate {
-  product: { id: string; name: string; price: number }; // Transformed price to number
+  product: { id: string; name: string; price: number };
   affiliate?: { id: string; slug: string; user: { name: string | null } } | null;
   group?: { id: string; name: string } | null;
 }
@@ -28,7 +31,6 @@ export default function ProductRateManager({ initialRates }: Props) {
   const [editingRate, setEditingRate] = useState<ProductRateWithRelations | null>(null);
   const [search, setSearch] = useState("");
   
-  // ✅ Ultra Update: Dynamic Currency
   const { formatPrice, symbol } = useGlobalStore();
 
   const filteredRates = rates.filter(r => 
@@ -49,6 +51,8 @@ export default function ProductRateManager({ initialRates }: Props) {
 
   const handleDelete = async (id: string) => {
     if(!confirm("Remove this commission override?")) return;
+    
+    // ✅ Call Service Method Directly
     const res = await deleteRateAction(id);
     if(res.success) {
         setRates(prev => prev.filter(r => r.id !== id));
@@ -164,7 +168,6 @@ export default function ProductRateManager({ initialRates }: Props) {
             initialData={editingRate}
             onSuccess={() => {
                 setIsModalOpen(false);
-                // Trigger re-fetch logic handled by parent server component or router refresh in real app
                 window.location.reload(); 
             }}
          />
@@ -203,6 +206,7 @@ function RateModal({ isOpen, onClose, initialData, onSuccess }: any) {
         };
 
         startTransition(async () => {
+            // ✅ Call Service Method Directly
             const res = await upsertRateAction(payload);
             if(res.success) {
                 toast.success(res.message);

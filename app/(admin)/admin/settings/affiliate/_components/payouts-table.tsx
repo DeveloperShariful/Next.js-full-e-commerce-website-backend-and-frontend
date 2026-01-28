@@ -3,15 +3,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { PayoutQueueItem } from "@/app/actions/admin/settings/affiliates/types";
-import { approvePayoutAction, rejectPayoutAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-payouts";
-import { getInvoiceData } from "@/app/actions/admin/settings/affiliates/_services/invoice-service";
+import { PayoutQueueItem } from "@/app/actions/admin/settings/affiliates/types"; 
 import { toast } from "sonner";
 import { Check, X, FileText, Download, ExternalLink, Loader2, AlertCircle } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+// ✅ Correct Import Path
+// ✅ Use Named Imports
+import { markAsPaid, rejectPayout } from "@/app/actions/admin/settings/affiliates/_services/payout-service";
+import { getInvoiceData } from "@/app/actions/admin/settings/affiliates/_services/invoice-service";
 
 interface Props {
   data: PayoutQueueItem[];
@@ -33,9 +36,10 @@ export default function PayoutsTable({ data }: Props) {
     if (!txnId) return;
 
     startTransition(async () => {
-      const res = await approvePayoutAction(id, txnId);
-      if (res.success) toast.success(res.message);
-      else toast.error(res.message);
+      // ✅ Call Service Method Directly
+      const res = await markAsPaid(id, txnId); 
+      if (res.success) toast.success("Payout Approved");
+      else toast.error("Failed");
     });
   };
 
@@ -44,9 +48,10 @@ export default function PayoutsTable({ data }: Props) {
     if (!reason) return;
 
     startTransition(async () => {
-      const res = await rejectPayoutAction(id, reason);
-      if (res.success) toast.success(res.message);
-      else toast.error(res.message);
+      // ✅ Call Service Method Directly
+      const res = await rejectPayout(id, reason);
+      if (res.success) toast.success("Payout Rejected");
+      else toast.error("Failed");
     });
   };
 
@@ -75,9 +80,7 @@ export default function PayoutsTable({ data }: Props) {
         doc.setFontSize(12);
         doc.text(invoiceData.storeName, 200, 20, { align: "right" });
         doc.setFontSize(10);
-        // If storeAddress exists
-        // doc.text("Store Address Here", 200, 26, { align: "right" });
-
+        
         // Bill To
         doc.line(14, 45, 200, 45);
         doc.setFontSize(12);

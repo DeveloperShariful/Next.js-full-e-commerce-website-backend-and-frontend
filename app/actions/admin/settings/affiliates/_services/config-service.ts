@@ -1,136 +1,152 @@
 // File: app/actions/admin/settings/affiliate/_services/config-service.ts
 
+"use server";
+
 import { db } from "@/lib/prisma";
-import { AffiliateGeneralSettings, AffiliateConfigDTO } from "../types";
+import { AffiliateGeneralSettings, AffiliateConfigDTO, ActionResponse } from "../types";
+import { revalidatePath } from "next/cache";
+import { auditService } from "@/lib/services/audit-service";
+import { affiliateGeneralSchema } from "../schemas";
+import { syncUser } from "@/lib/auth-sync";
 
-/**
- * SERVICE LAYER: Handles direct DB operations.
- * Separated from Actions to keep logic clean and reusable.
- */
+// =========================================
+// READ OPERATIONS
+// =========================================
+export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
+  try {
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: {
+        generalConfig: true,
+        affiliateConfig: true,
+      },
+    });
 
-export const configService = {
-  /**
-   * Fetch current affiliate settings from DB
-   * Merges `generalConfig` (isActive) and `affiliateConfig` (JSON)
-   */
-  async getSettings(): Promise<AffiliateGeneralSettings | null> {
-    try {
-      const settings = await db.storeSettings.findUnique({
-        where: { id: "settings" },
-        select: {
-          generalConfig: true,
-          affiliateConfig: true,
-        },
-      });
+    if (!settings) return null;
 
-      if (!settings) return null;
+    const genConfig = (settings.generalConfig as any) || {};
+    const affConfig = (settings.affiliateConfig as AffiliateConfigDTO) || {};
 
-      // Extract raw JSON data with type assertion
-      const genConfig = (settings.generalConfig as any) || {};
-      const affConfig = (settings.affiliateConfig as AffiliateConfigDTO) || {};
+    return {
+      isActive: genConfig.enableAffiliateProgram ?? false,
+      programName: affConfig.programName || "Affiliate Program",
+      termsUrl: affConfig.termsUrl || "",
+      excludeShipping: affConfig.excludeShipping ?? true,
+      excludeTax: affConfig.excludeTax ?? true,
+      autoApplyCoupon: affConfig.autoApplyCoupon ?? false,
+      zeroValueReferrals: affConfig.zeroValueReferrals ?? false,
+      referralParam: affConfig.referralParam || "ref",
+      customSlugsEnabled: affConfig.customSlugsEnabled ?? false,
+      autoCreateSlug: affConfig.autoCreateSlug ?? false,
+      slugLimit: Number(affConfig.slugLimit) || 5,
+      cookieDuration: Number(affConfig.cookieDuration) || 30,
+      allowSelfReferral: affConfig.allowSelfReferral ?? false,
+      isLifetimeLinkOnPurchase: affConfig.isLifetimeLinkOnPurchase ?? false,
+      lifetimeDuration: affConfig.lifetimeDuration ?? null,
+      holdingPeriod: Number(affConfig.holdingPeriod) || 14,
+      autoApprovePayout: affConfig.autoApprovePayout ?? false,
+      minimumPayout: Number(affConfig.minimumPayout) || 50,
+      payoutMethods: Array.isArray(affConfig.payoutMethods) 
+        ? affConfig.payoutMethods 
+        : ["STORE_CREDIT"],
+    };
+  } catch (error) {
+    throw new Error("Failed to load configuration");
+  }
+}
 
-      // Map DB data to our Strict Typed Object (With Defaults)
-      return {
-        // General
-        isActive: genConfig.enableAffiliateProgram ?? false,
-        programName: affConfig.programName || "GoBike Partner Program",
-        termsUrl: affConfig.termsUrl || "",
+// =========================================
+// SERVER ACTIONS (Mutations)
+// =========================================
 
-        // Commission Logic
-        excludeShipping: affConfig.excludeShipping ?? true,
-        excludeTax: affConfig.excludeTax ?? true,
-        autoApplyCoupon: affConfig.autoApplyCoupon ?? false,
-        zeroValueReferrals: affConfig.zeroValueReferrals ?? false,
-
-        // Links
-        referralParam: affConfig.referralParam || "ref",
-        customSlugsEnabled: affConfig.customSlugsEnabled ?? false,
-        autoCreateSlug: affConfig.autoCreateSlug ?? false,
-        slugLimit: Number(affConfig.slugLimit) || 5,
-
-        // Tracking
-        cookieDuration: Number(affConfig.cookieDuration) || 30,
-        allowSelfReferral: affConfig.allowSelfReferral ?? false,
-        isLifetimeLinkOnPurchase: affConfig.isLifetimeLinkOnPurchase ?? false,
-        lifetimeDuration: affConfig.lifetimeDuration ?? null, // Null = Forever
-
-        // Finance
-        holdingPeriod: Number(affConfig.holdingPeriod) || 14,
-        autoApprovePayout: affConfig.autoApprovePayout ?? false,
-        minimumPayout: Number(affConfig.minimumPayout) || 50,
-        payoutMethods: Array.isArray(affConfig.payoutMethods) 
-          ? affConfig.payoutMethods 
-          : ["STORE_CREDIT"],
-      };
-    } catch (error) {
-      console.error("[ConfigService] Fetch Error:", error);
-      throw new Error("Failed to load affiliate configuration.");
+export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings): Promise<ActionResponse> {
+  try {
+    // 1. Auth Check
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) {
+        return { success: false, message: "Unauthorized access." };
     }
-  },
 
-  /**
-   * Update settings in DB
-   * Handles the split between `generalConfig` and `affiliateConfig`
-   */
-  async updateSettings(data: AffiliateGeneralSettings): Promise<void> {
-    try {
-      // 1. Fetch existing data to preserve other nested keys (safe update)
-      const current = await db.storeSettings.findUnique({
-        where: { id: "settings" },
-        select: { generalConfig: true },
-      });
-
-      const existingGeneral = (current?.generalConfig as any) || {};
-
-      // 2. Prepare JSON payload for `affiliateConfig` column
-      const affiliateConfigPayload: AffiliateConfigDTO = {
-        programName: data.programName,
-        termsUrl: data.termsUrl,
-        
-        excludeShipping: data.excludeShipping,
-        excludeTax: data.excludeTax,
-        autoApplyCoupon: data.autoApplyCoupon,
-        zeroValueReferrals: data.zeroValueReferrals,
-
-        referralParam: data.referralParam,
-        customSlugsEnabled: data.customSlugsEnabled,
-        autoCreateSlug: data.autoCreateSlug,
-        slugLimit: data.slugLimit,
-
-        cookieDuration: data.cookieDuration,
-        allowSelfReferral: data.allowSelfReferral,
-        isLifetimeLinkOnPurchase: data.isLifetimeLinkOnPurchase,
-        lifetimeDuration: data.lifetimeDuration,
-
-        holdingPeriod: data.holdingPeriod,
-        autoApprovePayout: data.autoApprovePayout,
-        minimumPayout: data.minimumPayout,
-        payoutMethods: data.payoutMethods,
+    // 2. Validation
+    const result = affiliateGeneralSchema.safeParse(data);
+    if (!result.success) {
+      return {
+        success: false,
+        message: "Validation failed.",
+        errors: result.error.flatten().fieldErrors as Record<string, string[]>,
       };
+    }
 
-      // 3. Perform Update
-      await db.storeSettings.upsert({
+    const payload = result.data;
+
+    // 3. Fetch Existing Config to Merge
+    const current = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { generalConfig: true, affiliateConfig: true },
+    });
+
+    const existingGeneral = (current?.generalConfig as any) || {};
+    
+    const affiliateConfigPayload: AffiliateConfigDTO = {
+      programName: payload.programName,
+      termsUrl: payload.termsUrl,
+      excludeShipping: payload.excludeShipping,
+      excludeTax: payload.excludeTax,
+      autoApplyCoupon: payload.autoApplyCoupon,
+      zeroValueReferrals: payload.zeroValueReferrals,
+      referralParam: payload.referralParam,
+      customSlugsEnabled: payload.customSlugsEnabled,
+      autoCreateSlug: payload.autoCreateSlug,
+      slugLimit: payload.slugLimit,
+      cookieDuration: payload.cookieDuration,
+      allowSelfReferral: payload.allowSelfReferral,
+      isLifetimeLinkOnPurchase: payload.isLifetimeLinkOnPurchase,
+      lifetimeDuration: payload.lifetimeDuration,
+      holdingPeriod: payload.holdingPeriod,
+      autoApprovePayout: payload.autoApprovePayout,
+      minimumPayout: payload.minimumPayout,
+      payoutMethods: payload.payoutMethods,
+    };
+
+    // 4. Update DB
+    await db.$transaction(async (tx) => {
+      await tx.storeSettings.upsert({
         where: { id: "settings" },
         create: {
-          storeName: "My Store", // Fallback
+          storeName: "My Store",
           currency: "AUD",
           generalConfig: {
             ...existingGeneral,
-            enableAffiliateProgram: data.isActive,
+            enableAffiliateProgram: payload.isActive,
           },
-          affiliateConfig: affiliateConfigPayload as any, // Prisma Json handling
+          affiliateConfig: affiliateConfigPayload as any,
         },
         update: {
           generalConfig: {
             ...existingGeneral,
-            enableAffiliateProgram: data.isActive,
+            enableAffiliateProgram: payload.isActive,
           },
           affiliateConfig: affiliateConfigPayload as any,
         },
       });
-    } catch (error) {
-      console.error("[ConfigService] Update Error:", error);
-      throw new Error("Database update failed.");
-    }
-  },
-};
+
+      await auditService.log({
+        userId: auth.id,
+        action: "UPDATE",
+        entity: "StoreSettings",
+        entityId: "settings",
+        oldData: current?.affiliateConfig,
+        newData: affiliateConfigPayload,
+        meta: { module: "AFFILIATE_CONFIG" }
+      });
+    });
+
+    // 5. Revalidate Global Layout (Important for Context)
+    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/", "layout");
+
+    return { success: true, message: "Configuration updated successfully." };
+  } catch (error: any) {
+    return { success: false, message: "Internal server error." };
+  }
+}

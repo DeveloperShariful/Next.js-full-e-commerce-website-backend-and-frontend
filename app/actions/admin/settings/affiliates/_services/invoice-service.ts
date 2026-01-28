@@ -4,9 +4,6 @@
 
 import { db } from "@/lib/prisma";
 
-// Note: We removed jsPDF imports from here. 
-// This file only fetches data. PDF generation happens on the Client Side.
-
 export async function getInvoiceData(payoutId: string) {
   const payout = await db.affiliatePayout.findUnique({
     where: { id: payoutId },
@@ -28,7 +25,6 @@ export async function getInvoiceData(payoutId: string) {
     invoiceNo: `INV-${payout.id.substring(0, 8).toUpperCase()}`,
     date: payout.createdAt.toISOString().split("T")[0],
     storeName: settings?.storeName || "GoBike Store",
-    // storeAddress: settings?.storeAddress || "Dhaka, Bangladesh", // Uncomment if address exists in schema
     affiliateName: payout.affiliate.user.name,
     affiliateEmail: payout.affiliate.user.email,
     amount: payout.amount.toNumber(),

@@ -7,8 +7,10 @@ import { AffiliateTier } from "@prisma/client";
 import { Edit, Trash2, Users, Trophy, Plus, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import TierModal from "./tier-modal";
-import { deleteTierAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-tiers";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+
+// ✅ CORRECTED IMPORT
+import { deleteTierAction } from "@/app/actions/admin/settings/affiliates/_services/tier-service";
 
 interface TierWithCount extends AffiliateTier {
   _count?: { affiliates: number };
@@ -22,8 +24,6 @@ export default function TierList({ initialTiers }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<TierWithCount | null>(null);
   const [isDeleting, startDelete] = useTransition();
-  
-  // ✅ Ultra Update: Dynamic Currency from Global Store
   const { formatPrice, symbol } = useGlobalStore();
 
   const handleCreate = () => {
@@ -40,6 +40,7 @@ export default function TierList({ initialTiers }: Props) {
     if (!confirm("Are you sure? This action cannot be undone and may affect active affiliates.")) return;
     
     startDelete(async () => {
+      // ✅ Using Service Method Directly
       const result = await deleteTierAction(id);
       if (result.success) toast.success(result.message);
       else toast.error(result.message);
@@ -146,7 +147,6 @@ export default function TierList({ initialTiers }: Props) {
         </div>
       </div>
 
-      {/* Reusing Modal Component */}
       {isModalOpen && (
         <TierModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={editingTier} />
       )}

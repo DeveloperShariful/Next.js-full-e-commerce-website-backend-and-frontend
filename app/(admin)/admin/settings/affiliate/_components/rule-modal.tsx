@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import { X, Loader2, Save, Plus, Calculator  } from "lucide-react";
 import { AffiliateCommissionRule } from "@prisma/client";
 
-import { upsertRule } from "@/app/actions/admin/settings/affiliates/mutations/manage-rules";
+// ✅ Correct Import Path
+// ✅ Use Named Import
+import { upsertRuleAction } from "@/app/actions/admin/settings/affiliates/_services/rule-engine-service";
 
 interface Props {
   isOpen: boolean;
@@ -16,7 +18,6 @@ interface Props {
   initialData?: AffiliateCommissionRule | null;
 }
 
-// Logic Builder structure mapped to UI
 interface RuleFormValues {
   id?: string;
   name: string;
@@ -31,10 +32,10 @@ interface RuleFormValues {
   startDate?: string;
   endDate?: string;
 
-  // Logic Conditions (Flattened for UI)
+  // Logic Conditions
   minOrderAmount?: number;
   customerType?: "ALL" | "NEW" | "RETURNING";
-  requiredCategoryIds?: string; // Comma separated for simplicity in this demo
+  requiredCategoryIds?: string; 
 }
 
 export default function RuleModal({ isOpen, onClose, initialData }: Props) {
@@ -51,7 +52,6 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
     },
   });
 
-  // Hydrate form on edit
   useEffect(() => {
     if (initialData) {
       const action = initialData.action as any;
@@ -67,7 +67,6 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
         startDate: initialData.startDate ? new Date(initialData.startDate).toISOString().split('T')[0] : undefined,
         endDate: initialData.endDate ? new Date(initialData.endDate).toISOString().split('T')[0] : undefined,
         
-        // Map JSON logic back to UI fields
         minOrderAmount: conditions?.minOrderAmount || undefined,
         customerType: conditions?.customerType || "ALL",
         requiredCategoryIds: conditions?.categoryIds?.join(",") || "",
@@ -88,7 +87,6 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
     // 1. Construct the JSON Logic Object
     const conditions: Record<string, any> = {};
     
-    // Only add conditions if they are set
     if (data.minOrderAmount && data.minOrderAmount > 0) {
       conditions.minOrderAmount = data.minOrderAmount;
     }
@@ -99,7 +97,6 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
       conditions.categoryIds = data.requiredCategoryIds.split(",").map(s => s.trim()).filter(Boolean);
     }
     
-    // Fallback if no condition set (just to pass validation, though logic implies always true)
     if (Object.keys(conditions).length === 0) {
       conditions.alwaysTrue = true;
     }
@@ -110,7 +107,7 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
       name: data.name,
       isActive: data.isActive,
       priority: data.priority,
-      conditions: conditions, // Pass the constructed JSON
+      conditions: conditions, 
       action: {
         type: data.actionType,
         value: data.actionValue,
@@ -121,10 +118,12 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
     };
 
     startTransition(async () => {
-      const result = await upsertRule(payload);
+      // ✅ Call Service Method Directly
+      const result = await upsertRuleAction(payload);
       if (result.success) {
         toast.success(result.message);
         onClose();
+        // In real apps, you might trigger revalidatePath or use context
       } else {
         toast.error(result.message);
       }

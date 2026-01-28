@@ -7,7 +7,9 @@ import { AffiliateDocument } from "@prisma/client";
 import { Search, Eye, CheckCircle, XCircle, FileText, Download, X, Loader2, ShieldCheck, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { verifyDocumentAction, rejectDocumentAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-kyc";
+
+// ✅ CORRECTED IMPORT
+import { rejectDocumentAction, verifyDocumentAction } from "@/app/actions/admin/settings/affiliates/_services/kyc-service";
 
 interface DocumentWithUser extends AffiliateDocument {
   affiliate: {
@@ -43,7 +45,6 @@ export default function KycManager({ initialDocuments }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Header / Filter Bar */}
       <div className="flex flex-col sm:flex-row justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
          <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative w-full sm:w-64">
@@ -76,7 +77,6 @@ export default function KycManager({ initialDocuments }: Props) {
          </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-xs font-semibold">
@@ -156,8 +156,6 @@ export default function KycManager({ initialDocuments }: Props) {
   );
 }
 
-// --- SUB COMPONENT: Review Modal ---
-
 function ReviewModal({ doc, onClose, onUpdate }: any) {
     const [isPending, startTransition] = useTransition();
 
@@ -192,7 +190,6 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden">
-                {/* Modal Header */}
                 <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                     <div>
                         <h3 className="font-bold text-lg text-gray-900">Document Review</h3>
@@ -202,7 +199,6 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
                 </div>
 
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                    {/* Image Viewer */}
                     <div className="flex-1 bg-slate-900 flex items-center justify-center p-6 relative group">
                         <img 
                             src={doc.fileUrl} 
@@ -218,7 +214,6 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
                         </a>
                     </div>
 
-                    {/* Sidebar Details */}
                     <div className="w-full md:w-80 bg-white border-l p-6 flex flex-col gap-6 overflow-y-auto shrink-0">
                         <div>
                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Submitted By</h4>

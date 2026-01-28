@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { X, Loader2, Save, Trophy } from "lucide-react";
 import { AffiliateContest } from "@prisma/client";
 
-import { upsertContest } from "@/app/actions/admin/settings/affiliates/mutations/manage-contests";
+// ✅ CORRECTED IMPORT
+import { upsertContestAction } from "@/app/actions/admin/settings/affiliates/_services/contest-service";
 
 interface Props {
   isOpen: boolean;
@@ -72,10 +73,13 @@ export default function ContestModal({ isOpen, onClose, initialData }: Props) {
 
   const onSubmit = (data: ContestFormValues) => {
     startTransition(async () => {
-      const result = await upsertContest(data);
+      // ✅ Using Service Method
+      const result = await upsertContestAction(data);
       if (result.success) {
         toast.success(result.message);
         onClose();
+        // Trigger generic refresh if needed via router in parent
+        window.location.reload(); 
       } else {
         toast.error(result.message);
       }

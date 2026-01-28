@@ -8,8 +8,11 @@ import { Edit, Trash2, GripVertical, Plus, Calculator, CalendarClock, Ban, Check
 import { toast } from "sonner";
 import { format } from "date-fns";
 import RuleModal from "./rule-modal";
-import { deleteRuleAction, reorderRulesAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-rules";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+
+// ✅ Correct Import Path
+// ✅ Use Named Imports
+import { deleteRuleAction } from "@/app/actions/admin/settings/affiliates/_services/rule-engine-service";
 
 interface Props {
   initialRules: AffiliateCommissionRule[];
@@ -19,7 +22,7 @@ export default function RuleList({ initialRules }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AffiliateCommissionRule | null>(null);
   const [isDeleting, startDelete] = useTransition();
-  const { symbol } = useGlobalStore(); // Ultra Update: Use currency symbol
+  const { symbol } = useGlobalStore(); 
 
   const handleCreate = () => {
     setEditingRule(null);
@@ -35,6 +38,7 @@ export default function RuleList({ initialRules }: Props) {
     if (!confirm("Are you sure? This will delete the logic rule permanently.")) return;
     
     startDelete(async () => {
+      // ✅ Call Service Method Directly
       const result = await deleteRuleAction(id);
       if (result.success) toast.success(result.message);
       else toast.error(result.message);

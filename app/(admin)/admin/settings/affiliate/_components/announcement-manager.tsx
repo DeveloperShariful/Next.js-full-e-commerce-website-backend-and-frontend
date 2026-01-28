@@ -4,11 +4,18 @@
 
 import { useState } from "react";
 import { AffiliateAnnouncement } from "@prisma/client";
-import { Plus, Trash2, Megaphone, Calendar, Users, Eye, EyeOff, CheckCircle, AlertTriangle, Info } from "lucide-react";
+import { Plus, Trash2, Megaphone, Calendar, Users, Eye, EyeOff, CheckCircle, AlertTriangle, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { createAnnouncementAction, deleteAnnouncementAction, toggleAnnouncementStatusAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-announcements";
 import { formatDistanceToNow } from "date-fns";
+
+// ✅ 1. Correct Import Path (Singular 'affiliate')
+// ✅ 2. Named Imports directly
+import { 
+  createAnnouncementAction, 
+  deleteAnnouncementAction,
+  toggleStatusAction 
+} from "@/app/actions/admin/settings/affiliates/_services/announcement-service";
 
 interface AnnouncementWithTargets extends AffiliateAnnouncement {
   targetGroups: { id: string; name: string }[];
@@ -24,46 +31,60 @@ export default function AnnouncementManager({ initialData }: Props) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Form State
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [type, setType] = useState("INFO");
 
   const handleDelete = async (id: string) => {
-    if(!confirm("Delete this announcement? It will be removed from all dashboards.")) return;
+    if(!confirm("Delete this announcement?")) return;
+    
+    // Optimistic Delete
+    const previousItems = items;
+    setItems(prev => prev.filter(i => i.id !== id));
+
+    // ✅ Call Service Method Directly
     const res = await deleteAnnouncementAction(id);
+    
     if(res.success) {
-      setItems(prev => prev.filter(i => i.id !== id));
       toast.success(res.message);
+    } else {
+      setItems(previousItems); // Revert
+      toast.error(res.message);
     }
   };
 
   const handleToggle = async (id: string, current: boolean) => {
-    // Optimistic Update
     setItems(prev => prev.map(i => i.id === id ? { ...i, isActive: !current } : i));
     
-    const res = await toggleAnnouncementStatusAction(id, !current);
-    if(!res.success) {
-        // Revert if failed
+    // ✅ Call Service Method Directly
+    const res = await toggleStatusAction(id, !current);
+    
+    if(res.success) {
+        toast.success(res.message);
+    } else {
         setItems(prev => prev.map(i => i.id === id ? { ...i, isActive: current } : i));
         toast.error("Update failed");
-    } else {
-        toast.success(res.message);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const res = await createAnnouncementAction({ title, content, type: type as any, isActive: true });
+    
+    // ✅ Call Service Method Directly
+    const res = await createAnnouncementAction({ 
+        title, 
+        content, 
+        type: type as any, 
+        isActive: true 
+    });
+
     if(res.success) {
       toast.success(res.message);
       setIsFormOpen(false);
       setTitle("");
       setContent("");
-      // Real app should re-fetch or optimistically add. 
-      // For now, refreshing page is safest or returning the object from action.
-      // Assuming layout refresh triggers.
+      window.location.reload(); 
     } else {
       toast.error(res.message);
     }
@@ -80,16 +101,15 @@ export default function AnnouncementManager({ initialData }: Props) {
 
   return (
     <div className="space-y-6">
-      
       {/* Header */}
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
         <div>
-          <h3 className="font-semibold text-gray-900">Affiliate Dashboard Announcements</h3>
-          <p className="text-xs text-gray-500">Post news, updates, and urgent alerts for your partners.</p>
+          <h3 className="font-semibold text-gray-900">Dashboard Announcements</h3>
+          <p className="text-xs text-gray-500">Post news, updates, and urgent alerts directly to partner dashboards.</p>
         </div>
         <button 
           onClick={() => setIsFormOpen(!isFormOpen)}
-          className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all shadow-sm"
+          className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all shadow-sm active:scale-95"
         >
           <Plus className="w-4 h-4" /> {isFormOpen ? "Close Editor" : "New Post"}
         </button>
@@ -119,7 +139,8 @@ export default function AnnouncementManager({ initialData }: Props) {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-              <button type="submit" disabled={loading} className="px-6 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors">
+              <button type="submit" disabled={loading} className="px-6 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-2">
+                {loading && <Loader2 className="w-3 h-3 animate-spin"/>}
                 {loading ? "Posting..." : "Publish Now"}
               </button>
             </div>
@@ -137,7 +158,6 @@ export default function AnnouncementManager({ initialData }: Props) {
         ) : (
           items.map(item => (
             <div key={item.id} className={cn("group flex flex-col sm:flex-row gap-4 p-5 rounded-xl border transition-all bg-white hover:shadow-md", !item.isActive && "opacity-60 bg-gray-50 border-dashed")}>
-              {/* Icon */}
               <div className={cn("w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 border shadow-sm", 
                 item.type === "INFO" ? "bg-blue-50 border-blue-100" : 
                 item.type === "WARNING" ? "bg-orange-50 border-orange-100" : 
@@ -152,7 +172,6 @@ export default function AnnouncementManager({ initialData }: Props) {
                   {!item.isActive && <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">DRAFT</span>}
                 </div>
                 <p className="text-sm text-gray-600 mb-3 leading-relaxed">{item.content}</p>
-                
                 <div className="flex flex-wrap items-center gap-4 text-[11px] text-gray-400 font-medium">
                   <span className="flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded"><Calendar className="w-3 h-3" /> {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}</span>
                   <span className="flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded">
@@ -162,20 +181,11 @@ export default function AnnouncementManager({ initialData }: Props) {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-2 self-start sm:self-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                    onClick={() => handleToggle(item.id, item.isActive)} 
-                    className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors" 
-                    title={item.isActive ? "Hide from dashboard" : "Show on dashboard"}
-                >
+                <button onClick={() => handleToggle(item.id, item.isActive)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors">
                   {item.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
-                <button 
-                    onClick={() => handleDelete(item.id)} 
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete permanently"
-                >
+                <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

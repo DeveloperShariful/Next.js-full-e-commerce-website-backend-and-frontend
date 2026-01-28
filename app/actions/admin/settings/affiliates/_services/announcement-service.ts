@@ -1,70 +1,135 @@
-//File: app/actions/admin/settings/affiliates/_services/announcement-service.ts
+// File: app/actions/admin/settings/affiliate/_services/announcement-service.ts
+
+// ✅ 1. Top-level directive required for Server Actions
+"use server";
 
 import { db } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { auditService } from "@/lib/services/audit-service";
+import { ActionResponse } from "../types";
+import { syncUser } from "@/lib/auth-sync";
+import { z } from "zod";
 
-export const announcementService = {
-  async getAllAnnouncements(page: number = 1, limit: number = 10) {
-    const skip = (page - 1) * limit;
+const announcementSchema = z.object({
+  title: z.string().min(3),
+  content: z.string().min(5),
+  type: z.enum(["INFO", "WARNING", "SUCCESS"]),
+  isActive: z.boolean().default(true),
+  groupIds: z.array(z.string()).optional(),
+  tierIds: z.array(z.string()).optional(),
+  startsAt: z.date().optional(),
+  expiresAt: z.date().optional().nullable(),
+});
 
-    const [total, data] = await Promise.all([
-      db.affiliateAnnouncement.count(),
-      db.affiliateAnnouncement.findMany({
-        skip,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        include: {
-          targetGroups: { select: { id: true, name: true } },
-          targetTiers: { select: { id: true, name: true } }
-        }
-      })
-    ]);
+// =========================================
+// READ OPERATIONS
+// =========================================
 
-    return { 
-      announcements: data, 
-      total, 
-      totalPages: Math.ceil(total / limit) 
-    };
-  },
+// ✅ 2. Converted to Named Export
+export async function getAllAnnouncements(page: number = 1, limit: number = 20) {
+  const skip = (page - 1) * limit;
 
-  async createAnnouncement(data: {
-    title: string;
-    content: string;
-    type: string;
-    isActive: boolean;
-    startsAt?: Date;
-    expiresAt?: Date;
-    groupIds?: string[];
-    tierIds?: string[];
-  }) {
-    return await db.affiliateAnnouncement.create({
+  const [total, data] = await Promise.all([
+    db.affiliateAnnouncement.count(),
+    db.affiliateAnnouncement.findMany({
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        targetGroups: { select: { id: true, name: true } },
+        targetTiers: { select: { id: true, name: true } }
+      }
+    })
+  ]);
+
+  return { 
+    announcements: data, 
+    total, 
+    totalPages: Math.ceil(total / limit) 
+  };
+}
+
+// =========================================
+// SERVER ACTIONS (Mutations)
+// =========================================
+
+// ✅ 3. Removed inline "use server" (already at top)
+export async function createAnnouncementAction(data: z.infer<typeof announcementSchema>): Promise<ActionResponse> {
+  try {
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+
+    const result = announcementSchema.safeParse(data);
+    if (!result.success) return { success: false, message: "Validation failed." };
+
+    const payload = result.data;
+
+    const announcement = await db.affiliateAnnouncement.create({
       data: {
-        title: data.title,
-        content: data.content,
-        type: data.type,
-        isActive: data.isActive,
-        startsAt: data.startsAt || new Date(),
-        expiresAt: data.expiresAt,
-        targetGroups: data.groupIds ? {
-          connect: data.groupIds.map(id => ({ id }))
+        title: payload.title,
+        content: payload.content,
+        type: payload.type,
+        isActive: payload.isActive,
+        startsAt: payload.startsAt || new Date(),
+        expiresAt: payload.expiresAt,
+        targetGroups: payload.groupIds ? {
+          connect: payload.groupIds.map(id => ({ id }))
         } : undefined,
-        targetTiers: data.tierIds ? {
-          connect: data.tierIds.map(id => ({ id }))
+        targetTiers: payload.tierIds ? {
+          connect: payload.tierIds.map(id => ({ id }))
         } : undefined,
       }
     });
-  },
 
-  async deleteAnnouncement(id: string) {
-    return await db.affiliateAnnouncement.delete({
-      where: { id }
+    await auditService.log({
+      userId: auth.id,
+      action: "CREATE",
+      entity: "AffiliateAnnouncement",
+      entityId: announcement.id,
+      newData: payload
     });
-  },
 
-  async toggleStatus(id: string, isActive: boolean) {
-    return await db.affiliateAnnouncement.update({
+    revalidatePath("/admin/settings/affiliate/announcements");
+    return { success: true, message: "Announcement published." };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+}
+
+export async function deleteAnnouncementAction(id: string): Promise<ActionResponse> {
+  try {
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+
+    await db.affiliateAnnouncement.delete({ where: { id } });
+
+    await auditService.log({
+      userId: auth.id,
+      action: "DELETE",
+      entity: "AffiliateAnnouncement",
+      entityId: id
+    });
+
+    revalidatePath("/admin/settings/affiliate/announcements");
+    return { success: true, message: "Deleted successfully." };
+  } catch (error: any) {
+    return { success: false, message: "Failed to delete." };
+  }
+}
+
+export async function toggleStatusAction(id: string, isActive: boolean): Promise<ActionResponse> {
+  try {
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+
+    await db.affiliateAnnouncement.update({
       where: { id },
       data: { isActive }
     });
+
+    revalidatePath("/admin/settings/affiliate/announcements");
+    return { success: true, message: "Status updated." };
+  } catch (error: any) {
+    return { success: false, message: "Update failed." };
   }
-};
+}

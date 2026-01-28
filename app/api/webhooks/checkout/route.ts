@@ -2,54 +2,91 @@
 
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { affiliateEngine } from "@/lib/services/affiliate-engine";
 import { db } from "@/lib/prisma";
+import { auditService } from "@/lib/services/audit-service";
 
-// Example: Handling a Stripe/Payment Gateway Webhook
 export async function POST(req: Request) {
-  const body = await req.text();
-  const signature = (await headers()).get("Stripe-Signature") as string;
-
-  let event;
-
   try {
-    // In real app: event = stripe.webhooks.constructEvent(body, signature, secret);
-    // For demo, we assume the body is the event JSON
-    event = JSON.parse(body);
-  } catch (err: any) {
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
-  }
-
-  // Handle Event: Payment Succeeded
-  if (event.type === "checkout.session.completed" || event.type === "payment_intent.succeeded") {
+    const body = await req.text();
+    const headersList = await headers();
     
-    const session = event.data.object;
-    const orderId = session.metadata?.orderId;
+    const signature = headersList.get("Stripe-Signature");
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    if (orderId) {
-      console.log(`💰 Payment success for Order ${orderId}. Triggering Affiliate Engine...`);
-      
-      try {
-        // 1. Mark Order as Paid
+    if (webhookSecret && !signature) {
+      return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+    }
+    
+    const event = JSON.parse(body);
+    const eventId = event.id;
+    const eventType = event.type;
+
+    const existingLog = await db.paymentWebhookLog.findUnique({
+      where: { eventId: eventId }
+    });
+
+    if (existingLog && existingLog.processed) {
+      return NextResponse.json({ message: "Already processed" }, { status: 200 });
+    }
+
+    if (!existingLog) {
+      await db.paymentWebhookLog.create({
+        data: {
+          provider: "STRIPE", 
+          eventId: eventId,
+          eventType: eventType,
+          payload: event as any,
+          processed: false
+        }
+      });
+    }
+
+    if (eventType === "checkout.session.completed" || eventType === "payment_intent.succeeded") {
+      const session = event.data.object;
+      const orderId = session.metadata?.orderId;
+
+      if (orderId) {
         await db.order.update({
-            where: { id: orderId },
-            data: { 
-                paymentStatus: "PAID",
-                status: "PROCESSING"
+          where: { id: orderId },
+          data: { 
+            paymentStatus: "PAID",
+            paymentId: session.payment_intent || session.id,
+            isCaptured: true,
+            capturedAt: new Date(),
+            transactions: {
+              create: {
+                gateway: "stripe",
+                type: "SALE",
+                amount: session.amount_total / 100,
+                transactionId: session.payment_intent || session.id,
+                status: "COMPLETED",
+                rawResponse: event
+              }
             }
+          }
         });
 
-        // 2. Run Affiliate Logic
-        await affiliateEngine.processOrder(orderId);
-        
-        console.log("✅ Affiliate commissions calculated.");
-
-      } catch (error) {
-        console.error("❌ Affiliate Engine Failed:", error);
-        // Don't fail the webhook response, just log the error for admin review
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        fetch(`${appUrl}/api/affiliate/process-order`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.INTERNAL_API_KEY!
+          },
+          body: JSON.stringify({ orderId })
+        }).catch(err => console.error("Trigger Engine Failed", err));
       }
     }
-  }
 
-  return new NextResponse(null, { status: 200 });
+    await db.paymentWebhookLog.update({
+      where: { eventId: eventId },
+      data: { processed: true }
+    });
+
+    return NextResponse.json({ received: true });
+
+  } catch (error: any) {
+    await auditService.systemLog("ERROR", "WEBHOOK", "Payment Webhook Failed", { error: error.message });
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
+  }
 }

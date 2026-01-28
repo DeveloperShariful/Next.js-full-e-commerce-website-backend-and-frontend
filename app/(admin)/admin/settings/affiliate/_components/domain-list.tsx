@@ -4,9 +4,15 @@
 
 import { useState, useTransition } from "react";
 import { AffiliateDomain } from "@prisma/client";
-import { Trash2, Globe, CheckCircle, XCircle, RefreshCw, Copy, Plus, Loader2, Link as LinkIcon, ShieldCheck, AlertCircle } from "lucide-react";
+import { Trash2, Globe, CheckCircle, RefreshCw, Copy, Plus, Loader2, Link as LinkIcon, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { addDomainAction, verifyDomainAction, deleteDomainAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-domains";
+
+// ✅ CORRECTED IMPORT
+import { 
+  addDomainAction, 
+  deleteDomainAction, 
+  verifyDomainAction 
+} from "@/app/actions/admin/settings/affiliates/_services/domain-service";
 
 interface DomainWithAffiliate extends AffiliateDomain {
   affiliate: {
@@ -30,6 +36,7 @@ export default function DomainList({ initialDomains }: Props) {
 
   const handleVerify = (id: string) => {
     startTransition(async () => {
+      // ✅ Call Service Method
       const res = await verifyDomainAction(id);
       if (res.success) toast.success(res.message);
       else toast.error(res.message);
@@ -39,6 +46,7 @@ export default function DomainList({ initialDomains }: Props) {
   const handleDelete = (id: string) => {
     if (!confirm("Remove this domain? It will stop working immediately.")) return;
     startTransition(async () => {
+      // ✅ Call Service Method
       const res = await deleteDomainAction(id);
       if (res.success) toast.success(res.message);
       else toast.error(res.message);
@@ -50,6 +58,7 @@ export default function DomainList({ initialDomains }: Props) {
     if (!affiliateId || !newDomain) return toast.error("All fields required");
 
     startTransition(async () => {
+      // ✅ Call Service Method
       const res = await addDomainAction({ affiliateId, domain: newDomain });
       if (res.success) {
         toast.success(res.message);
@@ -80,14 +89,18 @@ export default function DomainList({ initialDomains }: Props) {
              </div>
              <button 
                 onClick={() => setIsAdding(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-all shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-all shadow-sm active:scale-95"
              >
                 <Plus className="w-4 h-4" /> Add Domain
              </button>
           </div>
         ) : (
-          <form onSubmit={handleAdd} className="space-y-4 animate-in fade-in">
-            <h4 className="text-sm font-bold text-gray-900 border-b pb-2">Connect New Domain</h4>
+          <form onSubmit={handleAdd} className="space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="text-sm font-bold text-gray-900">Connect New Domain</h4>
+                <button type="button" onClick={() => setIsAdding(false)} className="text-xs text-red-500 hover:underline">Cancel</button>
+            </div>
+            
             <div className="flex flex-col sm:flex-row gap-4 items-end">
                 <div className="space-y-1.5 flex-1 w-full">
                     <label className="text-xs font-bold text-gray-500 uppercase">Affiliate ID (UUID)</label>
@@ -109,22 +122,14 @@ export default function DomainList({ initialDomains }: Props) {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none"
                     />
                 </div>
-                <div className="flex gap-2">
-                    <button 
-                        type="button" 
-                        onClick={() => setIsAdding(false)}
-                        className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        type="submit" 
-                        disabled={isPending}
-                        className="px-6 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                    >
-                        {isPending ? "Connecting..." : "Connect"}
-                    </button>
-                </div>
+                <button 
+                    type="submit" 
+                    disabled={isPending}
+                    className="px-6 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                    {isPending && <Loader2 className="w-3 h-3 animate-spin"/>}
+                    {isPending ? "Connecting..." : "Connect"}
+                </button>
             </div>
           </form>
         )}
@@ -181,7 +186,7 @@ export default function DomainList({ initialDomains }: Props) {
                         {item.verificationToken || "N/A"}
                       </span>
                       {item.verificationToken && (
-                        <button onClick={() => copyToken(item.verificationToken!)} className="text-slate-400 hover:text-black">
+                        <button onClick={() => copyToken(item.verificationToken!)} className="text-slate-400 hover:text-black" title="Copy Token">
                           <Copy className="w-3 h-3" />
                         </button>
                       )}

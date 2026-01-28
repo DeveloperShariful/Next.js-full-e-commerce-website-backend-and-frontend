@@ -1,11 +1,14 @@
-//File: app/actions/admin/settings/affiliates/mutations/manage-groups.ts
+// File: app/actions/admin/settings/affiliate/_services/group-service.ts
 
 "use server";
 
-import { z } from "zod";
-import { revalidatePath } from "next/cache";
 import { db } from "@/lib/prisma";
 import { ActionResponse } from "../types";
+import { revalidatePath } from "next/cache";
+import { auditService } from "@/lib/services/audit-service";
+import { DecimalMath } from "@/lib/utils/decimal-math";
+import { syncUser } from "@/lib/auth-sync";
+import { z } from "zod";
 
 const groupSchema = z.object({
   id: z.string().optional(),
@@ -17,8 +20,33 @@ const groupSchema = z.object({
 
 type GroupInput = z.infer<typeof groupSchema>;
 
+// =========================================
+// READ OPERATIONS
+// =========================================
+export async function getAllGroups() {
+  return await db.affiliateGroup.findMany({
+    include: {
+      _count: { 
+        select: { 
+          affiliates: true,
+          productRates: true,
+          announcements: true
+        } 
+      }
+    },
+    orderBy: { name: "asc" }
+  });
+}
+
+// =========================================
+// SERVER ACTIONS (Mutations)
+// =========================================
+
 export async function upsertGroupAction(data: GroupInput): Promise<ActionResponse> {
   try {
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+
     const result = groupSchema.safeParse(data);
     if (!result.success) {
       return {
@@ -29,15 +57,16 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
     }
 
     const payload = result.data;
-    const rateValue = payload.commissionRate ? Number(payload.commissionRate) : null;
+    const rateValue = payload.commissionRate ? DecimalMath.toDecimal(payload.commissionRate as any) : null;
 
-    // Logic: If setting as default, unset others
     if (payload.isDefault) {
       await db.affiliateGroup.updateMany({
         where: { isDefault: true },
         data: { isDefault: false },
       });
     }
+
+    let groupId = payload.id;
 
     if (payload.id) {
       await db.affiliateGroup.update({
@@ -50,7 +79,7 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
         },
       });
     } else {
-      await db.affiliateGroup.create({
+      const created = await db.affiliateGroup.create({
         data: {
           name: payload.name,
           slug: payload.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
@@ -59,32 +88,44 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
           isDefault: payload.isDefault,
         },
       });
+      groupId = created.id;
     }
+
+    await auditService.log({
+      userId: auth.id,
+      action: payload.id ? "UPDATE" : "CREATE",
+      entity: "AffiliateGroup",
+      entityId: groupId!,
+      newData: payload
+    });
 
     revalidatePath("/admin/settings/affiliate/groups");
     return { success: true, message: payload.id ? "Group updated." : "Group created." };
 
   } catch (error: any) {
-    // Handle Unique Constraint (Slug/Name)
-    if (error.code === 'P2002') {
-      return { success: false, message: "A group with this name already exists." };
-    }
-    return { success: false, message: error.message || "Failed to save group." };
+    if (error.code === 'P2002') return { success: false, message: "A group with this name already exists." };
+    return { success: false, message: "Failed to save group." };
   }
 }
 
 export async function deleteGroupAction(id: string): Promise<ActionResponse> {
   try {
-    if (!id) return { success: false, message: "ID required." };
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
 
-    // Check if used
     const count = await db.affiliateAccount.count({ where: { groupId: id } });
     if (count > 0) {
-        // Option: Move to default group logic here if needed
         return { success: false, message: `Cannot delete: ${count} affiliates are in this group.` };
     }
 
     await db.affiliateGroup.delete({ where: { id } });
+
+    await auditService.log({
+      userId: auth.id,
+      action: "DELETE",
+      entity: "AffiliateGroup",
+      entityId: id
+    });
     
     revalidatePath("/admin/settings/affiliate/groups");
     return { success: true, message: "Group deleted successfully." };

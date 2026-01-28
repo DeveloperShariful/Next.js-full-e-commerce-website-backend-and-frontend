@@ -1,48 +1,62 @@
-// File: app/actions/admin/settings/affiliates/_services/kyc-service.ts
+// File: app/actions/admin/settings/affiliate/_services/kyc-service.ts
+
+"use server";
 
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { sendNotification } from "@/app/api/email/send-notification"; // ✅ Import Notification System
+import { sendNotification } from "@/app/api/email/send-notification";
+import { auditService } from "@/lib/services/audit-service";
+import { revalidatePath } from "next/cache";
+import { ActionResponse } from "../types";
+import { syncUser } from "@/lib/auth-sync";
 
-export const kycService = {
-  async getDocuments(page: number = 1, limit: number = 20, status?: string) {
-    const skip = (page - 1) * limit;
-    
-    const where: Prisma.AffiliateDocumentWhereInput = status ? { status } : {};
+// =========================================
+// READ OPERATIONS
+// =========================================
+export async function getDocuments(page: number = 1, limit: number = 20, status?: string) {
+  const skip = (page - 1) * limit;
+  
+  const where: Prisma.AffiliateDocumentWhereInput = status ? { status } : {};
 
-    const [total, data] = await Promise.all([
-      db.affiliateDocument.count({ where }),
-      db.affiliateDocument.findMany({
-        where,
-        take: limit,
-        skip,
-        orderBy: { createdAt: "desc" },
-        include: {
-          affiliate: {
-            select: {
-              id: true,
-              slug: true,
-              kycStatus: true,
-              user: {
-                select: { name: true, email: true, image: true }
-              }
+  const [total, data] = await Promise.all([
+    db.affiliateDocument.count({ where }),
+    db.affiliateDocument.findMany({
+      where,
+      take: limit,
+      skip,
+      orderBy: { createdAt: "desc" },
+      include: {
+        affiliate: {
+          select: {
+            id: true,
+            slug: true,
+            kycStatus: true,
+            user: {
+              select: { name: true, email: true, image: true }
             }
           }
         }
-      })
-    ]);
+      }
+    })
+  ]);
 
-    return {
-      documents: data,
-      total,
-      totalPages: Math.ceil(total / limit)
-    };
-  },
+  return {
+    documents: data,
+    total,
+    totalPages: Math.ceil(total / limit)
+  };
+}
 
-  async verifyDocument(documentId: string, adminId: string) {
-    // 1. Transaction to update DB
+// =========================================
+// SERVER ACTIONS (Mutations)
+// =========================================
+
+export async function verifyDocumentAction(documentId: string): Promise<ActionResponse> {
+  try {
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+
     const result = await db.$transaction(async (tx) => {
-      // Need user email for notification
       const doc = await tx.affiliateDocument.findUnique({
         where: { id: documentId },
         include: { 
@@ -54,7 +68,6 @@ export const kycService = {
 
       if (!doc) throw new Error("Document not found");
 
-      // Update Document Status
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
@@ -64,7 +77,7 @@ export const kycService = {
         }
       });
 
-      // Check if any other docs are pending
+      // Check if all docs are verified
       const pendingDocs = await tx.affiliateDocument.count({
         where: {
           affiliateId: doc.affiliateId,
@@ -72,7 +85,6 @@ export const kycService = {
         }
       });
 
-      // If all docs verified, update Main Account Status
       if (pendingDocs === 0) {
         await tx.affiliateAccount.update({
           where: { id: doc.affiliateId },
@@ -80,10 +92,17 @@ export const kycService = {
         });
       }
 
-      return doc; // Return doc to use outside transaction
+      await auditService.log({
+        userId: auth.id,
+        action: "VERIFY_KYC",
+        entity: "AffiliateDocument",
+        entityId: documentId,
+        meta: { affiliateId: doc.affiliateId }
+      });
+
+      return doc;
     });
 
-    // 2. Send Email Notification (Outside Transaction to keep DB fast)
     await sendNotification({
         trigger: "KYC_VERIFIED",
         recipient: result.affiliate.user.email,
@@ -94,11 +113,19 @@ export const kycService = {
         userId: result.affiliate.userId
     });
 
-    return { success: true };
-  },
+    revalidatePath("/admin/settings/affiliate/kyc");
+    return { success: true, message: "Document verified successfully." };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Verification failed." };
+  }
+}
 
-  async rejectDocument(documentId: string, reason: string) {
-    // 1. Transaction
+export async function rejectDocumentAction(documentId: string, reason: string): Promise<ActionResponse> {
+  try {
+    const auth = await syncUser();
+    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    if (!reason) return { success: false, message: "Rejection reason is required." };
+
     const result = await db.$transaction(async (tx) => {
       const doc = await tx.affiliateDocument.findUnique({
         where: { id: documentId },
@@ -111,7 +138,6 @@ export const kycService = {
 
       if (!doc) throw new Error("Document not found");
 
-      // Update Document
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
@@ -121,16 +147,22 @@ export const kycService = {
         }
       });
 
-      // Update Account Status immediately to Rejected/Pending
       await tx.affiliateAccount.update({
         where: { id: doc.affiliateId },
         data: { kycStatus: "REJECTED" }
       });
 
+      await auditService.log({
+        userId: auth.id,
+        action: "REJECT_KYC",
+        entity: "AffiliateDocument",
+        entityId: documentId,
+        meta: { reason, affiliateId: doc.affiliateId }
+      });
+
       return doc;
     });
 
-    // 2. Send Email Notification
     await sendNotification({
         trigger: "KYC_REJECTED",
         recipient: result.affiliate.user.email,
@@ -142,12 +174,9 @@ export const kycService = {
         userId: result.affiliate.userId
     });
 
-    return { success: true };
-  },
-
-  async getPendingCount() {
-    return await db.affiliateDocument.count({
-      where: { status: "PENDING" }
-    });
+    revalidatePath("/admin/settings/affiliate/kyc");
+    return { success: true, message: "Document rejected." };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Rejection failed." };
   }
-};
+}

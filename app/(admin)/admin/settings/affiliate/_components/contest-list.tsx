@@ -8,8 +8,10 @@ import { format, isAfter, isBefore } from "date-fns";
 import { Trophy, Calendar, Plus, Trash2, Edit, TrendingUp, Users, Medal, Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
-import { upsertContest, deleteContestAction } from "@/app/actions/admin/settings/affiliates/mutations/manage-contests";
-import { useGlobalStore } from "@/app/providers/global-store-provider";
+
+// ✅ Correct Import Path
+// ✅ Use Named Imports
+import { deleteContestAction, upsertContestAction } from "@/app/actions/admin/settings/affiliates/_services/contest-service";
 
 interface Props {
   initialContests: AffiliateContest[];
@@ -19,7 +21,6 @@ export default function ContestList({ initialContests }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AffiliateContest | null>(null);
   const [isDeleting, startDelete] = useTransition();
-  const { symbol } = useGlobalStore();
 
   const handleCreate = () => {
     setEditingItem(null);
@@ -34,6 +35,7 @@ export default function ContestList({ initialContests }: Props) {
   const handleDelete = (id: string) => {
     if (!confirm("Are you sure? This will hide the leaderboard.")) return;
     startDelete(async () => {
+      // ✅ Call Service Method
       const result = await deleteContestAction(id);
       if (result.success) toast.success(result.message);
       else toast.error(result.message);
@@ -70,7 +72,6 @@ export default function ContestList({ initialContests }: Props) {
             <div className="p-12 text-center text-gray-500 flex flex-col items-center">
               <Trophy className="h-10 w-10 text-gray-300 mb-3" />
               <p>No active contests.</p>
-              <p className="text-xs text-gray-400">Launch a competition to boost sales.</p>
             </div>
           ) : (
             initialContests.map((contest) => {
@@ -169,7 +170,8 @@ function ContestModal({ isOpen, onClose, initialData }: any) {
 
     const onSubmit = (data: any) => {
         startTransition(async () => {
-            const res = await upsertContest(data);
+            // ✅ Call Service Method
+            const res = await upsertContestAction(data);
             if(res.success) {
                 toast.success(res.message);
                 onClose();

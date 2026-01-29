@@ -15,7 +15,7 @@ interface PayPalGatewayProps {
   isShippingSelected: boolean;
   cartId: string;
   customerInfo: any;
-  shippingInfo: any;
+  shippingInfo: any; // This holds the final shipping address passed from parent
   selectedShippingId: string;
   onSuccess: (orderId: string) => void;
 }
@@ -28,29 +28,14 @@ export default function PayPalPaymentGateway({
   const [{ isPending, isResolved, isRejected, options }] = usePayPalScriptReducer();
   const [isReady, setIsReady] = useState(false);
 
-  // 🔍 DEBUG LOG 2: Script Status
+  // Script Load Status Check
   useEffect(() => {
-    console.log("🔥 [PayPalGateway] Script Status:", { 
-        isPending, 
-        isResolved, 
-        isRejected,
-        clientIdUsed: options.clientId 
-    });
-
     if (isResolved) {
-        // উইন্ডো অবজেক্ট চেক করা
         const hasWindowPayPal = typeof window !== 'undefined' && window.paypal;
         const hasButtons = hasWindowPayPal && window.paypal?.Buttons;
         
-        console.log("🔥 [PayPalGateway] Window Object Check:", { 
-            hasWindowPayPal: !!hasWindowPayPal, 
-            hasButtons: !!hasButtons 
-        });
-
         if (hasButtons) {
             setIsReady(true);
-        } else {
-            console.error("❌ [PayPalGateway] Script loaded but window.paypal.Buttons missing!");
         }
     }
   }, [isPending, isResolved, isRejected, options]);
@@ -68,8 +53,7 @@ export default function PayPalPaymentGateway({
   if (isRejected) {
     return (
         <div className="w-full p-4 bg-red-50 text-red-600 text-sm border border-red-200 rounded">
-            ⚠️ PayPal Script Failed to Load.<br/>
-            Check if Client ID is correct in Admin Panel.
+            ⚠️ PayPal Script Failed to Load. Check Client ID.
         </div>
     );
   }
@@ -78,7 +62,7 @@ export default function PayPalPaymentGateway({
   if (!isReady) {
       return (
         <div className="w-full h-[48px] bg-gray-100 rounded flex items-center justify-center text-sm text-gray-500">
-            Initializing Secure Payment...
+            Initializing Payment...
         </div>
       );
   }
@@ -87,7 +71,7 @@ export default function PayPalPaymentGateway({
       <PayPalButtons
         style={{ layout: "vertical", color: 'gold', shape: 'rect', label: 'paypal', height: 48 }}
         disabled={isPlacingOrder || !isShippingSelected}
-        forceReRender={[total]}
+        forceReRender={[total, selectedShippingId]} // Re-render if total or shipping changes
         
         createOrder={async () => {
           if (!isShippingSelected) {
@@ -100,9 +84,9 @@ export default function PayPalPaymentGateway({
           }
 
           try {
-             console.log("🚀 Calling Server Action: createPayPalOrder");
-             const { orderID } = await createPayPalOrder(cartId, selectedShippingId);
-             console.log("✅ Order ID Received:", orderID);
+             // 🔥 FIX: 3rd argument 'shippingInfo' passed here
+             // This address is needed for Server-Side Shipping Validation
+             const { orderID } = await createPayPalOrder(cartId, selectedShippingId, shippingInfo);
              return orderID;
           } catch (err) {
              console.error("❌ Create Order Failed:", err);
@@ -114,7 +98,6 @@ export default function PayPalPaymentGateway({
         onApprove={async (data) => {
            toast.loading("Processing order...");
            try {
-              console.log("🚀 Calling Server Action: capturePayPalOrder", data.orderID);
               const res = await capturePayPalOrder(
                   data.orderID, 
                   cartId, 
@@ -124,6 +107,7 @@ export default function PayPalPaymentGateway({
               );
 
               if (res.success && res.orderId) {
+                  toast.dismiss();
                   toast.success("Order placed successfully!");
                   onSuccess(res.orderId);
               } else {
@@ -131,7 +115,7 @@ export default function PayPalPaymentGateway({
               }
            } catch (err: any) {
               toast.dismiss();
-              toast.error(err.message || "Payment failed.");
+              toast.error(err.message || "Payment processing failed.");
            }
         }}
         

@@ -27,11 +27,12 @@ const StripePaymentGateway = forwardRef<HTMLFormElement, StripePaymentGatewayPro
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
+      
       if (!stripe || !elements || isProcessing) return;
 
       setIsProcessing(true);
       
-      // 1. Validate Form
+      // 1. Validate Payment Element inputs first
       const { error: submitError } = await elements.submit();
       if (submitError) {
         toast.error(submitError.message || "Please check your payment details.");
@@ -42,7 +43,8 @@ const StripePaymentGateway = forwardRef<HTMLFormElement, StripePaymentGatewayPro
       toast.loading('Creating order...');
 
       try {
-        // 2. Create Order in DB
+        // 2. Create Order in Database (PENDING state)
+        // This validates stock and creates the order ID we need for the return_url
         const orderDetails = await onPlaceOrder({ 
             paymentMethodId: selectedPaymentMethod 
         });
@@ -52,10 +54,9 @@ const StripePaymentGateway = forwardRef<HTMLFormElement, StripePaymentGatewayPro
         }
         
         // 3. Confirm Payment with Stripe
+        // Now passing the return_url with the order_id parameter
         const { error } = await stripe.confirmPayment({
           elements,
-          // FIX: 'clientSecret' removed. Elements will handle it automatically.
-          
           confirmParams: {
             return_url: `${window.location.origin}/order-success?order_id=${orderDetails.orderId}`,
             payment_method_data: {
@@ -68,18 +69,22 @@ const StripePaymentGateway = forwardRef<HTMLFormElement, StripePaymentGatewayPro
                         city: customerInfo.city,
                         state: customerInfo.state,
                         postal_code: customerInfo.postcode,
-                        country: 'AU',
+                        country: 'AU', // You might want to make this dynamic if shipping globally
                     }
                 }
             }
           },
         });
 
+        // 4. Handle Immediate Error
         if (error) {
           toast.dismiss();
+          // If payment fails (e.g. declined), the order remains PENDING in DB.
+          // You might want to auto-cancel it or let the user retry.
           toast.error(error.message || "Payment failed.");
         }
-        // Success automatically redirects to return_url
+        
+        // Note: If successful, Stripe redirects the page, so code below here won't run.
       } catch (err: any) {
         toast.dismiss();
         toast.error(err.message || "An unexpected error occurred.");
@@ -89,8 +94,10 @@ const StripePaymentGateway = forwardRef<HTMLFormElement, StripePaymentGatewayPro
     };
 
     const renderPaymentUI = () => {
+      const paymentElementOptions = { layout: 'tabs' as const };
+
       if (selectedPaymentMethod === 'stripe_card') {
-        return <PaymentElement options={{ layout: 'tabs' }} />;
+        return <PaymentElement options={paymentElementOptions} />;
       }
       
       if (selectedPaymentMethod === 'stripe_klarna') {
@@ -103,25 +110,32 @@ const StripePaymentGateway = forwardRef<HTMLFormElement, StripePaymentGatewayPro
                     Pay 4 interest-free payments of <strong>${installment}</strong>.
                 </div>
             </div>
-            <PaymentElement options={{ layout: 'tabs' }} />
+            <PaymentElement options={paymentElementOptions} />
           </div>
         );
       }
   
-      if (selectedPaymentMethod.includes('afterpay')) {
+      if (selectedPaymentMethod.includes('afterpay') || selectedPaymentMethod.includes('zip')) {
+        const isZip = selectedPaymentMethod.includes('zip');
         const installment = (total / 4).toFixed(2);
+        const logo = isZip 
+            ? "https://static.zipmoney.com.au/assets/default/footer-logo/zip-logo-black.svg" // Zip Logo
+            : "https://static.afterpay.com/integration/logo-afterpay-colour.svg"; // Afterpay Logo
+
         return (
           <div className="space-y-4">
-            <div className="flex items-center gap-4 p-4 border border-green-100 rounded-lg bg-green-50/50">
-               <Image src="https://static.afterpay.com/integration/logo-afterpay-colour.svg" alt="Afterpay" width={60} height={20} unoptimized/>
+            <div className={`flex items-center gap-4 p-4 border rounded-lg ${isZip ? 'border-purple-100 bg-purple-50/50' : 'border-green-100 bg-green-50/50'}`}>
+               <Image src={logo} alt={isZip ? "Zip" : "Afterpay"} width={60} height={20} unoptimized/>
                <div className="text-sm text-gray-700">
-                   Pay 4 installments of <strong>${installment}</strong>.
+                   {isZip ? "Own it now, pay later." : `Pay 4 installments of $${installment}.`}
                </div>
             </div>
-             <PaymentElement options={{ layout: 'tabs' }} />
+             <PaymentElement options={paymentElementOptions} />
           </div>
         );
       }
+
+      // Default fallback
       return <PaymentElement />;
     };
 

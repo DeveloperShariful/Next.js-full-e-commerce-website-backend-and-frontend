@@ -6,7 +6,7 @@ import { useTransition, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Save, Settings, AlertTriangle, Link as LinkIcon, DollarSign, Shield, Clock, Network } from "lucide-react";
+import { Loader2, Save, Settings, AlertTriangle, Link as LinkIcon, DollarSign, Shield, Clock, Network, Percent } from "lucide-react";
 import { z } from "zod";
 
 // ✅ Correct Import Path
@@ -162,6 +162,73 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                                 <ToggleField name="autoApplyCoupon" label="Auto-Apply Coupon" description="Apply coupon on link click." />
                             </div>
                         </section>
+                        <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
+    <SectionHeader title="Commission Logic" description="Set the default earnings for all partners." icon={DollarSign} />
+    
+    <div className="space-y-6">
+        
+        {/* 🔥 NEW: Professional Commission Input UI */}
+        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <label className="text-xs font-bold text-gray-700 uppercase mb-3 block">Global Default Commission</label>
+            
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                
+                {/* Type Toggle (Segmented Control) */}
+                <div className="flex p-1 bg-gray-200 rounded-lg shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => form.setValue("commissionType", "PERCENTAGE")}
+                        className={cn(
+                            "px-4 py-2 text-xs font-bold rounded-md flex items-center gap-2 transition-all shadow-sm",
+                            form.watch("commissionType") === "PERCENTAGE" 
+                                ? "bg-white text-black ring-1 ring-black/5" 
+                                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50 shadow-none"
+                        )}
+                    >
+                        <Percent className="w-3.5 h-3.5" /> Percentage
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => form.setValue("commissionType", "FIXED")}
+                        className={cn(
+                            "px-4 py-2 text-xs font-bold rounded-md flex items-center gap-2 transition-all shadow-sm",
+                            form.watch("commissionType") === "FIXED" 
+                                ? "bg-white text-black ring-1 ring-black/5" 
+                                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50 shadow-none"
+                        )}
+                    >
+                        <DollarSign className="w-3.5 h-3.5" /> Fixed Amount
+                    </button>
+                </div>
+
+                {/* Amount Input */}
+                <div className="relative flex-1 w-full">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className="text-gray-500 text-sm font-bold">
+                            {form.watch("commissionType") === "FIXED" ? "$" : "%"}
+                        </span>
+                    </div>
+                    <input
+                        type="number"
+                        step="0.01"
+                        {...form.register("commissionRate")}
+                        className="pl-8 pr-4 py-2.5 w-full border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-black/10 focus:border-black outline-none transition-all bg-white"
+                        placeholder="10"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                        <span className="text-xs text-gray-400">per order</span>
+                    </div>
+                </div>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-3 flex items-center gap-1.5">
+                <AlertTriangle className="w-3 h-3 text-orange-500"/>
+                This rate applies to affiliates who are not in a specific Tier or Group.
+            </p>
+        </div>
+
+        <div className="h-px bg-gray-100 w-full"></div>
+    </div>
+</section>
                     </div>
 
                     <div className="space-y-6">
@@ -222,16 +289,30 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                     </div>
                 </div>
 
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-200 flex justify-end items-center z-50 lg:pl-72 shadow-lg">
-                    <button
-                        type="submit"
-                        disabled={isPending}
-                        className="flex items-center gap-2 bg-black text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-gray-800 disabled:opacity-50 transition-all shadow-lg active:scale-95"
-                    >
-                        {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        Save General Config
-                    </button>
-                </div>
+               
+          
+          <div className="text-xs text-gray-500">
+              <p>Changes apply immediately across the system.</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+              <button 
+                  type="button" 
+                  onClick={() => window.location.reload()} // Optional Cancel Action
+                  className="px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                  Discard
+              </button>
+
+              <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-2 bg-black text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-gray-800 disabled:opacity-50 transition-all shadow-sm active:scale-95"
+              >
+                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Changes
+              </button>
+           </div>
             </form>
         )}
 

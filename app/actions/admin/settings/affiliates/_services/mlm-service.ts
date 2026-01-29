@@ -8,8 +8,8 @@ import { getCachedMLMConfig } from "@/lib/services/settings-cache";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { syncUser } from "@/lib/auth-sync";
 import { revalidatePath } from "next/cache";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 const mlmSchema = z.object({
   isEnabled: z.boolean(),
@@ -17,6 +17,10 @@ const mlmSchema = z.object({
   commissionBasis: z.enum(["SALES_AMOUNT", "PROFIT"]),
   levelRates: z.record(z.string(), z.number()),
 });
+
+// =========================================
+// INTERNAL ENGINE (Triggered by System - No Role Check)
+// =========================================
 
 export async function distributeMLMCommission(
   orderId: string, 
@@ -38,7 +42,6 @@ export async function distributeMLMCommission(
   availableDate.setDate(availableDate.getDate() + holdingPeriodDays);
 
   await db.$transaction(async (tx) => {
-    
     for (const node of upline) {
       const levelKey = node.level.toString();
       const ratePercent = config.levelRates[levelKey] || 0;
@@ -58,7 +61,7 @@ export async function distributeMLMCommission(
       await tx.referral.create({
         data: {
           affiliateId: node.affiliateId,
-          orderId: orderId + `-MLM-L${node.level}`, 
+          orderId: `${orderId}-MLM-L${node.level}`, 
           totalOrderAmount: baseAmount,
           netOrderAmount: baseAmount, 
           commissionAmount: commissionAmount,
@@ -75,6 +78,7 @@ export async function distributeMLMCommission(
   });
 }
 
+// Helper: Get Ancestors
 export async function getUpline(startAffiliateId: string, maxLevels: number) {
   const tree: { level: number; affiliateId: string }[] = [];
   let currentId = startAffiliateId;
@@ -100,17 +104,17 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
   return tree;
 }
 
+// =========================================
+// WRITE OPERATIONS (Admin Config)
+// =========================================
+
 export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Promise<ActionResponse> {
   try {
-    const user = await syncUser();
-    if (!user || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(user.role)) {
-        return { success: false, message: "Unauthorized." };
-    }
+    // Only Admin can change Network Structure logic
+    const actor = await protectAction("MANAGE_NETWORK"); 
 
     const result = mlmSchema.safeParse(data);
-    if (!result.success) {
-      return { success: false, message: "Validation failed." };
-    }
+    if (!result.success) return { success: false, message: "Validation failed." };
 
     await db.affiliateMLMConfig.upsert({
       where: { id: "mlm_config" },
@@ -129,7 +133,7 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
       }
     });
 
-    revalidatePath("/admin/settings/affiliate/mlm-configuration");
+    revalidatePath("/admin/settings/affiliate/network");
     return { success: true, message: "Network settings saved." };
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to save." };

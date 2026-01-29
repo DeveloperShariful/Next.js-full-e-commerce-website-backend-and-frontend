@@ -7,16 +7,20 @@ import { Prisma } from "@prisma/client";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { getCachedAffiliateSettings, getCachedGlobalRules } from "@/lib/services/settings-cache";
+// ✅ Correct Imports
 import { distributeMLMCommission } from "./_services/mlm-service";
+import { detectSelfReferral } from "./_services/fraud-service";
+import { auditService } from "@/lib/services/audit-service";
 
 export async function processOrder(orderId: string) {
+  // 1. Fetch Order with all necessary relations
   const order = await db.order.findUnique({
     where: { id: orderId },
     include: {
       items: {
         include: {
           product: {
-            select: { categoryId: true, category: true }
+            select: { id: true, categoryId: true, name: true }
           }
         }
       },
@@ -24,25 +28,23 @@ export async function processOrder(orderId: string) {
         include: {
           group: true,
           tier: true,
-          tags: true,
           user: true,
         },
       },
       user: {
         include: {
-          orders: {
-            select: { id: true },
-            take: 2
-          }
+          orders: { select: { id: true }, take: 2 } // To check if new customer
         }
       },
-      referral: true,
+      referral: true, // Check if already processed
     },
   });
 
+  // 2. Validations
   if (!order) return { success: false, error: "ORDER_NOT_FOUND" };
   if (order.referral) return { success: false, error: "ALREADY_PROCESSED" };
 
+  // 3. Identify Affiliate (Direct or Lifetime)
   let affiliateId = order.affiliateId;
   let attributionSource = "COOKIE";
 
@@ -61,28 +63,32 @@ export async function processOrder(orderId: string) {
 
   const affiliate = await db.affiliateAccount.findUnique({
     where: { id: affiliateId },
-    include: {
-      group: true,
-      tier: true,
-      user: true
-    }
+    include: { group: true, tier: true, user: true }
   });
 
   if (!affiliate || affiliate.status !== "ACTIVE") return { success: false, error: "AFFILIATE_INACTIVE" };
 
+  // 4. Load Settings & Security Checks
   const config = await getCachedAffiliateSettings();
   if (!config || !config.isActive) return { success: false, error: "PROGRAM_DISABLED" };
 
-  if (!config.allowSelfReferral && order.userId === affiliate.userId) {
-    return { success: false, error: "SELF_REFERRAL_BLOCKED" };
+  // ✅ Fraud Check: Self Referral
+  if (order.guestEmail || order.user?.email) {
+    const buyerEmail = order.guestEmail || order.user!.email;
+    const isSelf = await detectSelfReferral(affiliateId, buyerEmail, order.ipAddress || "0.0.0.0");
+    
+    if (isSelf && !config.allowSelfReferral) {
+        await auditService.systemLog("WARN", "AFFILIATE_ENGINE", `Self-referral blocked: Order ${order.orderNumber}`, { affiliateId });
+        return { success: false, error: "SELF_REFERRAL_BLOCKED" };
+    }
   }
 
+  // 5. Commission Calculation Logic
   let totalCommission = new Prisma.Decimal(0);
   const logDetails: any[] = [];
   const globalRules = await getCachedGlobalRules();
   const orderSubtotal = DecimalMath.toDecimal(order.subtotal);
   const orderTotal = DecimalMath.toDecimal(order.total);
-  
   const isNewCustomer = !order.user || order.user.orders.length <= 1;
 
   for (const item of order.items) {
@@ -91,14 +97,17 @@ export async function processOrder(orderId: string) {
     let source = "GLOBAL_DEFAULT";
     let isExcluded = false;
 
+    // A. Product Specific Rate (User Override)
     const userProductRate = await db.affiliateProductRate.findFirst({
       where: { productId: item.productId!, affiliateId: affiliate.id }
     });
 
+    // B. Product Specific Rate (Group Override)
     const groupProductRate = !userProductRate && affiliate.groupId ? await db.affiliateProductRate.findFirst({
       where: { productId: item.productId!, groupId: affiliate.groupId }
     }) : null;
 
+    // C. Global Logic Rules (Dynamic JSON Logic)
     let matchedRule = null;
     for (const rule of globalRules) {
       const conditions = rule.conditions as any;
@@ -123,6 +132,7 @@ export async function processOrder(orderId: string) {
       }
     }
 
+    // D. Determine Final Rate Priority
     if (userProductRate) {
       if (userProductRate.isDisabled) isExcluded = true;
       rate = userProductRate.rate;
@@ -143,11 +153,13 @@ export async function processOrder(orderId: string) {
       type = "PERCENTAGE";
       source = "GROUP_DEFAULT";
     } else if (affiliate.tier?.commissionRate) {
+      // ✅ Enterprise: Check Category Rate inside Tier (if schema supported in future)
+      // For now, use Tier Base Rate
       rate = affiliate.tier.commissionRate;
       type = affiliate.tier.commissionType;
       source = "TIER_DEFAULT";
     } else {
-      rate = new Prisma.Decimal(config.commissionRate);
+      rate = new Prisma.Decimal(config.commissionRate || 10);
       type = "PERCENTAGE";
       source = "GLOBAL_DEFAULT";
     }
@@ -157,12 +169,13 @@ export async function processOrder(orderId: string) {
       continue;
     }
 
+    // E. Calculate Item Commission
     let itemBasePrice = DecimalMath.fromOrder(
       item.total, 
       item.tax, 
-      0, 
+      0, // Item shipping usually not separated here, assumes shipping line item
       config.excludeTax, 
-      config.excludeShipping
+      config.excludeShipping // Only affects if shipping is part of item total (rare)
     );
 
     let itemComm = new Prisma.Decimal(0);
@@ -185,6 +198,7 @@ export async function processOrder(orderId: string) {
     });
   }
 
+  // 6. Finalize Transaction
   if (DecimalMath.isZero(totalCommission) && !config.zeroValueReferrals) {
      return { success: true, message: "ZERO_COMMISSION_IGNORED" };
   }
@@ -193,6 +207,7 @@ export async function processOrder(orderId: string) {
     const availableDate = new Date();
     availableDate.setDate(availableDate.getDate() + (config.holdingPeriod || 14));
 
+    // Create Referral Record
     await tx.referral.create({
       data: {
         affiliateId: affiliate.id,
@@ -211,16 +226,19 @@ export async function processOrder(orderId: string) {
       }
     });
 
+    // Update Lifetime Link
     if (order.userId && config.isLifetimeLinkOnPurchase && !affiliate.user.referredByAffiliateId) {
-      await tx.affiliateAccount.update({
-         where: { id: affiliate.id },
-         data: { customerReferrals: { connect: { id: order.userId } } }
+      await tx.user.update({
+         where: { id: order.userId },
+         data: { referredByAffiliateId: affiliate.id }
       });
     }
   });
 
+  // 7. Distribute MLM Commission (Async)
   await distributeMLMCommission(order.id, affiliate.id, orderSubtotal, config.holdingPeriod || 14);
 
+  // 8. Notification
   await sendNotification({
       trigger: "REFERRAL_PENDING",
       recipient: affiliate.user.email,

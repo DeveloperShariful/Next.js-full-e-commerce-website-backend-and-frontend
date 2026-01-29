@@ -6,7 +6,8 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Role } from "@prisma/client";
 import { z } from "zod";
-import { auth } from "@clerk/nextjs/server"; // [NEW] Clerk auth import
+// ✅ Use global syncUser instead of manual implementation
+import { syncUser } from "@/lib/auth-sync";
 
 // --- ZOD SCHEMA ---
 const StaffSchema = z.object({
@@ -22,22 +23,13 @@ export type ActionState = {
   error?: string;
 };
 
-// --- HELPER: Get Current User Role ---
-async function getCurrentUser() {
-  const { userId } = await auth();
-  if (!userId) return null;
-  
-  return await db.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true, role: true }
-  });
-}
-
 // 1. GET STAFFS
 export async function getStaffs() {
   try {
-    // Optional: Security check - only allow internal staff to see this list
-    const currentUser = await getCurrentUser();
+    // ✅ Security: Use centralized auth
+    const currentUser = await syncUser();
+    
+    // Only internal staff can view this list
     if (!currentUser || currentUser.role === 'CUSTOMER') {
         return { success: false, data: [] };
     }
@@ -52,6 +44,7 @@ export async function getStaffs() {
     });
     return { success: true, data: staffs };
   } catch (error) {
+    console.error("GET_STAFFS_ERROR", error);
     return { success: false, data: [] };
   }
 }
@@ -59,8 +52,7 @@ export async function getStaffs() {
 // 2. CREATE STAFF
 export async function createStaff(prevState: any, formData: FormData): Promise<ActionState> {
   try {
-    // [SECURITY] Check permissions
-    const currentUser = await getCurrentUser();
+    const currentUser = await syncUser();
     if (!currentUser) return { success: false, error: "Unauthorized" };
 
     const rawData = {
@@ -89,6 +81,7 @@ export async function createStaff(prevState: any, formData: FormData): Promise<A
     const existingUser = await db.user.findUnique({ where: { email } });
     if (existingUser) return { success: false, error: "User already exists with this email!" };
 
+    // ✅ Note: Created without clerkId. Will be linked when they sign up via email.
     await db.user.create({
       data: {
         name,
@@ -110,7 +103,7 @@ export async function createStaff(prevState: any, formData: FormData): Promise<A
 // 3. UPDATE STAFF
 export async function updateStaff(prevState: any, formData: FormData): Promise<ActionState> {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await syncUser();
     if (!currentUser) return { success: false, error: "Unauthorized" };
 
     const rawData = {
@@ -128,16 +121,16 @@ export async function updateStaff(prevState: any, formData: FormData): Promise<A
     const { id, name, email, role } = validated.data;
     if (!id) return { success: false, error: "ID required" };
 
-    // Fetch the target user we are trying to edit
+    // Fetch target user
     const targetUser = await db.user.findUnique({ where: { id } });
     if (!targetUser) return { success: false, error: "Staff not found" };
 
-    // [LOGIC] Logic to protect SUPER_ADMIN
+    // [LOGIC] Protect SUPER_ADMIN
     if (targetUser.role === Role.SUPER_ADMIN && currentUser.role !== Role.SUPER_ADMIN) {
          return { success: false, error: "You cannot edit a Super Admin." };
     }
 
-    // [LOGIC] Only SUPER_ADMIN can promote someone to SUPER_ADMIN
+    // [LOGIC] Promote check
     if (role === Role.SUPER_ADMIN && currentUser.role !== Role.SUPER_ADMIN) {
         return { success: false, error: "Only Super Admins can assign the Super Admin role." };
     }
@@ -157,6 +150,7 @@ export async function updateStaff(prevState: any, formData: FormData): Promise<A
     return { success: true, message: "Staff profile updated" };
 
   } catch (error) {
+    console.error("UPDATE_STAFF_ERROR", error);
     return { success: false, error: "Update failed" };
   }
 }
@@ -164,10 +158,10 @@ export async function updateStaff(prevState: any, formData: FormData): Promise<A
 // 4. DELETE STAFF
 export async function deleteStaff(id: string): Promise<ActionState> {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await syncUser();
     if (!currentUser) return { success: false, error: "Unauthorized" };
 
-    // Prevent deleting yourself
+    // Prevent self-delete
     if (currentUser.id === id) {
         return { success: false, error: "You cannot delete yourself." };
     }
@@ -175,12 +169,12 @@ export async function deleteStaff(id: string): Promise<ActionState> {
     const targetUser = await db.user.findUnique({ where: { id } });
     if (!targetUser) return { success: false, error: "User not found" };
 
-    // [LOGIC] Only SUPER_ADMIN can delete another SUPER_ADMIN
+    // [LOGIC] Super Admin Protection
     if (targetUser.role === Role.SUPER_ADMIN && currentUser.role !== Role.SUPER_ADMIN) {
         return { success: false, error: "Only Super Admins can delete other Super Admins." };
     }
     
-    // [LOGIC] Ordinary staff cannot delete anyone (Only ADMIN/SUPER_ADMIN)
+    // [LOGIC] Permission check
     if (currentUser.role !== Role.SUPER_ADMIN && currentUser.role !== Role.ADMIN) {
          return { success: false, error: "Permission denied." };
     }
@@ -189,6 +183,7 @@ export async function deleteStaff(id: string): Promise<ActionState> {
     revalidatePath("/admin/staff");
     return { success: true, message: "Staff removed" };
   } catch (error) {
+    console.error("DELETE_STAFF_ERROR", error);
     return { success: false, error: "Failed to delete staff" };
   }
 }

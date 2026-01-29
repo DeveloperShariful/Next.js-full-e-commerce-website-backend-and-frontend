@@ -3,12 +3,11 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
 import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 const ruleSchema = z.object({
   id: z.string().optional(),
@@ -16,7 +15,7 @@ const ruleSchema = z.object({
   isActive: z.boolean().default(true),
   priority: z.coerce.number().default(0),
 
-  // Extended Condition Logic
+  // Extended Condition Logic (Stored as JSON in Schema)
   conditions: z.object({
     minOrderAmount: z.coerce.number().optional(),
     maxOrderAmount: z.coerce.number().optional(),
@@ -45,6 +44,9 @@ type RuleInput = z.infer<typeof ruleSchema>;
 // =========================================
 export async function getRules() {
   try {
+    // Read only needs basic permission
+    await protectAction("MANAGE_CONFIGURATION"); 
+
     return await db.affiliateCommissionRule.findMany({
       orderBy: [
         { isActive: "desc" }, 
@@ -62,8 +64,7 @@ export async function getRules() {
 
 export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const result = ruleSchema.safeParse(data);
     if (!result.success) {
@@ -89,12 +90,14 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
       name: payload.name,
       isActive: payload.isActive,
       priority: payload.priority,
-      conditions: payload.conditions,
-      action: payload.action,
+      conditions: payload.conditions, // Stored as JSON
+      action: payload.action,         // Stored as JSON
       startDate: payload.startDate ? new Date(payload.startDate) : null,
       endDate: payload.endDate ? new Date(payload.endDate) : null,
       affiliateSpecificIds: payload.affiliateSpecificIds,
     };
+
+    let recordId = payload.id;
 
     if (payload.id) {
       await db.affiliateCommissionRule.update({
@@ -102,10 +105,19 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
         data: prismaData,
       });
     } else {
-      await db.affiliateCommissionRule.create({
+      const newRule = await db.affiliateCommissionRule.create({
         data: prismaData,
       });
+      recordId = newRule.id;
     }
+
+    await auditService.log({
+        userId: actor.id,
+        action: payload.id ? "UPDATE_RULE" : "CREATE_RULE",
+        entity: "AffiliateCommissionRule",
+        entityId: recordId!,
+        newData: prismaData
+    });
 
     revalidatePath("/admin/settings/affiliate/rules");
     return { success: true, message: "Commission rule saved successfully." };
@@ -117,8 +129,7 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
 
 export async function reorderRulesAction(items: { id: string; priority: number }[]): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    await protectAction("MANAGE_CONFIGURATION");
 
     await db.$transaction(
       items.map((item) =>
@@ -138,10 +149,16 @@ export async function reorderRulesAction(items: { id: string; priority: number }
 
 export async function deleteRuleAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliateCommissionRule.delete({ where: { id } });
+
+    await auditService.log({
+        userId: actor.id,
+        action: "DELETE_RULE",
+        entity: "AffiliateCommissionRule",
+        entityId: id
+    });
 
     revalidatePath("/admin/settings/affiliate/rules");
     return { success: true, message: "Rule deleted." };

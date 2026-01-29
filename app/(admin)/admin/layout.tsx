@@ -7,60 +7,75 @@ import { db } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import AdminSidebar from "@/app/(admin)/Header-Sideber/sidebar";
 import AdminHeader from "@/app/(admin)/Header-Sideber/header";
-import { GlobalStoreProvider } from "@/app/providers/global-store-provider"; 
+import { GlobalStoreProvider } from "@/app/providers/global-store-provider";
+import { serializePrismaData } from "@/lib/format-data"; 
 
-// --- Helper to fetch Global Data ---
 async function getGlobalData() {
-  const [settings, seo, marketing] = await Promise.all([
-    db.storeSettings.findUnique({ where: { id: "settings" } }),
-    db.seoGlobalConfig.findUnique({ where: { id: "global_seo" } }),
+  const [settings, seo, marketing, paymentMethods, pickupLocations] = await Promise.all([
+    db.storeSettings.findUnique({ where: { id: "settings" }, include: { logoMedia: true, faviconMedia: true } }),
+    db.seoGlobalConfig.findUnique({ where: { id: "global_seo" }, include: { ogMedia: true } }),
     db.marketingIntegration.findUnique({ where: { id: "marketing_config" } }),
+    db.paymentMethodConfig.findMany({ where: { isEnabled: true } }), 
+    db.location.findMany({ where: { isActive: true } }) 
   ]);
 
   return {
-    storeName: settings?.storeName || "GoBike",
-    storeEmail: settings?.storeEmail || "",
-    storePhone: settings?.storePhone || "",
-    logo: settings?.logo || null,
-    favicon: settings?.favicon || null,
-    isMaintenanceMode: settings?.maintenance || false,
-    
-    currency: settings?.currency || "AUD",
-    symbol: settings?.currencySymbol || "$",
-    weightUnit: settings?.weightUnit || "kg",
-    dimensionUnit: settings?.dimensionUnit || "cm",
-    
-    // JSON Fields Casting
-    address: (settings?.storeAddress as any) || {},
-    socials: (settings?.socialLinks as any) || {},
-    tax: (settings?.taxSettings as any) || {},
-    general: (settings?.generalConfig as any) || {},
+    settings: {
+      storeSettings: {
+        storeName: settings?.storeName || "GoBike",
+        storeEmail: settings?.storeEmail,
+        storePhone: settings?.storePhone,
+        currency: settings?.currency || "",
+        currencySymbol: settings?.currencySymbol || "",
+        weightUnit: settings?.weightUnit || "",
+        dimensionUnit: settings?.dimensionUnit || "",
+        
+        logo: settings?.logo,
+        favicon: settings?.favicon,
+        maintenance: settings?.maintenance || false,
+        storeAddress: settings?.storeAddress,
+        socialLinks: settings?.socialLinks,
+        generalConfig: settings?.generalConfig,
+        taxSettings: settings?.taxSettings,
+        affiliateConfig: settings?.affiliateConfig,
+        logoMedia: settings?.logoMedia,
+        faviconMedia: settings?.faviconMedia,
+      },
+      
+      seoConfig: {
+        siteName: seo?.siteName || "GoBike",
+        titleSeparator: seo?.titleSeparator || "|",
+        siteUrl: seo?.siteUrl || "",
+        defaultMetaTitle: seo?.defaultMetaTitle,
+        defaultMetaDesc: seo?.defaultMetaDesc,
+        ogImage: seo?.ogImage,
+        twitterCard: seo?.twitterCard || "summary_large_image",
+        twitterSite: seo?.twitterSite,
+        themeColor: seo?.themeColor,
+        robotsTxtContent: seo?.robotsTxtContent,
+        organizationData: seo?.organizationData,
+        manifestJson: seo?.manifestJson,
+        ogMedia: seo?.ogMedia,
+      },
 
-    // SEO
-    seo: {
-      siteName: seo?.siteName || "GoBike",
-      titleSeparator: seo?.titleSeparator || "|",
-      defaultMetaTitle: seo?.defaultMetaTitle || null,
-      defaultMetaDesc: seo?.defaultMetaDesc || null,
-      ogImage: seo?.ogImage || null,
-      twitterCard: seo?.twitterCard || "summary_large_image",
-      twitterSite: seo?.twitterSite || null,
+      marketingConfig: marketing ? {
+        gtmEnabled: marketing.gtmEnabled,
+        gtmContainerId: marketing.gtmContainerId,
+        gtmAuth: marketing.gtmAuth,
+        gtmPreview: marketing.gtmPreview,
+        fbEnabled: marketing.fbEnabled,
+        fbPixelId: marketing.fbPixelId,
+        klaviyoEnabled: marketing.klaviyoEnabled,
+        klaviyoPublicKey: marketing.klaviyoPublicKey,
+        cookieConsentRequired: false, 
+      } : null,
     },
-
-    // Marketing
-    marketing: {
-      gtmEnabled: marketing?.gtmEnabled || false,
-      gtmContainerId: marketing?.gtmContainerId || null,
-      fbEnabled: marketing?.fbEnabled || false,
-      fbPixelId: marketing?.fbPixelId || null,
-      klaviyoEnabled: marketing?.klaviyoEnabled || false,
-      klaviyoPublicKey: marketing?.klaviyoPublicKey || null,
-    },
+    paymentMethods: paymentMethods || [],
+    pickupLocations: pickupLocations || [],
   };
 }
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  // 1. Auth Check
   const clerkUser = await currentUser();
   if (!clerkUser) redirect("/sign-in");
 
@@ -68,7 +83,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     where: { email: clerkUser.emailAddresses[0].emailAddress }
   });
 
-  if (!dbUser || dbUser.role === Role.CUSTOMER) redirect("/"); 
+  if (!dbUser || dbUser.role === Role.CUSTOMER) redirect("/");
 
   const adminUser = {
     name: dbUser.name,
@@ -77,21 +92,20 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     image: clerkUser.imageUrl,
   };
 
-  // 2. Fetch Global Data
-  const rawGlobalData = await getGlobalData();
-
-  // ✅ FIX: Serialize data to remove Decimal objects before passing to Client Component
-  const globalData = JSON.parse(JSON.stringify(rawGlobalData));
-
+  const rawData = await getGlobalData();
+  const cleanData = serializePrismaData(rawData);
   return (
-    // 3. Wrap everything with GlobalStoreProvider
-    <GlobalStoreProvider settings={globalData}>
+    <GlobalStoreProvider 
+      settings={cleanData.settings} 
+      paymentMethods={cleanData.paymentMethods}
+      pickupLocations={cleanData.pickupLocations}
+    >
       <div className="flex h-screen bg-slate-50/50 font-sans text-slate-800 overflow-hidden">
         <AdminSidebar user={adminUser} />
         <div className="flex-1 flex flex-col h-full min-w-0">
           <AdminHeader user={adminUser} />
           <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">    
-                {children}
+            {children}
           </main>
         </div>
       </div>

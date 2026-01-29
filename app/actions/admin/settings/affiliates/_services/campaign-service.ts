@@ -8,12 +8,14 @@ import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS
 // =========================================
 export async function getAllCampaigns(page: number = 1, limit: number = 20, search?: string) {
+  await protectAction("VIEW_ANALYTICS");
+
   const skip = (page - 1) * limit;
 
   const where: Prisma.AffiliateCampaignWhereInput = search ? {
@@ -62,8 +64,7 @@ export async function getAllCampaigns(page: number = 1, limit: number = 20, sear
 
 export async function deleteCampaignAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS"); // Requires manager or admin
 
     if (!id) return { success: false, message: "Campaign ID is required." };
 
@@ -72,8 +73,8 @@ export async function deleteCampaignAction(id: string): Promise<ActionResponse> 
     });
 
     await auditService.log({
-      userId: auth.id,
-      action: "DELETE",
+      userId: actor.id,
+      action: "DELETE_CAMPAIGN",
       entity: "AffiliateCampaign",
       entityId: id,
       oldData: { name: deleted.name, affiliateId: deleted.affiliateId }

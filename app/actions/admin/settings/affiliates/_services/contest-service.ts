@@ -7,8 +7,9 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath, unstable_cache } from "next/cache";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
 import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
+import { auditService } from "@/lib/services/audit-service";
 
 const contestSchema = z.object({
   id: z.string().optional(),
@@ -30,8 +31,11 @@ type ContestInput = z.infer<typeof contestSchema>;
 // =========================================
 // READ OPERATIONS
 // =========================================
+
 export async function getContests() {
   try {
+    await protectAction("VIEW_ANALYTICS");
+    
     return await db.affiliateContest.findMany({
       orderBy: { startDate: "desc" },
     });
@@ -41,6 +45,7 @@ export async function getContests() {
 }
 
 export async function getContestLeaderboard(contestId: string, limit: number = 10) {
+  // Publicly accessible via cache, but strictly typed
   const cacheKey = `contest-leaderboard-${contestId}`;
 
   return await unstable_cache(
@@ -76,6 +81,8 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
       });
 
       const affiliateIds = leaderboard.map(l => l.affiliateId);
+      
+      // Fetch User Details efficiently
       const affiliates = await db.affiliateAccount.findMany({
         where: { id: { in: affiliateIds } },
         select: {
@@ -106,13 +113,12 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS (Protected)
 // =========================================
 
 export async function upsertContestAction(data: ContestInput): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION"); // ✅ Security
 
     const result = contestSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
@@ -130,8 +136,10 @@ export async function upsertContestAction(data: ContestInput): Promise<ActionRes
       endDate: new Date(payload.endDate),
       criteria: payload.criteria,
       isActive: payload.isActive,
-      prizes: payload.prizes,
+      prizes: payload.prizes, // JSON Field
     };
+
+    let recordId = payload.id;
 
     if (payload.id) {
       await db.affiliateContest.update({
@@ -139,10 +147,19 @@ export async function upsertContestAction(data: ContestInput): Promise<ActionRes
         data: dbPayload,
       });
     } else {
-      await db.affiliateContest.create({
+      const created = await db.affiliateContest.create({
         data: dbPayload,
       });
+      recordId = created.id;
     }
+
+    await auditService.log({
+        userId: actor.id,
+        action: payload.id ? "UPDATE_CONTEST" : "CREATE_CONTEST",
+        entity: "AffiliateContest",
+        entityId: recordId!,
+        newData: payload
+    });
 
     revalidatePath("/admin/settings/affiliate/contests");
     return { success: true, message: "Contest saved successfully." };
@@ -153,10 +170,17 @@ export async function upsertContestAction(data: ContestInput): Promise<ActionRes
 
 export async function deleteContestAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliateContest.delete({ where: { id } });
+    
+    await auditService.log({
+        userId: actor.id,
+        action: "DELETE_CONTEST",
+        entity: "AffiliateContest",
+        entityId: id
+    });
+
     revalidatePath("/admin/settings/affiliate/contests");
     return { success: true, message: "Contest deleted." };
   } catch (error) {

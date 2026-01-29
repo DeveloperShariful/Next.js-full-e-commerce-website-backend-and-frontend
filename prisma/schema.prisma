@@ -424,7 +424,7 @@ model Category {
 model CategoryTranslation {
   id          String   @id @default(uuid())
   categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   language    String
   name        String
   description String?  @db.Text
@@ -1326,7 +1326,7 @@ model Newsletter {
 }
 
 // ==========================================
-// 10. CMS & SYSTEM
+// 10. BLOG 
 // ==========================================
 
 model BlogPost {
@@ -1345,7 +1345,6 @@ model BlogPost {
   metaTitle       String?
   metaDesc        String?
   
-  // FIXED: Vector embedding
   contentEmbedding Unsupported("vector(1536)")?
   
   createdAt       DateTime @default(now())
@@ -1354,34 +1353,6 @@ model BlogPost {
   @@index([slug])
   @@index([isPublished, createdAt(sort: Desc)])
   @@index([authorId])
-}
-
-model Page {
-  id          String   @id @default(uuid())
-  title       String
-  slug        String   @unique
-  content     String   @db.Text
-  metaTitle   String?
-  metaDesc    String?
-  isPublished Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([slug])
-  @@index([isPublished])
-}
-
-model Menu {
-  id        String   @id @default(uuid())
-  title     String
-  slug      String   @unique
-  items     Json
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([slug])
-  @@index([isActive])
 }
 
 model Review {
@@ -1787,7 +1758,6 @@ model Media {
   storeFavicons  StoreSettings[]      @relation("StoreFavicon")
   users          User[]
   collections    Collection[]
-  banners        Banner[]
   emailConfigs   EmailConfiguration[]
   seoConfigs     SeoGlobalConfig[]
 
@@ -1864,21 +1834,6 @@ model MarketingIntegration {
   klaviyoTrackAddedToCart   Boolean  @default(true)
   verificationStatus        Json?    @default("{}")
   updatedAt                 DateTime @default(now()) @updatedAt
-}
-
-model Banner {
-  id        String   @id @default(uuid())
-  title     String
-  image     String
-  mediaId   String?
-  media     Media?   @relation(fields: [mediaId], references: [id])
-  link      String?
-  position  Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive, position(sort: Asc)])
 }
 
 model SystemLog {
@@ -2070,7 +2025,7 @@ model AffiliateAccount {
   balance         Decimal          @default(0.00) @db.Decimal(12, 2)
   totalEarnings   Decimal          @default(0.00) @db.Decimal(12, 2)
   storeCredit     Decimal          @default(0.00) @db.Decimal(12, 2)
-  
+  paymentDetailsConfigured Boolean @default(false)
   isLifetime        Boolean   @default(false)      
   cookieDuration    Int?      @default(30)         
   riskScore         Float     @default(0.0)        
@@ -2079,15 +2034,18 @@ model AffiliateAccount {
   kycStatus       String   @default("NOT_SUBMITTED")
   taxId           String?
   groupId         String?
+  postbackUrl       String?          // S2S Tracking URL
+  settings          Json?              // Custom settings per user (notifications, preferences)
   group           AffiliateGroup?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
   documents       AffiliateDocument[]
-  
+  analyticsSummaries AffiliateAnalyticsSummary[]
   campaigns         AffiliateCampaign[]        
   shortLinks        AffiliateLink[]              
   ledger            AffiliateLedger[] 
   productRates      AffiliateProductRate[]
   tags              AffiliateTag[]
-  
+  taxDocument       String?          // URL to Tax form (W-9/W-8BEN)
+  vatNumber         String?
   tierId          String?
   tier            AffiliateTier?   @relation(fields: [tierId], references: [id], onDelete: SetNull)
   
@@ -2151,6 +2109,7 @@ model AffiliateTier {
   commissionType  CommissionType     @default(PERCENTAGE)
   minSalesAmount  Decimal            @default(0) @db.Decimal(12, 2)
   minSalesCount   Int                @default(0)
+  categoryRates     Json?
   color           String?
   icon            String?
   isDefault       Boolean            @default(false)
@@ -2163,43 +2122,64 @@ model AffiliateTier {
   @@index([isDefault])
 }
 
-model AffiliateClick {
-  id              String           @id @default(uuid())
+model AffiliateAnalyticsSummary {
+  id              String   @id @default(uuid())
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  ipAddress       String?
-  userAgent       String?
-  referrer        String?
-  landingPage     String?
-  subId           String?
-  campaign        String?
-  country         String?
-  deviceType      String?
-  converted       Boolean          @default(false)
-  orderId         String?
-  utmSource         String?                       
-  utmMedium         String?                    
-  utmCampaign       String?                    
-  deviceFingerprint String?                     
-  city              String?                    
-  processingTime    Int? 
-  createdAt       DateTime         @default(now())
-  conversionStatus String          @default("PENDING")
+  date            DateTime @db.Date
+  clicks          Int      @default(0)
+  conversions     Int      @default(0)
+  revenue         Decimal  @default(0) @db.Decimal(12, 2)
+  commission      Decimal  @default(0) @db.Decimal(12, 2)
+  
+  @@unique([affiliateId, date])
+  @@index([date])
+}
 
-  @@index([affiliateId])
+model AffiliateClick {
+  id                String           @id @default(uuid())
+  affiliateId       String
+  affiliate         AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
+  ipAddress         String?
+  userAgent         String?
+  referrer          String?
+  landingPage       String?
+  subId             String?
+  campaign          String?
+  country           String?
+  deviceType        String?
+  converted         Boolean          @default(false)
+  orderId           String?
+  
+  // UTM & Tracking
+  utmSource         String?                                         
+  utmMedium         String?                                     
+  utmCampaign       String?                                     
+  deviceFingerprint String?                                      
+  city              String?                                     
+  processingTime    Int? 
+  
+  // NEW: Archiving logic
+  isArchived        Boolean          @default(false) 
+  
+  createdAt         DateTime         @default(now())
+  conversionStatus  String           @default("PENDING")
+
+  @@index([affiliateId, createdAt(sort: Desc)])
   @@index([subId])
-  @@index([createdAt])
+  @@index([createdAt]) 
   @@index([ipAddress])
   @@index([deviceFingerprint])
   @@index([converted])
+  @@index([isArchived]) 
 }
 
 model Referral {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   orderId         String           @unique
-  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: SetNull)
   totalOrderAmount Decimal         @db.Decimal(12, 2)
   netOrderAmount  Decimal          @db.Decimal(12, 2)
   commissionAmount Decimal         @db.Decimal(12, 2)
@@ -2240,7 +2220,7 @@ model Referral {
 model AffiliatePayout {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   amount          Decimal          @db.Decimal(12, 2)
   method          PayoutMethod
   status          PayoutStatus     @default(PENDING)
@@ -2260,7 +2240,7 @@ model AffiliatePayout {
 model AffiliateDomain {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   
   domain          String           @unique 
   isVerified      Boolean          @default(false)
@@ -2307,7 +2287,7 @@ model AffiliateCreativeUsage {
 model AffiliatePixel {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   type            String           
   pixelId         String
   accessToken     String?          @db.Text
@@ -2337,19 +2317,24 @@ model AffiliateContest {
 }
 
 model AffiliateCommissionRule {
-  id              String    @id @default(uuid())
-  name            String    
-  priority        Int       @default(0)
-  isActive        Boolean   @default(true)
-  conditions      Json      
-  action          Json      
-  startDate       DateTime?
-  endDate         DateTime?
-  affiliateSpecificIds String[]
-  referrals       Referral[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                   String   @id @default(uuid())
+  name                 String   
+  priority             Int      @default(0)
+  isActive             Boolean  @default(true)
   
+  productIds           String[] 
+  categoryIds          String[]
+  affiliateSpecificIds String[] 
+  
+  conditions           Json    
+  action               Json     
+  startDate            DateTime?
+  endDate              DateTime?
+  referrals            Referral[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  @@index([conditions(ops: JsonbPathOps)], type: Gin)
   @@index([isActive, priority(sort: Desc)])
   @@index([startDate, endDate])
 }
@@ -2357,7 +2342,7 @@ model AffiliateCommissionRule {
 model AffiliateLink {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   slug            String           @unique
   destinationUrl  String           
   campaignId      String?
@@ -2375,7 +2360,7 @@ model AffiliateCampaign {
   id              String           @id @default(uuid())
   name            String           
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   clicks          Int              @default(0)
   conversions     Int              @default(0)
   revenue         Decimal          @default(0.00) @db.Decimal(12, 2)
@@ -2389,7 +2374,7 @@ model AffiliateCampaign {
 model AffiliateLedger {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   type            LedgerType       
   amount          Decimal          @db.Decimal(12, 2)
   balanceBefore   Decimal          @db.Decimal(12, 2)

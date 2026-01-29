@@ -5,7 +5,6 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
 import { db } from "@/lib/prisma";
 
-// ✅ Updated Import Paths (Singular 'affiliate') & Named Exports
 import * as statsService from "@/app/actions/admin/settings/affiliates/_services/stats-service";
 import * as accountService from "@/app/actions/admin/settings/affiliates/_services/account-service"; 
 import * as payoutService from "@/app/actions/admin/settings/affiliates/_services/payout-service";
@@ -18,7 +17,6 @@ import * as campaignService from "@/app/actions/admin/settings/affiliates/_servi
 import * as announcementService from "@/app/actions/admin/settings/affiliates/_services/announcement-service";
 import * as networkService from "@/app/actions/admin/settings/affiliates/_services/network-service";
 import * as fraudService from "@/app/actions/admin/settings/affiliates/_services/fraud-service";
-import * as fraudRuleService from "@/app/actions/admin/settings/affiliates/_services/fraud-rule-service";
 import * as domainService from "@/app/actions/admin/settings/affiliates/_services/domain-service";
 import * as pixelService from "@/app/actions/admin/settings/affiliates/_services/pixel-service";
 import * as productRateService from "@/app/actions/admin/settings/affiliates/_services/product-rate-service";
@@ -27,6 +25,7 @@ import * as ledgerService from "@/app/actions/admin/settings/affiliates/_service
 import * as analyticsService from "@/app/actions/admin/settings/affiliates/_services/analytics-service";
 import * as groupService from "@/app/actions/admin/settings/affiliates/_services/group-service";
 import * as tagService from "@/app/actions/admin/settings/affiliates/_services/tag-service";
+import * as couponService from "@/app/actions/admin/settings/affiliates/_services/coupon-service";
 
 export const metadata = {
   title: "Affiliate Program Management | Enterprise Admin",
@@ -80,7 +79,9 @@ export default async function AffiliateMasterPage({
         data.partners = {
           users: usersData,
           groups: groupsList,
-          tags: tagsList
+          tags: tagsList,
+          defaultRate: data.config?.commissionRate ?? null ,
+          defaultType: data.config?.commissionType ?? "PERCENTAGE"
         };
         break;
 
@@ -120,7 +121,7 @@ export default async function AffiliateMasterPage({
         data.fraud = {
           highRisk: await fraudService.getHighRiskAffiliates(),
           flagged: await fraudService.getFlaggedReferrals(),
-          rules: await fraudRuleService.getRules(),
+          rules: await fraudService.getRules(),
         };
         break;
 
@@ -148,12 +149,16 @@ export default async function AffiliateMasterPage({
         // Fetch MLM Config specifically for the settings page
         data.mlmConfig = await db.affiliateMLMConfig.findUnique({ where: { id: "mlm_config" } });
         break;
+      case "tags":
+        data.tags = await tagService.getAllTags();
+        break;
+      case "coupons":
+        data.coupons = await couponService.getAllAffiliateCoupons(); 
+        break;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Affiliate Dashboard Error:", error);
-    // In a real enterprise app, we might redirect to an error page or show a fallback
-    // For now, we pass an error state to the view
-    data.error = "Failed to load module data. Please try again.";
+    data.error = error.message || "Failed to load module data. Please try again.";
   }
 
   return (

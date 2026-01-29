@@ -1,14 +1,20 @@
-//app/actions/admin/settings/affiliate/_services/analytics-service.ts
 // File: app/actions/admin/settings/affiliate/_services/analytics-service.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { subMonths, format, startOfMonth } from "date-fns";
-import { Prisma } from "@prisma/client";
+import { subMonths, startOfMonth } from "date-fns";
+import { protectAction } from "./permission-service"; // ✅ Security
+
+// =========================================
+// READ OPERATIONS (Protected)
+// =========================================
 
 export async function getTopProducts(limit: number = 5) {
   try {
+    await protectAction("VIEW_ANALYTICS");
+
+    // Raw SQL for performance on large OrderItem table
     const result = await db.$queryRaw<any[]>`
       SELECT 
         "productName" as name,
@@ -36,6 +42,8 @@ export async function getTopProducts(limit: number = 5) {
 
 export async function getTrafficSources() {
   try {
+    await protectAction("VIEW_ANALYTICS");
+
     const result = await db.$queryRaw<any[]>`
       SELECT 
         referrer as source,
@@ -56,6 +64,8 @@ export async function getTrafficSources() {
 }
 
 export async function getTopAffiliates(limit: number = 5) {
+  await protectAction("VIEW_ANALYTICS");
+
   const top = await db.affiliateAccount.findMany({
     orderBy: { totalEarnings: "desc" },
     take: limit,
@@ -78,6 +88,8 @@ export async function getTopAffiliates(limit: number = 5) {
 
 export async function getMonthlyPerformance() {
   try {
+    await protectAction("VIEW_ANALYTICS");
+
     const start = subMonths(startOfMonth(new Date()), 5);
     
     const result = await db.$queryRaw<any[]>`

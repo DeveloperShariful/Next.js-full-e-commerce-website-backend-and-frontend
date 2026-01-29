@@ -7,12 +7,14 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS
 // =========================================
 export async function getAllPixels() {
+  await protectAction("MANAGE_CONFIGURATION");
+
   return await db.affiliatePixel.findMany({
     include: {
       affiliate: {
@@ -27,19 +29,18 @@ export async function getAllPixels() {
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
 export async function createPixelAction(data: Prisma.AffiliatePixelCreateInput): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const pixel = await db.affiliatePixel.create({ data });
     
     await auditService.log({
-      userId: auth.id,
-      action: "CREATE",
+      userId: actor.id,
+      action: "CREATE_PIXEL",
       entity: "AffiliatePixel",
       entityId: pixel.id,
       newData: data
@@ -54,8 +55,7 @@ export async function createPixelAction(data: Prisma.AffiliatePixelCreateInput):
 
 export async function togglePixelStatusAction(id: string, isEnabled: boolean): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliatePixel.update({
       where: { id },
@@ -71,11 +71,17 @@ export async function togglePixelStatusAction(id: string, isEnabled: boolean): P
 
 export async function deletePixelAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliatePixel.delete({
       where: { id }
+    });
+
+    await auditService.log({
+      userId: actor.id,
+      action: "DELETE_PIXEL",
+      entity: "AffiliatePixel",
+      entityId: id
     });
 
     revalidatePath("/admin/settings/affiliate/pixels");

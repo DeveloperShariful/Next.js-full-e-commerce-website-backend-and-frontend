@@ -8,8 +8,8 @@ import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import dns from "dns/promises"; 
-import { syncUser } from "@/lib/auth-sync";
 import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 const domainSchema = z.object({
   affiliateId: z.string().min(1, "Affiliate ID is required"),
@@ -21,8 +21,11 @@ const domainSchema = z.object({
 // =========================================
 // READ OPERATIONS
 // =========================================
+
 export async function getAllDomains() {
   try {
+    await protectAction("MANAGE_CONFIGURATION");
+
     return await db.affiliateDomain.findMany({
       include: {
         affiliate: {
@@ -40,13 +43,12 @@ export async function getAllDomains() {
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
 export async function addDomainAction(data: z.infer<typeof domainSchema>): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const result = domainSchema.safeParse(data);
     if (!result.success) return { success: false, message: result.error.issues[0].message };
@@ -71,8 +73,8 @@ export async function addDomainAction(data: z.infer<typeof domainSchema>): Promi
     });
 
     await auditService.log({
-      userId: auth.id,
-      action: "CREATE",
+      userId: actor.id,
+      action: "ADD_DOMAIN",
       entity: "AffiliateDomain",
       entityId: record.id,
       newData: { domain: cleanDomain, affiliateId }
@@ -87,26 +89,23 @@ export async function addDomainAction(data: z.infer<typeof domainSchema>): Promi
 
 export async function verifyDomainAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const record = await db.affiliateDomain.findUnique({ where: { id } });
     if (!record) return { success: false, message: "Domain not found." };
 
     if (record.isVerified) return { success: true, message: "Already verified." };
 
-    // Real DNS Verification Logic
+    // ✅ DNS Verification Logic (Preserved)
     let isMatch = false;
     try {
       const txtRecords = await dns.resolveTxt(record.domain);
-      // Check if any TXT record contains our token
       isMatch = txtRecords.flat().some(txt => txt.includes(record.verificationToken!));
     } catch (e) {
-      // DNS lookup failed
       return { success: false, message: "DNS lookup failed. Ensure TXT record is propagated." };
     }
     
-    // For Localhost/Dev bypass (Optional: Remove in Production)
+    // Dev Bypass
     if (process.env.NODE_ENV === "development") isMatch = true;
 
     if (isMatch) {
@@ -116,7 +115,7 @@ export async function verifyDomainAction(id: string): Promise<ActionResponse> {
       });
       
       await auditService.log({
-        userId: auth.id,
+        userId: actor.id,
         action: "VERIFY_DOMAIN",
         entity: "AffiliateDomain",
         entityId: id,
@@ -135,10 +134,16 @@ export async function verifyDomainAction(id: string): Promise<ActionResponse> {
 
 export async function deleteDomainAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliateDomain.delete({ where: { id } });
+
+    await auditService.log({
+        userId: actor.id,
+        action: "DELETE_DOMAIN",
+        entity: "AffiliateDomain",
+        entityId: id
+    });
 
     revalidatePath("/admin/settings/affiliate/domains");
     return { success: true, message: "Domain removed." };

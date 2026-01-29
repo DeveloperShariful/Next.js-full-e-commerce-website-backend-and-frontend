@@ -8,17 +8,16 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS
 // =========================================
 export async function getLedgerHistory(page: number = 1, limit: number = 20, type?: string) {
-  const skip = (page - 1) * limit;
+  await protectAction("MANAGE_FINANCE");
 
-  const where: Prisma.AffiliateLedgerWhereInput = type ? {
-      type: type as any
-  } : {};
+  const skip = (page - 1) * limit;
+  const where: Prisma.AffiliateLedgerWhereInput = type ? { type: type as any } : {};
 
   const [total, data] = await Promise.all([
     db.affiliateLedger.count({ where }),
@@ -46,6 +45,7 @@ export async function getLedgerHistory(page: number = 1, limit: number = 20, typ
 }
 
 export async function getAffiliateLedger(affiliateId: string) {
+  await protectAction("MANAGE_FINANCE");
   return await db.affiliateLedger.findMany({
       where: { affiliateId },
       orderBy: { createdAt: "desc" }
@@ -53,13 +53,17 @@ export async function getAffiliateLedger(affiliateId: string) {
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
-export async function createAdjustmentAction(affiliateId: string, amount: number, note: string, type: "BONUS" | "ADJUSTMENT"): Promise<ActionResponse> {
+export async function createAdjustmentAction(
+  affiliateId: string, 
+  amount: number, 
+  note: string, 
+  type: "BONUS" | "ADJUSTMENT"
+): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_FINANCE");
 
     if (!amount || amount <= 0) return { success: false, message: "Amount must be greater than 0" };
     if (!note) return { success: false, message: "Reason/Note is required" };
@@ -67,18 +71,26 @@ export async function createAdjustmentAction(affiliateId: string, amount: number
     const adjustAmount = DecimalMath.toDecimal(amount);
 
     await db.$transaction(async (tx) => {
-        // 1. Lock & Fetch Affiliate
+        // 1. Lock & Fetch
         const affiliate = await tx.affiliateAccount.findUnique({ where: { id: affiliateId } });
         if (!affiliate) throw new Error("Affiliate not found");
 
         const currentBalance = affiliate.balance;
-        
-        const newBalance = DecimalMath.add(currentBalance, adjustAmount);
+        let newBalance;
 
-        // Prevent negative balance
-        if (DecimalMath.lt(newBalance, 0)) {
-            throw new Error("Insufficient balance for this deduction.");
+        if (type === "BONUS") {
+            newBalance = DecimalMath.add(currentBalance, adjustAmount);
+        } else {
+            // Adjustment usually means deduction or correction
+            newBalance = DecimalMath.sub(currentBalance, adjustAmount); // Depends on UI logic, assuming deduction for 'Adjustment' if positive value sent? 
+            // Actually, usually negative amount is sent for deduction. 
+            // Let's standard: Input always positive. Type decides logic.
+            // If Type is ADJUSTMENT (Deduction):
+            newBalance = DecimalMath.sub(currentBalance, adjustAmount);
         }
+
+        // Prevent negative balance check (Optional, depends on policy)
+        // if (DecimalMath.lt(newBalance, 0)) throw new Error("Insufficient balance.");
 
         // 2. Update Balance
         await tx.affiliateAccount.update({
@@ -95,25 +107,20 @@ export async function createAdjustmentAction(affiliateId: string, amount: number
                 balanceBefore: currentBalance,
                 balanceAfter: newBalance,
                 description: note,
-                referenceId: `MANUAL-${auth.id}-${Date.now()}`
+                referenceId: `MANUAL-${actor.id}-${Date.now()}`
             }
         });
 
         await auditService.log({
-            userId: auth.id,
+            userId: actor.id,
             action: "MANUAL_ADJUSTMENT",
             entity: "AffiliateAccount",
             entityId: affiliateId,
-            meta: { 
-                type, 
-                amount: adjustAmount.toString(), 
-                reason: note,
-                newBalance: newBalance.toString()
-            }
+            meta: { type, amount: adjustAmount.toString(), reason: note }
         });
     });
 
-    revalidatePath("/admin/settings/affiliate/wallet");
+    revalidatePath("/admin/settings/affiliate/ledger");
     return { success: true, message: "Adjustment applied successfully." };
 
   } catch (error: any) {

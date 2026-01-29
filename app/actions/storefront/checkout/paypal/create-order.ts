@@ -1,9 +1,11 @@
+//app/actions/storefront/checkout/paypal/create-order.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
-import { decrypt } from "@/app/actions/admin/settings/payments/crypto"; // পাথ ঠিক করে নিবেন
+import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
+import { calculateShippingServerSide } from "../get-shipping-rates";
 
-// PayPal API Token Helper
 async function getAccessToken(clientId: string, clientSecret: string, isSandbox: boolean) {
   const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
   const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -17,9 +19,8 @@ async function getAccessToken(clientId: string, clientSecret: string, isSandbox:
   return data.access_token;
 }
 
-export async function createPayPalOrder(cartId: string, shippingMethodId: string) {
+export async function createPayPalOrder(cartId: string, shippingMethodId: string, shippingAddress: any) {
   try {
-    // ১. কনফিগ লোড
     const config = await db.paypalConfig.findFirst({
         where: { paymentMethod: { isEnabled: true } },
         include: { paymentMethod: true }
@@ -29,11 +30,13 @@ export async function createPayPalOrder(cartId: string, shippingMethodId: string
 
     const isSandbox = config.sandbox;
     const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
-    const clientSecret = decrypt((isSandbox ? config.sandboxClientSecret : config.liveClientSecret) ?? "");
+    // 🔐 Security: Decrypt Secret
+    const rawSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret;
+    const clientSecret = rawSecret ? decrypt(rawSecret) : "";
 
     if (!clientId || !clientSecret) throw new Error("Missing PayPal Credentials");
 
-    // ২. সার্ভার সাইড ক্যালকুলেশন (Database থেকে)
+    // 🛡️ Server Side Calculation
     const cart = await db.cart.findUnique({
         where: { id: cartId },
         include: { items: { include: { product: true, variant: true } } }
@@ -43,23 +46,19 @@ export async function createPayPalOrder(cartId: string, shippingMethodId: string
 
     let subtotal = 0;
     cart.items.forEach(item => {
-        // ✅ FIX: Decimal to Number Conversion
         const price = Number(item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price));
         subtotal += price * item.quantity;
     });
 
-    // শিপিং কস্ট যোগ করা
+    // 🛡️ Validate Shipping Cost
     let shippingCost = 0;
     if (shippingMethodId) {
-        const rate = await db.shippingRate.findUnique({ where: { id: shippingMethodId } });
-        // অথবা যদি Transdirect বা অন্য লজিক থাকে, সেটি এখানে কল করে প্রাইস আনতে হবে
-        if (rate) shippingCost = Number(rate.price); // ✅ FIX: Decimal to Number Conversion
-        // নোট: যদি Transdirect dynamic quote হয়, আপনাকে সেই ভ্যালুটি এখানে ভ্যালিডেট করতে হবে
+       const cost = await calculateShippingServerSide(cartId, shippingAddress, shippingMethodId);
+       shippingCost = cost || 0;
     }
 
     const total = (subtotal + shippingCost).toFixed(2);
 
-    // ৩. PayPal API কল (Order Creation)
     const accessToken = await getAccessToken(clientId!, clientSecret, isSandbox);
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 

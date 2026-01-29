@@ -1,5 +1,7 @@
 // app/actions/storefront/header-footer/header-client.tsx
 
+// app/actions/storefront/header-footer/header-client.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -9,25 +11,49 @@ import { usePathname } from "next/navigation";
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
 import { Search, Menu, X, LayoutDashboard, User, Network } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { Cart_Icon } from "./Cart_Icon"; // Ensure this path is correct based on your folder structure
+import { Cart_Icon } from "./Cart_Icon"; 
 import { cn } from "@/lib/utils";
+
+// ✅ 1. মেনু আইটেমের টাইপ ডিফাইন করা হলো
+type MenuItem = {
+  id: string;
+  label: string;
+  url: string;
+  target?: string; // যেমন: "_blank"
+  children?: MenuItem[]; // সাব-মেনুর জন্য
+};
+
+// ✅ 2. মেনু আইটেমের ডাটা এখানেই হার্ডকোড করা হলো
+const mainMenuItems: MenuItem[] = [
+  { id: "1", label: "Home", url: "/" },
+  { id: "2", label: "Shop", url: "/shop" },
+  { 
+    id: "3", 
+    label: "Categories", 
+    url: "/categories",
+    children: [
+      { id: "3-1", label: "Electronics", url: "/shop/electronics" },
+      { id: "3-2", label: "Fashion", url: "/shop/fashion" },
+      { id: "3-3", label: "Accessories", url: "/shop/accessories" },
+    ]
+  },
+  { id: "4", label: "About Us", url: "/about" },
+  { id: "5", label: "Contact", url: "/contact" },
+];
 
 interface HeaderClientProps {
   cartCount: number;
-  isAffiliate: boolean; // ✅ Server থেকে আসা স্ট্যাটাস
+  isAffiliate: boolean; 
 }
 
 export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientProps) {
-  const { storeName, logo, menus, primaryColor } = useGlobalStore();
+  const { storeName, logo, primaryColor } = useGlobalStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { user } = useUser();
   const pathname = usePathname();
 
-  // Global Settings থেকে মেনু লোড করা
-  const mainMenuItems = menus["main-menu"] || [];
-
-  // Admin Role চেক করা (Clerk Metadata বা Pathname দিয়ে)
+  // Admin Role চেক করা
   const isAdmin = user?.publicMetadata?.role === "admin" || pathname.startsWith("/admin");
 
   return (
@@ -51,7 +77,7 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
                 <div className="relative w-8 h-8 sm:w-auto">
                   <Image 
                     src={logo.url} 
-                    alt={logo.altText || storeName} 
+                    alt={logo.altText || storeName || "Logo"} 
                     width={logo.width || 40} 
                     height={logo.height || 40}
                     className="object-contain max-h-10 w-auto"
@@ -66,7 +92,7 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
                 </div>
               )}
               <span className="font-bold text-xl text-slate-900 hidden sm:block tracking-tight">
-                {storeName}
+                {storeName || "Store"}
               </span>
             </Link>
           </div>
@@ -291,15 +317,15 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
                     </Link>
                 )}
                 <Link href="/affiliates/register" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-white border rounded-lg shadow-sm hover:bg-gray-50">
-                  <User size={18} /> <span className="font-medium text-sm">join Affiliate</span>
+                  <User size={18} /> <span className="font-medium text-sm">Join Affiliate</span>
                 </Link>
               </SignedIn>
 
               <SignedOut>
-                  <SignInButton>
+                  <SignInButton mode="modal">
                     <button className="w-full py-2.5 text-sm font-semibold border bg-white rounded-lg mb-2">Login</button>
                   </SignInButton>
-                  <SignUpButton>
+                  <SignUpButton mode="modal">
                     <button className="w-full py-2.5 text-sm font-bold bg-black text-white rounded-lg">Register</button>
                   </SignUpButton>
               </SignedOut>

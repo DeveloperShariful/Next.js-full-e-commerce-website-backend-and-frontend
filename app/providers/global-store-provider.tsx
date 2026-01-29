@@ -5,28 +5,8 @@
 import { createContext, useContext, ReactNode, useMemo } from "react";
 
 // ==========================================
-// 1. INTERFACES
+// 1. INTERFACES (UNCHANGED)
 // ==========================================
-
-export interface MenuItem {
-  id: string;
-  label: string;
-  url: string;
-  target?: "_self" | "_blank";
-  children?: MenuItem[];
-  type?: "category" | "page" | "custom";
-  image?: string | null;
-  icon?: string | null;
-  badge?: string | null;
-}
-
-export interface StoreBanner {
-  id: string;
-  title: string;
-  image: string;
-  link: string | null;
-  position: number;
-}
 
 export interface PickupLocation {
   id: string;
@@ -216,8 +196,8 @@ interface GlobalStoreContextType {
   address: StoreAddress;
   socials: SocialLinks;
   
-  menus: Record<string, MenuItem[]>;
-  activeBanners: StoreBanner[];
+  
+
   activePaymentMethods: ActivePaymentMethod[];
   pickupLocations: PickupLocation[];
 
@@ -245,12 +225,11 @@ const defaultContext: GlobalStoreContextType = {
   locale: "en-US",
   weightUnit: "",
   dimensionUnit: "",
-  dateFormat: "dd/MM/yyyy",
-  timezone: "UTC",
+  dateFormat: " ",
+  timezone: " ",
   address: {},
   socials: {},
-  menus: {},
-  activeBanners: [],
+  
   activePaymentMethods: [],
   pickupLocations: [],
   formatPrice: () => "",
@@ -275,7 +254,7 @@ const defaultContext: GlobalStoreContextType = {
   affiliate: {
     programName: "Affiliate Program",
     isActive: false,
-    referralParam: "ref",
+    referralParam: " ",
     termsUrl: null,
     
     cookieDuration: 30,
@@ -295,7 +274,7 @@ const defaultContext: GlobalStoreContextType = {
     
     holdingPeriod: 14,
     minimumPayout: 50,
-    payoutMethods: ["STORE_CREDIT"],
+    payoutMethods: [" "],
 
     enableMLM: false,
     enableCreatives: true,
@@ -375,23 +354,6 @@ interface MarketingConfigDTO {
   pinterest?: string | null;
 }
 
-interface MenuDTO {
-  slug: string;
-  isActive: boolean;
-  items: any;
-}
-
-interface BannerDTO {
-  id: string;
-  title: string;
-  image: string;
-  link?: string | null;
-  position: number;
-  isActive: boolean;
-  media?: {
-    url: string;
-  } | null;
-}
 
 interface PaymentMethodDTO {
   identifier: string;
@@ -430,8 +392,6 @@ interface ProviderSettings {
 interface ProviderProps {
   children: ReactNode;
   settings: ProviderSettings;
-  menus?: MenuDTO[]; 
-  banners?: BannerDTO[];
   paymentMethods?: PaymentMethodDTO[];
   pickupLocations?: PickupLocationDTO[];
 }
@@ -442,9 +402,7 @@ interface ProviderProps {
 
 export function GlobalStoreProvider({ 
   children, 
-  settings, 
-  menus = [], 
-  banners = [], 
+  settings,
   paymentMethods = [],
   pickupLocations = []
 }: ProviderProps) {
@@ -455,11 +413,14 @@ export function GlobalStoreProvider({
 
   const generalConfig = (s.generalConfig as GeneralConfig) || {};
   const taxSettings = (s.taxSettings as TaxSettings) || {};
-  const activeLocale = generalConfig.locale || "en-AU";
+  const activeLocale = generalConfig.locale || "";
+
+  // =========================================================
+  // FIXED: PRICE FORMATTING LOGIC
+  // =========================================================
 
   const formatPrice = useMemo(() => (price: number | string | { toNumber: () => number } | null | undefined) => {
     if (price === null || price === "" || price === undefined) return "";
-    
     let numPrice: number = 0;
     if (typeof price === 'object' && price !== null && 'toNumber' in price) {
       numPrice = price.toNumber(); 
@@ -471,17 +432,24 @@ export function GlobalStoreProvider({
 
     if (isNaN(numPrice)) numPrice = 0;
     
-    try {
-      return new Intl.NumberFormat(activeLocale, {
-        style: "currency",
-        currency: s.currency || "AUD",
-        minimumFractionDigits: 2,
-      }).format(numPrice);
-    } catch (e) {
-      return `${s.currencySymbol || "$"}${numPrice.toFixed(2)}`;
-    }
-  }, [activeLocale, s.currency, s.currencySymbol]);
+    const currencySymbol = s.currencySymbol ? s.currencySymbol : "";
 
+    try {
+      const formattedNumber = new Intl.NumberFormat(activeLocale, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        style: 'decimal' 
+      }).format(numPrice);
+
+      return `${currencySymbol}${formattedNumber}`;
+      
+    } catch (e) {
+      return `${currencySymbol}${numPrice.toFixed(2)}`;
+    }
+  }, [activeLocale, s.currencySymbol]); 
+
+  // =========================================================
+  
   const logoData: StoreMedia | null = s.logoMedia 
     ? {
         url: s.logoMedia.url,
@@ -493,32 +461,6 @@ export function GlobalStoreProvider({
     : (s.logo ? { url: s.logo } : null);
 
   const faviconUrl: string | null = s.faviconMedia?.url || s.favicon || null;
-
-  const processedMenus = useMemo(() => {
-    const map: Record<string, MenuItem[]> = {};
-    if (Array.isArray(menus)) {
-        menus.forEach((menu) => {
-          if (menu.isActive) {
-            map[menu.slug] = menu.items as MenuItem[];
-          }
-        });
-    }
-    return map;
-  }, [menus]);
-
-  const processedBanners = useMemo(() => {
-    if (!Array.isArray(banners)) return [];
-    return banners
-      .filter((b) => b.isActive)
-      .sort((a, b) => a.position - b.position)
-      .map((b) => ({
-        id: b.id,
-        title: b.title,
-        image: b.media?.url || b.image,
-        link: b.link || null,
-        position: b.position
-      }));
-  }, [banners]);
 
   const processedPayments = useMemo(() => {
     if (!Array.isArray(paymentMethods)) return [];
@@ -551,7 +493,7 @@ export function GlobalStoreProvider({
           maxOrderAmount: maxAmt || null,
           surchargeEnabled: pm.surchargeEnabled || false,
           surchargeAmount: surAmt,
-          surchargeType: pm.surchargeType || 'fixed'
+          surchargeType: pm.surchargeType || ''
         };
       });
   }, [paymentMethods]);
@@ -576,9 +518,9 @@ export function GlobalStoreProvider({
   const affiliateRaw = s.affiliateConfig || {};
   
   const affiliateConfig: AffiliateGlobalConfig = {
-    programName: affiliateRaw.programName || "GoBike Partner Program",
+    programName: affiliateRaw.programName || "Affiliate Program",
     isActive: generalConfig.enableAffiliateProgram ?? false,
-    referralParam: affiliateRaw.referralParam || "ref",
+    referralParam: affiliateRaw.referralParam || " ",
     termsUrl: affiliateRaw.termsUrl || null,
 
     cookieDuration: Number(affiliateRaw.cookieDuration) || 30,
@@ -602,7 +544,6 @@ export function GlobalStoreProvider({
       ? affiliateRaw.payoutMethods 
       : ["BANK_TRANSFER", "STORE_CREDIT"],
 
-    // --- UPDATED DYNAMIC FIELDS ---
     enableMLM: affiliateRaw.enableMLM ?? false,
     enableCreatives: affiliateRaw.enableCreatives ?? true,
     enableCampaigns: affiliateRaw.enableCampaigns ?? true,
@@ -628,25 +569,25 @@ export function GlobalStoreProvider({
     locale: activeLocale,
     weightUnit: s.weightUnit || "",
     dimensionUnit: s.dimensionUnit || "",
-    dateFormat: generalConfig.dateFormat || "dd/MM/yyyy",
-    timezone: generalConfig.timezone || "UTC",
+    dateFormat: generalConfig.dateFormat || "",
+    timezone: generalConfig.timezone || " ",
     
     address: (s.storeAddress as StoreAddress) || {},
     socials: (s.socialLinks as SocialLinks) || {},
 
-    menus: processedMenus,
-    activeBanners: processedBanners,
+  
+
     activePaymentMethods: processedPayments,
     pickupLocations: processedPickups,
     
     formatPrice,
 
     general: {
-      timezone: generalConfig.timezone || "UTC",
-      dateFormat: generalConfig.dateFormat || "dd/MM/yyyy",
+      timezone: generalConfig.timezone || " ",
+      dateFormat: generalConfig.dateFormat || " ",
       orderIdFormat: generalConfig.orderIdFormat || "#",
       locale: activeLocale,
-      defaultCountry: generalConfig.defaultCountry || "AU",
+      defaultCountry: generalConfig.defaultCountry || " ",
       supportedLocales: generalConfig.supportedLocales || [],
       headerScripts: generalConfig.headerScripts || "",
       footerScripts: generalConfig.footerScripts || "",
@@ -661,7 +602,7 @@ export function GlobalStoreProvider({
       defaultMetaTitle: seoData.defaultMetaTitle || null,
       defaultMetaDesc: seoData.defaultMetaDesc || null,
       ogImage: seoData.ogMedia?.url || seoData.ogImage || null,
-      twitterCard: seoData.twitterCard || "summary_large_image",
+      twitterCard: seoData.twitterCard || " ",
       twitterSite: seoData.twitterSite || null,
       themeColor: seoData.themeColor || null,
       robotsTxt: seoData.robotsTxtContent || null,

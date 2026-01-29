@@ -7,8 +7,8 @@ import { ActionResponse } from "../types";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
-import { syncUser } from "@/lib/auth-sync";
 import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 const groupSchema = z.object({
   id: z.string().optional(),
@@ -23,7 +23,10 @@ type GroupInput = z.infer<typeof groupSchema>;
 // =========================================
 // READ OPERATIONS
 // =========================================
+
 export async function getAllGroups() {
+  await protectAction("MANAGE_PARTNERS"); // Or VIEW_ANALYTICS
+
   return await db.affiliateGroup.findMany({
     include: {
       _count: { 
@@ -39,13 +42,12 @@ export async function getAllGroups() {
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
 export async function upsertGroupAction(data: GroupInput): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
 
     const result = groupSchema.safeParse(data);
     if (!result.success) {
@@ -59,6 +61,7 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
     const payload = result.data;
     const rateValue = payload.commissionRate ? DecimalMath.toDecimal(payload.commissionRate as any) : null;
 
+    // Handle Default Flag Logic
     if (payload.isDefault) {
       await db.affiliateGroup.updateMany({
         where: { isDefault: true },
@@ -92,8 +95,8 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
     }
 
     await auditService.log({
-      userId: auth.id,
-      action: payload.id ? "UPDATE" : "CREATE",
+      userId: actor.id,
+      action: payload.id ? "UPDATE_GROUP" : "CREATE_GROUP",
       entity: "AffiliateGroup",
       entityId: groupId!,
       newData: payload
@@ -110,8 +113,7 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
 
 export async function deleteGroupAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
 
     const count = await db.affiliateAccount.count({ where: { groupId: id } });
     if (count > 0) {
@@ -121,8 +123,8 @@ export async function deleteGroupAction(id: string): Promise<ActionResponse> {
     await db.affiliateGroup.delete({ where: { id } });
 
     await auditService.log({
-      userId: auth.id,
-      action: "DELETE",
+      userId: actor.id,
+      action: "DELETE_GROUP",
       entity: "AffiliateGroup",
       entityId: id
     });

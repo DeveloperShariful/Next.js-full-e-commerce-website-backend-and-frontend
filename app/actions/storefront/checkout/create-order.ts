@@ -1,47 +1,100 @@
 //app/actions/storefront/checkout/create-order.ts
+
+
 "use server"
 
 import { db } from "@/lib/prisma"
 import { OrderStatus, PaymentStatus } from "@prisma/client"
 import { clearCart } from "../cart/clear-cart"
+import { calculateShippingServerSide } from "./get-shipping-rates"
+import { sendNotification } from "@/app/api/email/send-notification" // 👈 Import Notification
 
 interface OrderInput {
+  cartId: string;
   billing: any
   shipping: any
-  items: any[]
   shippingMethodId: string
   paymentMethod: string
-  total: number
   customerNote?: string
+}
+
+interface OrderItemData {
+    productId: string;
+    variantId: string | null;
+    productName: string;
+    variantName: string | undefined;
+    price: number;
+    quantity: number;
+    total: number;
+    image: string | null;
 }
 
 export async function createOrder(data: OrderInput) {
   try {
-    // ১. অর্ডার নাম্বার জেনারেট
-    const count = await db.order.count()
-    const orderNumber = `ORD-${1000 + count + 1}`
+    const cart = await db.cart.findUnique({
+        where: { id: data.cartId },
+        include: { items: { include: { product: true, variant: true } } }
+    });
 
-    // ২. শিপিং কস্ট ডাটাবেস থেকে আনা (সিকিউরিটি)
-    let shippingCost = 0
-    if (data.shippingMethodId) {
-        // যদি লোকাল পিকআপ বা ফ্রি শিপিং হয়
-        if(data.shippingMethodId === 'pickup' || data.shippingMethodId === 'free_shipping') {
-            shippingCost = 0;
-        } 
-        // যদি Transdirect বা অন্য কোনো ডাইনামিক মেথড হয় (আমরা আপাতত রেটটা ট্রাস্ট করছি, কিন্তু প্রোডাকশনে রি-ভ্যালিডেট করা ভালো)
-        // সিমপ্লিফিকেশনের জন্য আমরা ধরে নিচ্ছি শিপিং মেথড আইডিতে কস্ট লুকানো নেই, কিন্তু ডাটাবেসে থাকলে ফেচ করতাম
+    if (!cart || cart.items.length === 0) {
+        return { success: false, error: "Cart is empty" };
     }
 
-    // ৩. ট্রানজ্যাকশন: অর্ডার তৈরি
+    let subtotal = 0;
+    const orderItemsData: OrderItemData[] = [];
+
+    for (const item of cart.items) {
+        const price = Number(item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price));
+        
+        const currentStock = item.variant ? item.variant.stock : item.product.stock;
+        const trackQuantity = item.variant ? item.variant.trackQuantity : item.product.trackQuantity;
+        
+        if (trackQuantity && currentStock < item.quantity) {
+             return { success: false, error: `Product ${item.product.name} is out of stock.` };
+        }
+
+        subtotal += price * item.quantity;
+
+        orderItemsData.push({
+            productId: item.productId,
+            variantId: item.variantId,
+            productName: item.product.name,
+            variantName: item.variant?.name,
+            price: price,
+            quantity: item.quantity,
+            total: price * item.quantity,
+            image: item.variant?.image || item.product.featuredImage
+        });
+    }
+
+    let shippingCost = 0;
+    if (data.shippingMethodId) {
+        const validCost = await calculateShippingServerSide(
+            data.cartId, 
+            data.shipping,
+            data.shippingMethodId
+        );
+        
+        if (validCost === null) {
+             return { success: false, error: "Invalid shipping method selected. Please refresh." };
+        }
+        shippingCost = validCost;
+    }
+
+    const grandTotal = subtotal + shippingCost;
+
     const newOrder = await db.$transaction(async (tx) => {
+      const count = await tx.order.count();
+      const orderNumber = `ORD-${1000 + count + 1}`;
+
       const order = await tx.order.create({
         data: {
           orderNumber,
-          status: OrderStatus.PENDING, // শুরুতে পেন্ডিং
+          status: OrderStatus.PENDING, 
           paymentStatus: PaymentStatus.UNPAID,
-          subtotal: data.total, // আপনার ক্যালকুলেশন অনুযায়ী
+          subtotal: subtotal, 
           shippingTotal: shippingCost,
-          total: data.total, // টোটাল
+          total: grandTotal,
           
           guestEmail: data.billing.email,
           shippingAddress: data.shipping,
@@ -52,23 +105,60 @@ export async function createOrder(data: OrderInput) {
           customerNote: data.customerNote,
           
           items: {
-            create: data.items.map((item: any) => ({
-                productName: item.name,
-                productId: item.productId,
-                quantity: item.quantity,
-                price: item.price,
-                total: item.price * item.quantity,
-                image: item.image
-            }))
+            create: orderItemsData
           }
         }
-      })
+      });
       
-      return order
-    })
+      const isOffline = data.paymentMethod.startsWith('offline') || data.paymentMethod === 'cod' || data.paymentMethod === 'bank_transfer';
+      
+      if (isOffline) {
+          for (const item of cart.items) {
+             if (item.variantId && item.variant?.trackQuantity) {
+                 await tx.productVariant.update({ 
+                     where: { id: item.variantId }, 
+                     data: { stock: { decrement: item.quantity } } 
+                 });
+             } else if (item.product.trackQuantity) {
+                 await tx.product.update({ 
+                     where: { id: item.productId }, 
+                     data: { stock: { decrement: item.quantity } } 
+                 });
+             }
+          }
+      }
 
-    // ৪. অফলাইন পেমেন্ট হলে সাথে সাথে কার্ট ক্লিয়ার
-    if (data.paymentMethod.startsWith('offline') || data.paymentMethod === 'cod' || data.paymentMethod === 'bank_transfer') {
+      return order;
+    });
+
+    // 🔥 FIX: Send Email Notifications (Async to prevent blocking)
+    // 1. Customer Email
+    await sendNotification({
+        trigger: "ORDER_PENDING", // Matches triggerEvent in email-templates.ts
+        recipient: data.billing.email,
+        orderId: newOrder.id,
+        data: {
+            order_number: newOrder.orderNumber,
+            customer_name: `${data.billing.firstName} ${data.billing.lastName}`,
+            total_amount: grandTotal.toFixed(2),
+        }
+    }).catch(err => console.error("Email Error:", err));
+
+    // 2. Admin Email
+    await sendNotification({
+        trigger: "ORDER_CREATED_ADMIN", // Matches triggerEvent in email-templates.ts
+        recipient: "", // Admin email auto-fetched in sendNotification
+        orderId: newOrder.id,
+        data: {
+            order_number: newOrder.orderNumber,
+            customer_name: `${data.billing.firstName} ${data.billing.lastName}`,
+            total_amount: grandTotal.toFixed(2),
+        }
+    }).catch(err => console.error("Admin Email Error:", err));
+
+
+    const isOffline = data.paymentMethod.startsWith('offline') || data.paymentMethod === 'cod' || data.paymentMethod === 'bank_transfer';
+    if (isOffline) {
         await clearCart();
     }
 
@@ -76,7 +166,8 @@ export async function createOrder(data: OrderInput) {
         success: true, 
         orderId: newOrder.id, 
         orderNumber: newOrder.orderNumber,
-        orderKey: "key_" + newOrder.id 
+        orderKey: "key_" + newOrder.id,
+        grandTotal: grandTotal 
     }
 
   } catch (error: any) {

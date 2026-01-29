@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, CreditCard, Settings, Trophy, Calculator, 
   Image as ImageIcon, Network, ShieldAlert, Code2, 
-  Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2, BarChart2,
+  Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2, BarChart2, Ticket,Tag,
   Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,8 @@ import KycManager from "./Management/kyc-manager";
 import LedgerTable from "./Management/ledger-table";
 import AffiliateGeneralConfigForm from "./Configuration/general-config-manager";
 import ReportsDashboard from "./Analytics/reports-dashboard";
+import TagManager from "./Configuration/tag-manager";
+import CouponManager from "./Marketing/coupon-manager";
 
 interface Props {
   initialData: any;
@@ -81,6 +83,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         { id: "creatives", label: "Creatives & Assets", icon: ImageIcon },
         { id: "contests", label: "Sales Contests", icon: Trophy },
         { id: "announcements", label: "Announcements", icon: Megaphone },
+        { id: "coupons", label: "Coupons", icon: Ticket },
     ]},
     { section: "Configuration", items: [
         { id: "tiers", label: "Tiers & Ranks", icon: Trophy },
@@ -90,7 +93,9 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         { id: "fraud", label: "Fraud Shield", icon: ShieldAlert },
         { id: "domains", label: "Custom Domains", icon: Globe },
         { id: "pixels", label: "Tracking Pixels", icon: Code2 },
+        { id: "tags", label: "System Tags", icon: Tag },
         { id: "general", label: "System Settings", icon: Settings },
+        
     ]}
   ];
 
@@ -111,6 +116,8 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
             currentPage={Number(searchParams.get("page")) || 1}
             groupsData={initialData.partners.groups}
             tags={initialData.partners.tags}
+            defaultRate={initialData.partners.defaultRate}
+            defaultType={initialData.partners.defaultType} 
         />
       ) : null;
       
@@ -132,7 +139,9 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
       case "fraud": return initialData.fraud ? <div className="space-y-6"><div className="p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm flex items-center gap-2"><ShieldAlert className="w-4 h-4"/> <strong>Live Monitor:</strong> {initialData.fraud.highRisk.length} High Risk Users Detected.</div><FraudRuleManager initialRules={initialData.fraud.rules} /></div> : null;
       case "domains": return initialData.domains ? <DomainList initialDomains={initialData.domains} /> : null;
       case "pixels": return initialData.pixels ? <PixelList pixels={initialData.pixels} /> : null;
-      
+      case "tags": return initialData.tags ? <TagManager initialTags={initialData.tags} /> : null;
+      case "coupons": return initialData.coupons ? <CouponManager initialCoupons={initialData.coupons} /> : null;
+
       case "general": return initialData.config ? (
         <AffiliateGeneralConfigForm 
             initialData={initialData.config} 

@@ -7,8 +7,8 @@ import { MediaType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
 import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 const creativeSchema = z.object({
   id: z.string().optional(),
@@ -27,8 +27,12 @@ type CreativeInput = z.infer<typeof creativeSchema>;
 // =========================================
 // READ OPERATIONS
 // =========================================
+
 export async function getAllCreatives() {
   try {
+    // Creatives are public for affiliates, but admin management requires view permission
+    await protectAction("MANAGE_CONFIGURATION"); 
+
     return await db.affiliateCreative.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -43,13 +47,12 @@ export async function getAllCreatives() {
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
 export async function upsertCreativeAction(data: CreativeInput): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const result = creativeSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
@@ -79,8 +82,8 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
     }
 
     await auditService.log({
-      userId: auth.id,
-      action: payload.id ? "UPDATE" : "CREATE",
+      userId: actor.id,
+      action: payload.id ? "UPDATE_CREATIVE" : "CREATE_CREATIVE",
       entity: "AffiliateCreative",
       entityId: payload.id || "NEW",
       newData: dbPayload
@@ -96,16 +99,15 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
 
 export async function deleteCreativeAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliateCreative.delete({
       where: { id },
     });
 
     await auditService.log({
-      userId: auth.id,
-      action: "DELETE",
+      userId: actor.id,
+      action: "DELETE_CREATIVE",
       entity: "AffiliateCreative",
       entityId: id
     });

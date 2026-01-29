@@ -8,12 +8,15 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS
 // =========================================
+
 export async function getAllRates(page: number = 1, limit: number = 20, search?: string) {
+  await protectAction("VIEW_ANALYTICS");
+
   const skip = (page - 1) * limit;
 
   const where: Prisma.AffiliateProductRateWhereInput = search ? {
@@ -49,6 +52,7 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
 }
 
 export async function searchProducts(query: string) {
+  await protectAction("MANAGE_CONFIGURATION");
   return await db.product.findMany({
     where: {
       name: { contains: query, mode: "insensitive" },
@@ -60,7 +64,7 @@ export async function searchProducts(query: string) {
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
 export async function upsertRateAction(data: {
@@ -73,11 +77,11 @@ export async function upsertRateAction(data: {
   groupId?: string | null;
 }): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const rateDecimal = DecimalMath.toDecimal(data.rate);
 
+    // Dynamic Upsert Logic
     if (data.id) {
       await db.affiliateProductRate.update({
         where: { id: data.id },
@@ -90,6 +94,7 @@ export async function upsertRateAction(data: {
         }
       });
     } else {
+      // Duplicate Check
       const existing = await db.affiliateProductRate.findFirst({
         where: {
           productId: data.productId,
@@ -98,7 +103,7 @@ export async function upsertRateAction(data: {
         }
       });
 
-      if (existing) return { success: false, message: "Rule exists for this combination" };
+      if (existing) return { success: false, message: "Rule already exists for this target combination." };
 
       await db.affiliateProductRate.create({
         data: {
@@ -112,8 +117,16 @@ export async function upsertRateAction(data: {
       });
     }
 
+    await auditService.log({
+        userId: actor.id,
+        action: "UPSERT_PRODUCT_RATE",
+        entity: "AffiliateProductRate",
+        entityId: data.id || "NEW",
+        newData: data
+    });
+
     revalidatePath("/admin/settings/affiliate/product-rates");
-    return { success: true, message: "Rule saved." };
+    return { success: true, message: "Commission override saved." };
   } catch (error: any) {
     return { success: false, message: error.message };
   }
@@ -121,11 +134,17 @@ export async function upsertRateAction(data: {
 
 export async function deleteRateAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliateProductRate.delete({ where: { id } });
     
+    await auditService.log({
+        userId: actor.id,
+        action: "DELETE_PRODUCT_RATE",
+        entity: "AffiliateProductRate",
+        entityId: id
+    });
+
     revalidatePath("/admin/settings/affiliate/product-rates");
     return { success: true, message: "Rule removed." };
   } catch (error: any) {
@@ -139,14 +158,14 @@ export async function bulkImportRatesAction(rates: {
   type: CommissionType;
 }[]): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     if (rates.length === 0) return { success: false, message: "No data provided" };
     if (rates.length > 500) return { success: false, message: "Limit 500 rows per import" };
 
     await db.$transaction(async (tx) => {
       for (const r of rates) {
+         // Check Global Override Existence
          const existing = await tx.affiliateProductRate.findFirst({
            where: { productId: r.productId, affiliateId: null, groupId: null }
          });
@@ -165,8 +184,8 @@ export async function bulkImportRatesAction(rates: {
     });
 
     await auditService.log({
-      userId: auth.id,
-      action: "BULK_IMPORT",
+      userId: actor.id,
+      action: "BULK_IMPORT_RATES",
       entity: "AffiliateProductRate",
       entityId: "BULK",
       meta: { count: rates.length }

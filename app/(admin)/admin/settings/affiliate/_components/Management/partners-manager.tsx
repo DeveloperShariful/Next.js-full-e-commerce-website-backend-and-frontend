@@ -10,17 +10,14 @@ import GroupManager from "./group-manager";
 
 // Props Definition (Combines props from both components)
 interface Props {
-  // Users Data
   usersData: any[];
   totalEntries: number;
   totalPages: number;
   currentPage: number;
-  
-  // Groups Data
   groupsData: any[];
-  
-  // Shared Data
   tags: any[];
+  defaultRate?: number;
+  defaultType?: "PERCENTAGE" | "FIXED";
 }
 
 export default function PartnersManager({ 
@@ -29,7 +26,9 @@ export default function PartnersManager({
   totalPages, 
   currentPage, 
   groupsData, 
-  tags 
+  tags ,
+  defaultRate ,
+  defaultType 
 }: Props) {
   const [activeTab, setActiveTab] = useState<"AFFILIATES" | "GROUPS">("AFFILIATES");
 
@@ -83,6 +82,8 @@ export default function PartnersManager({
                     currentPage={currentPage}
                     groups={groupsData} // Passing groups for dropdowns
                     tags={tags}
+                    defaultRate={defaultRate}
+                    defaultType={defaultType}
                 />
             </div>
         ) : (

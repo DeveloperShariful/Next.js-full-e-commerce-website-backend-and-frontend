@@ -24,7 +24,8 @@ import {
   rejectAffiliateAction, 
   bulkStatusAction, 
   bulkGroupAction, 
-  bulkTagAction 
+  bulkTagAction ,
+  updateCommissionAction
 } from "@/app/actions/admin/settings/affiliates/_services/account-service";
 
 import {
@@ -47,6 +48,8 @@ interface Props {
   currentPage: number;
   groups?: { id: string, name: string }[];
   tags?: { id: string, name: string }[];
+  defaultRate?: number;
+  defaultType?: "PERCENTAGE" | "FIXED";
 }
 
 type SortField = 'name' | 'totalEarnings' | 'balance' | 'createdAt' | 'status';
@@ -62,15 +65,19 @@ export default function AffiliateUsersTable({
   totalPages, 
   currentPage, 
   groups = [], 
-  tags = [] 
+  tags = [] ,
+  defaultRate ,
+  defaultType 
 }: Props) {
   // --- Core Hooks ---
+  const { symbol } = useGlobalStore(); 
+  const currencySymbol = symbol || ""; 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { formatPrice, affiliate } = useGlobalStore();
+  const { formatPrice ,affiliate } = useGlobalStore();
   const [isPending, startTransition] = useTransition();
-
+  const [editingCommissionUser, setEditingCommissionUser] = useState<AffiliateUserTableItem | null>(null);
   // --- Local State ---
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionType, setBulkActionType] = useState<string>("");
@@ -253,6 +260,17 @@ export default function AffiliateUsersTable({
 
   // --- Helper: Dynamic Commission Display ---
   const getCommissionDisplay = (user: AffiliateUserTableItem) => {
+
+    if (user.commissionRate !== null && user.commissionRate !== undefined) {
+        return { 
+            main: user.commissionType === "FIXED" 
+                ? `${currencySymbol}${user.commissionRate}` 
+                : `${user.commissionRate}%`, 
+            sub: "Coustom rate", 
+            isDefault: false,
+            isCustom: true 
+        };
+    }
     if (user.groupName && user.groupName !== "No Group") {
         return { main: user.groupName, sub: "Group Rate", isDefault: false };
     }
@@ -260,7 +278,10 @@ export default function AffiliateUsersTable({
         return { main: user.tierName, sub: "Tier Rate", isDefault: false };
     }
     return {
-        main: "Global Default", 
+        
+        main: defaultType === "FIXED" 
+            ? `${currencySymbol}${defaultRate}` 
+            : `${defaultRate}%`,
         sub: "Store Setting",
         isDefault: true
     };
@@ -482,6 +503,7 @@ export default function AffiliateUsersTable({
                             <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
                                 #{user.slug}
                             </span>
+                            
                           </div>
                         </div>
                       </div>
@@ -490,16 +512,11 @@ export default function AffiliateUsersTable({
                     {/* Commission Rate */}
                     <td className="px-6 py-4">
                       <div className="flex flex-col items-start gap-1">
-                        <span className={cn(
-                          "text-xs font-bold px-2 py-0.5 rounded border shadow-sm",
-                          commInfo.isDefault 
-                            ? "bg-gray-50 text-gray-700 border-gray-200" 
-                            : "bg-blue-50 text-blue-700 border-blue-200"
-                        )}>
-                           {commInfo.main}
+                        <span className={cn( "text-xs font-bold px-2 py-0.5 rounded border shadow-sm", commInfo.isCustom ? "bg-purple-100 text-purple-700 border-purple-200" : commInfo.isDefault 
+                          ? "bg-gray-50 text-gray-700 border-gray-200" : "bg-blue-50 text-blue-700 border-blue-200" )}> {commInfo.main}
                         </span>
                         <span className="text-[10px] text-gray-400 font-medium">
-                           {commInfo.sub}
+                          {commInfo.sub}
                         </span>
                       </div>
                     </td>
@@ -601,6 +618,11 @@ export default function AffiliateUsersTable({
                           <DropdownMenuItem onClick={() => toast.info("Feature coming soon: Pay Affiliate")} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50">
                             <CreditCard className="w-3.5 h-3.5 mr-2 text-gray-500" /> Pay Balance
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setEditingCommissionUser(user); }} 
+                            className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50"
+>
+                          <Percent className="w-3.5 h-3.5 mr-2 text-gray-500" /> Set Commission Rate
+                          </DropdownMenuItem>
                           
                           <DropdownMenuSeparator />
                           
@@ -661,7 +683,17 @@ export default function AffiliateUsersTable({
         formatPrice={formatPrice}
       />
 
+      <CommissionModal 
+        isOpen={!!editingCommissionUser}
+        onClose={() => setEditingCommissionUser(null)}
+        user={editingCommissionUser}
+       />
+
+      
+
     </div>
+
+    
   );
 }
 
@@ -782,12 +814,29 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                         <h3 className="text-sm font-bold text-gray-900 border-b pb-2 uppercase tracking-wide">Program Details</h3>
                         <div className="grid grid-cols-2 gap-y-6 gap-x-4 text-sm">
                             <div>
+                              <div className="col-span-2">
+                                <p className="text-xs text-gray-500 font-medium uppercase mb-1">System ID (UUID)</p>
+                              <div 
+                                className="flex items-center justify-between gap-2 bg-slate-800 text-slate-200 px-3 py-2 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors group"
+                                onClick={() => {
+                                navigator.clipboard.writeText(user.id);
+                                toast.success("ID Copied to clipboard");
+                                 }}
+                              >
+                              <code className="font-mono text-xs truncate">{user.id}</code>
+                             <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+                                </div>
+                                  <p className="text-[10px] text-gray-400 mt-1">Use this ID when manually assigning coupons or rates.</p>
+                                </div>
+
                                 <p className="text-xs text-gray-500 font-medium uppercase mb-1">Affiliate Slug</p>
                                 <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">
                                     <span className="font-mono text-gray-900 font-bold">/{user.slug}</span>
                                     <Copy className="w-3 h-3 text-gray-400 cursor-pointer hover:text-black" onClick={() => toast.success("Slug copied")} />
                                 </div>
+                                 
                             </div>
+
                             <div>
                                 <p className="text-xs text-gray-500 font-medium uppercase mb-1">Current Rank</p>
                                 <p className="font-bold text-gray-900 mt-1 flex items-center gap-1.5">
@@ -847,6 +896,104 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                         <CreditCard className="w-4 h-4" /> Payout History
                     </button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function CommissionModal({ isOpen, onClose, user }: any) {
+    const [isPending, startTransition] = useTransition();
+    const [rate, setRate] = useState(user?.commissionRate || "");
+    const [type, setType] = useState(user?.commissionType || "PERCENTAGE");
+    const [useDefault, setUseDefault] = useState(!user?.commissionRate); // If null, use default
+
+    if (!isOpen || !user) return null;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        startTransition(async () => {
+            // If "Use Default" is checked, sending null will make it fallback to Tier/Group
+            const finalRate = useDefault ? null : Number(rate);
+            const res = await updateCommissionAction(user.id, finalRate, type);
+            
+            if (res.success) {
+                toast.success("Commission updated");
+                onClose();
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
+                    <div>
+                        <h3 className="font-bold text-gray-900">Set Custom Rate</h3>
+                        <p className="text-xs text-gray-500">For {user.name}</p>
+                    </div>
+                    <button onClick={onClose}><X className="w-5 h-5 text-gray-400 hover:text-black"/></button>
+                </div>
+                
+                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                        <input 
+                            type="checkbox" 
+                            id="useDefault" 
+                            checked={useDefault} 
+                            onChange={(e) => setUseDefault(e.target.checked)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <label htmlFor="useDefault" className="text-xs font-bold text-blue-800 cursor-pointer select-none">
+                            Use System Default (Tier/Group)
+                        </label>
+                    </div>
+
+                    {!useDefault && (
+                        <div className="space-y-4 animate-in slide-in-from-top-2">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-700 uppercase">Commission Type</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setType("PERCENTAGE")}
+                                        className={cn("py-2 text-xs font-bold rounded border", type === "PERCENTAGE" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200")}
+                                    >
+                                        Percentage (%)
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setType("FIXED")}
+                                        className={cn("py-2 text-xs font-bold rounded border", type === "FIXED" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200")}
+                                    >
+                                        Fixed Amount ($)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-700 uppercase">Rate Value</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={rate} 
+                                    onChange={(e) => setRate(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none" 
+                                    placeholder="e.g. 15"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <button 
+                        type="submit" 
+                        disabled={isPending} 
+                        className="w-full bg-black text-white py-2.5 rounded-lg text-sm font-bold hover:bg-gray-800 disabled:opacity-50 flex justify-center items-center gap-2"
+                    >
+                        {isPending && <Loader2 className="w-4 h-4 animate-spin"/>} Save Changes
+                    </button>
+                </form>
             </div>
         </div>
     );

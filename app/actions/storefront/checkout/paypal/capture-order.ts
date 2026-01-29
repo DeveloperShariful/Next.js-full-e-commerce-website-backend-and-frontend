@@ -1,3 +1,5 @@
+//app/actions/storefront/checkout/paypal/capture-order.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -5,7 +7,6 @@ import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { clearCart } from "../../cart/clear-cart";
 
-// (getAccessToken ফাংশনটি এখানেও লাগবে বা শেয়ার্ড ফাইলে রাখতে পারেন)
 async function getAccessToken(clientId: string, clientSecret: string, isSandbox: boolean) {
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -16,15 +17,14 @@ async function getAccessToken(clientId: string, clientSecret: string, isSandbox:
 
 export async function capturePayPalOrder(payPalOrderId: string, cartId: string, customerInfo: any, shippingInfo: any, shippingMethodId: string) {
   try {
-    // ১. ক্রেডেনশিয়াল আনা
     const config = await db.paypalConfig.findFirst({ where: { paymentMethod: { isEnabled: true } } });
     if (!config) throw new Error("PayPal config missing");
     
     const isSandbox = config.sandbox;
     const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
-    const clientSecret = decrypt((isSandbox ? config.sandboxClientSecret : config.liveClientSecret) ?? "");
+    const rawSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret;
+    const clientSecret = rawSecret ? decrypt(rawSecret) : "";
 
-    // ২. PayPal Capture API কল
     const accessToken = await getAccessToken(clientId!, clientSecret, isSandbox);
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 
@@ -39,43 +39,39 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
         const captureId = data.purchase_units[0].payments.captures[0].id;
         const totalAmount = parseFloat(data.purchase_units[0].payments.captures[0].amount.value);
 
-        // ৩. অর্ডার ডাটাবেসে সেভ করা (WooCommerce স্টাইল)
         const cart = await db.cart.findUnique({ 
             where: { id: cartId },
             include: { items: { include: { product: true, variant: true } } }
         });
 
-        if(!cart) throw new Error("Cart not found during capture");
-
-        // Order Number Generate
-        const count = await db.order.count();
-        const orderNumber = `ORD-${1000 + count + 1}`;
+        if(!cart) throw new Error("Cart not found");
 
         const newOrder = await db.$transaction(async (tx) => {
-            // A. Create Order
+            // 1. Order Number
+            const count = await tx.order.count();
+            const orderNumber = `ORD-${1000 + count + 1}`;
+
+            // 2. Create Order
             const order = await tx.order.create({
                 data: {
                     orderNumber,
-                    status: OrderStatus.PROCESSING, // পেমেন্ট হয়ে গেছে, তাই প্রসেসিং
+                    status: OrderStatus.PROCESSING,
                     paymentStatus: PaymentStatus.PAID,
                     paymentMethod: "PayPal",
-                    paymentId: captureId, // ট্রানজ্যাকশন আইডি
+                    paymentId: captureId,
                     total: totalAmount,
-                    subtotal: totalAmount, // (Simplified logic, you can calculate exact)
-                    shippingTotal: 0, // (Simplified)
-                    
+                    subtotal: totalAmount, // (Note: You can store exact breakdown if needed)
+                    shippingTotal: 0, 
                     guestEmail: customerInfo.email,
                     billingAddress: customerInfo,
                     shippingAddress: shippingInfo,
                     shippingMethod: shippingMethodId,
-                    
                     items: {
                         create: cart.items.map(item => ({
                             productName: item.product.name,
                             productId: item.productId,
                             variantId: item.variantId,
                             quantity: item.quantity,
-                            // ✅ FIX: Decimal to Number Conversion
                             price: Number(item.variant?.price || item.product.price),
                             total: Number(item.variant?.price || item.product.price) * item.quantity
                         }))
@@ -83,7 +79,7 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
                 }
             });
 
-            // B. Create Transaction Log
+            // 3. Transaction Log
             await tx.orderTransaction.create({
                 data: {
                     orderId: order.id,
@@ -97,21 +93,25 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
                 }
             });
 
-            // C. Stock Deduction (গুরুত্বপূর্ণ)
+            // 4. 🔥 STOCK DEDUCTION (The Missing Part)
             for (const item of cart.items) {
                 if (item.variantId && item.variant?.trackQuantity) {
-                    await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
+                    await tx.productVariant.update({ 
+                        where: { id: item.variantId }, 
+                        data: { stock: { decrement: item.quantity } } 
+                    });
                 } else if (item.product.trackQuantity) {
-                    await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity } } });
+                    await tx.product.update({ 
+                        where: { id: item.productId }, 
+                        data: { stock: { decrement: item.quantity } } 
+                    });
                 }
             }
 
             return order;
         });
 
-        // ৪. কার্ট ক্লিয়ার
         await clearCart();
-
         return { success: true, orderId: newOrder.id };
     } 
     

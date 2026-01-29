@@ -20,26 +20,29 @@ interface RateParams {
   };
 }
 
+// 🛠️ INTERNAL HELPER: Server-side validation এর জন্য এই ফাংশনটি
+export async function calculateShippingServerSide(cartId: string, address: any, selectedMethodId: string): Promise<number | null> {
+    const rates = await getShippingRates({ cartId, address });
+    const selectedRate = rates.find(r => r.id === selectedMethodId);
+    return selectedRate ? selectedRate.cost : null;
+}
+
 export async function getShippingRates(params?: RateParams): Promise<ShippingOption[]> {
   try {
-    // ১. স্টোর সেটিংস চেক করা (Pickup Enabled কিনা?)
     const settings = await db.storeSettings.findUnique({
       where: { id: "settings" }
     });
     
-    // JSON থেকে সেটিং বের করা
     const generalConfig = settings?.generalConfig as any || {};
-    const enablePickup = generalConfig.enablePickup === true; // Schema অনুযায়ী চেক
+    const enablePickup = generalConfig.enablePickup === true;
 
-    // ২. ডিফল্ট রেসপন্স (যদি অ্যাড্রেস না থাকে)
+    // Address না থাকলে শুধু Pickup (যদি অন থাকে)
     if (!params || !params.address.postcode || !params.address.city) {
-      // যদি পিকআপ অন থাকে তবেই দেখাবে
       return enablePickup 
         ? [{ id: 'pickup', label: 'Local Pickup', cost: 0.00 }]
         : [];
     }
 
-    // ৩. কার্ট আইটেম আনা
     const cart = await db.cart.findUnique({
       where: { id: params.cartId },
       include: {
@@ -49,19 +52,19 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
 
     if (!cart || cart.items.length === 0) return [];
 
-    // ৪. আইটেম ম্যাপ করা
+    // Transdirect এর জন্য আইটেম প্রস্তুত করা
     const itemsForQuote = cart.items.map(item => {
       const source = item.variant || item.product;
       return {
-        weight: source.weight || 0.5,
-        length: source.length || 10,
-        width: source.width || 10,
-        height: source.height || 10,
+        weight: Number(source.weight) || 0.5,
+        length: Number(source.length) || 10,
+        width: Number(source.width) || 10,
+        height: Number(source.height) || 10,
         quantity: item.quantity
       };
     });
 
-    // ৫. Transdirect API কল
+    // Transdirect API কল
     const quoteResult = await getTransdirectQuotes({
       items: itemsForQuote,
       receiver: {
@@ -74,7 +77,8 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
 
     const dynamicRates: ShippingOption[] = [];
 
-    // ৬. API রেট যোগ করা
+    // Flat Rate / Free Shipping লজিক এখানে যুক্ত করতে পারেন (Database থেকে)
+    // আপাতত Transdirect + Pickup
     if (quoteResult.success && quoteResult.quotes.length > 0) {
       quoteResult.quotes.forEach((q: any) => {
         dynamicRates.push({
@@ -85,7 +89,6 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
       });
     }
 
-    // ৭. লোকাল পিকআপ অপশন যোগ করা (যদি এনাবল থাকে)
     if (enablePickup) {
         dynamicRates.push({ id: 'pickup', label: 'Local Pickup', cost: 0.00 });
     }
@@ -94,10 +97,7 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
 
   } catch (error) {
     console.error("Get Shipping Rates Error:", error);
-    // এরর হলে এবং পিকআপ অন থাকলে অন্তত পিকআপ দেখাবে
-    const settings = await db.storeSettings.findUnique({ where: { id: "settings" } });
-    const enablePickup = (settings?.generalConfig as any)?.enablePickup === true;
-    
-    return enablePickup ? [{ id: 'pickup', label: 'Local Pickup', cost: 0.00 }] : [];
+    // Fallback logic if needed
+    return [];
   }
 }

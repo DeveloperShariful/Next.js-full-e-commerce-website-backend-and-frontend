@@ -1,14 +1,13 @@
 // File: app/actions/admin/settings/affiliate/_services/announcement-service.ts
 
-// ✅ 1. Top-level directive required for Server Actions
 "use server";
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
 import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 const announcementSchema = z.object({
   title: z.string().min(3),
@@ -25,8 +24,10 @@ const announcementSchema = z.object({
 // READ OPERATIONS
 // =========================================
 
-// ✅ 2. Converted to Named Export
 export async function getAllAnnouncements(page: number = 1, limit: number = 20) {
+  // Read operations might not strict protection if used in dashboard, but better safe
+  await protectAction("MANAGE_CONFIGURATION"); 
+
   const skip = (page - 1) * limit;
 
   const [total, data] = await Promise.all([
@@ -53,11 +54,9 @@ export async function getAllAnnouncements(page: number = 1, limit: number = 20) 
 // SERVER ACTIONS (Mutations)
 // =========================================
 
-// ✅ 3. Removed inline "use server" (already at top)
 export async function createAnnouncementAction(data: z.infer<typeof announcementSchema>): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const result = announcementSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
@@ -72,6 +71,7 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
         isActive: payload.isActive,
         startsAt: payload.startsAt || new Date(),
         expiresAt: payload.expiresAt,
+        // ✅ Schema Relations
         targetGroups: payload.groupIds ? {
           connect: payload.groupIds.map(id => ({ id }))
         } : undefined,
@@ -82,8 +82,8 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
     });
 
     await auditService.log({
-      userId: auth.id,
-      action: "CREATE",
+      userId: actor.id,
+      action: "CREATE_ANNOUNCEMENT",
       entity: "AffiliateAnnouncement",
       entityId: announcement.id,
       newData: payload
@@ -98,14 +98,13 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
 
 export async function deleteAnnouncementAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliateAnnouncement.delete({ where: { id } });
 
     await auditService.log({
-      userId: auth.id,
-      action: "DELETE",
+      userId: actor.id,
+      action: "DELETE_ANNOUNCEMENT",
       entity: "AffiliateAnnouncement",
       entityId: id
     });
@@ -119,8 +118,7 @@ export async function deleteAnnouncementAction(id: string): Promise<ActionRespon
 
 export async function toggleStatusAction(id: string, isActive: boolean): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    await protectAction("MANAGE_CONFIGURATION");
 
     await db.affiliateAnnouncement.update({
       where: { id },

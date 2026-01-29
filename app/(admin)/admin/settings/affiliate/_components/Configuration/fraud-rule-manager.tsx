@@ -8,7 +8,7 @@ import { Plus, Trash2, Shield, AlertTriangle, Ban, Info, Loader2 } from "lucide-
 import { toast } from "sonner";
 
 // ✅ CORRECTED IMPORT
-import { createFraudRuleAction, deleteFraudRuleAction } from "@/app/actions/admin/settings/affiliates/_services/fraud-rule-service";
+import { createFraudRuleAction, deleteFraudRuleAction } from "@/app/actions/admin/settings/affiliates/_services/fraud-service";
 
 interface Props {
   initialRules: AffiliateFraudRule[];

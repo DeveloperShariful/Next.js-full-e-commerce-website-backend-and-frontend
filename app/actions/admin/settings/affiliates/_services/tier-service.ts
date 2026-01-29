@@ -8,8 +8,8 @@ import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
 import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 const tierSchema = z.object({
   id: z.string().optional(), 
@@ -29,6 +29,8 @@ type TierInput = z.infer<typeof tierSchema>;
 // =========================================
 export async function getAllTiers() {
   try {
+    await protectAction("MANAGE_CONFIGURATION");
+
     return await db.affiliateTier.findMany({
       orderBy: { minSalesAmount: "asc" },
       include: {
@@ -43,13 +45,12 @@ export async function getAllTiers() {
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
 export async function upsertTierAction(data: TierInput): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const result = tierSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
@@ -57,6 +58,8 @@ export async function upsertTierAction(data: TierInput): Promise<ActionResponse>
     const payload = result.data;
     const rateDecimal = DecimalMath.toDecimal(payload.commissionRate);
     const minSalesDecimal = DecimalMath.toDecimal(payload.minSalesAmount);
+
+    let tierId = payload.id;
 
     if (payload.id) {
       await db.affiliateTier.update({
@@ -75,7 +78,7 @@ export async function upsertTierAction(data: TierInput): Promise<ActionResponse>
       const existing = await db.affiliateTier.findUnique({ where: { name: payload.name } });
       if (existing) return { success: false, message: "Tier name already exists." };
 
-      await db.affiliateTier.create({
+      const newTier = await db.affiliateTier.create({
         data: {
           name: payload.name,
           commissionRate: rateDecimal,
@@ -86,13 +89,14 @@ export async function upsertTierAction(data: TierInput): Promise<ActionResponse>
           icon: payload.icon,
         },
       });
+      tierId = newTier.id;
     }
 
     await auditService.log({
-      userId: auth.id,
-      action: payload.id ? "UPDATE" : "CREATE",
+      userId: actor.id,
+      action: payload.id ? "UPDATE_TIER" : "CREATE_TIER",
       entity: "AffiliateTier",
-      entityId: payload.id || "NEW",
+      entityId: tierId!,
       newData: payload
     });
 
@@ -106,8 +110,7 @@ export async function upsertTierAction(data: TierInput): Promise<ActionResponse>
 
 export async function deleteTierAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     const usageCount = await db.affiliateAccount.count({
       where: { tierId: id },
@@ -120,8 +123,8 @@ export async function deleteTierAction(id: string): Promise<ActionResponse> {
     await db.affiliateTier.delete({ where: { id } });
 
     await auditService.log({
-      userId: auth.id,
-      action: "DELETE",
+      userId: actor.id,
+      action: "DELETE_TIER",
       entity: "AffiliateTier",
       entityId: id
     });

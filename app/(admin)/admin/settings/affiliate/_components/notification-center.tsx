@@ -1,4 +1,4 @@
-// File: app/(admin)/_components/notification-center.tsx
+// File: app/(admin)/admin/settings/affiliates/_components/notification-center.tsx
 
 "use client";
 
@@ -18,7 +18,6 @@ const MOCK_NOTIFICATIONS = [
 export function NotificationCenter() {
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
   const unreadCount = notifications.filter(n => !n.read).length;
-
   const markAllRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };

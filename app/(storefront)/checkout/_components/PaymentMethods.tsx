@@ -46,11 +46,9 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
 
   const stripeFormRef = useRef<HTMLFormElement>(null);
 
-  // 🔥 FIX: PayPal অপশন তৈরি করা (মেমোইজড)
+  // PayPal Config
   const initialPayPalOptions = useMemo(() => {
-    // যদি আইডি না থাকে তবে নাল রিটার্ন করব, যাতে নিচে চেক করতে পারি
     if (!paypalClientId) return null;
-    
     return {
       clientId: paypalClientId,
       currency: "AUD",
@@ -59,35 +57,38 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     };
   }, [paypalClientId]);
 
+  // Icons Helper
   const getGatewayIcon = (option: PaymentOption): React.ReactNode => {
     if (option.provider === 'paypal') return <Image src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" width={80} height={20} className="h-6 w-auto" unoptimized />;
     if (option.id === 'stripe_klarna') return <Image src="https://x.klarnacdn.net/payment-method/assets/badges/generic/klarna.svg" alt="Klarna" width={50} height={20} className="h-6 w-auto" />;
     if (option.id.includes('afterpay')) return <Image src="https://static.afterpay.com/integration/logo-afterpay-colour.svg" alt="Afterpay" width={80} height={20} className="h-6 w-auto" unoptimized />;
+    if (option.id.includes('zip')) return <Image src="https://static.zipmoney.com.au/assets/default/footer-logo/zip-logo-black.svg" alt="Zip" width={60} height={20} className="h-6 w-auto" unoptimized />;
     if (option.id === 'stripe_card') return <span className="flex items-center gap-1"><Image src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" width={30} height={20} className="h-5 w-5 rounded-[2px]" /><Image src="https://js.stripe.com/v3/fingerprinted/img/mastercard-4d8844094130711885b5e41b28c9848f.svg" alt="Mastercard" width={30} height={20} className="h-5 w-5 rounded-[2px]" /></span>;
     return null;
   };
 
   const handlePlaceOrderClick = () => {
     if (selectedPaymentMethod && selectedPaymentMethod.startsWith('stripe') && stripeFormRef.current) {
+      // Trigger the form inside StripePaymentGateway
       stripeFormRef.current.requestSubmit();
     } else {
+      // Offline payments
       onPlaceOrder({ paymentMethodId: selectedPaymentMethod });
     }
   };
 
-  // --- JSX RENDERING ---
-
-  // কন্টেন্ট রেন্ডার করার ফাংশন (যাতে PayPal Wrapper এর লজিক পরিষ্কার থাকে)
   const renderContent = () => (
     <div className="w-full flex flex-col gap-2.5">
         
-        {/* Express Checkouts */}
+        {/* Express Checkouts (Apple/Google Pay) */}
         {stripePublishableKey && (
             <ExpressCheckouts 
                 total={total} 
                 onOrderPlace={onPlaceOrder} 
                 isShippingSelected={isShippingSelected} 
                 stripePublishableKey={stripePublishableKey} 
+                cartId={cartId} // 👈 Pass Cart ID
+                selectedShippingId={selectedShippingId}
             />
         )}
         
@@ -139,7 +140,6 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
         <div className="w-full mt-2.5">
           {selectedPaymentMethod === 'paypal' ? (
             <div className="min-h-[150px] mt-4">
-                {/* 🔥 চেক: PayPal অপশন থাকলেই কেবল বাটন রেন্ডার হবে */}
                 {initialPayPalOptions ? (
                     <PayPalPaymentGateway 
                         total={total} 
@@ -156,7 +156,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
                     />
                 ) : (
                     <div className="p-4 text-center text-red-500 bg-red-50 rounded">
-                        PayPal is currently unavailable (Missing Configuration).
+                        PayPal configuration missing.
                     </div>
                 )}
             </div>
@@ -175,7 +175,6 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     </div>
   );
 
-  // 🔥 MAIN FIX: যদি PayPal অপশন ভ্যালিড থাকে, তবেই Provider দিয়ে র‍্যাপ করবে
   if (initialPayPalOptions) {
     return (
         <PayPalScriptProvider options={initialPayPalOptions}>
@@ -184,6 +183,5 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     );
   }
 
-  // PayPal না থাকলে বা ভুল থাকলে সাধারণ ডিভ রিটার্ন করবে (ক্র্যাশ করবে না)
   return renderContent();
 }

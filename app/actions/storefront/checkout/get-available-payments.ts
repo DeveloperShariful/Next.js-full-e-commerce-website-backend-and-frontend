@@ -1,7 +1,9 @@
 //app/actions/storefront/checkout/get-available-payments.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
+import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
 
 export type PaymentOption = {
   id: string
@@ -35,8 +37,13 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
       if (method.identifier === "stripe" && method.stripeConfig) {
         const config = method.stripeConfig
         const mode = config.testMode ? "TEST" : "LIVE"
-        const stripePubKey = config.testMode ? config.testPublishableKey : config.livePublishableKey
+        
+        // 🔐 Security Fix: Decrypt keys properly
+        const rawTestKey = config.testPublishableKey ? decrypt(config.testPublishableKey) : "";
+        const rawLiveKey = config.livePublishableKey ? decrypt(config.livePublishableKey) : "";
+        const stripePubKey = config.testMode ? rawTestKey : rawLiveKey;
 
+        // 1. Credit/Debit Card
         options.push({
           id: "stripe_card",
           provider: "stripe",
@@ -45,11 +52,12 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
           description: config.description,
           is_express: false,
           mode: mode,
-          public_key: stripePubKey ?? undefined
+          public_key: stripePubKey || undefined
         })
 
+        // 2. Klarna (BNPL)
         if (config.klarnaEnabled) {
-            options.push({
+             options.push({
                 id: "stripe_klarna",
                 provider: "stripe",
                 method_type: "bnpl",
@@ -57,53 +65,57 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
                 description: "Pay in 3 interest-free installments.",
                 is_express: false,
                 mode: mode,
-                public_key: stripePubKey ?? undefined
+                public_key: stripePubKey || undefined
             })
         }
+
+        // 3. Afterpay (BNPL) - ✅ Added Back
         if (config.afterpayEnabled) {
-             options.push({
-                id: "stripe_afterpay_clearpay",
-                provider: "stripe",
-                method_type: "bnpl",
-                name: "Afterpay",
-                description: "Buy now, pay later.",
-                is_express: false,
-                mode: mode,
-                public_key: stripePubKey ?? undefined
-             })
-        }
-        if (config.zipEnabled) {
-             options.push({
-                id: "stripe_zip",
-                provider: "stripe",
-                method_type: "bnpl",
-                name: "Zip",
-                description: "Own it now, pay later.",
-                is_express: false,
-                mode: mode,
-                public_key: stripePubKey ?? undefined
-             })
-        }
+            options.push({
+               id: "stripe_afterpay_clearpay",
+               provider: "stripe",
+               method_type: "bnpl",
+               name: "Afterpay",
+               description: "Buy now, pay later.",
+               is_express: false,
+               mode: mode,
+               public_key: stripePubKey || undefined
+            })
+       }
+
+       // 4. Zip (BNPL) - ✅ Added Back
+       if (config.zipEnabled) {
+            options.push({
+               id: "stripe_zip",
+               provider: "stripe",
+               method_type: "bnpl",
+               name: "Zip",
+               description: "Own it now, pay later.",
+               is_express: false,
+               mode: mode,
+               public_key: stripePubKey || undefined
+            })
+       }
       } 
       
-      // === PAYPAL (Project B Style: No Decryption, Raw Value) ===
+      // === PAYPAL ===
       else if (method.identifier === "paypal" && method.paypalConfig) {
         const config = method.paypalConfig
         
-        // সোজাসুজি ডাটাবেস ভ্যালু
-        const paypalClientId = config.sandbox 
-            ? config.sandboxClientId 
-            : config.liveClientId
+        // 🔐 Security Fix: Ensure correct Client ID
+        const rawSandboxId = config.sandboxClientId ? config.sandboxClientId : ""; 
+        const rawLiveId = config.liveClientId ? config.liveClientId : "";
+        const paypalClientId = config.sandbox ? rawSandboxId : rawLiveId;
 
         options.push({
           id: "paypal",
           provider: "paypal",
           method_type: "wallet",
-          name: config.title,
+          name: config.title || "PayPal",
           description: config.description,
           is_express: false,
           mode: config.sandbox ? "TEST" : "LIVE",
-          public_key: paypalClientId ?? undefined
+          public_key: paypalClientId || undefined
         })
       }
 

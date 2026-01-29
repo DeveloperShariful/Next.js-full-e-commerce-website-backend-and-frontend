@@ -49,6 +49,9 @@ export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
       payoutMethods: Array.isArray(affConfig.payoutMethods) 
         ? affConfig.payoutMethods 
         : ["STORE_CREDIT"],
+      commissionRate: Number(affConfig.commissionRate) || 10,
+      commissionType: affConfig.commissionType || "PERCENTAGE",
+        
     };
   } catch (error) {
     throw new Error("Failed to load configuration");
@@ -106,6 +109,8 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
       autoApprovePayout: payload.autoApprovePayout,
       minimumPayout: payload.minimumPayout,
       payoutMethods: payload.payoutMethods,
+      commissionRate: payload.commissionRate,
+      commissionType: payload.commissionType,
     };
 
     // 4. Update DB

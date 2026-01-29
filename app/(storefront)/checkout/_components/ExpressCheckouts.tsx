@@ -16,19 +16,21 @@ interface ShippingFormData {
 interface ExpressCheckoutsProps {
   total: number;
   stripePublishableKey: string;
+  cartId: string;
   onOrderPlace: (paymentData: { 
     transaction_id: string; 
     paymentMethodId: string;
     shippingAddress?: Partial<ShippingFormData>; 
   }) => Promise<{ orderId: string; orderKey: string } | void | null>;
   isShippingSelected: boolean;
+  selectedShippingId: string;
 }
 
 const CheckoutForm = ({ onOrderPlace, clientSecret }: { onOrderPlace: any, clientSecret: string }) => {
   const stripe = useStripe();
   const elements = useElements();
 
-  // FIX: Removed 'event' argument to satisfy TypeScript
+  // 🔥 FIX: elements প্যারামিটার থেকে না নিয়ে হুক থেকে নেওয়া হচ্ছে
   const onConfirm = async () => {
     if (!stripe || !elements) return;
 
@@ -70,23 +72,23 @@ const CheckoutForm = ({ onOrderPlace, clientSecret }: { onOrderPlace: any, clien
   return <ExpressCheckoutElement onConfirm={onConfirm} />;
 }
 
-export default function ExpressCheckouts({ total, onOrderPlace, isShippingSelected, stripePublishableKey }: ExpressCheckoutsProps) {
+export default function ExpressCheckouts({ total, onOrderPlace, isShippingSelected, stripePublishableKey, cartId, selectedShippingId }: ExpressCheckoutsProps) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [stripePromise] = useState(() => loadStripe(stripePublishableKey));
 
   useEffect(() => {
     const initPayment = async () => {
-      if (total <= 0) return;
+      if (!cartId) return;
 
       if (!paymentIntentId) {
-        const res = await createPaymentIntent(total);
+        const res = await createPaymentIntent(cartId, selectedShippingId);
         if (res.clientSecret && res.id) {
             setClientSecret(res.clientSecret);
             setPaymentIntentId(res.id);
         }
       } else {
-        await updatePaymentIntent(paymentIntentId, total);
+        await updatePaymentIntent(paymentIntentId, cartId, selectedShippingId);
       }
     };
 
@@ -95,7 +97,7 @@ export default function ExpressCheckouts({ total, onOrderPlace, isShippingSelect
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [total, paymentIntentId]);
+  }, [total, cartId, selectedShippingId, paymentIntentId]);
 
   if (!clientSecret || !stripePromise) {
     return <div className="h-12 w-full bg-gray-100 rounded-lg animate-pulse mb-4"></div>;

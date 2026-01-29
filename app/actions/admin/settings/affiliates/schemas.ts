@@ -4,8 +4,7 @@ import { z } from "zod";
 
 /**
  * ------------------------------------------------------------------
- * ENTERPRISE AFFILIATE CONFIGURATION SCHEMA
- * Matches "Solid Affiliate" Logic & UI Groups
+ * 1. EXISTING CONFIGURATION SCHEMA (UNCHANGED)
  * ------------------------------------------------------------------
  */
 export const affiliateGeneralSchema = z.object({
@@ -73,4 +72,26 @@ export const affiliateGeneralSchema = z.object({
     .refine((value) => value.length > 0, {
       message: "You must select at least one payout method.",
     }),
+   commissionRate: z.coerce.number().min(0).max(100).default(10),
+   commissionType: z.enum(["PERCENTAGE", "FIXED"]).default("PERCENTAGE"),
+});
+
+/**
+ * ------------------------------------------------------------------
+ * 2. NEW ENTERPRISE SCHEMAS (ADDED FOR UPDATE)
+ * ------------------------------------------------------------------
+ */
+
+// Schema for Assigning/Creating Coupons for Affiliates
+export const couponAssignmentSchema = z.object({
+  affiliateId: z.string().uuid(),
+  code: z.string().min(3, "Code must be at least 3 chars").regex(/^[A-Z0-9_-]+$/, "Uppercase alphanumeric only"),
+  value: z.coerce.number().min(0),
+  type: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
+});
+
+// Schema for Moving Affiliates within the MLM Tree
+export const mlmMoveSchema = z.object({
+  affiliateId: z.string().uuid(),
+  newParentId: z.string().uuid().nullable(), // Null means moving to Root (No Parent)
 });

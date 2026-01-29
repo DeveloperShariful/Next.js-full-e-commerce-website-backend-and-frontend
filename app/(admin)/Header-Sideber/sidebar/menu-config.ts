@@ -70,7 +70,6 @@ export const sidebarConfig: SidebarGroup[] = [
     title: "Marketing",
     items: [
       { name: "Coupons", href: "/admin/coupons", icon: TicketPercent },
-      { name: "Banners & Ads", href: "/admin/banners", icon: Megaphone },
       { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ]
   },

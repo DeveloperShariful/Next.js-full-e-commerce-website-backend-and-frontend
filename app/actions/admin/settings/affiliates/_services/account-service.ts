@@ -1,7 +1,5 @@
 // File: app/actions/admin/settings/affiliate/_services/account-service.ts
 
-
-// ✅ 1. Top-level "use server" directive is mandatory here
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -12,12 +10,14 @@ import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, AffiliateUserTableItem } from "../types";
 import { syncUser } from "@/lib/auth-sync";
+import { protectAction } from "./permission-service";
+import { Tags } from "lucide-react";
 
 // =========================================
 // READ OPERATIONS (Server Side Fetching)
 // =========================================
 
-// ✅ 2. Converted to named export function
+ 
 export async function getAffiliates(
   page: number = 1, 
   limit: number = 20, 
@@ -92,6 +92,8 @@ export async function getAffiliates(
       createdAt: account.createdAt,
       kycStatus: account.kycStatus,
       riskScore: account.riskScore || 0,
+      commissionRate: account.commissionRate ? DecimalMath.toNumber(account.commissionRate) : null,
+      commissionType: account.commissionType,
     };
   });
 
@@ -225,8 +227,7 @@ export async function bulkGroupAction(ids: string[], groupId: string): Promise<A
 
 export async function bulkTagAction(ids: string[], tagId: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
 
     await db.$transaction(
       ids.map(id => db.affiliateAccount.update({
@@ -234,7 +235,13 @@ export async function bulkTagAction(ids: string[], tagId: string): Promise<Actio
           data: { tags: { connect: { id: tagId } } }
       }))
     );
-
+     await auditService.log({
+        userId: actor.id,
+        action: "UPDATE_COMMISSION",
+        entity: "AffiliateAccount",
+        entityId: tagId,
+        meta: { Tags }
+    });
     revalidatePath("/admin/settings/affiliate/users");
     return { success: true, message: "Tag added to affiliates." };
   } catch (error: any) {
@@ -244,8 +251,7 @@ export async function bulkTagAction(ids: string[], tagId: string): Promise<Actio
 
 export async function bulkDeleteAction(ids: string[]): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
 
     await db.affiliateAccount.updateMany({
       where: { id: { in: ids } },
@@ -253,7 +259,7 @@ export async function bulkDeleteAction(ids: string[]): Promise<ActionResponse> {
     });
 
     await auditService.log({
-      userId: auth.id,
+      userId: actor.id,
       action: "BULK_DELETE",
       entity: "AffiliateAccount",
       entityId: "BULK",
@@ -266,3 +272,35 @@ export async function bulkDeleteAction(ids: string[]): Promise<ActionResponse> {
     return { success: false, message: "Bulk delete failed." };
   }
 }
+
+export async function updateCommissionAction(
+  id: string, 
+  rate: number | null, 
+  type: "PERCENTAGE" | "FIXED"
+): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_PARTNERS");
+
+    await db.affiliateAccount.update({
+      where: { id },
+      data: {
+        commissionRate: rate ? DecimalMath.toDecimal(rate) : null, // null means use Tier/Group default
+        commissionType: type
+      }
+    });
+
+    await auditService.log({
+        userId: actor.id,
+        action: "UPDATE_COMMISSION",
+        entity: "AffiliateAccount",
+        entityId: id,
+        meta: { rate, type }
+    });
+
+    revalidatePath("/admin/settings/affiliate");
+    return { success: true, message: "Commission updated successfully." };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+}
+

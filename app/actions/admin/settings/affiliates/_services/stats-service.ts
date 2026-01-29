@@ -7,14 +7,19 @@ import { DashboardKPI, ChartDataPoint, DateRange } from "../types";
 import { startOfDay, endOfDay, eachDayOfInterval, format, subDays, subMonths } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { DecimalMath } from "@/lib/utils/decimal-math";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 // =========================================
-// READ OPERATIONS (KPIs & Charts)
+// READ OPERATIONS (Cached)
 // =========================================
+
 export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> {
+  await protectAction("VIEW_ANALYTICS");
+
   const from = range?.from || subMonths(new Date(), 1);
   const to = range?.to || new Date();
 
+  // Cache key based on date range to prevent stale data
   const cacheKey = `affiliate-kpi-${from.toISOString()}-${to.toISOString()}`;
 
   return await unstable_cache(
@@ -68,11 +73,13 @@ export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> 
       };
     },
     [cacheKey],
-    { tags: ["affiliate-stats"], revalidate: 300 }
+    { tags: ["affiliate-stats"], revalidate: 300 } // 5 min cache
   )();
 }
 
 export async function getChartData(range: DateRange = { from: subDays(new Date(), 30), to: new Date() }): Promise<ChartDataPoint[]> {
+  await protectAction("VIEW_ANALYTICS");
+
   const cacheKey = `affiliate-chart-${range.from.toISOString()}-${range.to.toISOString()}`;
 
   return await unstable_cache(
@@ -103,6 +110,7 @@ export async function getChartData(range: DateRange = { from: subDays(new Date()
         const dayRevenue = dayReferrals.reduce((sum, r) => sum + DecimalMath.toNumber(r.totalOrderAmount ?? 0), 0);
         const dayCommission = dayReferrals.reduce((sum, r) => sum + DecimalMath.toNumber(r.commissionAmount ?? 0), 0);
 
+        // Approximate clicks mapping (since groupBy returns date objects)
         const clicksForDay = clickData
           .filter(c => format(c.createdAt, "yyyy-MM-dd") === dayStr)
           .reduce((acc, curr) => acc + curr._count.id, 0);

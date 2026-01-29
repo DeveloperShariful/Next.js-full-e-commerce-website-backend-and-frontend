@@ -2,14 +2,26 @@
 
 import { z } from "zod";
 import { affiliateGeneralSchema } from "./schemas";
-import { AffiliateStatus, PayoutStatus, PayoutMethod, MediaType } from "@prisma/client";
+import { AffiliateStatus, PayoutStatus, PayoutMethod, MediaType, Role } from "@prisma/client";
 
 /**
  * ==================================================================
- * 1. SHARED TYPES (COMMON)
+ * 1. SECURITY TYPES (UPDATED)
  * ==================================================================
  */
+export type AffiliatePermission = 
+  | "VIEW_ANALYTICS"
+  | "MANAGE_PARTNERS"
+  | "MANAGE_FINANCE"
+  | "MANAGE_CONFIGURATION"
+  | "MANAGE_NETWORK"
+  | "MANAGE_FRAUD"; // ✅ ADDED THIS MISSING TYPE
 
+/**
+ * ==================================================================
+ * 2. SHARED TYPES
+ * ==================================================================
+ */
 export type ActionResponse<T = null> = {
   success: boolean;
   message: string;
@@ -21,12 +33,6 @@ export interface DateRange {
   from: Date;
   to: Date;
 }
-
-/**
- * ==================================================================
- * 2. SETTINGS TYPES (CONFIGURATION)
- * ==================================================================
- */
 
 export type AffiliateGeneralSettings = z.infer<typeof affiliateGeneralSchema>;
 
@@ -49,15 +55,10 @@ export interface AffiliateConfigDTO {
   minimumPayout?: number;
   payoutMethods?: string[];
   autoApprovePayout?: boolean;
+  commissionRate?: number; 
+  commissionType?: "PERCENTAGE" | "FIXED"; 
 }
 
-/**
- * ==================================================================
- * 3. MANAGEMENT TYPES (DASHBOARD, USERS, PAYOUTS)
- * ==================================================================
- */
-
-// Dashboard KPIs
 export interface DashboardKPI {
   revenue: number;
   commission: number;
@@ -69,7 +70,6 @@ export interface DashboardKPI {
   payoutsPending: number;
 }
 
-// Chart Data
 export interface ChartDataPoint {
   date: string;
   revenue: number;
@@ -77,7 +77,6 @@ export interface ChartDataPoint {
   clicks: number;
 }
 
-// User List Table Item (UPDATED FOR SOLID AFFILIATE UI)
 export interface AffiliateUserTableItem {
   id: string;
   userId: string;
@@ -87,30 +86,26 @@ export interface AffiliateUserTableItem {
   slug: string;
   status: AffiliateStatus;
   tierName: string;
-  
-  // --- NEW FIELDS ADDED HERE ---
-  groupName: string;          // For Group Column
-  tags: string[];             // For Tags Column
-  coupons: string[];          // For Coupons Column
-  storeCredit: number;        // For Store Credit Column
-  
+  groupName: string;
+  tags: string[];
+  coupons: string[];
+  storeCredit: number;
   balance: number;
   totalEarnings: number;
-  
-  // Stats
   referralCount: number;
   visitCount: number;
-  salesTotal: number;         // For "Sales: $X"
-  commissionTotal: number;    // For "Comm: ($Y)"
-  netRevenue: number;         // For "Net: $Z"
-  
+  salesTotal: number;
+  commissionTotal: number;
+  netRevenue: number;
   registrationNotes: string | null;
   createdAt: Date;
   kycStatus: string;
   riskScore: number;
+  paymentReady?: boolean;
+  commissionRate: number | null;
+  commissionType?: "PERCENTAGE" | "FIXED";
 }
 
-// Payout List Item
 export interface PayoutQueueItem {
   id: string;
   affiliateId: string;
@@ -122,15 +117,9 @@ export interface PayoutQueueItem {
   requestedAt: Date;
   bankDetails?: any;
   paypalEmail?: string | null;
+  riskScore?: number; 
 }
 
-/**
- * ==================================================================
- * 4. ULTRA FEATURES TYPES (MLM, FRAUD, CONTESTS)
- * ==================================================================
- */
-
-// MLM Network Tree Node
 export interface NetworkNode {
   id: string;
   name: string;
@@ -142,7 +131,6 @@ export interface NetworkNode {
   children?: NetworkNode[];
 }
 
-// Fraud Detection Alert
 export interface FraudAlertItem {
   id: string;
   affiliateName: string;
@@ -153,7 +141,6 @@ export interface FraudAlertItem {
   status: "PENDING" | "RESOLVED" | "BLOCKED";
 }
 
-// Pixel Tracking
 export interface TrackingPixelItem {
   id: string;
   affiliateName: string;
@@ -162,3 +149,4 @@ export interface TrackingPixelItem {
   status: boolean;
   createdAt: Date;
 }
+

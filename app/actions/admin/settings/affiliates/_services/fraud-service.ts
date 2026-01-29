@@ -3,14 +3,97 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { getCachedFraudRules } from "@/lib/services/settings-cache";
+import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
+import { getCachedFraudRules } from "@/lib/services/settings-cache";
+import { ActionResponse } from "../types";
+import { z } from "zod";
+import { protectAction } from "./permission-service"; // ✅ Security
 
-// =========================================
-// INTERNAL LOGIC (Used by Engine & Cron)
-// =========================================
+// ==============================================================================
+// PART 1: FRAUD RULES CONFIGURATION (Schema & CRUD)
+// ==============================================================================
 
+const ruleSchema = z.object({
+  type: z.enum(["IP_CLICK_LIMIT", "CONVERSION_RATE_LIMIT", "ORDER_VALUE_LIMIT", "BLACKLIST_COUNTRY"]),
+  value: z.string().min(1, "Threshold value is required"),
+  action: z.enum(["BLOCK", "FLAG", "SUSPEND"]).default("FLAG"),
+  reason: z.string().optional(),
+});
+
+// --- READ RULES ---
+export async function getRules() {
+  try {
+    await protectAction("MANAGE_FRAUD");
+    
+    return await db.affiliateFraudRule.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+  } catch (error) {
+    throw new Error("Failed to load fraud rules.");
+  }
+}
+
+// --- CREATE RULE ---
+export async function createFraudRuleAction(data: z.infer<typeof ruleSchema>): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_FRAUD");
+
+    const result = ruleSchema.safeParse(data);
+    if (!result.success) return { success: false, message: result.error.issues[0].message };
+
+    const rule = await db.affiliateFraudRule.create({
+      data: {
+        type: result.data.type,
+        value: result.data.value,
+        action: result.data.action,
+        reason: result.data.reason || "Automated Rule Match"
+      }
+    });
+
+    await auditService.log({
+      userId: actor.id,
+      action: "CREATE_FRAUD_RULE",
+      entity: "AffiliateFraudRule",
+      entityId: rule.id,
+      newData: result.data
+    });
+
+    revalidatePath("/admin/settings/affiliate/fraud");
+    return { success: true, message: "Security rule activated." };
+  } catch (error: any) {
+    return { success: false, message: "Failed to create rule." };
+  }
+}
+
+// --- DELETE RULE ---
+export async function deleteFraudRuleAction(id: string): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_FRAUD");
+
+    await db.affiliateFraudRule.delete({ where: { id } });
+
+    await auditService.log({
+        userId: actor.id,
+        action: "DELETE_FRAUD_RULE",
+        entity: "AffiliateFraudRule",
+        entityId: id
+    });
+
+    revalidatePath("/admin/settings/affiliate/fraud");
+    return { success: true, message: "Rule removed." };
+  } catch (error: any) {
+    return { success: false, message: "Failed to delete rule." };
+  }
+}
+
+// ==============================================================================
+// PART 2: FRAUD DETECTION LOGIC (Engine & Analysis)
+// ==============================================================================
+
+// --- SELF REFERRAL CHECK (Called by Engine) ---
 export async function detectSelfReferral(affiliateId: string, buyerEmail: string, buyerIp: string): Promise<boolean> {
+  // Internal Logic - No Role Check needed as it's called by system
   const affiliate = await db.affiliateAccount.findUnique({
     where: { id: affiliateId },
     include: { user: true }
@@ -36,6 +119,7 @@ export async function detectSelfReferral(affiliateId: string, buyerEmail: string
   return false;
 }
 
+// --- RISK SCORE CALCULATION (Called by Cron/Engine) ---
 export async function updateRiskScore(affiliateId: string) {
   let score = 0;
   const rules = await getCachedFraudRules();
@@ -54,7 +138,7 @@ export async function updateRiskScore(affiliateId: string) {
   const conversionCount = referrals.length;
   const conversionRate = clickCount > 0 ? (conversionCount / clickCount) * 100 : 0;
 
-  // 2. Apply Dynamic Rules
+  // 2. Apply Dynamic Rules from DB
   for (const rule of rules) {
     const threshold = Number(rule.value);
     
@@ -64,9 +148,11 @@ export async function updateRiskScore(affiliateId: string) {
         await logFraudAlert(affiliateId, "SUSPICIOUS_CONVERSION", `Rate ${conversionRate.toFixed(2)}% > ${threshold}%`);
       }
     }
+    
+    // Add logic for other rule types if needed here (IP LIMIT, etc handled in middleware usually)
   }
 
-  // 3. Base Heuristics
+  // 3. Base Heuristics (Hardcoded Safety Nets)
   score += (flaggedCount * 15);
 
   if (referrals.length >= 5) {
@@ -97,15 +183,18 @@ export async function updateRiskScore(affiliateId: string) {
   return score;
 }
 
-export async function logFraudAlert(affiliateId: string, type: string, details: string) {
+// --- INTERNAL LOGGING HELPER ---
+async function logFraudAlert(affiliateId: string, type: string, details: string) {
   await auditService.systemLog("WARN", "FRAUD_DETECTOR", `Risk Alert: ${type}`, { affiliateId, details });
 }
 
-// =========================================
-// READ OPERATIONS (Admin Reporting)
-// =========================================
+// ==============================================================================
+// PART 3: REPORTING (Admin UI Data)
+// ==============================================================================
 
 export async function getHighRiskAffiliates() {
+  await protectAction("MANAGE_FRAUD");
+
   return await db.affiliateAccount.findMany({
     where: { riskScore: { gt: 50 } }, 
     include: { 
@@ -116,6 +205,8 @@ export async function getHighRiskAffiliates() {
 }
 
 export async function getFlaggedReferrals() {
+  await protectAction("MANAGE_FRAUD");
+
   return await db.referral.findMany({
     where: { isFlagged: true },
     include: {

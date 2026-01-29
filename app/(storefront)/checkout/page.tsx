@@ -1,3 +1,5 @@
+//app/(storefront)/checkout/page.tsx
+
 import { getAvailablePaymentMethods } from '@/app/actions/storefront/checkout/get-available-payments';
 import { getShippingRates } from '@/app/actions/storefront/checkout/get-shipping-rates';
 import { getCartDetails } from '@/app/actions/storefront/cart/get-cart-details';

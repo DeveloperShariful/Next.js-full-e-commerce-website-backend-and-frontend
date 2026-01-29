@@ -8,15 +8,16 @@ import { sendNotification } from "@/app/api/email/send-notification";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { syncUser } from "@/lib/auth-sync";
+import { protectAction } from "./permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS
 // =========================================
 export async function getDocuments(page: number = 1, limit: number = 20, status?: string) {
+  await protectAction("MANAGE_PARTNERS"); // Or MANAGE_FINANCE
+
   const skip = (page - 1) * limit;
-  
-  const where: Prisma.AffiliateDocumentWhereInput = status ? { status } : {};
+  const where: Prisma.AffiliateDocumentWhereInput = status && status !== "ALL" ? { status } : {};
 
   const [total, data] = await Promise.all([
     db.affiliateDocument.count({ where }),
@@ -48,26 +49,22 @@ export async function getDocuments(page: number = 1, limit: number = 20, status?
 }
 
 // =========================================
-// SERVER ACTIONS (Mutations)
+// WRITE OPERATIONS
 // =========================================
 
 export async function verifyDocumentAction(documentId: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
 
     const result = await db.$transaction(async (tx) => {
       const doc = await tx.affiliateDocument.findUnique({
         where: { id: documentId },
-        include: { 
-            affiliate: { 
-                include: { user: true } 
-            } 
-        }
+        include: { affiliate: { include: { user: true } } } 
       });
 
       if (!doc) throw new Error("Document not found");
 
+      // 1. Update Document Status
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
@@ -77,7 +74,7 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
         }
       });
 
-      // Check if all docs are verified
+      // 2. Check if ALL documents are verified to update Account Status
       const pendingDocs = await tx.affiliateDocument.count({
         where: {
           affiliateId: doc.affiliateId,
@@ -93,7 +90,7 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
       }
 
       await auditService.log({
-        userId: auth.id,
+        userId: actor.id,
         action: "VERIFY_KYC",
         entity: "AffiliateDocument",
         entityId: documentId,
@@ -122,18 +119,14 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
 
 export async function rejectDocumentAction(documentId: string, reason: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
+    
     if (!reason) return { success: false, message: "Rejection reason is required." };
 
     const result = await db.$transaction(async (tx) => {
       const doc = await tx.affiliateDocument.findUnique({
         where: { id: documentId },
-        include: { 
-            affiliate: { 
-                include: { user: true } 
-            } 
-        }
+        include: { affiliate: { include: { user: true } } } 
       });
 
       if (!doc) throw new Error("Document not found");
@@ -147,13 +140,14 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
         }
       });
 
+      // Downgrade Account Status
       await tx.affiliateAccount.update({
         where: { id: doc.affiliateId },
         data: { kycStatus: "REJECTED" }
       });
 
       await auditService.log({
-        userId: auth.id,
+        userId: actor.id,
         action: "REJECT_KYC",
         entity: "AffiliateDocument",
         entityId: documentId,

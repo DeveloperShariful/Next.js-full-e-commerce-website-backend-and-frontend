@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/rules/_components/rule-modal.tsx
+// File: app/(admin)/admin/settings/affiliate/rules/_components/Configuration/rule-modal.tsx
 
 "use client";
 
@@ -10,7 +10,7 @@ import { AffiliateCommissionRule } from "@prisma/client";
 
 // ✅ Correct Import Path
 // ✅ Use Named Import
-import { upsertRuleAction } from "@/app/actions/admin/settings/affiliates/_services/rule-engine-service";
+import { upsertRuleAction } from "@/app/actions/admin/settings/affiliates/_services/commition-rule-service";
 
 interface Props {
   isOpen: boolean;

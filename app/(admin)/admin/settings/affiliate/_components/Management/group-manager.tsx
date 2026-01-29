@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/group-manager.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Management/group-manager.tsx
 
 "use client";
 

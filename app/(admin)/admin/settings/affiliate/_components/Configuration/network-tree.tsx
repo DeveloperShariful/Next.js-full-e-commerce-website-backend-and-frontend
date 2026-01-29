@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/network-tree.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/network-tree.tsx
 
 "use client";
 

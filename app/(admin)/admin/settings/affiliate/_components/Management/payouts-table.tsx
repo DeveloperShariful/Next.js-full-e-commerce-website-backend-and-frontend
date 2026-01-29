@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/payouts-table.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Management/payouts-table.tsx
 
 "use client";
 

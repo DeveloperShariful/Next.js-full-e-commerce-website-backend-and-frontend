@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/ledger-table.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Management/ledger-table.tsx
 
 "use client";
 

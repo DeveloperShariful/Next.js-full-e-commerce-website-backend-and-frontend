@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/creatives/_components/creative-modal.tsx
+// File: app/(admin)/admin/settings/affiliate/creatives/_components/Marketing/creative-modal.tsx
 
 "use client";
 

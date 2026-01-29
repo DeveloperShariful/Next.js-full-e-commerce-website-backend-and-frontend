@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/cron-service.ts
+// File: app/actions/admin/settings/affiliate/cron-service.ts
 
 "use server";
 
@@ -6,7 +6,7 @@ import { db } from "@/lib/prisma";
 import { auditService } from "@/lib/services/audit-service";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { DecimalMath } from "@/lib/utils/decimal-math";
-import { updateRiskScore } from "./fraud-service";
+import { updateRiskScore } from "./_services/fraud-service";
 
 export async function processDailyJobs() {
   try {

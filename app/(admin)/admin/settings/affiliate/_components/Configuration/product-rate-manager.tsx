@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/product-rate-manager.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/product-rate-manager.tsx
 
 "use client";
 

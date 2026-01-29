@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/tier-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/tier-list.tsx
 
 "use client";
 

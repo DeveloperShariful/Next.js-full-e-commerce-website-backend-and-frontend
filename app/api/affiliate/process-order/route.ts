@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 // ✅ Correct Import Path and using named import
-import { processOrder } from "@/app/actions/admin/settings/affiliates/_services/affiliate-engine";
+import { processOrder } from "@/app/actions/admin/settings/affiliates/affiliate-engine";
 import { auditService } from "@/lib/services/audit-service";
 
 export const dynamic = 'force-dynamic';

@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/config-service.ts
+// File: app/actions/admin/settings/affiliate/_services/general-config-service.ts
 
 "use server";
 

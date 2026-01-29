@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/users-table.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Management/users-table.tsx
 "use client";
 
 import { useState, useTransition, useEffect, useMemo } from "react";

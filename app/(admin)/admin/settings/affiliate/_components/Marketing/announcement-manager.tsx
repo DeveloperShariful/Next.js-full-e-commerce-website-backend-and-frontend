@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/announcement-manager.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Marketing/announcement-manager.tsx
 
 "use client";
 

@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/pixel-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/pixel-list.tsx
 
 "use client";
 

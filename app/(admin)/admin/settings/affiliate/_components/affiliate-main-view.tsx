@@ -15,24 +15,24 @@ import { cn } from "@/lib/utils";
 import { NotificationCenter } from "./notification-center";
 
 // Import All Sub-Components
-import MainOverview from "./main-overview";
-import PartnersManager from "./partners-manager"; 
-import PayoutsTable from "./payouts-table";
-import TierList from "./tier-list";
-import RuleList from "./rule-list";
-import CreativeList from "./creative-list";
-import ContestList from "./contest-list";
-import CampaignList from "./campaign-list";
-import AnnouncementManager from "./announcement-manager";
-import NetworkTree from "./network-tree";
-import FraudRuleManager from "./fraud-rule-manager"; 
-import DomainList from "./domain-list";
-import PixelList from "./pixel-list";
-import ProductRateManager from "./product-rate-manager";
-import KycManager from "./kyc-manager";
-import LedgerTable from "./ledger-table";
-import AffiliateGeneralConfigForm from "./general-config-form";
-import ReportsDashboard from "./reports-dashboard";
+import MainOverview from "./Analytics/main-overview";
+import PartnersManager from "./Management/partners-manager"; 
+import PayoutsTable from "./Management/payouts-table";
+import TierList from "./Configuration/tier-list";
+import RuleList from "./Configuration/rule-list";
+import CreativeList from "./Marketing/creative-list";
+import ContestList from "./Marketing/contest-list";
+import CampaignList from "./Marketing/campaign-list";
+import AnnouncementManager from "./Marketing/announcement-manager";
+import NetworkTree from "./Configuration/network-tree";
+import FraudRuleManager from "./Configuration/fraud-rule-manager"; 
+import DomainList from "./Configuration/domain-list";
+import PixelList from "./Configuration/pixel-list";
+import ProductRateManager from "./Configuration/product-rate-manager";
+import KycManager from "./Management/kyc-manager";
+import LedgerTable from "./Management/ledger-table";
+import AffiliateGeneralConfigForm from "./Configuration/general-config-manager";
+import ReportsDashboard from "./Analytics/reports-dashboard";
 
 interface Props {
   initialData: any;

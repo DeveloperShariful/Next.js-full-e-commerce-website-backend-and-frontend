@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/creative-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Marketing/creative-list.tsx
 
 "use client";
 

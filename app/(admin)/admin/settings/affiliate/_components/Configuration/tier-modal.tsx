@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/tiers/_components/tier-modal.tsx
+// File: app/(admin)/admin/settings/affiliate/tiers/_components/Configuration/tier-modal.tsx
 
 "use client";
 

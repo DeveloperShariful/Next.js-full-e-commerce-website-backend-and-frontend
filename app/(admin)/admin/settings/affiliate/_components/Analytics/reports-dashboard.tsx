@@ -1,4 +1,4 @@
-//app/(admin)/admin/settings/affiliate/_components/reports-dashboard.tsx
+//app/(admin)/admin/settings/affiliate/_components/Analytics/reports-dashboard.tsx
 
 "use client";
 

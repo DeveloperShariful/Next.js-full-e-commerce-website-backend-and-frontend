@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/rule-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/rule-list.tsx
 
 "use client";
 
@@ -12,7 +12,7 @@ import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ Correct Import Path
 // ✅ Use Named Imports
-import { deleteRuleAction } from "@/app/actions/admin/settings/affiliates/_services/rule-engine-service";
+import { deleteRuleAction } from "@/app/actions/admin/settings/affiliates/_services/commition-rule-service";
 
 interface Props {
   initialRules: AffiliateCommissionRule[];

@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/general-config-form.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/general-config-manager.tsx
 
 "use client";
 
@@ -11,7 +11,7 @@ import { z } from "zod";
 
 // ✅ Correct Import Path
 import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliates/schemas";
-import { updateGeneralSettingsAction } from "@/app/actions/admin/settings/affiliates/_services/config-service";
+import { updateGeneralSettingsAction } from "@/app/actions/admin/settings/affiliates/_services/general-config-service";
 import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliates/types";
 import { cn } from "@/lib/utils";
 

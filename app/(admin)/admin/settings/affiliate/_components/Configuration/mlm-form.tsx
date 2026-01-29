@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/mlm-form.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/mlm-form.tsx
 
 "use client";
 

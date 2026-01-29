@@ -1,4 +1,4 @@
-//app/(admin)/admin/settings/affiliate/contests/_components/contest-modal.tsx
+//app/(admin)/admin/settings/affiliate/contests/_components/Marketing/contest-modal.tsx
 
 "use client";
 

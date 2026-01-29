@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/fraud-rule-manager.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/fraud-rule-manager.tsx
 
 "use client";
 

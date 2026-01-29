@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/contest-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Marketing/contest-list.tsx
 
 "use client";
 

@@ -1,4 +1,4 @@
-//app/(admin)/admin/settings/affiliate/_components/partners-manager.tsx
+//app/(admin)/admin/settings/affiliate/_components/Management/partners-manager.tsx
 
 "use client";
 

@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/main-overview.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Analytics/main-overview.tsx
 
 "use client";
 

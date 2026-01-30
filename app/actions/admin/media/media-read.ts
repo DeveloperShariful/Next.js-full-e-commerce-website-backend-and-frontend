@@ -12,7 +12,6 @@ export type MediaUsage = {
   inBlogs: number;
   inStoreSettings: number;
   inCollections: number;
-  inBanners: number;
   details: string[]; 
 };
 
@@ -64,9 +63,6 @@ export async function getAllMedia(
     const where: any = {};
     const skip = (page - 1) * limit;
     
-    // 1. Folder Logic (Critical for Enterprise Structure)
-    // If folderId is "root" or null, we fetch files with folderId: null
-    // If "all", we ignore folder scope (good for global search)
     if (folderId !== "ALL_MEDIA_SEARCH") {
         where.folderId = folderId === "root" ? null : folderId;
     }
@@ -98,18 +94,12 @@ export async function getAllMedia(
       default: orderBy = { createdAt: 'desc' };
     }
 
-    // 5. Usage Filter Logic is applied POST-FETCH or via Complex Query
-    // Prisma doesn't support easy filtering on "count of multiple relations" directly without raw query.
-    // For performance, we fetch relations and filter in memory if "usageFilter" is strict, 
-    // OR we rely on a computed field approach. Here we fetch relations to display usage.
-
     const [mediaRaw, total] = await Promise.all([
       db.media.findMany({
         where,
         orderBy,
         skip,
         take: limit,
-        // ✅ FETCHING ALL RELATIONS TO CHECK USAGE
         include: {
           productImages: { select: { product: { select: { name: true } } } },
           categories: { select: { name: true } },
@@ -120,7 +110,6 @@ export async function getAllMedia(
           storeLogos: { select: { storeName: true } },
           storeFavicons: { select: { storeName: true } },
           collections: { select: { name: true } },
-          banners: { select: { title: true } },
           seoConfigs: { select: { siteName: true } } // OG Image
         }
       }),
@@ -137,7 +126,6 @@ export async function getAllMedia(
         m.brands.forEach(b => details.push(`Brand Logo: ${b.name}`));
         m.products.forEach(p => details.push(`Product Featured: ${p.name}`));
         m.blogPosts.forEach(b => details.push(`Blog: ${b.title}`));
-        m.banners.forEach(b => details.push(`Banner: ${b.title}`));
         if(m.storeLogos.length > 0) details.push("Store Logo");
         
         const usageStats: MediaUsage = {
@@ -147,7 +135,6 @@ export async function getAllMedia(
             inBlogs: m.blogPosts.length,
             inStoreSettings: m.storeLogos.length + m.storeFavicons.length + m.seoConfigs.length,
             inCollections: m.collections.length,
-            inBanners: m.banners.length,
             details: details.slice(0, 5) // Limit details to 5 items to keep payload light
         };
 

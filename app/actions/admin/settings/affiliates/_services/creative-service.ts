@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 const creativeSchema = z.object({
   id: z.string().optional(),

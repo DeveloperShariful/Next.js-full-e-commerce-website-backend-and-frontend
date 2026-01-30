@@ -8,7 +8,7 @@ import { z } from "zod";
  * ------------------------------------------------------------------
  */
 export const affiliateGeneralSchema = z.object({
-  // --- 1. General / Identity ---
+ 
   isActive: z.boolean().default(false),
   programName: z
     .string()
@@ -17,28 +17,27 @@ export const affiliateGeneralSchema = z.object({
   
   termsUrl: z.string().url().optional().or(z.literal("")),
 
-  // --- 2. Commission Calculation Logic ---
-  excludeShipping: z.boolean().default(true), // Solid Affiliate default: On
-  excludeTax: z.boolean().default(true),      // Solid Affiliate default: On
+  excludeShipping: z.boolean().default(true), 
+  excludeTax: z.boolean().default(true),      
   autoApplyCoupon: z.boolean().default(false),
   zeroValueReferrals: z.boolean().default(false),
 
-  // --- 3. Affiliate Links & Slugs ---
+  
   referralParam: z
     .string()
     .min(1, { message: "Parameter required." })
     .regex(/^[a-zA-Z0-9_-]+$/, { message: "Alphanumeric only (e.g. 'ref')." })
     .default("ref"),
   
-  customSlugsEnabled: z.boolean().default(false), // Allow users to create "ref/myname"
-  autoCreateSlug: z.boolean().default(false),     // Generate slug on signup
+  customSlugsEnabled: z.boolean().default(false), 
+  autoCreateSlug: z.boolean().default(false),     
   slugLimit: z.coerce
     .number()
     .min(1)
     .max(100)
     .default(5),
 
-  // --- 4. Tracking & Lifetime ---
+  
   cookieDuration: z.coerce
     .number()
     .min(1, { message: "Minimum 1 day." })
@@ -47,13 +46,13 @@ export const affiliateGeneralSchema = z.object({
     
   allowSelfReferral: z.boolean().default(false),
 
-  isLifetimeLinkOnPurchase: z.boolean().default(false), // Link customer permanently after purchase
+  isLifetimeLinkOnPurchase: z.boolean().default(false), 
   lifetimeDuration: z.coerce
     .number()
     .nullable()
-    .optional(), // Null means "Forever"
+    .optional(), 
 
-  // --- 5. Payouts & Finance ---
+  
   holdingPeriod: z.coerce
     .number()
     .min(0, { message: "Cannot be negative." })
@@ -82,7 +81,6 @@ export const affiliateGeneralSchema = z.object({
  * ------------------------------------------------------------------
  */
 
-// Schema for Assigning/Creating Coupons for Affiliates
 export const couponAssignmentSchema = z.object({
   affiliateId: z.string().uuid(),
   code: z.string().min(3, "Code must be at least 3 chars").regex(/^[A-Z0-9_-]+$/, "Uppercase alphanumeric only"),
@@ -90,8 +88,8 @@ export const couponAssignmentSchema = z.object({
   type: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
 });
 
-// Schema for Moving Affiliates within the MLM Tree
+
 export const mlmMoveSchema = z.object({
   affiliateId: z.string().uuid(),
-  newParentId: z.string().uuid().nullable(), // Null means moving to Root (No Parent)
+  newParentId: z.string().uuid().nullable(),
 });

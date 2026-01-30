@@ -9,7 +9,7 @@ import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 const tierSchema = z.object({
   id: z.string().optional(), 

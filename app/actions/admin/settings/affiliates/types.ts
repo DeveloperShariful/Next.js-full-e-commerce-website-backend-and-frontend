@@ -15,7 +15,7 @@ export type AffiliatePermission =
   | "MANAGE_FINANCE"
   | "MANAGE_CONFIGURATION"
   | "MANAGE_NETWORK"
-  | "MANAGE_FRAUD"; // ✅ ADDED THIS MISSING TYPE
+  | "MANAGE_FRAUD"; 
 
 /**
  * ==================================================================

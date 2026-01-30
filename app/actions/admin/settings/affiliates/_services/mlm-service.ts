@@ -9,7 +9,7 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 const mlmSchema = z.object({
   isEnabled: z.boolean(),

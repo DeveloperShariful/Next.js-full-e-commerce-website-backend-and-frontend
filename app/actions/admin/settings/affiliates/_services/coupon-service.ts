@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { ActionResponse } from "../types";
-import { protectAction } from "./permission-service";
+import { protectAction } from "../permission-service";
 import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { revalidatePath } from "next/cache";

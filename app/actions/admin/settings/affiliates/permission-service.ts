@@ -1,10 +1,10 @@
-//File: app/actions/admin/settings/affiliate/_services/permission-service.ts
+//File: app/actions/admin/settings/affiliate/permission-service.ts
 
 "use server";
 
 import { syncUser } from "@/lib/auth-sync";
 import { Role } from "@prisma/client";
-import { AffiliatePermission } from "../types";
+import { AffiliatePermission } from "./types";
 
 // ✅ UPDATED: Added "MANAGE_FRAUD" to Admin & Super Admin
 const PERMISSIONS: Record<Role, AffiliatePermission[]> = {

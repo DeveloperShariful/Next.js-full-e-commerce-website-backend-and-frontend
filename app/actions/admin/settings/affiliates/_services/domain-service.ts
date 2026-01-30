@@ -9,7 +9,7 @@ import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import dns from "dns/promises"; 
 import { z } from "zod";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 const domainSchema = z.object({
   affiliateId: z.string().min(1, "Affiliate ID is required"),

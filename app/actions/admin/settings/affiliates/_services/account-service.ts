@@ -1,23 +1,20 @@
 // File: app/actions/admin/settings/affiliate/_services/account-service.ts
-
 "use server";
 
 import { db } from "@/lib/prisma";
-import { AffiliateStatus, Prisma } from "@prisma/client";
+import { AffiliateStatus, Prisma, AffiliateAccount } from "@prisma/client";
 import { sendNotification } from "@/app/api/email/send-notification"; 
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, AffiliateUserTableItem } from "../types";
-import { syncUser } from "@/lib/auth-sync";
-import { protectAction } from "./permission-service";
-import { Tags } from "lucide-react";
+import { protectAction } from "../permission-service";
+import { getChanges } from "../get-changes";
 
 // =========================================
 // READ OPERATIONS (Server Side Fetching)
 // =========================================
 
- 
 export async function getAffiliates(
   page: number = 1, 
   limit: number = 20, 
@@ -132,16 +129,26 @@ export async function getAffiliateDetails(id: string) {
 // SERVER ACTIONS (Mutations)
 // =========================================
 
-// ✅ 3. Removed inline "use server" (already defined at top)
 export async function approveAffiliateAction(id: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
+
+    const current = await db.affiliateAccount.findUnique({ where: { id } });
+    if (!current) return { success: false, message: "Affiliate not found" };
+
+    // ✅ Strict Typing: Use Partial<AffiliateAccount> instead of implicit type
+    const payload: Partial<AffiliateAccount> = { status: "ACTIVE" };
+
+    // ✅ No 'as any' needed. Both match Partial<AffiliateAccount> structure
+    const { hasChanges, changes, oldValues } = getChanges(current, payload);
+
+    if (!hasChanges) return { success: true, message: "Affiliate is already active." };
 
     const updated = await db.affiliateAccount.update({
       where: { id },
       include: { user: true },
-      data: { status: "ACTIVE" }
+      // ✅ Strict Typing: Use UncheckedUpdateInput to safely handle the partial object
+      data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
     });
 
     await sendNotification({
@@ -152,11 +159,12 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
     });
 
     await auditService.log({
-        userId: auth.id,
+        userId: actor.id,
         action: "UPDATE",
         entity: "AffiliateAccount",
         entityId: id,
-        newData: { status: "ACTIVE" },
+        oldData: oldValues,
+        newData: changes,
         meta: { action: "APPROVE_AFFILIATE" }
     });
 
@@ -169,13 +177,27 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
 
 export async function rejectAffiliateAction(id: string, reason: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
+
+    const current = await db.affiliateAccount.findUnique({ where: { id } });
+    if (!current) return { success: false, message: "Affiliate not found" };
+
+    // ✅ Strict Typing
+    const payload: Partial<AffiliateAccount> = { 
+      status: "REJECTED",
+      adminNotes: reason
+    };
+
+    // ✅ Type-safe comparison
+    const { hasChanges, changes, oldValues } = getChanges(current, payload);
+
+    if (!hasChanges) return { success: true, message: "Already rejected with same reason." };
 
     const updated = await db.affiliateAccount.update({
       where: { id },
       include: { user: true },
-      data: { status: "REJECTED", adminNotes: reason }
+      // ✅ Type-safe update
+      data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
     });
 
     await sendNotification({
@@ -185,6 +207,16 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
         userId: updated.userId
     });
 
+    await auditService.log({
+      userId: actor.id,
+      action: "UPDATE",
+      entity: "AffiliateAccount",
+      entityId: id,
+      oldData: oldValues,
+      newData: changes,
+      meta: { action: "REJECT_AFFILIATE", reason }
+    });
+
     revalidatePath("/admin/settings/affiliate/users");
     return { success: true, message: "Affiliate rejected." };
   } catch (error: any) {
@@ -192,20 +224,37 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
   }
 }
 
-// --- BULK ACTIONS ---
+// --- BULK ACTIONS (Remain same as they handle array logic differently) ---
 
 export async function bulkStatusAction(ids: string[], status: AffiliateStatus): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
+
+    const existing = await db.affiliateAccount.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, status: true }
+    });
+
+    const toUpdate = existing.filter(acc => acc.status !== status).map(acc => acc.id);
+
+    if (toUpdate.length === 0) return { success: true, message: "No updates needed." };
 
     await db.affiliateAccount.updateMany({
-      where: { id: { in: ids } },
+      where: { id: { in: toUpdate } },
       data: { status }
     });
 
+    await auditService.log({
+      userId: actor.id,
+      action: "BULK_UPDATE",
+      entity: "AffiliateAccount",
+      entityId: "BULK",
+      newData: { status, count: toUpdate.length, affectedIds: toUpdate },
+      meta: { action: "BULK_STATUS_CHANGE" }
+    });
+
     revalidatePath("/admin/settings/affiliate/users");
-    return { success: true, message: `${ids.length} affiliates updated.` };
+    return { success: true, message: `${toUpdate.length} affiliates updated.` };
   } catch (error: any) {
     return { success: false, message: "Bulk update failed." };
   }
@@ -213,12 +262,20 @@ export async function bulkStatusAction(ids: string[], status: AffiliateStatus): 
 
 export async function bulkGroupAction(ids: string[], groupId: string): Promise<ActionResponse> {
   try {
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) return { success: false, message: "Unauthorized" };
+    const actor = await protectAction("MANAGE_PARTNERS");
 
     await db.affiliateAccount.updateMany({
       where: { id: { in: ids } },
       data: { groupId }
+    });
+
+    await auditService.log({
+      userId: actor.id,
+      action: "BULK_UPDATE",
+      entity: "AffiliateAccount",
+      entityId: "BULK",
+      newData: { groupId, count: ids.length, ids },
+      meta: { action: "BULK_GROUP_ASSIGN" }
     });
 
     revalidatePath("/admin/settings/affiliate/users");
@@ -238,13 +295,16 @@ export async function bulkTagAction(ids: string[], tagId: string): Promise<Actio
           data: { tags: { connect: { id: tagId } } }
       }))
     );
-     await auditService.log({
-        userId: actor.id,
-        action: "UPDATE_COMMISSION",
-        entity: "AffiliateAccount",
-        entityId: tagId,
-        meta: { Tags }
+
+    await auditService.log({
+      userId: actor.id,
+      action: "BULK_UPDATE",
+      entity: "AffiliateAccount",
+      entityId: "BULK",
+      newData: { tagId, count: ids.length, ids },
+      meta: { action: "BULK_TAG_ADD" }
     });
+
     revalidatePath("/admin/settings/affiliate/users");
     return { success: true, message: "Tag added to affiliates." };
   } catch (error: any) {
@@ -284,12 +344,24 @@ export async function updateCommissionAction(
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
+    const current = await db.affiliateAccount.findUnique({ where: { id } });
+    if (!current) return { success: false, message: "Affiliate not found" };
+
+    // ✅ Strict Typing for Commission Payload
+    const payload: Partial<AffiliateAccount> = {
+      commissionRate: rate ? DecimalMath.toDecimal(rate) : null,
+      commissionType: type
+    };
+
+    // ✅ Type-safe comparison
+    const { hasChanges, changes, oldValues } = getChanges(current, payload);
+
+    if (!hasChanges) return { success: true, message: "No commission changes detected." };
+
     await db.affiliateAccount.update({
       where: { id },
-      data: {
-        commissionRate: rate ? DecimalMath.toDecimal(rate) : null, // null means use Tier/Group default
-        commissionType: type
-      }
+      // ✅ Type-safe update
+      data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
     });
 
     await auditService.log({
@@ -297,7 +369,9 @@ export async function updateCommissionAction(
         action: "UPDATE_COMMISSION",
         entity: "AffiliateAccount",
         entityId: id,
-        meta: { rate, type }
+        oldData: oldValues,
+        newData: changes,
+        meta: { updatedBy: "ADMIN_MANUAL_OVERRIDE" }
     });
 
     revalidatePath("/admin/settings/affiliate");
@@ -306,4 +380,3 @@ export async function updateCommissionAction(
     return { success: false, message: error.message };
   }
 }
-

@@ -8,7 +8,7 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS

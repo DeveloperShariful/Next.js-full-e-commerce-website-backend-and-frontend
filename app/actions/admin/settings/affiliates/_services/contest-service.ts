@@ -8,7 +8,7 @@ import { revalidatePath, unstable_cache } from "next/cache";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 import { auditService } from "@/lib/services/audit-service";
 
 const contestSchema = z.object({

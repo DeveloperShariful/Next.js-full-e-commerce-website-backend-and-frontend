@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { subMonths, startOfMonth } from "date-fns";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS (Protected)

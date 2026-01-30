@@ -7,7 +7,7 @@
 import { db } from "@/lib/prisma";
 import { ActionResponse } from "../types";
 import { revalidatePath } from "next/cache";
-import { protectAction } from "./permission-service"; 
+import { protectAction } from "../permission-service"; 
 import { auditService } from "@/lib/services/audit-service";
 
 // =========================================

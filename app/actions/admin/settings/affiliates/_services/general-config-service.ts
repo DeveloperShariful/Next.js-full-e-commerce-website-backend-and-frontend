@@ -7,7 +7,9 @@ import { AffiliateGeneralSettings, AffiliateConfigDTO, ActionResponse } from "..
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { affiliateGeneralSchema } from "../schemas";
-import { syncUser } from "@/lib/auth-sync";
+import { getChanges } from "../get-changes";
+// ✅ 1. Correct Import
+import { protectAction } from "../permission-service"; 
 
 // =========================================
 // READ OPERATIONS
@@ -51,7 +53,6 @@ export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
         : ["STORE_CREDIT"],
       commissionRate: Number(affConfig.commissionRate) || 10,
       commissionType: affConfig.commissionType || "PERCENTAGE",
-        
     };
   } catch (error) {
     throw new Error("Failed to load configuration");
@@ -64,13 +65,7 @@ export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
 
 export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings): Promise<ActionResponse> {
   try {
-    // 1. Auth Check
-    const auth = await syncUser();
-    if (!auth || !["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(auth.role)) {
-        return { success: false, message: "Unauthorized access." };
-    }
-
-    // 2. Validation
+    const actor = await protectAction("MANAGE_CONFIGURATION");
     const result = affiliateGeneralSchema.safeParse(data);
     if (!result.success) {
       return {
@@ -81,15 +76,6 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
     }
 
     const payload = result.data;
-
-    // 3. Fetch Existing Config to Merge
-    const current = await db.storeSettings.findUnique({
-      where: { id: "settings" },
-      select: { generalConfig: true, affiliateConfig: true },
-    });
-
-    const existingGeneral = (current?.generalConfig as any) || {};
-    
     const affiliateConfigPayload: AffiliateConfigDTO = {
       programName: payload.programName,
       termsUrl: payload.termsUrl,
@@ -113,45 +99,62 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
       commissionType: payload.commissionType,
     };
 
-    // 4. Update DB
+    const currentSettings = await getSettings();
+    
+    const { hasChanges, changes, oldValues } = currentSettings 
+        ? getChanges(currentSettings, payload)
+        : { hasChanges: true, changes: payload, oldValues: null };
+
+    if (!hasChanges) {
+        return { success: true, message: "No changes detected." };
+    }
+
+    const rawSettings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { generalConfig: true, affiliateConfig: true },
+    });
+
+    const existingGeneral = (rawSettings?.generalConfig as any) || {};
+    
+    const newGeneralConfig = {
+      ...existingGeneral,
+      enableAffiliateProgram: payload.isActive,
+    };
+
+    const newAffiliateConfig = {
+      ...(rawSettings?.affiliateConfig as any),
+      ...affiliateConfigPayload 
+    };
+
     await db.$transaction(async (tx) => {
       await tx.storeSettings.upsert({
         where: { id: "settings" },
         create: {
           storeName: "My Store",
           currency: "AUD",
-          generalConfig: {
-            ...existingGeneral,
-            enableAffiliateProgram: payload.isActive,
-          },
-          affiliateConfig: affiliateConfigPayload as any,
+          generalConfig: newGeneralConfig,
+          affiliateConfig: newAffiliateConfig as any,
         },
         update: {
-          generalConfig: {
-            ...existingGeneral,
-            enableAffiliateProgram: payload.isActive,
-          },
-          affiliateConfig: affiliateConfigPayload as any,
+          generalConfig: newGeneralConfig,
+          affiliateConfig: newAffiliateConfig as any,
         },
       });
 
       await auditService.log({
-        userId: auth.id,
+        userId: actor.id,
         action: "UPDATE",
         entity: "StoreSettings",
         entityId: "settings",
-        oldData: current?.affiliateConfig,
-        newData: affiliateConfigPayload,
+        oldData: oldValues, 
+        newData: changes,   
         meta: { module: "AFFILIATE_CONFIG" }
       });
     });
 
-    // 5. Revalidate Global Layout (Important for Context)
     revalidatePath("/admin/settings/affiliate");
-    revalidatePath("/", "layout");
-
     return { success: true, message: "Configuration updated successfully." };
   } catch (error: any) {
-    return { success: false, message: "Internal server error." };
+    return { success: false, message: error.message || "Internal server error." };
   }
 }

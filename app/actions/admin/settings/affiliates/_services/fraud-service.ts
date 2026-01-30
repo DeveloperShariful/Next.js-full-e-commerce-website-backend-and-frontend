@@ -8,7 +8,7 @@ import { auditService } from "@/lib/services/audit-service";
 import { getCachedFraudRules } from "@/lib/services/settings-cache";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 // ==============================================================================
 // PART 1: FRAUD RULES CONFIGURATION (Schema & CRUD)

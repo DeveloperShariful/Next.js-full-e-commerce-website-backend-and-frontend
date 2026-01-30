@@ -7,7 +7,7 @@ import { DashboardKPI, ChartDataPoint, DateRange } from "../types";
 import { startOfDay, endOfDay, eachDayOfInterval, format, subDays, subMonths } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { DecimalMath } from "@/lib/utils/decimal-math";
-import { protectAction } from "./permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; // ✅ Security
 
 // =========================================
 // READ OPERATIONS (Cached)

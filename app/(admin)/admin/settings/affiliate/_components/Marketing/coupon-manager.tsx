@@ -120,10 +120,11 @@ function CouponModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: (
             affiliateId: ""
         }
     });
-
+    const { symbol } = useGlobalStore();
+    const currency = symbol || "";
     const onSubmit = (data: any) => {
         startTransition(async () => {
-            // Note: affiliateId can be empty string, createAndLinkCouponAction should handle empty as null
+            
             const res = await createAndLinkCouponAction(
                 data.affiliateId || undefined, 
                 data.code, 
@@ -168,7 +169,7 @@ function CouponModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: (
                             <label className="text-xs font-bold text-gray-700 uppercase">Discount Type</label>
                             <select {...register("type")} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                                 <option value="PERCENTAGE">Percentage (%)</option>
-                                <option value="FIXED_AMOUNT">Fixed Amount ($)</option>
+                                <option value="FIXED_AMOUNT">Fixed Amount ({currency})</option>
                             </select>
                         </div>
                         <div className="space-y-1.5">

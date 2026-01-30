@@ -9,9 +9,6 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import RuleModal from "./rule-modal";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-
-// ✅ Correct Import Path
-// ✅ Use Named Imports
 import { deleteRuleAction } from "@/app/actions/admin/settings/affiliates/_services/commition-rule-service";
 
 interface Props {

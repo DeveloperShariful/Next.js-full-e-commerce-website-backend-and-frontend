@@ -7,6 +7,7 @@ import { useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import { X, Loader2, Save } from "lucide-react";
 import { AffiliateTier, CommissionType } from "@prisma/client";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ CORRECTED IMPORT
 import { upsertTierAction } from "@/app/actions/admin/settings/affiliates/_services/tier-service";
@@ -28,6 +29,8 @@ interface FormValues {
 }
 
 export default function TierModal({ isOpen, onClose, initialData }: Props) {
+  const { symbol } = useGlobalStore(); 
+  const currency = symbol || "";
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<FormValues>({
@@ -134,7 +137,7 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
                 className="w-full border rounded-md px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-black/5 outline-none"
               >
                 <option value="PERCENTAGE">Percentage (%)</option>
-                <option value="FIXED">Fixed Amount ($)</option>
+                <option value="FIXED">Fixed Amount ({currency})</option>
               </select>
             </div>
           </div>
@@ -148,7 +151,7 @@ export default function TierModal({ isOpen, onClose, initialData }: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Min. Sales Amount ($)</label>
+              <label className="text-sm font-medium text-gray-700">Min. Sales Amount ({currency})</label>
               <input
                 type="number"
                 {...form.register("minSalesAmount")}

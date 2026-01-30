@@ -61,7 +61,9 @@ export async function addDomainAction(data: z.infer<typeof domainSchema>): Promi
     });
     if (existing) return { success: false, message: "Domain is already registered." };
 
-    const token = `gobike-verify-${crypto.randomBytes(8).toString("hex")}`;
+    const appName = process.env.NEXT_PUBLIC_APP_NAME || "app";
+    const cleanName = appName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const token = `${cleanName}-verify-${crypto.randomBytes(8).toString("hex")}`;
 
     const record = await db.affiliateDomain.create({
       data: {

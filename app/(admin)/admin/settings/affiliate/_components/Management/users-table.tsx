@@ -7,7 +7,7 @@ import {
   Search, Download, Users, ShieldAlert, Loader2, MoreVertical, 
   CheckCircle, XCircle, Filter, ChevronLeft, 
   ChevronRight, ArrowUpDown, Tag, CreditCard, Ticket, 
-  Copy, ExternalLink, Calendar, MapPin, Mail, 
+  Copy, ExternalLink, Calendar, Trophy, Mail, 
   AlertTriangle, DollarSign, Briefcase, Eye, X, UserCheck, UserX,
   Percent, Layers
 } from "lucide-react";
@@ -271,11 +271,21 @@ export default function AffiliateUsersTable({
             isCustom: true 
         };
     }
-    if (user.groupName && user.groupName !== "No Group") {
-        return { main: user.groupName, sub: "Group Rate", isDefault: false };
+    if (user.groupName && user.groupName !== "No Group" && user.groupRate) {
+        return { 
+            main: `${user.groupRate}%`, 
+            sub: `${user.groupName} (Group)`, 
+            isDefault: false 
+        };
     }
-    if (user.tierName && user.tierName !== "Default") {
-        return { main: user.tierName, sub: "Tier Rate", isDefault: false };
+    if (user.tierName && user.tierName !== "Default" && user.tierRate) {
+        return { 
+            main: user.tierType === "FIXED" 
+                ? `${currencySymbol}${user.tierRate}` 
+                : `${user.tierRate}%`,
+            sub: `${user.tierName} (Tier)`, 
+            isDefault: false 
+        };
     }
     return {
         
@@ -503,7 +513,13 @@ export default function AffiliateUsersTable({
                             <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
                                 #{user.slug}
                             </span>
-                            
+                            <span className={cn( "text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 uppercase tracking-wide", user.tierName === "Default" || !user.tierName 
+                              ? "bg-gray-50 text-gray-500 border-gray-200" 
+                              : "bg-yellow-50 text-yellow-700 border-yellow-200" 
+                              )}>
+                              <Trophy className="w-3 h-3" /> 
+                              {user.tierName || "Starter"}
+                            </span>
                           </div>
                         </div>
                       </div>

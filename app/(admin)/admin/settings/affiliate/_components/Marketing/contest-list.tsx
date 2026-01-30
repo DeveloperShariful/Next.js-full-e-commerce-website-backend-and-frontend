@@ -8,6 +8,7 @@ import { format, isAfter, isBefore } from "date-fns";
 import { Trophy, Calendar, Plus, Trash2, Edit, TrendingUp, Users, Medal, Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ Correct Import Path
 // ✅ Use Named Imports
@@ -18,6 +19,8 @@ interface Props {
 }
 
 export default function ContestList({ initialContests }: Props) {
+  const { symbol } = useGlobalStore();
+  const currency = symbol || " ";
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AffiliateContest | null>(null);
   const [isDeleting, startDelete] = useTransition();
@@ -167,7 +170,8 @@ function ContestModal({ isOpen, onClose, initialData }: any) {
             }
         }
     });
-
+    const { symbol } = useGlobalStore(); // ✅ স্টোর থেকে সিম্বল আনুন
+    const currency = symbol || " ";
     const onSubmit = (data: any) => {
         startTransition(async () => {
             // ✅ Call Service Method
@@ -212,7 +216,7 @@ function ContestModal({ isOpen, onClose, initialData }: any) {
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-gray-700 uppercase">Winning Criteria</label>
                             <select {...register("criteria")} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-black/5 outline-none">
-                                <option value="sales_amount">Highest Total Revenue ($)</option>
+                                <option value="sales_amount">Highest Total Revenue ({currency})</option>
                                 <option value="referral_count">Most Sales (Count)</option>
                             </select>
                         </div>

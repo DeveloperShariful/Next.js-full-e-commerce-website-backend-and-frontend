@@ -7,9 +7,8 @@ import { useTransition, useEffect } from "react";
 import { toast } from "sonner";
 import { X, Loader2, Save, Plus, Calculator  } from "lucide-react";
 import { AffiliateCommissionRule } from "@prisma/client";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
-// ✅ Correct Import Path
-// ✅ Use Named Import
 import { upsertRuleAction } from "@/app/actions/admin/settings/affiliates/_services/commition-rule-service";
 
 interface Props {
@@ -40,7 +39,8 @@ interface RuleFormValues {
 
 export default function RuleModal({ isOpen, onClose, initialData }: Props) {
   const [isPending, startTransition] = useTransition();
-
+  const { symbol } = useGlobalStore(); // ✅ স্টোর থেকে সিম্বল আনুন
+    const currency = symbol || " ";
   const form = useForm<RuleFormValues>({
     defaultValues: {
       name: "",
@@ -194,7 +194,7 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Min. Order Value ($)</label>
+                  <label className="text-sm font-medium text-gray-700">Min. Order Value ({currency})</label>
                   <input
                     type="number"
                     placeholder="0"
@@ -228,7 +228,7 @@ export default function RuleModal({ isOpen, onClose, initialData }: Props) {
                     className="w-full border rounded-md px-3 py-2 text-sm bg-white"
                   >
                     <option value="PERCENTAGE">Percentage (%)</option>
-                    <option value="FIXED">Fixed Amount ($)</option>
+                    <option value="FIXED">Fixed Amount ({currency})</option>
                   </select>
                 </div>
                 <div className="space-y-2">

@@ -124,10 +124,11 @@ export default function TierList({ initialTiers }: Props) {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <div className="inline-flex items-center gap-1.5 text-gray-700 bg-gray-100 px-3 py-1 rounded-full text-xs font-medium">
+                      <a href={`/admin/settings/affiliate?view=partners&search=${tier.name}`}
+                       className="inline-flex items-center gap-1.5 text-gray-700 bg-gray-100 px-3 py-1 rounded-full text-xs font-medium">
                         <Users className="w-3 h-3" />
                         {tier._count?.affiliates || 0}
-                      </div>
+                      </a>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

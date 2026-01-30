@@ -32,8 +32,9 @@ interface CreativeFormValues {
 }
 
 export default function CreativeModal({ isOpen, onClose, initialData }: Props) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const [isPending, startTransition] = useTransition();
-
+  
   const form = useForm<CreativeFormValues>({
     defaultValues: {
       title: "",
@@ -139,7 +140,7 @@ export default function CreativeModal({ isOpen, onClose, initialData }: Props) {
                         <label className="text-xs font-bold text-gray-700 uppercase">Target URL</label>
                         <input
                           {...form.register("targetUrl")}
-                          placeholder="https://gobike.au/sale"
+                          placeholder={`${siteUrl}/sale`}
                           className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none"
                         />
                       </div>

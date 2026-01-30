@@ -2425,6 +2425,7 @@ model AffiliateGroup {
   slug           String             @unique
   description    String?
   commissionRate Decimal?           @db.Decimal(5, 2)
+   commissionType CommissionType  @default(PERCENTAGE) 
   isDefault      Boolean            @default(false)
   isActive       Boolean            @default(true)
   

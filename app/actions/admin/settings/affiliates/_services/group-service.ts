@@ -15,6 +15,7 @@ const groupSchema = z.object({
   name: z.string().min(2, "Group name must be at least 2 characters."),
   description: z.string().optional(),
   commissionRate: z.union([z.string(), z.number()]).optional(),
+  commissionType: z.enum(["PERCENTAGE", "FIXED"]).default("PERCENTAGE"),
   isDefault: z.boolean().default(false),
 });
 
@@ -78,6 +79,7 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
           name: payload.name,
           description: payload.description,
           commissionRate: rateValue,
+          commissionType: payload.commissionType, 
           isDefault: payload.isDefault,
         },
       });
@@ -88,6 +90,7 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
           slug: payload.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
           description: payload.description,
           commissionRate: rateValue,
+          commissionType: payload.commissionType ,
           isDefault: payload.isDefault,
         },
       });

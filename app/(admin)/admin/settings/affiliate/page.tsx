@@ -26,6 +26,7 @@ import * as analyticsService from "@/app/actions/admin/settings/affiliates/_serv
 import * as groupService from "@/app/actions/admin/settings/affiliates/_services/group-service";
 import * as tagService from "@/app/actions/admin/settings/affiliates/_services/tag-service";
 import * as couponService from "@/app/actions/admin/settings/affiliates/_services/coupon-service";
+import { serializePrismaData } from "@/lib/format-data"; 
 
 export const metadata = {
   title: "Affiliate Program Management | Enterprise Admin",
@@ -176,7 +177,7 @@ export default async function AffiliateMasterPage({
             <p className="text-gray-500 max-w-md mt-2">{data.error}</p>
           </div>
         ) : (
-          <AffiliateMainView initialData={data} currentView={currentView} />
+          <AffiliateMainView initialData={serializePrismaData(data) } currentView={currentView} />
         )}
       </Suspense>
     </div>

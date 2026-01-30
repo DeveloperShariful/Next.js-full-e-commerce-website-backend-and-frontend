@@ -8,11 +8,12 @@ import { useForm } from "react-hook-form";
 import { 
   Search, Plus, Users, Edit, Trash2, MoreVertical, 
   Layers, Percent, ShieldCheck, Package, Megaphone,
-  Copy, X, Loader2, Save, ArrowUpDown
+  Copy, X, Loader2, Save, ArrowUpDown, DollarSign 
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AffiliateGroup } from "@prisma/client";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ CORRECTED IMPORT: Using named imports from consolidated group service
 import { 
@@ -58,12 +59,15 @@ export default function GroupManager({ initialGroups }: Props) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupWithDetails | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<GroupWithDetails | null>(null);
+  const { symbol } = useGlobalStore(); 
+  const currency = symbol || "";
 
   useEffect(() => {
     setGroups(initialGroups);
   }, [initialGroups]);
 
   // --- Filter & Sort Logic ---
+  
   const filteredGroups = useMemo(() => {
     let result = [...groups];
 
@@ -437,12 +441,13 @@ function SortableHeader({ label, field, currentSort, currentDir, onSort }: any) 
 function GroupConfigModal({ isOpen, onClose, initialData }: any) {
     const [isPending, startTransition] = useTransition();
     
-    const { register, handleSubmit, formState: { errors } } = useForm({
+    const { register, handleSubmit, watch, formState: { errors } } = useForm({
         defaultValues: {
             name: initialData?.name || "",
             description: initialData?.description || "",
             commissionRate: initialData?.commissionRate ? Number(initialData.commissionRate) : "",
-            isDefault: initialData?.isDefault || false
+            isDefault: initialData?.isDefault || false,
+             commissionType: initialData?.commissionType || "PERCENTAGE" 
         }
     });
 
@@ -462,16 +467,25 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
 
     if(!isOpen) return null;
 
+    // টাইপ অনুযায়ী আইকন এবং প্লেসহোল্ডার চেঞ্জ করার জন্য
+    const commissionType = watch("commissionType");
+    const { symbol } = useGlobalStore(); 
+    const currency = symbol || "";
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+                
+                {/* Header */}
                 <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50/50">
                     <h3 className="font-bold text-gray-900">{initialData ? "Edit Group" : "Create Group"}</h3>
                     <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-black" /></button>
                 </div>
                 
+                {/* Scrollable Form Body */}
                 <div className="p-6 overflow-y-auto">
                     <form id="group-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                        
+                        {/* Group Name */}
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-gray-700 uppercase">Group Name</label>
                             <input 
@@ -482,22 +496,64 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
                             {errors.name && <span className="text-red-500 text-xs font-medium">{errors.name.message as string}</span>}
                         </div>
                         
+                        {/* Description */}
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-gray-700 uppercase">Description</label>
-                            <textarea {...register("description")} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" rows={3} placeholder="Internal notes..." />
+                            <textarea 
+                                {...register("description")} 
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" 
+                                rows={3} 
+                                placeholder="Internal notes..." 
+                            />
                         </div>
 
+                        {/* 🔥 UPDATED: Commission Structure (Type + Rate) */}
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-gray-700 uppercase">Commission Override (%)</label>
-                            <div className="relative">
-                                <Percent className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                                <input type="number" step="0.01" {...register("commissionRate")} className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" placeholder="Global default" />
+                            <label className="text-xs font-bold text-gray-700 uppercase">Commission Structure</label>
+                            
+                            <div className="flex gap-3">
+                                {/* Type Selector */}
+                                <div className="w-1/3">
+                                    <select 
+                                        {...register("commissionType")} 
+                                        className="w-full h-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-black/5 outline-none font-medium cursor-pointer"
+                                    >
+                                        <option value="PERCENTAGE">Percent (%)</option>
+                                        <option value="FIXED">Fixed ({currency})</option>
+                                    </select>
+                                </div>
+
+                                {/* Rate Input */}
+                                <div className="relative flex-1">
+                                    <div className="absolute left-3 top-2.5 text-gray-400 pointer-events-none">
+                                        {commissionType === "FIXED" ? (
+                                            <DollarSign className="w-4 h-4" />
+                                        ) : (
+                                            <Percent className="w-4 h-4" />
+                                        )}
+                                    </div>
+                                    <input 
+                                        type="number" 
+                                        step="0.01" 
+                                        {...register("commissionRate")} 
+                                        className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" 
+                                        placeholder={commissionType === "FIXED" ? "e.g. 50.00" : "e.g. 10"} 
+                                    />
+                                </div>
                             </div>
-                            <p className="text-[10px] text-gray-400">Leave empty to use the system-wide commission rate.</p>
+                            <p className="text-[10px] text-gray-400 pt-1">
+                                Choose between Percentage or Fixed Amount. Leave empty to use system default.
+                            </p>
                         </div>
 
+                        {/* Default Checkbox */}
                         <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex items-center gap-3 hover:border-blue-200 transition-colors">
-                            <input type="checkbox" id="isDefault" {...register("isDefault")} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                            <input 
+                                type="checkbox" 
+                                id="isDefault" 
+                                {...register("isDefault")} 
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                            />
                             <label htmlFor="isDefault" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
                                 Set as Default Group <br/>
                                 <span className="text-xs text-blue-600/70 font-normal">New affiliates will join this group automatically.</span>
@@ -506,6 +562,7 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
                     </form>
                 </div>
 
+                {/* Footer Actions */}
                 <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0">
                     <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
                     <button type="submit" form="group-form" disabled={isPending} className="px-6 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 flex items-center gap-2 shadow-lg active:scale-95 transition-all">
@@ -520,7 +577,8 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
 
 function GroupDetailDrawer({ isOpen, onClose, group }: { isOpen: boolean, onClose: () => void, group: GroupWithDetails | null }) {
     if (!isOpen || !group) return null;
-
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-site.com";
+    const regLink = `${siteUrl}/affiliate/register?group=${group.slug}`;
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
             <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] transition-opacity animate-in fade-in" onClick={onClose} />
@@ -590,10 +648,10 @@ function GroupDetailDrawer({ isOpen, onClose, group }: { isOpen: boolean, onClos
                         <p className="text-xs font-bold text-blue-700 uppercase">Registration Link for this Group</p>
                         <div className="flex items-center gap-2 bg-white p-2 rounded border border-blue-200">
                             <code className="text-xs text-gray-600 flex-1 truncate">
-                                https://gobike.au/affiliate/register?group={group.slug}
+                                {regLink}
                             </code>
                             <button onClick={() => {
-                                navigator.clipboard.writeText(`https://gobike.au/affiliate/register?group=${group.slug}`);
+                                navigator.clipboard.writeText(regLink);
                                 toast.success("Link copied");
                             }} className="p-1 hover:bg-gray-100 rounded">
                                 <Copy className="w-3.5 h-3.5 text-gray-500"/>

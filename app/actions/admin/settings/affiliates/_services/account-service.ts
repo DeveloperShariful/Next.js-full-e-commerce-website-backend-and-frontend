@@ -50,8 +50,8 @@ export async function getAffiliates(
       orderBy: { createdAt: "desc" },
       include: {
         user: { select: { id: true, name: true, email: true, image: true } },
-        tier: { select: { name: true } },
-        group: { select: { id: true, name: true } },
+        tier: { select: { name: true, commissionRate: true, commissionType: true } },
+        group: { select: { id: true, name: true, commissionRate: true } },
         tags: { select: { id: true, name: true } },
         coupons: { select: { code: true } },
         referrals: {
@@ -77,7 +77,10 @@ export async function getAffiliates(
       slug: account.slug,
       status: account.status,
       tierName: account.tier?.name || "Default",
+      tierRate: account.tier?.commissionRate ? DecimalMath.toNumber(account.tier.commissionRate) : null,
+      tierType: account.tier?.commissionType || "PERCENTAGE",
       groupName: account.group?.name || "No Group",
+      groupRate: account.group?.commissionRate ? DecimalMath.toNumber(account.group.commissionRate) : null,
       tags: account.tags.map(t => t.name),
       coupons: account.coupons.map(c => c.code),
       balance: DecimalMath.toNumber(account.balance),

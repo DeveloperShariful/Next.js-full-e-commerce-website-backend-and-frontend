@@ -14,6 +14,7 @@ import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliates/
 import { updateGeneralSettingsAction } from "@/app/actions/admin/settings/affiliates/_services/general-config-service";
 import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliates/types";
 import { cn } from "@/lib/utils";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 import MLMForm from "./mlm-form";
 
@@ -25,9 +26,11 @@ interface Props {
 }
 
 export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData }: Props) {
+  const { symbol } = useGlobalStore(); // ✅ স্টোর থেকে সিম্বল আনুন
+  const currency = symbol || " ";
   const [activeTab, setActiveTab] = useState<"GENERAL" | "MLM">("GENERAL");
   const [isPending, startTransition] = useTransition();
-
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
   const form = useForm<FormValues>({
     resolver: zodResolver(affiliateGeneralSchema) as any,
     defaultValues: initialData as any,
@@ -149,7 +152,7 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                             <SectionHeader title="Brand Identity" description="How the program appears." icon={Settings} />
                             <div className="grid gap-4">
                                 <InputField name="programName" label="Program Name" placeholder="e.g. GoBike Partner Program" />
-                                <InputField name="termsUrl" label="Terms URL" placeholder="https://gobike.au/terms" type="url" />
+                                <InputField name="termsUrl" label="Terms URL" placeholder={`${siteUrl}/terms`} type="url" />
                             </div>
                         </section>
 
@@ -158,7 +161,7 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                             <div className="grid gap-3">
                                 <ToggleField name="excludeShipping" label="Exclude Shipping" description="Deduct shipping from total." />
                                 <ToggleField name="excludeTax" label="Exclude Taxes" description="Deduct tax from total." />
-                                <ToggleField name="zeroValueReferrals" label="Track Zero Value" description="Record orders with $0 total." />
+                                <ToggleField name="zeroValueReferrals" label="Track Zero Value"  description={`Record orders with ${currency}0 total.`} />
                                 <ToggleField name="autoApplyCoupon" label="Auto-Apply Coupon" description="Apply coupon on link click." />
                             </div>
                         </section>
@@ -205,7 +208,7 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                 <div className="relative flex-1 w-full">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <span className="text-gray-500 text-sm font-bold">
-                            {form.watch("commissionType") === "FIXED" ? "$" : "%"}
+                            {form.watch("commissionType") === "FIXED" ? currency  : "%"}
                         </span>
                     </div>
                     <input
@@ -267,7 +270,7 @@ export default function AffiliateGeneralConfigForm({ initialData, mlmInitialData
                             <SectionHeader title="Payouts" description="Withdrawal configuration." icon={Clock} />
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <InputField name="minimumPayout" label="Min Payout" type="number" prefix="$" />
+                                    <InputField name="minimumPayout" label="Min Payout" type="number" prefix={currency} />
                                     <InputField name="holdingPeriod" label="Holding Period" type="number" suffix="Days" />
                                 </div>
                                 

@@ -87,6 +87,9 @@ export interface AffiliateUserTableItem {
   status: AffiliateStatus;
   tierName: string;
   groupName: string;
+  groupRate?: number | null;
+  tierRate?: number | null;
+  tierType?: "PERCENTAGE" | "FIXED";
   tags: string[];
   coupons: string[];
   storeCredit: number;

@@ -12,7 +12,7 @@ import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ Correct Import Path
 // ✅ Use Named Imports
-import { deleteRateAction, upsertRateAction } from "@/app/actions/admin/settings/affiliates/_services/product-rate-service";
+import { deleteRateAction, upsertRateAction } from "@/app/actions/admin/settings/affiliate/_services/product-rate-service";
 
 // Types
 interface ProductRateWithRelations extends AffiliateProductRate {

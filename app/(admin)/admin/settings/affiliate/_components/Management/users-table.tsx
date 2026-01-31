@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ Type Import (Path Fixed)
-import { AffiliateUserTableItem } from "@/app/actions/admin/settings/affiliates/types";
+import { AffiliateUserTableItem } from "@/app/actions/admin/settings/affiliate/types";
 
 // ✅ Server Actions Import (Named Imports to fix Build Error)
 import { 
@@ -26,7 +26,7 @@ import {
   bulkGroupAction, 
   bulkTagAction ,
   updateCommissionAction
-} from "@/app/actions/admin/settings/affiliates/_services/account-service";
+} from "@/app/actions/admin/settings/affiliate/_services/account-service";
 
 import {
   DropdownMenu,

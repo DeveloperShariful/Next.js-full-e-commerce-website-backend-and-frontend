@@ -3,18 +3,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { PayoutQueueItem } from "@/app/actions/admin/settings/affiliates/types"; 
+import { PayoutQueueItem } from "@/app/actions/admin/settings/affiliate/types"; 
 import { toast } from "sonner";
 import { Check, X, FileText, Download, ExternalLink, Loader2, AlertCircle } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-// ✅ Correct Import Path
-// ✅ Use Named Imports
-import { markAsPaid, rejectPayout } from "@/app/actions/admin/settings/affiliates/_services/payout-service";
-import { getInvoiceData } from "@/app/actions/admin/settings/affiliates/_services/invoice-service";
+import { markAsPaid, rejectPayout, getInvoiceData } from "@/app/actions/admin/settings/affiliate/_services/payout-service";
 
 interface Props {
   data: PayoutQueueItem[];

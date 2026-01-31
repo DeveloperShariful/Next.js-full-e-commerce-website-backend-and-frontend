@@ -9,13 +9,11 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
-// ✅ 1. Correct Import Path (Singular 'affiliate')
-// ✅ 2. Named Imports directly
 import { 
   createAnnouncementAction, 
   deleteAnnouncementAction,
-  toggleStatusAction 
-} from "@/app/actions/admin/settings/affiliates/_services/announcement-service";
+  toggleAnnouncementStatusAction 
+} from "@/app/actions/admin/settings/affiliate/_services/marketing-assets-service";
 
 interface AnnouncementWithTargets extends AffiliateAnnouncement {
   targetGroups: { id: string; name: string }[];
@@ -57,7 +55,7 @@ export default function AnnouncementManager({ initialData }: Props) {
     setItems(prev => prev.map(i => i.id === id ? { ...i, isActive: !current } : i));
     
     // ✅ Call Service Method Directly
-    const res = await toggleStatusAction(id, !current);
+    const res = await toggleAnnouncementStatusAction(id, !current);
     
     if(res.success) {
         toast.success(res.message);

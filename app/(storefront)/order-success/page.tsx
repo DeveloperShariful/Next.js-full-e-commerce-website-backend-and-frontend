@@ -19,7 +19,6 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
     return notFound();
   }
 
-  // 1. Fetch Order Details with Items (Items needed for commission calculation)
   const order = await db.order.findUnique({
     where: { id: orderId },
     select: { 
@@ -29,7 +28,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
       subtotal: true,
       guestEmail: true,
       userId: true,
-      referral: { select: { affiliateId: true } }, // Check if already attributed
+      referrals: { select: { affiliateId: true } }, 
       items: {
         select: { productId: true, total: true } 
       }
@@ -45,17 +44,13 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
     );
   }
 
-  // 2. Affiliate Logic: Check Cookie & Trigger Processing
   const cookieStore = await cookies();
   const affiliateSlug = cookieStore.get("affiliate_token")?.value;
   
-  let finalAffiliateId = order.referral?.affiliateId || null;
+  let finalAffiliateId = order.referrals.length > 0 ? order.referrals[0].affiliateId : null;
 
-  // যদি অর্ডারটিতে এখনো রেফারাল সেট না থাকে এবং আমাদের কাছে কুকি থাকে
   if (!finalAffiliateId && affiliateSlug) {
     try {
-      // Internal API Call to process commission
-      // Note: We use full URL because server components need absolute path
       const apiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/internal/affiliate/process-order`;
       
       const response = await fetch(apiUrl, {
@@ -69,7 +64,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
           subtotal: Number(order.subtotal),
           items: order.items
         }),
-        cache: 'no-store' // Ensure we don't cache this trigger
+        cache: 'no-store' 
       });
 
       const result = await response.json();
@@ -84,7 +79,6 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 bg-gray-50">
       
-      {/* 3. Pixel Renderer (Hidden Logic) */}
       {finalAffiliateId && (
         <AffiliatePixelRenderer 
           affiliateId={finalAffiliateId}

@@ -10,7 +10,7 @@ import { format } from "date-fns";
 
 // ✅ Correct Import Path
 // ✅ Use Named Import
-import { deleteCampaignAction } from "@/app/actions/admin/settings/affiliates/_services/campaign-service";
+import { deleteCampaignAction } from "@/app/actions/admin/settings/affiliate/_services/engagement-service";
 
 interface CampaignItem {
   id: string;

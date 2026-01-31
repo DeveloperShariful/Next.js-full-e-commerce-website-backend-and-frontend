@@ -5,27 +5,23 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
 import { db } from "@/lib/prisma";
 
-import * as statsService from "@/app/actions/admin/settings/affiliates/_services/stats-service";
-import * as accountService from "@/app/actions/admin/settings/affiliates/_services/account-service"; 
-import * as payoutService from "@/app/actions/admin/settings/affiliates/_services/payout-service";
-import * as configService from "@/app/actions/admin/settings/affiliates/_services/general-config-service";
-import * as tierService from "@/app/actions/admin/settings/affiliates/_services/tier-service";
-import * as creativeService from "@/app/actions/admin/settings/affiliates/_services/creative-service";
-import * as ruleEngineService from "@/app/actions/admin/settings/affiliates/_services/commition-rule-service";
-import * as contestService from "@/app/actions/admin/settings/affiliates/_services/contest-service";
-import * as campaignService from "@/app/actions/admin/settings/affiliates/_services/campaign-service";
-import * as announcementService from "@/app/actions/admin/settings/affiliates/_services/announcement-service";
-import * as networkService from "@/app/actions/admin/settings/affiliates/_services/network-service";
-import * as fraudService from "@/app/actions/admin/settings/affiliates/_services/fraud-service";
-import * as domainService from "@/app/actions/admin/settings/affiliates/_services/domain-service";
-import * as pixelService from "@/app/actions/admin/settings/affiliates/_services/pixel-service";
-import * as productRateService from "@/app/actions/admin/settings/affiliates/_services/product-rate-service";
-import * as kycService from "@/app/actions/admin/settings/affiliates/_services/kyc-service";
-import * as ledgerService from "@/app/actions/admin/settings/affiliates/_services/ledger-service";
-import * as analyticsService from "@/app/actions/admin/settings/affiliates/_services/analytics-service";
-import * as groupService from "@/app/actions/admin/settings/affiliates/_services/group-service";
-import * as tagService from "@/app/actions/admin/settings/affiliates/_services/tag-service";
-import * as couponService from "@/app/actions/admin/settings/affiliates/_services/coupon-service";
+import * as statsService from "@/app/actions/admin/settings/affiliate/_services/analytics-service";
+import * as accountService from "@/app/actions/admin/settings/affiliate/_services/account-service"; 
+import * as payoutService from "@/app/actions/admin/settings/affiliate/_services/payout-service";
+import * as configService from "@/app/actions/admin/settings/affiliate/_services/general-config-service";
+import * as tierService from "@/app/actions/admin/settings/affiliate/_services/tier-service";
+import * as marketingService from "@/app/actions/admin/settings/affiliate/_services/marketing-assets-service";
+import * as ruleEngineService from "@/app/actions/admin/settings/affiliate/_services/commition-rule-service";
+import * as engagementService from "@/app/actions/admin/settings/affiliate/_services/engagement-service";
+import * as networkService from "@/app/actions/admin/settings/affiliate/_services/mlm-network-service";
+import * as fraudService from "@/app/actions/admin/settings/affiliate/_services/fraud-service";
+import * as trackingService from "@/app/actions/admin/settings/affiliate/_services/pixel-domain-service";
+import * as productRateService from "@/app/actions/admin/settings/affiliate/_services/product-rate-service";
+import * as kycService from "@/app/actions/admin/settings/affiliate/_services/kyc-service";
+import * as ledgerService from "@/app/actions/admin/settings/affiliate/_services/ledger-service";
+import * as analyticsService from "@/app/actions/admin/settings/affiliate/_services/analytics-service";
+import * as groupService from "@/app/actions/admin/settings/affiliate/_services/group-service";
+import * as couponTagService from "@/app/actions/admin/settings/affiliate/_services/coupon-tag-service";
 import { serializePrismaData } from "@/lib/format-data"; 
 
 export const metadata = {
@@ -74,7 +70,7 @@ export default async function AffiliateMasterPage({
         const [usersData, groupsList, tagsList] = await Promise.all([
           accountService.getAffiliates(page, 20, params.status as any, search),
           groupService.getAllGroups(),
-          tagService.getAllTags() 
+          couponTagService.getAllTags() 
         ]);
         
         data.partners = {
@@ -99,19 +95,19 @@ export default async function AffiliateMasterPage({
         break;
 
       case "creatives":
-        data.creatives = await creativeService.getAllCreatives();
+        data.creatives = await marketingService.getAllCreatives();
         break;
 
       case "contests":
-        data.contests = await contestService.getContests();
+        data.contests = await engagementService.getContests();
         break;
 
       case "campaigns":
-        data.campaigns = await campaignService.getAllCampaigns(page, 20, search);
+        data.campaigns = await engagementService.getAllCampaigns(page, 20, search);
         break;
 
       case "announcements":
-        data.announcements = await announcementService.getAllAnnouncements(page, 20);
+        data.announcements = await marketingService.getAllAnnouncements(page, 20);
         break;
 
       case "network":
@@ -127,11 +123,11 @@ export default async function AffiliateMasterPage({
         break;
 
       case "domains":
-        data.domains = await domainService.getAllDomains();
+        data.domains = await trackingService.getAllDomains();
         break;
 
       case "pixels":
-        data.pixels = await pixelService.getAllPixels();
+        data.pixels = await trackingService.getAllPixels();
         break;
 
       case "product-rates":
@@ -151,10 +147,10 @@ export default async function AffiliateMasterPage({
         data.mlmConfig = await db.affiliateMLMConfig.findUnique({ where: { id: "mlm_config" } });
         break;
       case "tags":
-        data.tags = await tagService.getAllTags();
+        data.tags = await couponTagService.getAllTags();
         break;
       case "coupons":
-        data.coupons = await couponService.getAllAffiliateCoupons(); 
+        data.coupons = await couponTagService.getAllAffiliateCoupons(); 
         break;
     }
   } catch (error: any) {

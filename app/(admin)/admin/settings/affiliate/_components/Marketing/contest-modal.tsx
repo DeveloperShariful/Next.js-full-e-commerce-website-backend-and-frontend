@@ -9,7 +9,7 @@ import { X, Loader2, Save, Trophy } from "lucide-react";
 import { AffiliateContest } from "@prisma/client";
 
 // ✅ CORRECTED IMPORT
-import { upsertContestAction } from "@/app/actions/admin/settings/affiliates/_services/contest-service";
+import { upsertContestAction } from "@/app/actions/admin/settings/affiliate/_services/engagement-service";
 
 interface Props {
   isOpen: boolean;

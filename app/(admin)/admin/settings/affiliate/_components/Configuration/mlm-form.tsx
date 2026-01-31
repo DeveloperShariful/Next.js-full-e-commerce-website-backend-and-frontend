@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 // ✅ Correct Import Path
 // ✅ Use Named Import
-import { updateMlmConfigAction } from "@/app/actions/admin/settings/affiliates/_services/mlm-service";
+import { updateMlmConfigAction } from "@/app/actions/admin/settings/affiliate/_services/mlm-network-service";
 
 interface MLMFormValues {
   isEnabled: boolean;

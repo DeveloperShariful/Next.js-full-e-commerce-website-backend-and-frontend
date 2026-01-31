@@ -12,7 +12,7 @@ import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ Correct Import Path
 // ✅ Use Named Imports
-import { deleteContestAction, upsertContestAction } from "@/app/actions/admin/settings/affiliates/_services/contest-service";
+import { deleteContestAction, upsertContestAction } from "@/app/actions/admin/settings/affiliate/_services/engagement-service";
 
 interface Props {
   initialContests: AffiliateContest[];

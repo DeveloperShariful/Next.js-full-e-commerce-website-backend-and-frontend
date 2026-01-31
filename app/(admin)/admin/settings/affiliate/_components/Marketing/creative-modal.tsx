@@ -8,10 +8,7 @@ import { toast } from "sonner";
 import { X, Loader2, Save } from "lucide-react";
 import { AffiliateCreative, MediaType } from "@prisma/client";
 import { MediaPicker } from "@/components/media/media-picker"; 
-
-// ✅ Correct Import Path
-// ✅ Use Named Import
-import { upsertCreativeAction } from "@/app/actions/admin/settings/affiliates/_services/creative-service";
+import { upsertCreativeAction } from "@/app/actions/admin/settings/affiliate/_services/marketing-assets-service";
 
 interface Props {
   isOpen: boolean;

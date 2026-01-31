@@ -19,7 +19,7 @@ import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { 
   deleteGroupAction, 
   upsertGroupAction 
-} from "@/app/actions/admin/settings/affiliates/_services/group-service";
+} from "@/app/actions/admin/settings/affiliate/_services/group-service";
 
 import {
   DropdownMenu,

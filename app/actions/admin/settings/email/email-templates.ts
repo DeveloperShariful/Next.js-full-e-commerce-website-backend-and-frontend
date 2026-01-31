@@ -4,8 +4,9 @@
 
 import { db } from "@/lib/prisma";
 
+// ✅ UPDATED: Added all Enterprise Affiliate Triggers
 const DEFAULT_TEMPLATES = [
-    // --- ORDER & PAYMENT ---
+    // --- ORDER & PAYMENT (EXISTING) ---
     { slug: 'order_pending', name: 'Order Pending', triggerEvent: 'ORDER_PENDING', recipientType: 'customer', subject: 'Your Order #{order_number} is Pending', content: '<p>Thanks for your order. We have received it.</p>' },
     { slug: 'order_processing', name: 'Order Processing', triggerEvent: 'ORDER_PROCESSING', recipientType: 'customer', subject: 'We are processing Order #{order_number}', content: '<p>Your order is being processed.</p>' },
     { slug: 'order_packed', name: 'Order Packed', triggerEvent: 'ORDER_PACKED', recipientType: 'customer', subject: 'Order #{order_number} is Packed', content: '<p>Your order is packed and ready to ship.</p>' },
@@ -25,24 +26,26 @@ const DEFAULT_TEMPLATES = [
     { slug: 'fulfillment_partial', name: 'Partially Fulfilled', triggerEvent: 'FULFILLMENT_PARTIALLY_FULFILLED', recipientType: 'customer', subject: 'Items Partially Sent for #{order_number}', content: '<p>Some items have been sent.</p>' },
     { slug: 'fulfillment_returned', name: 'Shipment Returned', triggerEvent: 'FULFILLMENT_RETURNED', recipientType: 'customer', subject: 'Order #{order_number} Returned to Sender', content: '<p>We received your return package.</p>' },
 
-    // --- ADMIN NOTIFICATIONS ---
+    // --- ADMIN NOTIFICATIONS (EXISTING) ---
     { slug: 'admin_new_order', name: 'Admin: New Order', triggerEvent: 'ORDER_CREATED_ADMIN', recipientType: 'admin', subject: '[Admin] New Order #{order_number}', content: '<p>New order received from {customer_name}. Total: {total_amount}</p>' },
     { slug: 'admin_cancelled', name: 'Admin: Order Cancelled', triggerEvent: 'ADMIN_ORDER_CANCELLED', recipientType: 'admin', subject: '[Admin] Order #{order_number} Cancelled', content: '<p>Order #{order_number} was cancelled.</p>' },
     { slug: 'admin_refunded', name: 'Admin: Order Refunded', triggerEvent: 'ADMIN_PAYMENT_REFUNDED', recipientType: 'admin', subject: '[Admin] Refund Issued #{order_number}', content: '<p>A refund was issued for this order.</p>' },
     { slug: 'admin_returned', name: 'Admin: Item Returned', triggerEvent: 'ADMIN_FULFILLMENT_RETURNED', recipientType: 'admin', subject: '[Admin] Return Received #{order_number}', content: '<p>A shipment has been returned.</p>' },
     { slug: 'admin_payment_failed', name: 'Admin: Payment Failed', triggerEvent: 'ADMIN_PAYMENT_FAILED', recipientType: 'admin', subject: '[Admin] Payment Failed for Order #{order_number}', content: '<p>Payment failed for order #{order_number}. Customer: {customer_name}</p>' },
 
-    // --- AFFILIATE SYSTEM (ULTRA UPDATE) ---
+    // --- AFFILIATE SYSTEM (NEW ENTERPRISE TRIGGERS) ---
     { slug: 'affiliate_welcome', name: 'Affiliate Welcome', triggerEvent: 'AFFILIATE_WELCOME', recipientType: 'customer', subject: 'Welcome to the Affiliate Program', content: '<p>Hi {affiliate_name}, thanks for joining! Your application is currently under review.</p>' },
     { slug: 'affiliate_approved', name: 'Affiliate Approved', triggerEvent: 'AFFILIATE_APPROVED', recipientType: 'customer', subject: 'You are Approved!', content: '<p>Congrats {affiliate_name}! You can now start promoting and earning commissions.</p>' },
     { slug: 'affiliate_rejected', name: 'Affiliate Rejected', triggerEvent: 'AFFILIATE_REJECTED', recipientType: 'customer', subject: 'Affiliate Application Update', content: '<p>Hi {affiliate_name}, unfortunately, your application was not approved. Reason: {rejection_reason}</p>' },
-    { slug: 'commission_earned', name: 'Commission Earned', triggerEvent: 'COMMISSION_EARNED', recipientType: 'customer', subject: 'New Commission Earned!', content: '<p>You earned {commission_amount} from Order #{order_number}!</p>' },
+    { slug: 'referral_pending', name: 'New Referral Pending', triggerEvent: 'REFERRAL_PENDING', recipientType: 'customer', subject: 'New Commission Pending!', content: '<p>Great news! You have a new pending commission of {commission_amount} from Order #{order_number}. It will be available in {holding_period} days.</p>' },
+    { slug: 'commission_earned', name: 'Commission Approved', triggerEvent: 'COMMISSION_APPROVED', recipientType: 'customer', subject: 'Commission Approved!', content: '<p>Your commission of {amount} for Order #{order_id} has been approved and added to your balance.</p>' },
     { slug: 'payout_requested', name: 'Payout Requested', triggerEvent: 'PAYOUT_REQUESTED', recipientType: 'admin', subject: '[Admin] New Payout Request', content: '<p>{affiliate_name} requested a payout of {payout_amount}.</p>' },
     { slug: 'payout_processed', name: 'Payout Processed', triggerEvent: 'PAYOUT_PROCESSED', recipientType: 'customer', subject: 'Payout Sent', content: '<p>Hi {affiliate_name}, your payout of {payout_amount} has been processed successfully. Transaction ID: {transaction_id}</p>' },
     { slug: 'payout_rejected', name: 'Payout Rejected', triggerEvent: 'PAYOUT_REJECTED', recipientType: 'customer', subject: 'Payout Request Update', content: '<p>Your payout request for {payout_amount} was rejected. Reason: {rejection_reason}</p>' },
     { slug: 'tier_upgraded', name: 'Tier Upgraded', triggerEvent: 'TIER_UPGRADED', recipientType: 'customer', subject: 'Level Up! You are now {tier_name}', content: '<p>Congratulations! You have been upgraded to the {tier_name} tier. You will now enjoy higher commission rates!</p>' },
     { slug: 'kyc_verified', name: 'KYC Verified', triggerEvent: 'KYC_VERIFIED', recipientType: 'customer', subject: 'Identity Verification Successful', content: '<p>Hi {affiliate_name}, your document ({document_type}) has been verified successfully. You are now eligible for payouts.</p>' },
-    { slug: 'kyc_rejected', name: 'KYC Rejected', triggerEvent: 'KYC_REJECTED', recipientType: 'customer', subject: 'Action Required: Identity Verification Failed', content: '<p>Hi {affiliate_name}, your document ({document_type}) was rejected. <br/><strong>Reason:</strong> {rejection_reason}<br/>Please upload a valid document again.</p>' }
+    { slug: 'kyc_rejected', name: 'KYC Rejected', triggerEvent: 'KYC_REJECTED', recipientType: 'customer', subject: 'Action Required: Identity Verification Failed', content: '<p>Hi {affiliate_name}, your document ({document_type}) was rejected. <br/><strong>Reason:</strong> {rejection_reason}<br/>Please upload a valid document again.</p>' },
+    { slug: 'fraud_alert', name: 'Admin: Fraud Alert', triggerEvent: 'FRAUD_ALERT_ADMIN', recipientType: 'admin', subject: '[Alert] Suspicious Affiliate Activity', content: '<p>Affiliate {affiliate_name} has been flagged for {fraud_reason}. Risk Score: {risk_score}</p>' }
 ];
 
 export async function getEmailTemplates() {
@@ -59,7 +62,7 @@ export async function syncEmailTemplates() {
         for (const tmpl of DEFAULT_TEMPLATES) {
             await db.emailTemplate.upsert({
                 where: { triggerEvent: tmpl.triggerEvent },
-                update: {},
+                update: {}, // Don't overwrite if exists, users might have edited content
                 create: {
                     slug: tmpl.slug,
                     name: tmpl.name,

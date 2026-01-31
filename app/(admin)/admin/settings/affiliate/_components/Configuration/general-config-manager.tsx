@@ -10,9 +10,9 @@ import { Loader2, Save, Settings, AlertTriangle, Link as LinkIcon, DollarSign, S
 import { z } from "zod";
 
 // ✅ Correct Import Path
-import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliates/schemas";
-import { updateGeneralSettingsAction } from "@/app/actions/admin/settings/affiliates/_services/general-config-service";
-import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliates/types";
+import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliate/schemas";
+import { updateGeneralSettingsAction } from "@/app/actions/admin/settings/affiliate/_services/general-config-service";
+import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliate/types";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 

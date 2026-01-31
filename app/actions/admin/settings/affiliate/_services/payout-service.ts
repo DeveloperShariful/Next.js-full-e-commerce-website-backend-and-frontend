@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliates/_services/payout-service.ts
+// File: app/actions/admin/settings/affiliate/_services/payout-service.ts
 
 "use server";
 
@@ -59,10 +59,6 @@ export async function getPayouts(page: number = 1, limit: number = 20, status?: 
 // INTERNAL WALLET LOGIC (Merged)
 // =========================================
 
-/**
- * Automatically credit affiliate's wallet (Store Credit).
- * This logic was previously in wallet-service.ts
- */
 async function processStoreCreditPayout(
   payoutId: string, 
   userId: string, 
@@ -256,4 +252,36 @@ export async function rejectPayout(payoutId: string, reason: string) {
 
   revalidatePath("/admin/settings/affiliate/payouts");
   return { success: true };
+}
+
+export async function getInvoiceData(payoutId: string) {
+  const payout = await db.affiliatePayout.findUnique({
+    where: { id: payoutId },
+    include: {
+      affiliate: {
+        include: {
+          user: { select: { name: true, email: true, addresses: true } }
+        }
+      }
+    }
+  });
+
+  if (!payout) throw new Error("Payout not found");
+
+  const settings = await db.storeSettings.findUnique({ where: { id: "settings" } });
+
+  // Return clean JSON for Client Component to render PDF
+  return {
+    invoiceNo: `INV-${payout.id.substring(0, 8).toUpperCase()}`,
+    date: payout.createdAt.toISOString().split("T")[0],
+    storeName: settings?.storeName || "GoBike Store",
+    affiliateName: payout.affiliate.user.name,
+    affiliateEmail: payout.affiliate.user.email,
+    amount: payout.amount.toNumber(),
+    method: payout.method,
+    status: payout.status,
+    items: [
+        { description: "Affiliate Commission Payout", amount: payout.amount.toNumber() }
+    ]
+  };
 }

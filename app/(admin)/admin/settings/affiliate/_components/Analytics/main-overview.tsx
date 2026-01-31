@@ -2,7 +2,7 @@
 
 "use client";
 
-import { DashboardKPI, ChartDataPoint } from "@/app/actions/admin/settings/affiliates/types";
+import { DashboardKPI, ChartDataPoint } from "@/app/actions/admin/settings/affiliate/types";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DollarSign, Users, MousePointer, Wallet, AlertCircle, ArrowUpRight } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";

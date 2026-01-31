@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // ✅ CORRECTED IMPORT
-import { rejectDocumentAction, verifyDocumentAction } from "@/app/actions/admin/settings/affiliates/_services/kyc-service";
+import { rejectDocumentAction, verifyDocumentAction } from "@/app/actions/admin/settings/affiliate/_services/kyc-service";
 
 interface DocumentWithUser extends AffiliateDocument {
   affiliate: {

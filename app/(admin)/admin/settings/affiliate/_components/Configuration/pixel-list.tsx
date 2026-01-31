@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 // ✅ CORRECTED IMPORT
 // ✅ Use Named Imports
-import { deletePixelAction, togglePixelStatusAction } from "@/app/actions/admin/settings/affiliates/_services/pixel-service";
+import { deletePixelAction, togglePixelStatusAction } from "@/app/actions/admin/settings/affiliate/_services/pixel-domain-service";
 
 interface PixelWithUser extends AffiliatePixel {
   affiliate: {

@@ -10,7 +10,7 @@ import TierModal from "./tier-modal";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ CORRECTED IMPORT
-import { deleteTierAction } from "@/app/actions/admin/settings/affiliates/_services/tier-service";
+import { deleteTierAction } from "@/app/actions/admin/settings/affiliate/_services/tier-service";
 
 interface TierWithCount extends AffiliateTier {
   _count?: { affiliates: number };

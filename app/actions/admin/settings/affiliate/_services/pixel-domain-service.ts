@@ -1,15 +1,103 @@
-// File: app/actions/admin/settings/affiliate/_services/domain-service.ts
+// File: app/actions/admin/settings/affiliate/_services/pixel-domain-service.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { ActionResponse } from "../types";
-import crypto from "crypto";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
+import { ActionResponse } from "../types";
+import { protectAction } from "../permission-service"; // ✅ Security
+import crypto from "crypto";
 import dns from "dns/promises"; 
 import { z } from "zod";
-import { protectAction } from "../permission-service"; // ✅ Security
+
+// ==============================================================================
+// SECTION 1: PIXEL MANAGEMENT (Merged from pixel-service.ts)
+// ==============================================================================
+
+// --- READ PIXELS ---
+export async function getAllPixels() {
+  await protectAction("MANAGE_CONFIGURATION");
+
+  return await db.affiliatePixel.findMany({
+    include: {
+      affiliate: {
+        select: {
+          user: { select: { name: true, email: true } },
+          slug: true
+        }
+      }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+// --- CREATE PIXEL ---
+export async function createPixelAction(data: Prisma.AffiliatePixelCreateInput): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_CONFIGURATION");
+
+    const pixel = await db.affiliatePixel.create({ data });
+    
+    await auditService.log({
+      userId: actor.id,
+      action: "CREATE_PIXEL",
+      entity: "AffiliatePixel",
+      entityId: pixel.id,
+      newData: data
+    });
+
+    revalidatePath("/admin/settings/affiliate/pixels");
+    return { success: true, message: "Tracking pixel added." };
+  } catch (error: any) {
+    return { success: false, message: "Failed to create pixel." };
+  }
+}
+
+// --- TOGGLE PIXEL STATUS ---
+export async function togglePixelStatusAction(id: string, isEnabled: boolean): Promise<ActionResponse> {
+  try {
+    await protectAction("MANAGE_CONFIGURATION");
+
+    await db.affiliatePixel.update({
+      where: { id },
+      data: { isEnabled }
+    });
+
+    revalidatePath("/admin/settings/affiliate/pixels");
+    return { success: true, message: `Pixel ${isEnabled ? "enabled" : "disabled"}.` };
+  } catch (error: any) {
+    return { success: false, message: "Failed to update status." };
+  }
+}
+
+// --- DELETE PIXEL ---
+export async function deletePixelAction(id: string): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_CONFIGURATION");
+
+    await db.affiliatePixel.delete({
+      where: { id }
+    });
+
+    await auditService.log({
+      userId: actor.id,
+      action: "DELETE_PIXEL",
+      entity: "AffiliatePixel",
+      entityId: id
+    });
+
+    revalidatePath("/admin/settings/affiliate/pixels");
+    return { success: true, message: "Pixel deleted." };
+  } catch (error: any) {
+    return { success: false, message: "Failed to delete pixel." };
+  }
+}
+
+// ==============================================================================
+// SECTION 2: DOMAIN MANAGEMENT (Merged from domain-service.ts)
+// ==============================================================================
 
 const domainSchema = z.object({
   affiliateId: z.string().min(1, "Affiliate ID is required"),
@@ -18,10 +106,7 @@ const domainSchema = z.object({
     .regex(/^(?!:\/\/)([a-zA-Z0-9-_]+\.)*[a-zA-Z0-9][a-zA-Z0-9-_]+\.[a-zA-Z]{2,11}?$/, "Invalid domain format (e.g. shop.example.com)"),
 });
 
-// =========================================
-// READ OPERATIONS
-// =========================================
-
+// --- READ DOMAINS ---
 export async function getAllDomains() {
   try {
     await protectAction("MANAGE_CONFIGURATION");
@@ -42,10 +127,7 @@ export async function getAllDomains() {
   }
 }
 
-// =========================================
-// WRITE OPERATIONS
-// =========================================
-
+// --- ADD DOMAIN ---
 export async function addDomainAction(data: z.infer<typeof domainSchema>): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -89,6 +171,7 @@ export async function addDomainAction(data: z.infer<typeof domainSchema>): Promi
   }
 }
 
+// --- VERIFY DOMAIN ---
 export async function verifyDomainAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -134,6 +217,7 @@ export async function verifyDomainAction(id: string): Promise<ActionResponse> {
   }
 }
 
+// --- DELETE DOMAIN ---
 export async function deleteDomainAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");

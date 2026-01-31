@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { NetworkNode } from "@/app/actions/admin/settings/affiliates/types";
+import { NetworkNode } from "@/app/actions/admin/settings/affiliate/types";
 import { ChevronRight, ChevronDown, User, Users, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";

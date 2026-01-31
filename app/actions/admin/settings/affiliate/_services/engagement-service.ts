@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/contest-service.ts
+//File: app/actions/admin/settings/affiliate/_services/engagement-service.ts
 
 "use server";
 
@@ -10,6 +10,10 @@ import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service"; // ✅ Security
 import { auditService } from "@/lib/services/audit-service";
+
+// =========================================
+// SECTION 1: CONTESTS (Competitions)
+// =========================================
 
 const contestSchema = z.object({
   id: z.string().optional(),
@@ -28,9 +32,7 @@ const contestSchema = z.object({
 
 type ContestInput = z.infer<typeof contestSchema>;
 
-// =========================================
-// READ OPERATIONS
-// =========================================
+// --- READ OPERATIONS ---
 
 export async function getContests() {
   try {
@@ -112,9 +114,7 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
   )();
 }
 
-// =========================================
-// WRITE OPERATIONS (Protected)
-// =========================================
+// --- WRITE OPERATIONS ---
 
 export async function upsertContestAction(data: ContestInput): Promise<ActionResponse> {
   try {
@@ -185,5 +185,83 @@ export async function deleteContestAction(id: string): Promise<ActionResponse> {
     return { success: true, message: "Contest deleted." };
   } catch (error) {
     return { success: false, message: "Failed to delete contest." };
+  }
+}
+
+// =========================================
+// SECTION 2: CAMPAIGNS (Tracking)
+// =========================================
+
+// --- READ OPERATIONS ---
+
+export async function getAllCampaigns(page: number = 1, limit: number = 20, search?: string) {
+  await protectAction("VIEW_ANALYTICS");
+
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.AffiliateCampaignWhereInput = search ? {
+    OR: [
+      { name: { contains: search, mode: "insensitive" } },
+      { affiliate: { user: { name: { contains: search, mode: "insensitive" } } } }
+    ]
+  } : {};
+
+  const [total, data] = await Promise.all([
+    db.affiliateCampaign.count({ where }),
+    db.affiliateCampaign.findMany({
+      where,
+      take: limit,
+      skip,
+      orderBy: { revenue: "desc" }, 
+      include: {
+        affiliate: {
+          select: {
+            slug: true,
+            user: { select: { name: true, image: true, email: true } }
+          }
+        },
+        _count: {
+          select: { links: true } 
+        }
+      }
+    })
+  ]);
+
+  const formattedData = data.map(c => ({
+      ...c,
+      revenue: DecimalMath.toNumber(c.revenue)
+  }));
+
+  return { 
+    campaigns: formattedData, 
+    total, 
+    totalPages: Math.ceil(total / limit) 
+  };
+}
+
+// --- WRITE OPERATIONS ---
+
+export async function deleteCampaignAction(id: string): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_PARTNERS"); // Requires manager or admin
+
+    if (!id) return { success: false, message: "Campaign ID is required." };
+
+    const deleted = await db.affiliateCampaign.delete({
+      where: { id }
+    });
+
+    await auditService.log({
+      userId: actor.id,
+      action: "DELETE_CAMPAIGN",
+      entity: "AffiliateCampaign",
+      entityId: id,
+      oldData: { name: deleted.name, affiliateId: deleted.affiliateId }
+    });
+
+    revalidatePath("/admin/settings/affiliate/campaigns");
+    return { success: true, message: "Campaign deleted successfully." };
+  } catch (error: any) {
+    return { success: false, message: "Failed to delete campaign." };
   }
 }

@@ -9,7 +9,7 @@ import { X, Loader2, Save, Plus, Calculator  } from "lucide-react";
 import { AffiliateCommissionRule } from "@prisma/client";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
-import { upsertRuleAction } from "@/app/actions/admin/settings/affiliates/_services/commition-rule-service";
+import { upsertRuleAction } from "@/app/actions/admin/settings/affiliate/_services/commition-rule-service";
 
 interface Props {
   isOpen: boolean;

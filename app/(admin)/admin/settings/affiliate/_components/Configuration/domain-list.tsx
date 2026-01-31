@@ -12,7 +12,7 @@ import {
   addDomainAction, 
   deleteDomainAction, 
   verifyDomainAction 
-} from "@/app/actions/admin/settings/affiliates/_services/domain-service";
+} from "@/app/actions/admin/settings/affiliate/_services/pixel-domain-service";
 
 interface DomainWithAffiliate extends AffiliateDomain {
   affiliate: {

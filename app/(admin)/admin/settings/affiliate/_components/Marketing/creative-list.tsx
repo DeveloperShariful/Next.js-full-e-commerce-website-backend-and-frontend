@@ -8,9 +8,7 @@ import { Edit, Trash2, Image as ImageIcon, Link as LinkIcon, Copy, Plus, Externa
 import { toast } from "sonner";
 
 import CreativeModal from "./creative-modal";
-// ✅ Correct Import Path
-// ✅ Use Named Import
-import { deleteCreativeAction } from "@/app/actions/admin/settings/affiliates/_services/creative-service";
+import { deleteCreativeAction } from "@/app/actions/admin/settings/affiliate/_services/marketing-assets-service";
 
 interface Props {
   initialCreatives: AffiliateCreative[];

@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { auditService } from "@/lib/services/audit-service";
-import { processDailyJobs } from "@/app/actions/admin/settings/affiliates/cron-service";
+import { processDailyJobs } from "@/app/actions/admin/settings/affiliate/cron-service";
 
 export const dynamic = 'force-dynamic'; // Prevent caching
 

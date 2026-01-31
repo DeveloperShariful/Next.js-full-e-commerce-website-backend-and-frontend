@@ -7,7 +7,7 @@ import { Ticket, Plus, Trash2, Loader2, X, User, Save, DollarSign, Percent } fro
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { createAndLinkCouponAction, unlinkCouponAction } from "@/app/actions/admin/settings/affiliates/_services/coupon-service";
+import { createAndLinkCouponAction, unlinkCouponAction } from "@/app/actions/admin/settings/affiliate/_services/coupon-tag-service";
 
 interface Coupon {
   id: string;

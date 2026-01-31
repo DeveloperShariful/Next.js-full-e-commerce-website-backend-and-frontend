@@ -10,7 +10,7 @@ import { AffiliateTier, CommissionType } from "@prisma/client";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // ✅ CORRECTED IMPORT
-import { upsertTierAction } from "@/app/actions/admin/settings/affiliates/_services/tier-service";
+import { upsertTierAction } from "@/app/actions/admin/settings/affiliate/_services/tier-service";
 
 interface Props {
   isOpen: boolean;

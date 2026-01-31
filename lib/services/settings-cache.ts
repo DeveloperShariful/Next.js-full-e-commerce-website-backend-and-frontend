@@ -1,4 +1,4 @@
-//lib/services/settings-cache.ts
+// File: lib/services/settings-cache.ts
 
 import { db } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
@@ -22,6 +22,7 @@ export const getCachedAffiliateSettings = unstable_cache(
       isActive: genConfig.enableAffiliateProgram ?? false,
       programName: affConfig.programName || "Affiliate Program",
       commissionRate: affConfig.commissionRate ?? 10,
+      commissionType: affConfig.commissionType || "PERCENTAGE", 
       excludeShipping: affConfig.excludeShipping ?? true,
       excludeTax: affConfig.excludeTax ?? true,
       cookieDuration: affConfig.cookieDuration ?? 30,

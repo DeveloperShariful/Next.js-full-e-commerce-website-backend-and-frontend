@@ -39,14 +39,22 @@ export async function processPendingReferrals() {
 
   const results = await Promise.allSettled(readyReferrals.map(async (ref) => {
     return await db.$transaction(async (tx) => {
+        
+        const affiliate = await tx.affiliateAccount.findUnique({
+            where: { id: ref.affiliateId! }
+        });
 
-        const updatedAffiliate = await tx.affiliateAccount.update({
-          where: { id: ref.affiliateId },
+        if (!affiliate) throw new Error(`Affiliate ${ref.affiliateId} not found`);
+
+        const balanceBefore = affiliate.balance;
+        const balanceAfter = DecimalMath.add(balanceBefore, ref.commissionAmount);
+
+        await tx.affiliateAccount.update({
+          where: { id: ref.affiliateId! },
           data: {
-            balance: { increment: ref.commissionAmount },
+            balance: balanceAfter,
             totalEarnings: { increment: ref.commissionAmount }
-          },
-          select: { id: true, balance: true, userId: true, user: { select: { email: true } } }
+          }
         });
 
         await tx.referral.update({
@@ -57,12 +65,9 @@ export async function processPendingReferrals() {
           }
         });
 
-        const balanceAfter = updatedAffiliate.balance;
-        const balanceBefore = DecimalMath.sub(balanceAfter, ref.commissionAmount);
-
         await tx.affiliateLedger.create({
           data: {
-            affiliateId: ref.affiliateId,
+            affiliateId: ref.affiliateId!,
             type: "COMMISSION",
             amount: ref.commissionAmount,
             balanceBefore: balanceBefore, 
@@ -72,22 +77,26 @@ export async function processPendingReferrals() {
           }
         });
 
-        await tx.notificationQueue.create({
-            data: {
-                channel: "EMAIL",
-                recipient: updatedAffiliate.user.email,
-                templateSlug: "COMMISSION_APPROVED",
-                status: "PENDING",
-                userId: updatedAffiliate.userId,
-                content: "", 
-                metadata: {
-                    amount: ref.commissionAmount.toString(),
-                    order_id: ref.orderId
-                }
-            }
-        });
+        const user = await tx.user.findUnique({ where: { id: affiliate.userId } });
 
-        return { ref, updatedAffiliate };
+        if (user?.email) {
+            await tx.notificationQueue.create({
+                data: {
+                    channel: "EMAIL",
+                    recipient: user.email,
+                    templateSlug: "COMMISSION_APPROVED",
+                    status: "PENDING",
+                    userId: affiliate.userId,
+                    content: "", 
+                    metadata: {
+                        amount: ref.commissionAmount.toString(),
+                        order_id: ref.orderId
+                    }
+                }
+            });
+        }
+
+        return { refId: ref.id, status: "PROCESSED" };
     });
   }));
 
@@ -97,7 +106,6 @@ export async function processPendingReferrals() {
         errors: failed.map((f:any) => f.reason?.message).slice(0, 5) 
       });
   }
-  
 }
 
 export async function runTierUpgrades() {
@@ -136,7 +144,7 @@ export async function runTierUpgrades() {
                         templateSlug: "TIER_UPGRADED",
                         status: "PENDING",
                         userId: affiliate.userId,
-                        content: "", // Required field
+                        content: "", 
                         metadata: { 
                             affiliate_name: affiliate.user.name, 
                             tier_name: eligibleTier.name 
@@ -152,7 +160,6 @@ export async function runTierUpgrades() {
 }
 
 export async function runFraudAnalysis() {
-
   const activeAffiliates = await db.affiliateClick.findMany({
     where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
     select: { affiliateId: true },

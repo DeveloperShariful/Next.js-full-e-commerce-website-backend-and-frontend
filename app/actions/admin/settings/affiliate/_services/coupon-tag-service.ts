@@ -156,3 +156,74 @@ export async function deleteTagAction(id: string): Promise<ActionResponse> {
     return { success: false, message: "Failed to delete tag." };
   }
 }
+
+export async function updateCouponAction(
+  id: string,
+  code: string,
+  value: number,
+  type: "PERCENTAGE" | "FIXED_AMOUNT",
+  affiliateId?: string
+): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_PARTNERS");
+
+    if (code.length < 3) return { success: false, message: "Code too short" };
+
+    // Check uniqueness (excluding self)
+    const exists = await db.discount.findFirst({
+      where: { 
+        code: code.toUpperCase(), 
+        id: { not: id } 
+      }
+    });
+    
+    if (exists) return { success: false, message: "Coupon code already exists" };
+
+    await db.discount.update({
+      where: { id },
+      data: {
+        code: code.toUpperCase(),
+        type: type,
+        value: DecimalMath.toDecimal(value),
+        affiliateId: affiliateId && affiliateId.trim() !== "" ? affiliateId : null,
+        description: affiliateId ? `Affiliate Exclusive` : `General Coupon`,
+      }
+    });
+
+    await auditService.log({
+      userId: actor.id,
+      action: "UPDATE_COUPON",
+      entity: "Discount",
+      entityId: id,
+      newData: { code, value, type, affiliateId }
+    });
+
+    revalidatePath("/admin/settings/affiliate");
+    return { success: true, message: "Coupon updated successfully." };
+
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+}
+
+// ✅ NEW: Search affiliates for dropdown
+export async function searchAffiliatesForDropdown(query: string) {
+  await protectAction("MANAGE_PARTNERS");
+  
+  return await db.affiliateAccount.findMany({
+    where: {
+      OR: [
+        { user: { name: { contains: query, mode: "insensitive" } } },
+        { user: { email: { contains: query, mode: "insensitive" } } },
+        { slug: { contains: query, mode: "insensitive" } }
+      ],
+      status: "ACTIVE"
+    },
+    take: 5,
+    select: {
+      id: true,
+      slug: true,
+      user: { select: { name: true, email: true } }
+    }
+  });
+}

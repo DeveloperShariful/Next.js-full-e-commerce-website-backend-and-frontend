@@ -3,16 +3,12 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service"; 
 import { MediaType } from "@prisma/client";
-
-// =========================================
-// SECTION 1: ANNOUNCEMENTS
-// =========================================
 
 const announcementSchema = z.object({
   title: z.string().min(3),
@@ -25,7 +21,20 @@ const announcementSchema = z.object({
   expiresAt: z.date().optional().nullable(),
 });
 
-// --- READ OPERATIONS ---
+const creativeSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().min(3, "Title is required."),
+  type: z.nativeEnum(MediaType).default("IMAGE"),
+  url: z.string().url("Must be a valid image/resource URL."),
+  targetUrl: z.string().url("Must be a valid destination URL.").optional().or(z.literal("")),
+  width: z.coerce.number().optional(),
+  height: z.coerce.number().optional(),
+  isActive: z.boolean().default(true),
+  description: z.string().optional(),
+});
+
+type CreativeInput = z.infer<typeof creativeSchema>;
+
 export async function getAllAnnouncements(page: number = 1, limit: number = 20) {
   await protectAction("MANAGE_CONFIGURATION");
 
@@ -51,7 +60,6 @@ export async function getAllAnnouncements(page: number = 1, limit: number = 20) 
   };
 }
 
-// --- WRITE OPERATIONS ---
 export async function createAnnouncementAction(data: z.infer<typeof announcementSchema>): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -129,25 +137,6 @@ export async function toggleAnnouncementStatusAction(id: string, isActive: boole
   }
 }
 
-// =========================================
-// SECTION 2: CREATIVES (Banners/Assets)
-// =========================================
-
-const creativeSchema = z.object({
-  id: z.string().optional(),
-  title: z.string().min(3, "Title is required."),
-  type: z.nativeEnum(MediaType).default("IMAGE"),
-  url: z.string().url("Must be a valid image/resource URL."),
-  targetUrl: z.string().url("Must be a valid destination URL.").optional().or(z.literal("")),
-  width: z.coerce.number().optional(),
-  height: z.coerce.number().optional(),
-  isActive: z.boolean().default(true),
-  description: z.string().optional(),
-});
-
-type CreativeInput = z.infer<typeof creativeSchema>;
-
-// --- READ OPERATIONS ---
 export async function getAllCreatives() {
   try {
     await protectAction("MANAGE_CONFIGURATION"); 
@@ -165,7 +154,6 @@ export async function getAllCreatives() {
   }
 }
 
-// --- WRITE OPERATIONS ---
 export async function upsertCreativeAction(data: CreativeInput): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -186,22 +174,25 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
       description: payload.description || null,
     };
 
+    let entityId = payload.id;
+
     if (payload.id) {
       await db.affiliateCreative.update({
         where: { id: payload.id },
         data: dbPayload,
       });
     } else {
-      await db.affiliateCreative.create({
+      const created = await db.affiliateCreative.create({
         data: dbPayload,
       });
+      entityId = created.id;
     }
 
     await auditService.log({
       userId: actor.id,
       action: payload.id ? "UPDATE_CREATIVE" : "CREATE_CREATIVE",
       entity: "AffiliateCreative",
-      entityId: payload.id || "NEW",
+      entityId: entityId || "NEW",
       newData: dbPayload
     });
 
@@ -232,5 +223,27 @@ export async function deleteCreativeAction(id: string): Promise<ActionResponse> 
     return { success: true, message: "Asset deleted successfully." };
   } catch (error) {
     return { success: false, message: "Failed to delete asset." };
+  }
+}
+
+export async function trackCreativeUsageAction(creativeId: string, affiliateId: string) {
+  try {
+    await db.affiliateCreativeUsage.create({
+      data: {
+        creativeId,
+        affiliateId,
+        copiedAt: new Date()
+      }
+    });
+    
+    await db.affiliateCreative.update({
+      where: { id: creativeId },
+      data: { usageCount: { increment: 1 } }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to track usage", error);
+    return { success: false };
   }
 }

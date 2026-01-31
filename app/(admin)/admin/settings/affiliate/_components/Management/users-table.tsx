@@ -9,24 +9,21 @@ import {
   ChevronRight, ArrowUpDown, Tag, CreditCard, Ticket, 
   Copy, ExternalLink, Calendar, Trophy, Mail, 
   AlertTriangle, DollarSign, Briefcase, Eye, X, UserCheck, UserX,
-  Percent, Layers
+  Percent, Layers, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-
-// ✅ Type Import (Path Fixed)
 import { AffiliateUserTableItem } from "@/app/actions/admin/settings/affiliate/types";
-
-// ✅ Server Actions Import (Named Imports to fix Build Error)
 import { 
   approveAffiliateAction, 
   rejectAffiliateAction, 
   bulkStatusAction, 
   bulkGroupAction, 
-  bulkTagAction ,
+  bulkTagAction,
   updateCommissionAction
 } from "@/app/actions/admin/settings/affiliate/_services/account-service";
+import { createAdjustmentAction } from "@/app/actions/admin/settings/affiliate/_services/ledger-service";
 
 import {
   DropdownMenu,
@@ -48,7 +45,7 @@ interface Props {
   currentPage: number;
   groups?: { id: string, name: string }[];
   tags?: { id: string, name: string }[];
-  defaultRate?: number;
+  defaultRate?: number | null;
   defaultType?: "PERCENTAGE" | "FIXED";
 }
 
@@ -66,18 +63,18 @@ export default function AffiliateUsersTable({
   currentPage, 
   groups = [], 
   tags = [] ,
-  defaultRate ,
-  defaultType 
+  defaultRate = 10,
+  defaultType = "PERCENTAGE"
 }: Props) {
   // --- Core Hooks ---
-  const { symbol } = useGlobalStore(); 
-  const currencySymbol = symbol || ""; 
+  const { symbol, formatPrice } = useGlobalStore(); 
+  const currencySymbol = symbol || "$"; 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { formatPrice ,affiliate } = useGlobalStore();
   const [isPending, startTransition] = useTransition();
   const [editingCommissionUser, setEditingCommissionUser] = useState<AffiliateUserTableItem | null>(null);
+  const [payingUser, setPayingUser] = useState<AffiliateUserTableItem | null>(null);
   // --- Local State ---
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionType, setBulkActionType] = useState<string>("");
@@ -260,39 +257,41 @@ export default function AffiliateUsersTable({
 
   // --- Helper: Dynamic Commission Display ---
   const getCommissionDisplay = (user: AffiliateUserTableItem) => {
-
+    // 1. Custom Override (Highest Priority)
     if (user.commissionRate !== null && user.commissionRate !== undefined) {
         return { 
             main: user.commissionType === "FIXED" 
                 ? `${currencySymbol}${user.commissionRate}` 
                 : `${user.commissionRate}%`, 
-            sub: "Coustom rate", 
+            sub: "Custom Rate", 
             isDefault: false,
             isCustom: true 
         };
     }
+    // 2. Group Override
     if (user.groupName && user.groupName !== "No Group" && user.groupRate) {
         return { 
             main: `${user.groupRate}%`, 
-            sub: `${user.groupName} (Group)`, 
+            sub: `${user.groupName}`, 
             isDefault: false 
         };
     }
+    // 3. Tier Override
     if (user.tierName && user.tierName !== "Default" && user.tierRate) {
         return { 
             main: user.tierType === "FIXED" 
                 ? `${currencySymbol}${user.tierRate}` 
                 : `${user.tierRate}%`,
-            sub: `${user.tierName} (Tier)`, 
+            sub: `${user.tierName}`, 
             isDefault: false 
         };
     }
+    // 4. Global Default (Lowest Priority)
     return {
-        
         main: defaultType === "FIXED" 
             ? `${currencySymbol}${defaultRate}` 
             : `${defaultRate}%`,
-        sub: "Store Setting",
+        sub: "Global Default",
         isDefault: true
     };
   };
@@ -631,13 +630,15 @@ export default function AffiliateUsersTable({
                           <DropdownMenuItem onClick={() => openDetails(user)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50">
                             <Eye className="w-3.5 h-3.5 mr-2 text-gray-500" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toast.info("Feature coming soon: Pay Affiliate")} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50">
-                            <CreditCard className="w-3.5 h-3.5 mr-2 text-gray-500" /> Pay Balance
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setEditingCommissionUser(user); }} 
                             className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50"
 >
                           <Percent className="w-3.5 h-3.5 mr-2 text-gray-500" /> Set Commission Rate
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem onClick={() => setPayingUser(user)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50"
+>
+                          <CreditCard className="w-3.5 h-3.5 mr-2 text-gray-500" /> Pay / Bonus
                           </DropdownMenuItem>
                           
                           <DropdownMenuSeparator />
@@ -703,13 +704,16 @@ export default function AffiliateUsersTable({
         isOpen={!!editingCommissionUser}
         onClose={() => setEditingCommissionUser(null)}
         user={editingCommissionUser}
+        symbol={currencySymbol}
        />
-
-      
+       <PaymentModal 
+        isOpen={!!payingUser}
+        onClose={() => setPayingUser(null)}
+        user={payingUser}
+        symbol={currencySymbol}
+        />
 
     </div>
-
-    
   );
 }
 
@@ -775,13 +779,9 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
-            {/* Backdrop */}
             <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] transition-opacity animate-in fade-in" onClick={onClose} />
-            
-            {/* Drawer Panel */}
             <div className="relative w-full max-w-lg bg-white h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col border-l border-gray-200">
                 
-                {/* Header */}
                 <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-white border-2 border-white shadow-md p-0.5 overflow-hidden">
@@ -808,10 +808,7 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                     </button>
                 </div>
 
-                {/* Body */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-white">
-                    
-                    {/* Stat Cards */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="p-5 bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-blue-100 shadow-sm">
                             <p className="text-xs text-blue-600 font-bold uppercase tracking-wider">Current Balance</p>
@@ -825,7 +822,6 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                         </div>
                     </div>
 
-                    {/* Detailed Info */}
                     <div className="space-y-4">
                         <h3 className="text-sm font-bold text-gray-900 border-b pb-2 uppercase tracking-wide">Program Details</h3>
                         <div className="grid grid-cols-2 gap-y-6 gap-x-4 text-sm">
@@ -845,12 +841,11 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                                   <p className="text-[10px] text-gray-400 mt-1">Use this ID when manually assigning coupons or rates.</p>
                                 </div>
 
-                                <p className="text-xs text-gray-500 font-medium uppercase mb-1">Affiliate Slug</p>
+                                <p className="text-xs text-gray-500 font-medium uppercase mb-1 mt-4">Affiliate Slug</p>
                                 <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 w-fit">
                                     <span className="font-mono text-gray-900 font-bold">/{user.slug}</span>
                                     <Copy className="w-3 h-3 text-gray-400 cursor-pointer hover:text-black" onClick={() => toast.success("Slug copied")} />
                                 </div>
-                                 
                             </div>
 
                             <div>
@@ -875,7 +870,6 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                         </div>
                     </div>
 
-                    {/* Registration Notes */}
                     {user.registrationNotes && (
                         <div className="space-y-2">
                             <h3 className="text-sm font-bold text-gray-900 border-b pb-2 uppercase tracking-wide">Application Note</h3>
@@ -887,7 +881,6 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                         </div>
                     )}
 
-                    {/* Tags */}
                     <div className="space-y-2">
                         <h3 className="text-sm font-bold text-gray-900 border-b pb-2 uppercase tracking-wide">System Tags</h3>
                         <div className="flex flex-wrap gap-2">
@@ -903,7 +896,6 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
 
                 </div>
 
-                {/* Footer Actions */}
                 <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-4">
                     <button className="flex-1 py-3 border border-gray-300 bg-white rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors shadow-sm text-gray-700 flex items-center justify-center gap-2">
                         <Briefcase className="w-4 h-4" /> Edit Profile
@@ -917,18 +909,17 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
     );
 }
 
-function CommissionModal({ isOpen, onClose, user }: any) {
+function CommissionModal({ isOpen, onClose, user, symbol }: any) {
     const [isPending, startTransition] = useTransition();
     const [rate, setRate] = useState(user?.commissionRate || "");
     const [type, setType] = useState(user?.commissionType || "PERCENTAGE");
-    const [useDefault, setUseDefault] = useState(!user?.commissionRate); // If null, use default
+    const [useDefault, setUseDefault] = useState(!user?.commissionRate); 
 
     if (!isOpen || !user) return null;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         startTransition(async () => {
-            // If "Use Default" is checked, sending null will make it fallback to Tier/Group
             const finalRate = useDefault ? null : Number(rate);
             const res = await updateCommissionAction(user.id, finalRate, type);
             
@@ -983,21 +974,26 @@ function CommissionModal({ isOpen, onClose, user }: any) {
                                         onClick={() => setType("FIXED")}
                                         className={cn("py-2 text-xs font-bold rounded border", type === "FIXED" ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200")}
                                     >
-                                        Fixed Amount ($)
+                                        Fixed Amount ({symbol})
                                     </button>
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-gray-700 uppercase">Rate Value</label>
-                                <input 
-                                    type="number" 
-                                    step="0.01" 
-                                    value={rate} 
-                                    onChange={(e) => setRate(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none" 
-                                    placeholder="e.g. 15"
-                                />
+                                <div className="relative">
+                                    <input 
+                                        type="number" 
+                                        step="0.01" 
+                                        value={rate} 
+                                        onChange={(e) => setRate(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none" 
+                                        placeholder="e.g. 15"
+                                    />
+                                    <span className="absolute right-3 top-2 text-gray-400 text-sm font-bold">
+                                        {type === "PERCENTAGE" ? "%" : symbol}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1009,6 +1005,118 @@ function CommissionModal({ isOpen, onClose, user }: any) {
                     >
                         {isPending && <Loader2 className="w-4 h-4 animate-spin"/>} Save Changes
                     </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function PaymentModal({ isOpen, onClose, user, symbol }: any) {
+    const [isPending, startTransition] = useTransition();
+    const [amount, setAmount] = useState("");
+    const [note, setNote] = useState("");
+    const [type, setType] = useState<"BONUS" | "ADJUSTMENT">("BONUS"); // BONUS = Give Money, ADJUSTMENT = Deduct/Pay
+
+    if (!isOpen || !user) return null;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!amount || !note) return toast.error("Amount and Note are required");
+
+        startTransition(async () => {
+            // ADJUSTMENT acts as a Manual Payout (Debit)
+            // BONUS acts as a Reward (Credit)
+            const res = await createAdjustmentAction(user.id, Number(amount), note, type);
+            
+            if (res.success) {
+                toast.success(type === "BONUS" ? "Bonus Credited" : "Payment Recorded");
+                onClose();
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="p-5 border-b bg-gray-50 flex justify-between items-center">
+                    <div>
+                        <h3 className="font-bold text-gray-900">Manage Balance</h3>
+                        <p className="text-xs text-gray-500">Transaction for {user.name}</p>
+                    </div>
+                    <button onClick={onClose}><X className="w-5 h-5 text-gray-400 hover:text-black"/></button>
+                </div>
+                
+                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                    
+                    {/* Transaction Type Selector */}
+                    <div className="grid grid-cols-2 gap-3 p-1 bg-gray-100 rounded-lg">
+                        <button
+                            type="button"
+                            onClick={() => setType("BONUS")}
+                            className={cn(
+                                "py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
+                                type === "BONUS" 
+                                    ? "bg-white text-green-700 shadow-sm ring-1 ring-black/5" 
+                                    : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span> Give Bonus (+)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setType("ADJUSTMENT")}
+                            className={cn(
+                                "py-2 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
+                                type === "ADJUSTMENT" 
+                                    ? "bg-white text-red-700 shadow-sm ring-1 ring-black/5" 
+                                    : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span> Manual Pay (-)
+                        </button>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-700 uppercase">Amount</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-gray-500 font-bold text-sm">{symbol}</span>
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                value={amount} 
+                                onChange={(e) => setAmount(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none font-medium" 
+                                placeholder="0.00"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-700 uppercase">Description / Note</label>
+                        <textarea 
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            rows={2}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none resize-none" 
+                            placeholder={type === "BONUS" ? "e.g. Performance Reward" : "e.g. Paid via Cash/External"}
+                        />
+                    </div>
+
+                    <div className="pt-2">
+                        <button 
+                            type="submit" 
+                            disabled={isPending} 
+                            className={cn(
+                                "w-full py-2.5 rounded-lg text-sm font-bold text-white flex justify-center items-center gap-2 transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:scale-100",
+                                type === "BONUS" ? "bg-green-600 hover:bg-green-700" : "bg-gray-900 hover:bg-black"
+                            )}
+                        >
+                            {isPending && <Loader2 className="w-4 h-4 animate-spin"/>} 
+                            {type === "BONUS" ? "Credit Bonus" : "Record Payment"}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

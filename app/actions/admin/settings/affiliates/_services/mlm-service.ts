@@ -9,8 +9,7 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { protectAction } from "../permission-service"; // ✅ Security
-
+import { protectAction } from "../permission-service"; 
 const mlmSchema = z.object({
   isEnabled: z.boolean(),
   maxLevels: z.number().min(1).max(10),
@@ -19,10 +18,11 @@ const mlmSchema = z.object({
 });
 
 // =========================================
-// INTERNAL ENGINE (Triggered by System - No Role Check)
+// INTERNAL ENGINE (Triggered by System)
 // =========================================
 
 export async function distributeMLMCommission(
+  tx: Prisma.TransactionClient, 
   orderId: string, 
   directAffiliateId: string, 
   orderBasisAmount: number | Prisma.Decimal,
@@ -34,71 +34,77 @@ export async function distributeMLMCommission(
 
   const baseAmount = DecimalMath.toDecimal(orderBasisAmount);
   if (DecimalMath.isZero(baseAmount)) return;
-
   const upline = await getUpline(directAffiliateId, config.maxLevels);
+  
   if (upline.length === 0) return;
 
   const availableDate = new Date();
   availableDate.setDate(availableDate.getDate() + holdingPeriodDays);
 
-  await db.$transaction(async (tx) => {
-    for (const node of upline) {
-      const levelKey = node.level.toString();
-      const ratePercent = config.levelRates[levelKey] || 0;
-      
-      if (ratePercent <= 0) continue;
+  for (const node of upline) {
+    const levelKey = node.level.toString();
+    const ratePercent = config.levelRates[levelKey] || 0;
+    
+    if (ratePercent <= 0) continue;
 
-      const commissionAmount = DecimalMath.percent(baseAmount, ratePercent);
+    const commissionAmount = DecimalMath.percent(baseAmount, ratePercent);
 
-      if (DecimalMath.lte(commissionAmount, 0)) continue;
+    if (DecimalMath.lte(commissionAmount, 0)) continue;
 
-      const uplineAffiliate = await tx.affiliateAccount.findUnique({
-          where: { id: node.affiliateId }
-      });
-
-      if (!uplineAffiliate || uplineAffiliate.status !== "ACTIVE") continue;
-
-      await tx.referral.create({
-        data: {
-          affiliateId: node.affiliateId,
-          orderId: `${orderId}-MLM-L${node.level}`, 
-          totalOrderAmount: baseAmount,
-          netOrderAmount: baseAmount, 
-          commissionAmount: commissionAmount,
-          status: "PENDING",
-          commissionType: "PERCENTAGE",
-          commissionRate: new Prisma.Decimal(ratePercent),
-          isMlmReward: true,
-          fromDownlineId: node.level === 1 ? null : directAffiliateId, 
-          availableAt: availableDate,
-          metadata: { level: node.level, sourceAffiliate: directAffiliateId }
+    await tx.referral.create({
+      data: {
+        affiliateId: node.affiliateId,
+        orderId: orderId, 
+        totalOrderAmount: baseAmount,
+        netOrderAmount: baseAmount, 
+        commissionAmount: commissionAmount,
+        status: "PENDING",
+        commissionType: "PERCENTAGE",
+        commissionRate: new Prisma.Decimal(ratePercent),
+        isMlmReward: true,
+        fromDownlineId: node.level === 1 ? null : directAffiliateId, 
+        availableAt: availableDate,
+        metadata: { 
+            level: node.level, 
+            sourceAffiliate: directAffiliateId,
+            type: "MLM_COMMISSION" 
         }
-      });
-    }
-  });
+      }
+    });
+  }
 }
-
-// Helper: Get Ancestors
 export async function getUpline(startAffiliateId: string, maxLevels: number) {
+  const startNode = await db.affiliateAccount.findUnique({
+    where: { id: startAffiliateId },
+    select: { mlmPath: true, parentId: true }
+  });
+
+  if (!startNode || !startNode.mlmPath) return [];
+  const pathIds = startNode.mlmPath.split('.');
+  const ancestorIds = pathIds.reverse().slice(0, maxLevels);
+
+  if (ancestorIds.length === 0) return [];
+
+  const validAncestors = await db.affiliateAccount.findMany({
+    where: {
+      id: { in: ancestorIds },
+      status: "ACTIVE" 
+    },
+    select: { id: true }
+  });
+
+  const validSet = new Set(validAncestors.map(a => a.id));
+
   const tree: { level: number; affiliateId: string }[] = [];
-  let currentId = startAffiliateId;
-  let currentLevel = 1;
 
-  while (currentLevel <= maxLevels) {
-    const currentAffiliate = await db.affiliateAccount.findUnique({
-      where: { id: currentId },
-      select: { parentId: true }
-    });
-
-    if (!currentAffiliate || !currentAffiliate.parentId) break;
-
-    tree.push({
-      level: currentLevel,
-      affiliateId: currentAffiliate.parentId
-    });
-
-    currentId = currentAffiliate.parentId;
-    currentLevel++;
+  for (let i = 0; i < ancestorIds.length; i++) {
+    const id = ancestorIds[i];
+    if (validSet.has(id)) {
+        tree.push({
+            level: i + 1,
+            affiliateId: id
+        });
+    }
   }
 
   return tree;
@@ -110,7 +116,6 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
 
 export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Promise<ActionResponse> {
   try {
-    // Only Admin can change Network Structure logic
     const actor = await protectAction("MANAGE_NETWORK"); 
 
     const result = mlmSchema.safeParse(data);

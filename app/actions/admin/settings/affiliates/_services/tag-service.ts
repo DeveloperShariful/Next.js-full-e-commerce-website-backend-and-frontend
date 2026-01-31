@@ -1,5 +1,3 @@
-//Path: app/actions/admin/settings/affiliate/_services/tag-service.ts
-
 // File: app/actions/admin/settings/affiliate/_services/tag-service.ts
 
 "use server";

@@ -969,7 +969,7 @@ model Order {
   
   affiliateId            String?
   affiliate              AffiliateAccount?  @relation("OrderAffiliate", fields: [affiliateId], references: [id], onDelete: SetNull)
-  referral               Referral?
+  referrals              Referral[]
 
   items                  OrderItem[]
   shipments              Shipment[]
@@ -2178,7 +2178,7 @@ model Referral {
   id              String           @id @default(uuid())
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
-  orderId         String           @unique
+  orderId         String           
   order           Order            @relation(fields: [orderId], references: [id], onDelete: SetNull)
   totalOrderAmount Decimal         @db.Decimal(12, 2)
   netOrderAmount  Decimal          @db.Decimal(12, 2)
@@ -2215,6 +2215,7 @@ model Referral {
   @@index([createdAt])
   @@index([paidAt])
   @@index([isFlagged])
+  @@index([orderId])
 }
 
 model AffiliatePayout {

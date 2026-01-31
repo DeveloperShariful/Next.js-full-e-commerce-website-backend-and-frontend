@@ -101,14 +101,14 @@ export async function detectSelfReferral(affiliateId: string, buyerEmail: string
 
   if (!affiliate) return false;
 
-  // 1. Email Match
-  if (affiliate.user.email.toLowerCase() === buyerEmail.toLowerCase()) return true;
+  // 1. Email Match (Enhanced with trim/lowercase)
+  if (affiliate.user.email.toLowerCase().trim() === buyerEmail.toLowerCase().trim()) return true;
 
-  // 2. IP Match (Check last 5 clicks)
+  // 2. IP Match (Check last 10 clicks instead of 5 for better accuracy)
   const recentClicks = await db.affiliateClick.findMany({
     where: { affiliateId: affiliate.id },
     orderBy: { createdAt: "desc" },
-    take: 5,
+    take: 10, // Increased scope
     select: { ipAddress: true }
   });
 
@@ -117,6 +117,43 @@ export async function detectSelfReferral(affiliateId: string, buyerEmail: string
   }
 
   return false;
+}
+
+// ✅ NEW ENTERPRISE ADDITION: Velocity Check
+// This is used by the Engine to block rapid-fire orders in real-time.
+export async function checkVelocity(affiliateId: string): Promise<boolean> {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    // Check pending referrals in last 5 minutes
+    const recentReferralsCount = await db.referral.count({
+        where: {
+            affiliateId: affiliateId,
+            createdAt: { gte: fiveMinutesAgo },
+            status: "PENDING" // Only count pending/new ones
+        }
+    });
+
+    // Threshold: More than 10 orders in 5 minutes is suspicious (Bot attack)
+    if (recentReferralsCount >= 10) {
+        return true; // Flag as High Velocity
+    }
+
+    return false;
+}
+
+// ✅ NEW ENTERPRISE ADDITION: Device Fingerprint Check
+// Placeholder for integration with frontend fingerprinting libraries
+export async function checkDeviceFingerprint(affiliateId: string, fingerprint: string) {
+    if (!fingerprint) return "UNKNOWN";
+
+    const fingerprintMatch = await db.affiliateClick.findFirst({
+        where: { 
+            affiliateId: affiliateId, 
+            deviceFingerprint: fingerprint 
+        }
+    });
+
+    return fingerprintMatch ? "MATCH" : "NEW_DEVICE";
 }
 
 // --- RISK SCORE CALCULATION (Called by Cron/Engine) ---

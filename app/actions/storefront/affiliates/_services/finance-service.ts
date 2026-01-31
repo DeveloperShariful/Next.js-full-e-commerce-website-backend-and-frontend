@@ -1,7 +1,7 @@
 //app/actions/storefront/affiliates/_services/finance-service.ts
 
 import { db } from "@/lib/prisma";
-import { AffiliateConfigDTO } from "@/app/actions/admin/settings/affiliates/types";
+import { AffiliateConfigDTO } from "@/app/actions/storefront/affiliates/types";
 
 /**
  * SERVICE: Finance & Wallet Management

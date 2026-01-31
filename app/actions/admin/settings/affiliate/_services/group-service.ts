@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { z } from "zod";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service";
 
 const groupSchema = z.object({
   id: z.string().optional(),
@@ -26,7 +26,7 @@ type GroupInput = z.infer<typeof groupSchema>;
 // =========================================
 
 export async function getAllGroups() {
-  await protectAction("MANAGE_PARTNERS"); // Or VIEW_ANALYTICS
+  await protectAction("MANAGE_PARTNERS");
 
   return await db.affiliateGroup.findMany({
     include: {
@@ -62,47 +62,50 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
     const payload = result.data;
     const rateValue = payload.commissionRate ? DecimalMath.toDecimal(payload.commissionRate as any) : null;
 
-    // Handle Default Flag Logic
-    if (payload.isDefault) {
-      await db.affiliateGroup.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false },
-      });
-    }
+    // ENTERPRISE: Use Transaction to handle Default Group Logic safely
+    await db.$transaction(async (tx) => {
+      // 1. If setting as default, unset previous default
+      if (payload.isDefault) {
+        await tx.affiliateGroup.updateMany({
+          where: { isDefault: true, id: { not: payload.id } },
+          data: { isDefault: false },
+        });
+      }
 
-    let groupId = payload.id;
+      let groupId = payload.id;
 
-    if (payload.id) {
-      await db.affiliateGroup.update({
-        where: { id: payload.id },
-        data: {
-          name: payload.name,
-          description: payload.description,
-          commissionRate: rateValue,
-          commissionType: payload.commissionType, 
-          isDefault: payload.isDefault,
-        },
-      });
-    } else {
-      const created = await db.affiliateGroup.create({
-        data: {
-          name: payload.name,
-          slug: payload.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-          description: payload.description,
-          commissionRate: rateValue,
-          commissionType: payload.commissionType ,
-          isDefault: payload.isDefault,
-        },
-      });
-      groupId = created.id;
-    }
+      if (payload.id) {
+        await tx.affiliateGroup.update({
+          where: { id: payload.id },
+          data: {
+            name: payload.name,
+            description: payload.description,
+            commissionRate: rateValue,
+            commissionType: payload.commissionType, 
+            isDefault: payload.isDefault,
+          },
+        });
+      } else {
+        const created = await tx.affiliateGroup.create({
+          data: {
+            name: payload.name,
+            slug: payload.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+            description: payload.description,
+            commissionRate: rateValue,
+            commissionType: payload.commissionType ,
+            isDefault: payload.isDefault,
+          },
+        });
+        groupId = created.id;
+      }
 
-    await auditService.log({
-      userId: actor.id,
-      action: payload.id ? "UPDATE_GROUP" : "CREATE_GROUP",
-      entity: "AffiliateGroup",
-      entityId: groupId!,
-      newData: payload
+      await auditService.log({
+        userId: actor.id,
+        action: payload.id ? "UPDATE_GROUP" : "CREATE_GROUP",
+        entity: "AffiliateGroup",
+        entityId: groupId!,
+        newData: payload
+      });
     });
 
     revalidatePath("/admin/settings/affiliate/groups");
@@ -118,6 +121,7 @@ export async function deleteGroupAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
+    // Integrity Check
     const count = await db.affiliateAccount.count({ where: { groupId: id } });
     if (count > 0) {
         return { success: false, message: `Cannot delete: ${count} affiliates are in this group.` };

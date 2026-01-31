@@ -8,8 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Loader2, Save, Settings, AlertTriangle, Link as LinkIcon, DollarSign, Shield, Clock, Network, Percent } from "lucide-react";
 import { z } from "zod";
-
-// ✅ Correct Import Path
 import { affiliateGeneralSchema } from "@/app/actions/admin/settings/affiliate/schemas";
 import { updateGeneralSettingsAction } from "@/app/actions/admin/settings/affiliate/_services/general-config-service";
 import { AffiliateGeneralSettings } from "@/app/actions/admin/settings/affiliate/types";

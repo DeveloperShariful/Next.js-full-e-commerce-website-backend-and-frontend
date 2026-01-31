@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/Marketing/contest-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Marketing/contest-manager.tsx
 
 "use client";
 
@@ -9,9 +9,6 @@ import { Trophy, Calendar, Plus, Trash2, Edit, TrendingUp, Users, Medal, Loader2
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-
-// ✅ Correct Import Path
-// ✅ Use Named Imports
 import { deleteContestAction, upsertContestAction } from "@/app/actions/admin/settings/affiliate/_services/engagement-service";
 
 interface Props {

@@ -3,19 +3,17 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service";
 
 const ruleSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(3, "Rule name is required."),
   isActive: z.boolean().default(true),
   priority: z.coerce.number().default(0),
-
-  // Extended Condition Logic (Stored as JSON in Schema)
   conditions: z.object({
     minOrderAmount: z.coerce.number().optional(),
     maxOrderAmount: z.coerce.number().optional(),
@@ -25,13 +23,11 @@ const ruleSchema = z.object({
   }).refine((data) => Object.keys(data).length > 0, {
     message: "At least one condition is required.",
   }),
-
   action: z.object({
     type: z.enum(["PERCENTAGE", "FIXED"]),
     value: z.coerce.number().min(0),
     tierBonus: z.coerce.number().optional(),
   }),
-
   startDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
   affiliateSpecificIds: z.array(z.string()).default([]),
@@ -42,11 +38,10 @@ type RuleInput = z.infer<typeof ruleSchema>;
 // =========================================
 // READ OPERATIONS
 // =========================================
+
 export async function getRules() {
   try {
-    // Read only needs basic permission
     await protectAction("MANAGE_CONFIGURATION"); 
-
     return await db.affiliateCommissionRule.findMany({
       orderBy: [
         { isActive: "desc" }, 
@@ -77,7 +72,6 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
 
     const payload = result.data;
 
-    // Auto-assign priority if missing
     if (!payload.priority) {
       const maxPrio = await db.affiliateCommissionRule.findFirst({
         orderBy: { priority: "desc" },
@@ -90,8 +84,8 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
       name: payload.name,
       isActive: payload.isActive,
       priority: payload.priority,
-      conditions: payload.conditions, // Stored as JSON
-      action: payload.action,         // Stored as JSON
+      conditions: payload.conditions,
+      action: payload.action,
       startDate: payload.startDate ? new Date(payload.startDate) : null,
       endDate: payload.endDate ? new Date(payload.endDate) : null,
       affiliateSpecificIds: payload.affiliateSpecificIds,
@@ -139,7 +133,7 @@ export async function reorderRulesAction(items: { id: string; priority: number }
         })
       )
     );
-    
+
     revalidatePath("/admin/settings/affiliate/rules");
     return { success: true, message: "Priorities updated." };
   } catch (error) {

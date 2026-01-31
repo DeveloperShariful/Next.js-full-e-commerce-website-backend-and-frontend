@@ -7,16 +7,15 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; 
 import crypto from "crypto";
 import dns from "dns/promises"; 
 import { z } from "zod";
 
 // ==============================================================================
-// SECTION 1: PIXEL MANAGEMENT (Merged from pixel-service.ts)
+// SECTION 1: PIXEL MANAGEMENT
 // ==============================================================================
 
-// --- READ PIXELS ---
 export async function getAllPixels() {
   await protectAction("MANAGE_CONFIGURATION");
 
@@ -33,7 +32,6 @@ export async function getAllPixels() {
   });
 }
 
-// --- CREATE PIXEL ---
 export async function createPixelAction(data: Prisma.AffiliatePixelCreateInput): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -55,7 +53,6 @@ export async function createPixelAction(data: Prisma.AffiliatePixelCreateInput):
   }
 }
 
-// --- TOGGLE PIXEL STATUS ---
 export async function togglePixelStatusAction(id: string, isEnabled: boolean): Promise<ActionResponse> {
   try {
     await protectAction("MANAGE_CONFIGURATION");
@@ -72,7 +69,6 @@ export async function togglePixelStatusAction(id: string, isEnabled: boolean): P
   }
 }
 
-// --- DELETE PIXEL ---
 export async function deletePixelAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -96,7 +92,7 @@ export async function deletePixelAction(id: string): Promise<ActionResponse> {
 }
 
 // ==============================================================================
-// SECTION 2: DOMAIN MANAGEMENT (Merged from domain-service.ts)
+// SECTION 2: DOMAIN MANAGEMENT
 // ==============================================================================
 
 const domainSchema = z.object({
@@ -106,7 +102,6 @@ const domainSchema = z.object({
     .regex(/^(?!:\/\/)([a-zA-Z0-9-_]+\.)*[a-zA-Z0-9][a-zA-Z0-9-_]+\.[a-zA-Z]{2,11}?$/, "Invalid domain format (e.g. shop.example.com)"),
 });
 
-// --- READ DOMAINS ---
 export async function getAllDomains() {
   try {
     await protectAction("MANAGE_CONFIGURATION");
@@ -127,7 +122,6 @@ export async function getAllDomains() {
   }
 }
 
-// --- ADD DOMAIN ---
 export async function addDomainAction(data: z.infer<typeof domainSchema>): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -171,7 +165,6 @@ export async function addDomainAction(data: z.infer<typeof domainSchema>): Promi
   }
 }
 
-// --- VERIFY DOMAIN ---
 export async function verifyDomainAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -181,16 +174,17 @@ export async function verifyDomainAction(id: string): Promise<ActionResponse> {
 
     if (record.isVerified) return { success: true, message: "Already verified." };
 
-    // ✅ DNS Verification Logic (Preserved)
     let isMatch = false;
     try {
       const txtRecords = await dns.resolveTxt(record.domain);
       isMatch = txtRecords.flat().some(txt => txt.includes(record.verificationToken!));
     } catch (e) {
-      return { success: false, message: "DNS lookup failed. Ensure TXT record is propagated." };
+      console.error("DNS Lookup failed:", e);
+      if (process.env.NODE_ENV !== "development") {
+        return { success: false, message: "DNS lookup failed. Ensure TXT record is propagated." };
+      }
     }
     
-    // Dev Bypass
     if (process.env.NODE_ENV === "development") isMatch = true;
 
     if (isMatch) {
@@ -217,7 +211,6 @@ export async function verifyDomainAction(id: string): Promise<ActionResponse> {
   }
 }
 
-// --- DELETE DOMAIN ---
 export async function deleteDomainAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");

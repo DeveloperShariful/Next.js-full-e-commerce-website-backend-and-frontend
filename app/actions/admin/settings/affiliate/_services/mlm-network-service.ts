@@ -9,10 +9,10 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse, NetworkNode } from "../types";
 import { z } from "zod";
 import { revalidatePath, unstable_cache } from "next/cache";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; 
 
 // ==============================================================================
-// SECTION 1: MLM CORE ENGINE & CONFIGURATION (Merged from mlm-service.ts)
+// SECTION 1: MLM CORE ENGINE & CONFIGURATION (ENTERPRISE: Optimized)
 // ==============================================================================
 
 const mlmSchema = z.object({
@@ -22,18 +22,14 @@ const mlmSchema = z.object({
   levelRates: z.record(z.string(), z.number()),
 });
 
-/**
- * ✅ ENTERPRISE UPDATE: 
- * 1. Added `tx` (TransactionClient) to ensure ACID compliance inside orders.
- * 2. Uses optimized path-based lookup instead of recursive loops.
- */
 export async function distributeMLMCommission(
-  tx: Prisma.TransactionClient, // <--- Accepts transaction context
+  tx: Prisma.TransactionClient,
   orderId: string, 
   directAffiliateId: string, 
   orderBasisAmount: number | Prisma.Decimal,
   holdingPeriodDays: number
 ) {
+
   const config = await getCachedMLMConfig();
   
   if (!config.isEnabled) return;
@@ -41,7 +37,6 @@ export async function distributeMLMCommission(
   const baseAmount = DecimalMath.toDecimal(orderBasisAmount);
   if (DecimalMath.isZero(baseAmount)) return;
 
-  // ✅ OPTIMIZATION: Using the new optimized getUpline function
   const upline = await getUpline(directAffiliateId, config.maxLevels);
   
   if (upline.length === 0) return;
@@ -58,12 +53,10 @@ export async function distributeMLMCommission(
     const commissionAmount = DecimalMath.percent(baseAmount, ratePercent);
 
     if (DecimalMath.lte(commissionAmount, 0)) continue;
-
-    // ✅ DATA INTEGRITY: Insert using the passed transaction client 'tx'
     await tx.referral.create({
       data: {
         affiliateId: node.affiliateId,
-        orderId: orderId, // Non-unique in schema, allows multiple rows
+        orderId: orderId, 
         totalOrderAmount: baseAmount,
         netOrderAmount: baseAmount, 
         commissionAmount: commissionAmount,
@@ -83,12 +76,7 @@ export async function distributeMLMCommission(
   }
 }
 
-/**
- * ✅ ENTERPRISE OPTIMIZATION:
- * Path-Based Ancestor Lookup (O(1) Query instead of O(N) Loops)
- */
 export async function getUpline(startAffiliateId: string, maxLevels: number) {
-  // 1. Fetch current user to get the 'mlmPath' string
   const startNode = await db.affiliateAccount.findUnique({
     where: { id: startAffiliateId },
     select: { mlmPath: true, parentId: true }
@@ -96,15 +84,11 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
 
   if (!startNode || !startNode.mlmPath) return [];
 
-  // 2. Parse Path: "root.user1.user2"
   const pathIds = startNode.mlmPath.split('.');
-  
-  // We want ancestors in reverse order (closest parent first)
-  const ancestorIds = pathIds.reverse().slice(0, maxLevels);
+  const ancestorIds = pathIds.filter(id => id !== startAffiliateId).reverse().slice(0, maxLevels);
 
   if (ancestorIds.length === 0) return [];
 
-  // 3. BULK FETCH: Get all valid/active ancestors in ONE database call
   const validAncestors = await db.affiliateAccount.findMany({
     where: {
       id: { in: ancestorIds },
@@ -114,15 +98,13 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
   });
 
   const validSet = new Set(validAncestors.map(a => a.id));
-
   const tree: { level: number; affiliateId: string }[] = [];
 
-  // 4. Map back to levels
   for (let i = 0; i < ancestorIds.length; i++) {
     const id = ancestorIds[i];
     if (validSet.has(id)) {
         tree.push({
-            level: i + 1,
+            level: i + 1, 
             affiliateId: id
         });
     }
@@ -131,7 +113,6 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
   return tree;
 }
 
-// --- WRITE OPERATION: UPDATE CONFIG ---
 export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_NETWORK"); 
@@ -164,10 +145,9 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
 }
 
 // ==============================================================================
-// SECTION 2: NETWORK VISUALIZATION & STATS (Merged from network-service.ts)
+// SECTION 2: NETWORK VISUALIZATION & STATS (Cached)
 // ==============================================================================
 
-// --- READ OPERATION: GET MLM TREE (Cached) ---
 export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[]> {
   return await unstable_cache(
     async () => {
@@ -198,13 +178,12 @@ export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[
           user: { select: { name: true, image: true } },
           _count: { select: { downlines: true } }
         },
-        take: 5000 // Safety Limit
+        take: 5000
       });
 
       const nodeMap = new Map<string, NetworkNode>();
       const tree: NetworkNode[] = [];
 
-      // 1. Initialize Nodes
       affiliates.forEach(aff => {
         nodeMap.set(aff.id, {
           id: aff.id,
@@ -218,7 +197,6 @@ export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[
         });
       });
 
-      // 2. Build Hierarchy
       affiliates.forEach(aff => {
         const node = nodeMap.get(aff.id)!;
         if (aff.parentId && nodeMap.has(aff.parentId)) {
@@ -229,7 +207,6 @@ export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[
         }
       });
 
-      // 3. Calculate Recursive Team Stats
       const calculateStats = (node: NetworkNode): number => {
         let size = 0;
         if (node.children) {
@@ -250,7 +227,6 @@ export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[
   )();
 }
 
-// --- READ OPERATION: GET NODE STATS ---
 export async function getNodeStats(affiliateId: string) {
   const [referralStats, downlineCount, wallet] = await Promise.all([
     db.referral.aggregate({

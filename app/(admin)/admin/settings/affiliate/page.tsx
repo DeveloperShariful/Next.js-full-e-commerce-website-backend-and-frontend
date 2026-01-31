@@ -5,7 +5,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
 import { db } from "@/lib/prisma";
 
-import * as statsService from "@/app/actions/admin/settings/affiliate/_services/analytics-service";
+import * as statsService from "@/app/actions/admin/settings/affiliate/_services/dashboard-service";
 import * as accountService from "@/app/actions/admin/settings/affiliate/_services/account-service"; 
 import * as payoutService from "@/app/actions/admin/settings/affiliate/_services/payout-service";
 import * as configService from "@/app/actions/admin/settings/affiliate/_services/general-config-service";
@@ -19,7 +19,7 @@ import * as trackingService from "@/app/actions/admin/settings/affiliate/_servic
 import * as productRateService from "@/app/actions/admin/settings/affiliate/_services/product-rate-service";
 import * as kycService from "@/app/actions/admin/settings/affiliate/_services/kyc-service";
 import * as ledgerService from "@/app/actions/admin/settings/affiliate/_services/ledger-service";
-import * as analyticsService from "@/app/actions/admin/settings/affiliate/_services/analytics-service";
+import * as analyticsService from "@/app/actions/admin/settings/affiliate/_services/dashboard-service";
 import * as groupService from "@/app/actions/admin/settings/affiliate/_services/group-service";
 import * as couponTagService from "@/app/actions/admin/settings/affiliate/_services/coupon-tag-service";
 import { serializePrismaData } from "@/lib/format-data"; 
@@ -38,34 +38,37 @@ export default async function AffiliateMasterPage({
   const currentView = params.view || "overview";
   const page = Number(params.page) || 1;
   const search = params.search || "";
-
-  // Data Container
   const data: any = {};
 
   try {
-    // 1. Always fetch Configuration (Required for Context & Global Rules)
     data.config = await configService.getSettings();
 
-    // 2. Efficient Data Fetching Switch
     switch (currentView) {
       case "overview":
-        const [kpi, charts] = await Promise.all([
+        const [
+            kpi, 
+            charts, 
+            topProducts, 
+            trafficSources, 
+            topAffiliates, 
+            monthlyStats
+        ] = await Promise.all([
           statsService.getDashboardKPI(),
           statsService.getChartData(),
-        ]);
-        data.dashboard = { kpi, charts };
-        break;
-
-      case "reports":
-        const [topProducts, trafficSources, topAffiliates, monthlyStats] = await Promise.all([
           analyticsService.getTopProducts(),
           analyticsService.getTrafficSources(),
           analyticsService.getTopAffiliates(),
           analyticsService.getMonthlyPerformance(),
         ]);
-        data.reports = { topProducts, trafficSources, topAffiliates, monthlyStats };
+        data.dashboard = { 
+            kpi, 
+            charts, 
+            topProducts, 
+            trafficSources, 
+            topAffiliates, 
+            monthlyStats 
+        };
         break;
-
       case "partners": // Merged View: Users + Groups + Tags
         const [usersData, groupsList, tagsList] = await Promise.all([
           accountService.getAffiliates(page, 20, params.status as any, search),

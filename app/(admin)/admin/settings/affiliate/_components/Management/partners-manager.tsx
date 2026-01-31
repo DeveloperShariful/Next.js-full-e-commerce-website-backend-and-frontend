@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import AffiliateUsersTable from "./users-table";
 import GroupManager from "./group-manager";
 
-// Props Definition (Combines props from both components)
 interface Props {
   usersData: any[];
   totalEntries: number;

@@ -4,15 +4,15 @@
 
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { sendNotification } from "@/app/api/email/send-notification";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { getCachedAffiliateSettings, getCachedGlobalRules } from "@/lib/services/settings-cache";
 import { distributeMLMCommission } from "./_services/mlm-network-service";
 import { detectSelfReferral, checkVelocity } from "./_services/fraud-service"; 
 import { auditService } from "@/lib/services/audit-service";
+//import { sendNotification } from "@/app/api/email/send-notification";
 
 export async function processOrder(orderId: string) {
-  // 1. Fetch Order with UPDATED relations (Referrals array)
+
   const order = await db.order.findUnique({
     where: { id: orderId },
     include: {
@@ -39,14 +39,12 @@ export async function processOrder(orderId: string) {
     },
   });
 
-  // 2. Validations
   if (!order) return { success: false, error: "ORDER_NOT_FOUND" };
   
   if (order.referrals.length > 0) {
     return { success: false, error: "ALREADY_PROCESSED" };
   }
 
-  // 3. Identify Affiliate (Direct or Lifetime) - Logic Preserved
   let affiliateId = order.affiliateId;
   let attributionSource = "COOKIE";
 
@@ -70,7 +68,6 @@ export async function processOrder(orderId: string) {
 
   if (!affiliate || affiliate.status !== "ACTIVE") return { success: false, error: "AFFILIATE_INACTIVE" };
 
-  // 4. Load Settings & Security Checks
   const config = await getCachedAffiliateSettings();
   if (!config || !config.isActive) return { success: false, error: "PROGRAM_DISABLED" };
 
@@ -78,8 +75,11 @@ export async function processOrder(orderId: string) {
   const buyerIp = order.ipAddress || "0.0.0.0";
   
   if (buyerEmail) {
-    const isSelf = await detectSelfReferral(affiliateId, buyerEmail, buyerIp);
-    const isHighVelocity = await checkVelocity(affiliateId); // New Check
+
+    const [isSelf, isHighVelocity] = await Promise.all([
+        detectSelfReferral(affiliateId, buyerEmail, buyerIp),
+        checkVelocity(affiliateId)
+    ]);
 
     if ((isSelf && !config.allowSelfReferral) || isHighVelocity) {
        await auditService.systemLog("WARN", "AFFILIATE_ENGINE", `Commission Blocked: Fraud Rules`, { 
@@ -90,7 +90,6 @@ export async function processOrder(orderId: string) {
     }
   }
 
-  // 5. Commission Calculation Logic (Preserved & Optimized)
   let totalCommission = new Prisma.Decimal(0);
   const logDetails: any[] = [];
   const globalRules = await getCachedGlobalRules();
@@ -104,17 +103,14 @@ export async function processOrder(orderId: string) {
     let source = "GLOBAL_DEFAULT";
     let isExcluded = false;
 
-    // A. Product Specific Rate (User Override)
     const userProductRate = await db.affiliateProductRate.findFirst({
       where: { productId: item.productId!, affiliateId: affiliate.id }
     });
 
-    // B. Product Specific Rate (Group Override)
     const groupProductRate = !userProductRate && affiliate.groupId ? await db.affiliateProductRate.findFirst({
       where: { productId: item.productId!, groupId: affiliate.groupId }
     }) : null;
 
-    // C. Global Logic Rules
     let matchedRule = null;
     for (const rule of globalRules) {
       const conditions = rule.conditions as any;
@@ -173,7 +169,6 @@ export async function processOrder(orderId: string) {
       continue;
     }
 
-    // E. Calculate Item Commission
     let itemBasePrice = DecimalMath.fromOrder(
       item.total, 
       item.tax, 0, 
@@ -201,7 +196,6 @@ export async function processOrder(orderId: string) {
     });
   }
 
-  // 6. Finalize Transaction
   if (DecimalMath.isZero(totalCommission) && !config.zeroValueReferrals) {
      return { success: true, message: "ZERO_COMMISSION_IGNORED" };
   }
@@ -210,7 +204,6 @@ export async function processOrder(orderId: string) {
     const availableDate = new Date();
     availableDate.setDate(availableDate.getDate() + (config.holdingPeriod || 14));
 
-    // A. Create Direct Referral
     await tx.referral.create({
       data: {
         affiliateId: affiliate.id,
@@ -228,16 +221,16 @@ export async function processOrder(orderId: string) {
         }
       }
     });
-
+ 
     if (order.userId && config.isLifetimeLinkOnPurchase && !affiliate.user.referredByAffiliateId) {
       await tx.user.update({
          where: { id: order.userId },
          data: { referredByAffiliateId: affiliate.id }
       });
     }
+
     await distributeMLMCommission(tx, order.id, affiliate.id, orderSubtotal, config.holdingPeriod || 14);
 
-    
     const today = new Date();
     today.setHours(0,0,0,0);
     
@@ -262,10 +255,27 @@ export async function processOrder(orderId: string) {
         }
     });
 
+    await tx.notificationQueue.create({
+      data: {
+        channel: "EMAIL",
+        recipient: affiliate.user.email,
+        templateSlug: "REFERRAL_PENDING",
+        status: "PENDING",
+        userId: affiliate.userId,
+        content: "",
+        metadata: {
+            commission_amount: totalCommission.toFixed(2),
+            order_number: order.orderNumber,
+            holding_period: (config.holdingPeriod || 14).toString()
+        }
+      }
+    });
+
   }); 
+ 
 
   
-  await sendNotification({
+  /*await sendNotification({
       trigger: "REFERRAL_PENDING",
       recipient: affiliate.user.email,
       data: {
@@ -274,7 +284,7 @@ export async function processOrder(orderId: string) {
           holding_period: (config.holdingPeriod || 14).toString()
       },
       userId: affiliate.userId
-  });
+  });*/
 
   return { success: true, commission: totalCommission };
 }

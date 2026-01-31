@@ -1,9 +1,10 @@
 // File: app/actions/admin/settings/affiliate/_services/account-service.ts
+
+
 "use server";
 
 import { db } from "@/lib/prisma";
 import { AffiliateStatus, Prisma, AffiliateAccount } from "@prisma/client";
-import { sendNotification } from "@/app/api/email/send-notification"; 
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
@@ -136,36 +137,40 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
     const current = await db.affiliateAccount.findUnique({ where: { id } });
     if (!current) return { success: false, message: "Affiliate not found" };
 
-    // ✅ Strict Typing: Use Partial<AffiliateAccount> instead of implicit type
     const payload: Partial<AffiliateAccount> = { status: "ACTIVE" };
-
-    // ✅ No 'as any' needed. Both match Partial<AffiliateAccount> structure
     const { hasChanges, changes, oldValues } = getChanges(current, payload);
 
     if (!hasChanges) return { success: true, message: "Affiliate is already active." };
 
-    const updated = await db.affiliateAccount.update({
-      where: { id },
-      include: { user: true },
-      // ✅ Strict Typing: Use UncheckedUpdateInput to safely handle the partial object
-      data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
-    });
+    await db.$transaction(async (tx) => {
+        const updated = await tx.affiliateAccount.update({
+          where: { id },
+          include: { user: true },
+          data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
+        });
 
-    await sendNotification({
-        trigger: "AFFILIATE_APPROVED",
-        recipient: updated.user.email,
-        data: { affiliate_name: updated.user.name || "Partner" },
-        userId: updated.userId
-    });
+        await tx.notificationQueue.create({
+            data: {
+                channel: "EMAIL",
+                recipient: updated.user.email,
+                templateSlug: "AFFILIATE_APPROVED",
+                status: "PENDING",
+                userId: updated.userId,
+                content: "",
+                metadata: { affiliate_name: updated.user.name || "Partner" }
+            }
+        });
 
-    await auditService.log({
-        userId: actor.id,
-        action: "UPDATE",
-        entity: "AffiliateAccount",
-        entityId: id,
-        oldData: oldValues,
-        newData: changes,
-        meta: { action: "APPROVE_AFFILIATE" }
+        // Log Audit
+        await auditService.log({
+            userId: actor.id,
+            action: "UPDATE",
+            entity: "AffiliateAccount",
+            entityId: id,
+            oldData: oldValues,
+            newData: changes,
+            meta: { action: "APPROVE_AFFILIATE" }
+        });
     });
 
     revalidatePath("/admin/settings/affiliate/users");
@@ -182,39 +187,45 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
     const current = await db.affiliateAccount.findUnique({ where: { id } });
     if (!current) return { success: false, message: "Affiliate not found" };
 
-    // ✅ Strict Typing
     const payload: Partial<AffiliateAccount> = { 
       status: "REJECTED",
       adminNotes: reason
     };
 
-    // ✅ Type-safe comparison
     const { hasChanges, changes, oldValues } = getChanges(current, payload);
-
     if (!hasChanges) return { success: true, message: "Already rejected with same reason." };
 
-    const updated = await db.affiliateAccount.update({
-      where: { id },
-      include: { user: true },
-      // ✅ Type-safe update
-      data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
-    });
+    await db.$transaction(async (tx) => {
+        const updated = await tx.affiliateAccount.update({
+          where: { id },
+          include: { user: true },
+          data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
+        });
 
-    await sendNotification({
-        trigger: "AFFILIATE_REJECTED",
-        recipient: updated.user.email,
-        data: { affiliate_name: updated.user.name || "Partner", rejection_reason: reason },
-        userId: updated.userId
-    });
+        await tx.notificationQueue.create({
+            data: {
+                channel: "EMAIL",
+                recipient: updated.user.email,
+                templateSlug: "AFFILIATE_REJECTED",
+                status: "PENDING",
+                userId: updated.userId,
+                content: "", 
+                metadata: { 
+                    affiliate_name: updated.user.name || "Partner", 
+                    rejection_reason: reason 
+                }
+            }
+        });
 
-    await auditService.log({
-      userId: actor.id,
-      action: "UPDATE",
-      entity: "AffiliateAccount",
-      entityId: id,
-      oldData: oldValues,
-      newData: changes,
-      meta: { action: "REJECT_AFFILIATE", reason }
+        await auditService.log({
+          userId: actor.id,
+          action: "UPDATE",
+          entity: "AffiliateAccount",
+          entityId: id,
+          oldData: oldValues,
+          newData: changes,
+          meta: { action: "REJECT_AFFILIATE", reason }
+        });
     });
 
     revalidatePath("/admin/settings/affiliate/users");
@@ -224,7 +235,7 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
   }
 }
 
-// --- BULK ACTIONS (Remain same as they handle array logic differently) ---
+// --- BULK ACTIONS ---
 
 export async function bulkStatusAction(ids: string[], status: AffiliateStatus): Promise<ActionResponse> {
   try {
@@ -232,25 +243,46 @@ export async function bulkStatusAction(ids: string[], status: AffiliateStatus): 
 
     const existing = await db.affiliateAccount.findMany({
       where: { id: { in: ids } },
-      select: { id: true, status: true }
+      select: { id: true, status: true, userId: true, user: { select: { email: true, name: true } } }
     });
 
-    const toUpdate = existing.filter(acc => acc.status !== status).map(acc => acc.id);
-
+    const toUpdate = existing.filter(acc => acc.status !== status);
+    
     if (toUpdate.length === 0) return { success: true, message: "No updates needed." };
 
-    await db.affiliateAccount.updateMany({
-      where: { id: { in: toUpdate } },
-      data: { status }
-    });
+    await db.$transaction(async (tx) => {
+        await tx.affiliateAccount.updateMany({
+          where: { id: { in: toUpdate.map(x => x.id) } },
+          data: { status }
+        });
 
-    await auditService.log({
-      userId: actor.id,
-      action: "BULK_UPDATE",
-      entity: "AffiliateAccount",
-      entityId: "BULK",
-      newData: { status, count: toUpdate.length, affectedIds: toUpdate },
-      meta: { action: "BULK_STATUS_CHANGE" }
+        if (status === "ACTIVE" || status === "REJECTED") {
+            const templateSlug = status === "ACTIVE" ? "AFFILIATE_APPROVED" : "AFFILIATE_REJECTED";
+            
+            for (const acc of toUpdate) {
+                 await tx.notificationQueue.create({
+                    data: {
+                        channel: "EMAIL",
+                        recipient: acc.user.email,
+                        templateSlug: templateSlug,
+                        status: "PENDING",
+                        userId: acc.userId,
+                        content: "",
+                        metadata: { affiliate_name: acc.user.name || "Partner" }
+                    }
+                });
+            }
+        }
+
+        // 3. Audit
+        await auditService.log({
+          userId: actor.id,
+          action: "BULK_UPDATE",
+          entity: "AffiliateAccount",
+          entityId: "BULK",
+          newData: { status, count: toUpdate.length, affectedIds: toUpdate.map(x=>x.id) },
+          meta: { action: "BULK_STATUS_CHANGE" }
+        });
     });
 
     revalidatePath("/admin/settings/affiliate/users");
@@ -347,20 +379,17 @@ export async function updateCommissionAction(
     const current = await db.affiliateAccount.findUnique({ where: { id } });
     if (!current) return { success: false, message: "Affiliate not found" };
 
-    // ✅ Strict Typing for Commission Payload
     const payload: Partial<AffiliateAccount> = {
       commissionRate: rate ? DecimalMath.toDecimal(rate) : null,
       commissionType: type
     };
 
-    // ✅ Type-safe comparison
     const { hasChanges, changes, oldValues } = getChanges(current, payload);
 
     if (!hasChanges) return { success: true, message: "No commission changes detected." };
 
     await db.affiliateAccount.update({
       where: { id },
-      // ✅ Type-safe update
       data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
     });
 

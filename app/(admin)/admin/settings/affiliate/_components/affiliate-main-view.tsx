@@ -7,34 +7,30 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, CreditCard, Settings, Trophy, Calculator, 
   Image as ImageIcon, Network, ShieldAlert, Code2, 
-  Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2, BarChart2, Ticket,Tag,
+  Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2, Ticket, Tag,
   Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
 import { NotificationCenter } from "./notification-center";
-
-// Import All Sub-Components
-import MainOverview from "./Analytics/main-overview";
+import AnalyticsDashboard from "./analytics-dashboard";
 import PartnersManager from "./Management/partners-manager"; 
 import PayoutsTable from "./Management/payouts-table";
-import TierList from "./Configuration/tier-list";
-import RuleList from "./Configuration/rule-list";
-import CreativeList from "./Marketing/creative-list";
-import ContestList from "./Marketing/contest-list";
-import CampaignList from "./Marketing/campaign-list";
-import AnnouncementManager from "./Marketing/announcement-manager";
-import NetworkTree from "./Configuration/network-tree";
-import FraudRuleManager from "./Configuration/fraud-rule-manager"; 
-import DomainList from "./Configuration/domain-list";
-import PixelList from "./Configuration/pixel-list";
-import ProductRateManager from "./Configuration/product-rate-manager";
 import KycManager from "./Management/kyc-manager";
 import LedgerTable from "./Management/ledger-table";
-import AffiliateGeneralConfigForm from "./Configuration/general-config-manager";
-import ReportsDashboard from "./Analytics/reports-dashboard";
-import TagManager from "./Configuration/tag-manager";
+import CreativeList from "./Marketing/creative-manager";
+import ContestList from "./Marketing/contest-manager";
+import CampaignList from "./Marketing/campaign-manager";
 import CouponManager from "./Marketing/coupon-manager";
+import AnnouncementManager from "./Marketing/announcement-manager";
+import NetworkTree from "./Configuration/mlm-network-manager";
+import FraudRuleManager from "./Configuration/fraud-rule-manager"; 
+import TierList from "./Configuration/tier-manager";
+import RuleList from "./Configuration/commission-rule-management";
+import DomainList from "./Configuration/domain-manager";
+import PixelList from "./Configuration/pixel-manager";
+import ProductRateManager from "./Configuration/product-rate-manager";
+import AffiliateGeneralConfigForm from "./Configuration/general-config-manager";
+import TagManager from "./Configuration/tag-manager";
 
 interface Props {
   initialData: any;
@@ -58,19 +54,15 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
     startTransition(() => {
         const params = new URLSearchParams(searchParams.toString());
         params.set("view", view);
-        // Reset pagination and filters when switching main modules
         params.delete("page");
         params.delete("search");
         params.delete("status");
         router.push(`/admin/settings/affiliate?${params.toString()}`);
     });
   };
-
-  // Enterprise Menu Structure
   const MENU_ITEMS = [
     { section: "Analytics", items: [
-        { id: "overview", label: "Overview", icon: LayoutDashboard },
-        { id: "reports", label: "Adv. Reports", icon: BarChart2 },
+        { id: "overview", label: "Dashboard", icon: LayoutDashboard },
     ]},
     { section: "Management", items: [
         { id: "partners", label: "Partner Management", icon: Users },
@@ -95,7 +87,6 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         { id: "pixels", label: "Tracking Pixels", icon: Code2 },
         { id: "tags", label: "System Tags", icon: Tag },
         { id: "general", label: "System Settings", icon: Settings },
-        
     ]}
   ];
 
@@ -103,11 +94,25 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
     if (!initialData) return null;
 
     switch (activeTab) {
-      // 1. Analytics & Reports
-      case "overview": return initialData.dashboard ? <MainOverview kpi={initialData.dashboard.kpi} charts={initialData.dashboard.charts} /> : null;
-      case "reports": return initialData.reports ? <ReportsDashboard topProducts={initialData.reports.topProducts} trafficSources={initialData.reports.trafficSources} topAffiliates={initialData.reports.topAffiliates} monthlyStats={initialData.reports.monthlyStats} /> : null;
-      
+      // =========================================================
+      // 1. Unified Dashboard (Merged View)
+      // =========================================================
+      case "overview": 
+        return initialData.dashboard ? (
+          <AnalyticsDashboard 
+              kpi={initialData.dashboard.kpi} 
+              charts={initialData.dashboard.charts} 
+              topProducts={initialData.dashboard.topProducts} 
+              trafficSources={initialData.dashboard.trafficSources} 
+              topAffiliates={initialData.dashboard.topAffiliates} 
+              monthlyStats={initialData.dashboard.monthlyStats}
+          />
+        ) : null;
+
+      // =========================================================
       // 2. Management Modules
+      // =========================================================
+      
       case "partners": return initialData.partners ? (
         <PartnersManager 
             usersData={initialData.partners.users.affiliates}
@@ -125,13 +130,19 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
       case "ledger": return initialData.ledger ? <LedgerTable data={initialData.ledger.transactions} totalEntries={initialData.ledger.total} totalPages={initialData.ledger.totalPages} currentPage={Number(searchParams.get("page")) || 1} /> : null;
       case "kyc": return initialData.kyc ? <KycManager initialDocuments={initialData.kyc.documents} /> : null;
 
+      // =========================================================
       // 3. Marketing Tools
+      // =========================================================
+      
       case "campaigns": return initialData.campaigns ? <CampaignList data={initialData.campaigns.campaigns} totalEntries={initialData.campaigns.total} /> : null;
       case "creatives": return initialData.creatives ? <CreativeList initialCreatives={initialData.creatives} /> : null;
       case "contests": return initialData.contests ? <ContestList initialContests={initialData.contests} /> : null;
       case "announcements": return initialData.announcements ? <AnnouncementManager initialData={initialData.announcements.announcements} /> : null;
 
+      // =========================================================
       // 4. System Configuration
+      // =========================================================
+      
       case "tiers": return initialData.tiers ? <TierList initialTiers={initialData.tiers} /> : null;
       case "rules": return initialData.rules ? <RuleList initialRules={initialData.rules} /> : null;
       case "product-rates": return initialData.rates ? <ProductRateManager initialRates={initialData.rates.rates} /> : null;

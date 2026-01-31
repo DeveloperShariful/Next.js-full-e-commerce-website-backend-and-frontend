@@ -8,7 +8,7 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service";
 
 // =========================================
 // READ OPERATIONS
@@ -81,7 +81,6 @@ export async function upsertRateAction(data: {
 
     const rateDecimal = DecimalMath.toDecimal(data.rate);
 
-    // Dynamic Upsert Logic
     if (data.id) {
       await db.affiliateProductRate.update({
         where: { id: data.id },
@@ -94,7 +93,6 @@ export async function upsertRateAction(data: {
         }
       });
     } else {
-      // Duplicate Check
       const existing = await db.affiliateProductRate.findFirst({
         where: {
           productId: data.productId,
@@ -165,7 +163,6 @@ export async function bulkImportRatesAction(rates: {
 
     await db.$transaction(async (tx) => {
       for (const r of rates) {
-         // Check Global Override Existence
          const existing = await tx.affiliateProductRate.findFirst({
            where: { productId: r.productId, affiliateId: null, groupId: null }
          });

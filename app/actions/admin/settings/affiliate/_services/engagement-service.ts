@@ -8,7 +8,7 @@ import { revalidatePath, unstable_cache } from "next/cache";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; 
 import { auditService } from "@/lib/services/audit-service";
 
 // =========================================
@@ -37,7 +37,6 @@ type ContestInput = z.infer<typeof contestSchema>;
 export async function getContests() {
   try {
     await protectAction("VIEW_ANALYTICS");
-    
     return await db.affiliateContest.findMany({
       orderBy: { startDate: "desc" },
     });
@@ -47,7 +46,7 @@ export async function getContests() {
 }
 
 export async function getContestLeaderboard(contestId: string, limit: number = 10) {
-  // Publicly accessible via cache, but strictly typed
+  // Publicly accessible via cache to reduce DB load on high traffic
   const cacheKey = `contest-leaderboard-${contestId}`;
 
   return await unstable_cache(
@@ -60,7 +59,9 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
 
       const isSalesMetric = contest.criteria === "sales_amount";
 
-      // Aggregate Referrals within Date Range
+      // Aggregating Referrals within Date Range
+      // Note: For Enterprise scale with millions of rows, consider a Summary Table approach.
+      // But unstable_cache with 5 min TTL makes this acceptable for < 10M rows.
       const leaderboard = await db.referral.groupBy({
         by: ['affiliateId'],
         where: {
@@ -84,7 +85,7 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
 
       const affiliateIds = leaderboard.map(l => l.affiliateId);
       
-      // Fetch User Details efficiently
+      // Efficiently fetch user details
       const affiliates = await db.affiliateAccount.findMany({
         where: { id: { in: affiliateIds } },
         select: {
@@ -110,7 +111,7 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
       });
     },
     [cacheKey],
-    { tags: [`contest-${contestId}`], revalidate: 300 }
+    { tags: [`contest-${contestId}`], revalidate: 300 } // 5 Minutes Cache
   )();
 }
 
@@ -118,7 +119,7 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
 
 export async function upsertContestAction(data: ContestInput): Promise<ActionResponse> {
   try {
-    const actor = await protectAction("MANAGE_CONFIGURATION"); // ✅ Security
+    const actor = await protectAction("MANAGE_CONFIGURATION"); 
 
     const result = contestSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
@@ -136,7 +137,7 @@ export async function upsertContestAction(data: ContestInput): Promise<ActionRes
       endDate: new Date(payload.endDate),
       criteria: payload.criteria,
       isActive: payload.isActive,
-      prizes: payload.prizes, // JSON Field
+      prizes: payload.prizes, 
     };
 
     let recordId = payload.id;
@@ -243,9 +244,15 @@ export async function getAllCampaigns(page: number = 1, limit: number = 20, sear
 
 export async function deleteCampaignAction(id: string): Promise<ActionResponse> {
   try {
-    const actor = await protectAction("MANAGE_PARTNERS"); // Requires manager or admin
+    const actor = await protectAction("MANAGE_PARTNERS"); 
 
     if (!id) return { success: false, message: "Campaign ID is required." };
+
+    // Enterprise Integrity Check
+    const linkCount = await db.affiliateLink.count({ where: { campaignId: id } });
+    if (linkCount > 0) {
+        return { success: false, message: `Cannot delete: ${linkCount} active links use this campaign.` };
+    }
 
     const deleted = await db.affiliateCampaign.delete({
       where: { id }

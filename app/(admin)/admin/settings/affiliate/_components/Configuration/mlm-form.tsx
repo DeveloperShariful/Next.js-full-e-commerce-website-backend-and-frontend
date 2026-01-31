@@ -7,9 +7,6 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { Save, Plus, Trash2, Loader2, GitGraph, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-// ✅ Correct Import Path
-// ✅ Use Named Import
 import { updateMlmConfigAction } from "@/app/actions/admin/settings/affiliate/_services/mlm-network-service";
 
 interface MLMFormValues {

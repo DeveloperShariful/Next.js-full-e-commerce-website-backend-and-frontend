@@ -14,8 +14,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AffiliateGroup } from "@prisma/client";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-
-// ✅ CORRECTED IMPORT: Using named imports from consolidated group service
 import { 
   deleteGroupAction, 
   upsertGroupAction 

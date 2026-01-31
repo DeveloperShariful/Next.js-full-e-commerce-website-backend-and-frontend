@@ -8,7 +8,7 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; 
 
 // =========================================
 // READ OPERATIONS
@@ -53,7 +53,7 @@ export async function getAffiliateLedger(affiliateId: string) {
 }
 
 // =========================================
-// WRITE OPERATIONS
+// WRITE OPERATIONS (Transactional)
 // =========================================
 
 export async function createAdjustmentAction(
@@ -69,43 +69,42 @@ export async function createAdjustmentAction(
     if (!note) return { success: false, message: "Reason/Note is required" };
 
     const adjustAmount = DecimalMath.toDecimal(amount);
-
     await db.$transaction(async (tx) => {
-        // 1. Lock & Fetch
-        const affiliate = await tx.affiliateAccount.findUnique({ where: { id: affiliateId } });
+        const affiliate = await tx.affiliateAccount.findUnique({ 
+            where: { id: affiliateId },
+            select: { id: true, balance: true } 
+        });
+        
         if (!affiliate) throw new Error("Affiliate not found");
 
-        const currentBalance = affiliate.balance;
-        let newBalance;
+        let updatedAffiliate;
 
         if (type === "BONUS") {
-            newBalance = DecimalMath.add(currentBalance, adjustAmount);
+            updatedAffiliate = await tx.affiliateAccount.update({
+                where: { id: affiliateId },
+                data: { balance: { increment: adjustAmount } },
+                select: { balance: true }
+            });
         } else {
-            // Adjustment usually means deduction or correction
-            newBalance = DecimalMath.sub(currentBalance, adjustAmount); // Depends on UI logic, assuming deduction for 'Adjustment' if positive value sent? 
-            // Actually, usually negative amount is sent for deduction. 
-            // Let's standard: Input always positive. Type decides logic.
-            // If Type is ADJUSTMENT (Deduction):
-            newBalance = DecimalMath.sub(currentBalance, adjustAmount);
+            updatedAffiliate = await tx.affiliateAccount.update({
+                where: { id: affiliateId },
+                data: { balance: { decrement: adjustAmount } },
+                select: { balance: true }
+            });
         }
 
-        // Prevent negative balance check (Optional, depends on policy)
-        // if (DecimalMath.lt(newBalance, 0)) throw new Error("Insufficient balance.");
+        const balanceAfter = updatedAffiliate.balance;
+        const balanceBefore = type === "BONUS" 
+            ? DecimalMath.sub(balanceAfter, adjustAmount)
+            : DecimalMath.add(balanceAfter, adjustAmount);
 
-        // 2. Update Balance
-        await tx.affiliateAccount.update({
-            where: { id: affiliateId },
-            data: { balance: newBalance }
-        });
-
-        // 3. Create Ledger Record
         await tx.affiliateLedger.create({
             data: {
                 affiliateId,
-                type: type,
+                type: type, 
                 amount: adjustAmount,
-                balanceBefore: currentBalance,
-                balanceAfter: newBalance,
+                balanceBefore: balanceBefore,
+                balanceAfter: balanceAfter,
                 description: note,
                 referenceId: `MANUAL-${actor.id}-${Date.now()}`
             }

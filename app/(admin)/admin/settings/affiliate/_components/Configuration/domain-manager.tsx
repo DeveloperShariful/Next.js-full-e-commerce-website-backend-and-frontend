@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/Configuration/domain-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/domain-manager.tsx
 
 "use client";
 
@@ -6,8 +6,6 @@ import { useState, useTransition } from "react";
 import { AffiliateDomain } from "@prisma/client";
 import { Trash2, Globe, CheckCircle, RefreshCw, Copy, Plus, Loader2, Link as LinkIcon, ShieldCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-
-// ✅ CORRECTED IMPORT
 import { 
   addDomainAction, 
   deleteDomainAction, 

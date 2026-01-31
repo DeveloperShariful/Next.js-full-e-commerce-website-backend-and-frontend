@@ -16,7 +16,6 @@ import { revalidatePath } from "next/cache";
 export async function getAllAffiliateCoupons() {
   await protectAction("MANAGE_PARTNERS");
 
-  // শুধুমাত্র সেই কুপনগুলো আনবে যেগুলো কোনো অ্যাফিলিয়েট এর সাথে যুক্ত
   const coupons = await db.discount.findMany({
     where: {
       affiliateId: { not: null }
@@ -101,7 +100,7 @@ export async function unlinkCouponAction(couponId: string): Promise<ActionRespon
 
     await db.discount.update({
         where: { id: couponId },
-        data: { affiliateId: null } // Just unlink, don't delete history
+        data: { affiliateId: null }
     });
 
     revalidatePath("/admin/settings/affiliate");
@@ -129,7 +128,7 @@ export async function createTagAction(name: string): Promise<ActionResponse> {
         newData: { name }
     });
 
-    revalidatePath("/admin/settings/affiliate"); // Path updated just in case
+    revalidatePath("/admin/settings/affiliate");
     return { success: true, message: "Tag created." };
   } catch (error: any) {
     return { success: false, message: "Tag already exists or failed." };

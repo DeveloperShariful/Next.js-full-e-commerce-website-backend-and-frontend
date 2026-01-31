@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/Configuration/pixel-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/pixel-manager.tsx
 
 "use client";
 
@@ -6,9 +6,6 @@ import { useState, useTransition } from "react";
 import { AffiliatePixel } from "@prisma/client";
 import { Code2, Trash2, AlertCircle, ToggleLeft, ToggleRight, Facebook, Chrome } from "lucide-react";
 import { toast } from "sonner";
-
-// ✅ CORRECTED IMPORT
-// ✅ Use Named Imports
 import { deletePixelAction, togglePixelStatusAction } from "@/app/actions/admin/settings/affiliate/_services/pixel-domain-service";
 
 interface PixelWithUser extends AffiliatePixel {

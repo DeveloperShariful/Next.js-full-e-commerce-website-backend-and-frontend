@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/Configuration/network-tree.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Configuration/mlm-network-manager.tsx
 
 "use client";
 

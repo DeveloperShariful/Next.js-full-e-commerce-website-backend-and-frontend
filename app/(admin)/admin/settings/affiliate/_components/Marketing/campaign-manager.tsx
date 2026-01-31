@@ -1,4 +1,4 @@
-// File: app/(admin)/admin/settings/affiliate/_components/Marketing/campaign-list.tsx
+// File: app/(admin)/admin/settings/affiliate/_components/Marketing/campaign-manager.tsx
 
 "use client";
 
@@ -7,9 +7,6 @@ import { Trash2, Megaphone, Calendar, MousePointer, Percent } from "lucide-react
 import { toast } from "sonner";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format } from "date-fns";
-
-// ✅ Correct Import Path
-// ✅ Use Named Import
 import { deleteCampaignAction } from "@/app/actions/admin/settings/affiliate/_services/engagement-service";
 
 interface CampaignItem {

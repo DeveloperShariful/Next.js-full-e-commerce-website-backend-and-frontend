@@ -4,17 +4,16 @@
 
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { sendNotification } from "@/app/api/email/send-notification";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service";
 
 // =========================================
 // READ OPERATIONS
 // =========================================
 export async function getDocuments(page: number = 1, limit: number = 20, status?: string) {
-  await protectAction("MANAGE_PARTNERS"); // Or MANAGE_FINANCE
+  await protectAction("MANAGE_PARTNERS"); 
 
   const skip = (page - 1) * limit;
   const where: Prisma.AffiliateDocumentWhereInput = status && status !== "ALL" ? { status } : {};
@@ -49,14 +48,14 @@ export async function getDocuments(page: number = 1, limit: number = 20, status?
 }
 
 // =========================================
-// WRITE OPERATIONS
+// WRITE OPERATIONS (Transactional)
 // =========================================
 
 export async function verifyDocumentAction(documentId: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
-    const result = await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       const doc = await tx.affiliateDocument.findUnique({
         where: { id: documentId },
         include: { affiliate: { include: { user: true } } } 
@@ -64,7 +63,6 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
 
       if (!doc) throw new Error("Document not found");
 
-      // 1. Update Document Status
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
@@ -73,8 +71,6 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
           rejectionReason: null
         }
       });
-
-      // 2. Check if ALL documents are verified to update Account Status
       const pendingDocs = await tx.affiliateDocument.count({
         where: {
           affiliateId: doc.affiliateId,
@@ -89,6 +85,21 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
         });
       }
 
+      await tx.notificationQueue.create({
+          data: {
+              channel: "EMAIL",
+              recipient: doc.affiliate.user.email,
+              templateSlug: "KYC_VERIFIED",
+              status: "PENDING",
+              userId: doc.affiliate.userId,
+              content: "", 
+              metadata: { 
+                  affiliate_name: doc.affiliate.user.name || "Partner",
+                  document_type: doc.type.replace("_", " ") 
+              }
+          }
+      });
+
       await auditService.log({
         userId: actor.id,
         action: "VERIFY_KYC",
@@ -96,18 +107,6 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
         entityId: documentId,
         meta: { affiliateId: doc.affiliateId }
       });
-
-      return doc;
-    });
-
-    await sendNotification({
-        trigger: "KYC_VERIFIED",
-        recipient: result.affiliate.user.email,
-        data: { 
-            affiliate_name: result.affiliate.user.name || "Partner",
-            document_type: result.type.replace("_", " ") 
-        },
-        userId: result.affiliate.userId
     });
 
     revalidatePath("/admin/settings/affiliate/kyc");
@@ -123,7 +122,7 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
     
     if (!reason) return { success: false, message: "Rejection reason is required." };
 
-    const result = await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       const doc = await tx.affiliateDocument.findUnique({
         where: { id: documentId },
         include: { affiliate: { include: { user: true } } } 
@@ -140,10 +139,25 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
         }
       });
 
-      // Downgrade Account Status
       await tx.affiliateAccount.update({
         where: { id: doc.affiliateId },
         data: { kycStatus: "REJECTED" }
+      });
+
+      await tx.notificationQueue.create({
+          data: {
+              channel: "EMAIL",
+              recipient: doc.affiliate.user.email,
+              templateSlug: "KYC_REJECTED",
+              status: "PENDING",
+              userId: doc.affiliate.userId,
+              content: "", // Required
+              metadata: { 
+                  affiliate_name: doc.affiliate.user.name || "Partner",
+                  document_type: doc.type.replace("_", " "),
+                  rejection_reason: reason
+              }
+          }
       });
 
       await auditService.log({
@@ -153,19 +167,6 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
         entityId: documentId,
         meta: { reason, affiliateId: doc.affiliateId }
       });
-
-      return doc;
-    });
-
-    await sendNotification({
-        trigger: "KYC_REJECTED",
-        recipient: result.affiliate.user.email,
-        data: { 
-            affiliate_name: result.affiliate.user.name || "Partner",
-            document_type: result.type.replace("_", " "),
-            rejection_reason: reason
-        },
-        userId: result.affiliate.userId
     });
 
     revalidatePath("/admin/settings/affiliate/kyc");

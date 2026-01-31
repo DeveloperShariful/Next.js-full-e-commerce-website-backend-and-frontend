@@ -1,9 +1,9 @@
-// File: app/actions/admin/settings/affiliate/_services/analytics-service.ts
+// File: app/actions/admin/settings/affiliate/_services/dashboard-service.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { protectAction } from "../permission-service"; // ✅ Security
+import { protectAction } from "../permission-service"; 
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { unstable_cache } from "next/cache";
 import { 
@@ -18,7 +18,7 @@ import {
 import { DashboardKPI, ChartDataPoint, DateRange } from "../types";
 
 // =========================================
-// SECTION 1: DASHBOARD KPI & CHARTS (From stats-service)
+// SECTION 1: DASHBOARD KPI & CHARTS (ENTERPRISE OPTIMIZED)
 // =========================================
 
 export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> {
@@ -27,34 +27,30 @@ export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> 
   const from = range?.from || subMonths(new Date(), 1);
   const to = range?.to || new Date();
 
-  // Cache key based on date range to prevent stale data
+  // Ensure strict date boundaries
+  from.setHours(0,0,0,0);
+  to.setHours(23,59,59,999);
+
   const cacheKey = `affiliate-kpi-${from.toISOString()}-${to.toISOString()}`;
 
   return await unstable_cache(
     async () => {
-      const dateFilter = {
-        createdAt: {
-          gte: from,
-          lte: to,
-        }
-      };
-
-      const [financials, clicks, activeAffiliates, pendingApprovals, pendingPayouts] = await Promise.all([
-        db.referral.aggregate({
+      // ENTERPRISE UPDATE: Query Summary Table instead of Raw Referrals
+      // This changes complexity from O(N) orders to O(N) days (super fast)
+      
+      const [summaryStats, clicks, activeAffiliates, pendingApprovals, pendingPayouts] = await Promise.all([
+        db.affiliateAnalyticsSummary.aggregate({
           where: {
-            status: { in: ["APPROVED", "PAID"] },
-            ...dateFilter
+            date: { gte: from, lte: to }
           },
           _sum: {
-            totalOrderAmount: true,
-            commissionAmount: true,
-          },
-          _count: {
-            id: true,
+            revenue: true,
+            commission: true,
+            conversions: true
           }
         }),
         db.affiliateClick.count({
-          where: dateFilter
+          where: { createdAt: { gte: from, lte: to } }
         }),
         db.affiliateAccount.count({ where: { status: "ACTIVE" } }),
         db.affiliateAccount.count({ where: { status: "PENDING" } }),
@@ -64,9 +60,9 @@ export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> 
         })
       ]);
 
-      const revenue = DecimalMath.toNumber(financials._sum.totalOrderAmount ?? 0);
-      const commission = DecimalMath.toNumber(financials._sum.commissionAmount ?? 0);
-      const conversions = financials._count.id || 0;
+      const revenue = DecimalMath.toNumber(summaryStats._sum.revenue ?? 0);
+      const commission = DecimalMath.toNumber(summaryStats._sum.commission ?? 0);
+      const conversions = summaryStats._sum.conversions || 0;
       const conversionRate = clicks > 0 ? (conversions / clicks) * 100 : 0;
 
       return {
@@ -88,16 +84,23 @@ export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> 
 export async function getChartData(range: DateRange = { from: subDays(new Date(), 30), to: new Date() }): Promise<ChartDataPoint[]> {
   await protectAction("VIEW_ANALYTICS");
 
+  range.from.setHours(0,0,0,0);
+  range.to.setHours(23,59,59,999);
+
   const cacheKey = `affiliate-chart-${range.from.toISOString()}-${range.to.toISOString()}`;
 
   return await unstable_cache(
     async () => {
-      const referrals = await db.referral.findMany({
+      // ENTERPRISE UPDATE: GroupBy on Summary Table
+      const summaryData = await db.affiliateAnalyticsSummary.groupBy({
+        by: ['date'], 
         where: {
-          createdAt: { gte: range.from, lte: range.to },
-          status: { in: ["APPROVED", "PAID"] }
+            date: { gte: range.from, lte: range.to }
         },
-        select: { createdAt: true, totalOrderAmount: true, commissionAmount: true },
+        _sum: {
+            revenue: true,
+            commission: true
+        }
       });
 
       const clickData = await db.affiliateClick.groupBy({
@@ -110,23 +113,19 @@ export async function getChartData(range: DateRange = { from: subDays(new Date()
       
       return days.map(day => {
         const dayStr = format(day, "yyyy-MM-dd");
-        const dayStart = startOfDay(day);
-        const dayEnd = endOfDay(day);
-
-        const dayReferrals = referrals.filter(r => r.createdAt >= dayStart && r.createdAt <= dayEnd);
         
-        const dayRevenue = dayReferrals.reduce((sum, r) => sum + DecimalMath.toNumber(r.totalOrderAmount ?? 0), 0);
-        const dayCommission = dayReferrals.reduce((sum, r) => sum + DecimalMath.toNumber(r.commissionAmount ?? 0), 0);
+        // Find matching summary row
+        const dayStat = summaryData.find(s => format(s.date, "yyyy-MM-dd") === dayStr);
 
-        // Approximate clicks mapping (since groupBy returns date objects)
+        // Approximate clicks mapping (since groupBy returns date objects with time)
         const clicksForDay = clickData
           .filter(c => format(c.createdAt, "yyyy-MM-dd") === dayStr)
           .reduce((acc, curr) => acc + curr._count.id, 0);
 
         return {
           date: format(day, "MMM dd"),
-          revenue: dayRevenue,
-          commission: dayCommission,
+          revenue: DecimalMath.toNumber(dayStat?._sum.revenue ?? 0),
+          commission: DecimalMath.toNumber(dayStat?._sum.commission ?? 0),
           clicks: clicksForDay, 
         };
       });
@@ -137,14 +136,14 @@ export async function getChartData(range: DateRange = { from: subDays(new Date()
 }
 
 // =========================================
-// SECTION 2: DEEP ANALYTICS & TABLES (From analytics-service)
+// SECTION 2: DEEP ANALYTICS & TABLES (Optimized Raw Queries)
 // =========================================
 
 export async function getTopProducts(limit: number = 5) {
   try {
     await protectAction("VIEW_ANALYTICS");
 
-    // Raw SQL for performance on large OrderItem table
+    // Optimized Raw SQL for performance on large OrderItem table
     const result = await db.$queryRaw<any[]>`
       SELECT 
         "productName" as name,
@@ -222,6 +221,7 @@ export async function getMonthlyPerformance() {
 
     const start = subMonths(startOfMonth(new Date()), 5);
     
+    // Optimized Raw SQL for Monthly Aggregation
     const result = await db.$queryRaw<any[]>`
       SELECT 
         TO_CHAR("createdAt", 'Mon YYYY') as month,

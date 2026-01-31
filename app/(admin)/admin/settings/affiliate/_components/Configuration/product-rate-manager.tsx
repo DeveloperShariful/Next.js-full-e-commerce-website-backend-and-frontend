@@ -9,9 +9,6 @@ import { Plus, Search, Edit, Trash2, X, Loader2, Package, User, Users, CheckCirc
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-
-// ✅ Correct Import Path
-// ✅ Use Named Imports
 import { deleteRateAction, upsertRateAction } from "@/app/actions/admin/settings/affiliate/_services/product-rate-service";
 
 // Types

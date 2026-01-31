@@ -4,7 +4,6 @@
 
 import { db } from "@/lib/prisma";
 import { auditService } from "@/lib/services/audit-service";
-import { sendNotification } from "@/app/api/email/send-notification";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { updateRiskScore } from "./_services/fraud-service";
 
@@ -12,17 +11,11 @@ const BATCH_SIZE = 50;
 
 export async function processDailyJobs() {
   try {
-    console.log("⏳ Starting Daily Cron Jobs...");
-    const results = await Promise.allSettled([
-        processPendingReferrals(),
-        runTierUpgrades(),
-        runFraudAnalysis()
-    ]);
-
-    const failed = results.filter(r => r.status === "rejected");
-    if (failed.length > 0) {
-        throw new Error(`Some jobs failed: ${failed.map((f: any) => f.reason).join(", ")}`);
-    }
+    console.log("⏳ Starting Enterprise Cron Jobs...");
+    
+    await processPendingReferrals();
+    await runTierUpgrades();
+    await runFraudAnalysis();
 
     return { success: true };
   } catch (error: any) {
@@ -33,6 +26,7 @@ export async function processDailyJobs() {
 
 export async function processPendingReferrals() {
   const now = new Date();
+  
   const readyReferrals = await db.referral.findMany({
     where: {
       status: "PENDING",
@@ -45,27 +39,26 @@ export async function processPendingReferrals() {
 
   const results = await Promise.allSettled(readyReferrals.map(async (ref) => {
     return await db.$transaction(async (tx) => {
-       
-        const affiliate = await tx.affiliateAccount.findUnique({
-          where: { id: ref.affiliateId }
-        });
 
-        if (!affiliate) throw new Error(`Affiliate ${ref.affiliateId} missing`);
-
-        const balanceBefore = affiliate.balance;
-        const balanceAfter = DecimalMath.add(affiliate.balance, ref.commissionAmount);
-        await tx.referral.update({
-          where: { id: ref.id },
-          data: { status: "APPROVED" }
-        });
-
-        await tx.affiliateAccount.update({
+        const updatedAffiliate = await tx.affiliateAccount.update({
           where: { id: ref.affiliateId },
           data: {
             balance: { increment: ref.commissionAmount },
             totalEarnings: { increment: ref.commissionAmount }
+          },
+          select: { id: true, balance: true, userId: true, user: { select: { email: true } } }
+        });
+
+        await tx.referral.update({
+          where: { id: ref.id },
+          data: { 
+              status: "APPROVED",
+              paidAt: new Date()
           }
         });
+
+        const balanceAfter = updatedAffiliate.balance;
+        const balanceBefore = DecimalMath.sub(balanceAfter, ref.commissionAmount);
 
         await tx.affiliateLedger.create({
           data: {
@@ -78,72 +71,93 @@ export async function processPendingReferrals() {
             referenceId: `REL-${ref.id}` 
           }
         });
-        return { ref, affiliate };
+
+        await tx.notificationQueue.create({
+            data: {
+                channel: "EMAIL",
+                recipient: updatedAffiliate.user.email,
+                templateSlug: "COMMISSION_APPROVED",
+                status: "PENDING",
+                userId: updatedAffiliate.userId,
+                content: "", 
+                metadata: {
+                    amount: ref.commissionAmount.toString(),
+                    order_id: ref.orderId
+                }
+            }
+        });
+
+        return { ref, updatedAffiliate };
     });
   }));
 
-
-  const successful = results.filter(r => r.status === "fulfilled").map((r: any) => r.value);
   const failed = results.filter(r => r.status === "rejected");
-
   if (failed.length > 0) {
-      await auditService.systemLog("ERROR", "CRON_REFERRAL", `Failed to release ${failed.length} referrals`, { errors: failed.map((f:any) => f.reason) });
+      await auditService.systemLog("ERROR", "CRON_REFERRAL", `Failed to release ${failed.length} referrals`, { 
+        errors: failed.map((f:any) => f.reason?.message).slice(0, 5) 
+      });
   }
-
-  for (const item of successful) {
-      await sendNotification({
-          trigger: "COMMISSION_APPROVED",
-          recipient: item.affiliate.user.email,
-          data: {
-              amount: item.ref.commissionAmount.toString(),
-              order_id: item.ref.orderId
-          },
-          userId: item.affiliate.userId
-      }).catch(console.error);
-  }
+  
 }
 
 export async function runTierUpgrades() {
   const tiers = await db.affiliateTier.findMany({ orderBy: { minSalesAmount: 'desc' } });
+  
   const activeAffiliates = await db.affiliateAccount.findMany({
     where: { 
         status: "ACTIVE",
-        updatedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } 
+        updatedAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) } 
     },
     include: { tier: true, user: true }
   });
 
-  await Promise.allSettled(activeAffiliates.map(async (affiliate) => {
-    const earnings = affiliate.totalEarnings.toNumber();
-    const salesCount = await db.referral.count({ where: { affiliateId: affiliate.id, status: "PAID" } });
-    
-    const eligibleTier = tiers.find(t => earnings >= t.minSalesAmount.toNumber() && salesCount >= t.minSalesCount);
-
-    if (eligibleTier && eligibleTier.id !== affiliate.tierId) {
-      const currentReq = affiliate.tier?.minSalesAmount.toNumber() || 0;
-      
-      if (eligibleTier.minSalesAmount.toNumber() > currentReq) {
-        await db.affiliateAccount.update({ where: { id: affiliate.id }, data: { tierId: eligibleTier.id } });
-        
-        await sendNotification({
-          trigger: "TIER_UPGRADED",
-          recipient: affiliate.user.email,
-          data: { affiliate_name: affiliate.user.name, tier_name: eligibleTier.name },
-          userId: affiliate.userId
+  for (const affiliate of activeAffiliates) {
+      try {
+        const earnings = affiliate.totalEarnings.toNumber();
+        const salesCount = await db.referral.count({ 
+            where: { affiliateId: affiliate.id, status: { in: ["APPROVED", "PAID"] } } 
         });
+        
+        const eligibleTier = tiers.find(t => earnings >= t.minSalesAmount.toNumber() && salesCount >= t.minSalesCount);
+
+        if (eligibleTier && eligibleTier.id !== affiliate.tierId) {
+            const currentReq = affiliate.tier?.minSalesAmount.toNumber() || 0;
+            
+            if (eligibleTier.minSalesAmount.toNumber() > currentReq) {
+                await db.affiliateAccount.update({ 
+                    where: { id: affiliate.id }, 
+                    data: { tierId: eligibleTier.id } 
+                });
+                
+                await db.notificationQueue.create({
+                    data: {
+                        channel: "EMAIL",
+                        recipient: affiliate.user.email,
+                        templateSlug: "TIER_UPGRADED",
+                        status: "PENDING",
+                        userId: affiliate.userId,
+                        content: "", // Required field
+                        metadata: { 
+                            affiliate_name: affiliate.user.name, 
+                            tier_name: eligibleTier.name 
+                        }
+                    }
+                });
+            }
+        }
+      } catch (err) {
+          console.error(`Tier Check Failed for ${affiliate.id}`, err);
       }
-    }
-  }));
+  }
 }
 
-
 export async function runFraudAnalysis() {
+
   const activeAffiliates = await db.affiliateClick.findMany({
     where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
     select: { affiliateId: true },
     distinct: ['affiliateId']
   });
-
   
   for (const item of activeAffiliates) {
     if (item.affiliateId) {

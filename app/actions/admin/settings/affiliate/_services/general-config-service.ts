@@ -99,7 +99,6 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
     };
 
     const currentSettings = await getSettings();
-    
     const { hasChanges, changes, oldValues } = currentSettings 
         ? getChanges(currentSettings, payload)
         : { hasChanges: true, changes: payload, oldValues: null };

@@ -592,12 +592,12 @@ model Product {
   purchaseNote             String?
   enableReviews            Boolean                @default(true)
   affiliateCommissionRate  Decimal?               @db.Decimal(5, 2)
+  affiliateCommissionType  CommissionType         @default(PERCENTAGE)
   disableAffiliate         Boolean                @default(false)
   affiliateRates           AffiliateProductRate[]
   deletedAt                DateTime?
   version                  Int                    @default(1)
   
-  // FIXED: Vector embeddings using proper pgvector syntax
   descriptionEmbedding     Unsupported("vector(1536)")?
   imageEmbedding           Unsupported("vector(512)")?
   
@@ -606,7 +606,6 @@ model Product {
   orderItems               OrderItem[]
   cartItems                CartItem[]
   
-  // Audit fields
   createdBy                String?
   updatedBy                String?
   
@@ -1288,7 +1287,7 @@ model Discount {
   ruleLogic        Json?
   isActive         Boolean      @default(true)
   orders           Order[]
-  
+  affiliateCommissionRate Decimal?       @db.Decimal(5, 2)
   affiliateId      String?
   affiliate        AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
 
@@ -2150,8 +2149,9 @@ model AffiliateClick {
   deviceType        String?
   converted         Boolean          @default(false)
   orderId           String?
+  batchId           String?         // Kon Cron Job run a ata insert hoyece tar ID
+  isAggregated      Boolean          @default(false)
   
-  // UTM & Tracking
   utmSource         String?                                         
   utmMedium         String?                                     
   utmCampaign       String?                                     
@@ -2195,7 +2195,7 @@ model Referral {
   fromDownlineId  String?
   metadata        Json?
   availableAt     DateTime?
-
+  productsBreakdown Json?
   commissionRuleId  String?                       
   matchedRule       AffiliateCommissionRule?      @relation(fields: [commissionRuleId], references: [id], onDelete: SetNull)
   

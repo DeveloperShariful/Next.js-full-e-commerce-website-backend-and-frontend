@@ -19,28 +19,6 @@ export interface AffiliateProfileDTO {
   balance: number;
 }
 
-export interface AffiliateConfigDTO {
-  programName?: string;
-  termsUrl?: string;
-  excludeShipping?: boolean;
-  excludeTax?: boolean;
-  autoApplyCoupon?: boolean;
-  zeroValueReferrals?: boolean;
-  referralParam?: string;
-  customSlugsEnabled?: boolean;
-  autoCreateSlug?: boolean;
-  slugLimit?: number;
-  cookieDuration?: number;
-  allowSelfReferral?: boolean;
-  isLifetimeLinkOnPurchase?: boolean;
-  lifetimeDuration?: number | null;
-  holdingPeriod?: number;
-  minimumPayout?: number;
-  payoutMethods?: string[];
-  autoApprovePayout?: boolean;
-  commissionRate?: number; 
-  commissionType?: "PERCENTAGE" | "FIXED"; 
-}
 
 export interface DashboardStats {
   clicks: number;

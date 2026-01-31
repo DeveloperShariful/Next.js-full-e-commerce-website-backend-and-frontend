@@ -6,7 +6,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/prisma";
 import { PayoutMethod } from "@prisma/client";
-import { AffiliateConfigDTO } from "@/app/actions/admin/settings/affiliates/types";
+import { AffiliateConfigDTO } from "@/app/actions/admin/settings/affiliate/types";
 
 const payoutSchema = z.object({
   userId: z.string(),

@@ -9,6 +9,8 @@ import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { z } from "zod";
 import { protectAction } from "../permission-service";
+import { Prisma } from "@prisma/client";
+import { getChanges } from "../get-changes"; 
 
 const groupSchema = z.object({
   id: z.string().optional(),
@@ -43,7 +45,7 @@ export async function getAllGroups() {
 }
 
 // =========================================
-// WRITE OPERATIONS
+// WRITE OPERATIONS (UPSERT)
 // =========================================
 
 export async function upsertGroupAction(data: GroupInput): Promise<ActionResponse> {
@@ -62,9 +64,8 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
     const payload = result.data;
     const rateValue = payload.commissionRate ? DecimalMath.toDecimal(payload.commissionRate as any) : null;
 
-    // ENTERPRISE: Use Transaction to handle Default Group Logic safely
     await db.$transaction(async (tx) => {
-      // 1. If setting as default, unset previous default
+      
       if (payload.isDefault) {
         await tx.affiliateGroup.updateMany({
           where: { isDefault: true, id: { not: payload.id } },
@@ -74,38 +75,67 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
 
       let groupId = payload.id;
 
+      // =========================================================
+      // UPDATE SCENARIO
+      // =========================================================
       if (payload.id) {
-        await tx.affiliateGroup.update({
-          where: { id: payload.id },
-          data: {
-            name: payload.name,
-            description: payload.description,
-            commissionRate: rateValue,
-            commissionType: payload.commissionType, 
-            isDefault: payload.isDefault,
-          },
+        const existing = await tx.affiliateGroup.findUnique({
+          where: { id: payload.id }
         });
-      } else {
+
+        if (!existing) throw new Error("Group not found");
+
+        const targetData = {
+            name: payload.name,
+            description: payload.description || null,
+            commissionRate: rateValue,
+            commissionType: payload.commissionType,
+            isDefault: payload.isDefault
+        };
+
+        const { hasChanges, changes, oldValues } = getChanges(existing, targetData);
+
+        if (hasChanges) {
+          await tx.affiliateGroup.update({
+            where: { id: payload.id },
+            data: changes as Prisma.AffiliateGroupUpdateInput,
+          });
+
+          await auditService.log({
+            userId: actor.id,
+            action: "UPDATE_GROUP",
+            entity: "AffiliateGroup",
+            entityId: payload.id,
+            oldData: oldValues, 
+            newData: changes    
+          });
+        }
+
+      } 
+      // =========================================================
+      // CREATE SCENARIO
+      // =========================================================
+      else {
         const created = await tx.affiliateGroup.create({
           data: {
             name: payload.name,
             slug: payload.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
             description: payload.description,
             commissionRate: rateValue,
-            commissionType: payload.commissionType ,
+            commissionType: payload.commissionType,
             isDefault: payload.isDefault,
           },
         });
         groupId = created.id;
-      }
 
-      await auditService.log({
-        userId: actor.id,
-        action: payload.id ? "UPDATE_GROUP" : "CREATE_GROUP",
-        entity: "AffiliateGroup",
-        entityId: groupId!,
-        newData: payload
-      });
+        await auditService.log({
+          userId: actor.id,
+          action: "CREATE_GROUP",
+          entity: "AffiliateGroup",
+          entityId: groupId,
+          newData: payload
+        });
+      }
     });
 
     revalidatePath("/admin/settings/affiliate/groups");
@@ -113,27 +143,30 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
 
   } catch (error: any) {
     if (error.code === 'P2002') return { success: false, message: "A group with this name already exists." };
-    return { success: false, message: "Failed to save group." };
+    return { success: false, message: error.message || "Failed to save group." };
   }
 }
+
+// =========================================
+// DELETE OPERATION
+// =========================================
 
 export async function deleteGroupAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
-
-    // Integrity Check
     const count = await db.affiliateAccount.count({ where: { groupId: id } });
     if (count > 0) {
         return { success: false, message: `Cannot delete: ${count} affiliates are in this group.` };
     }
 
-    await db.affiliateGroup.delete({ where: { id } });
+    const deleted = await db.affiliateGroup.delete({ where: { id } });
 
     await auditService.log({
       userId: actor.id,
       action: "DELETE_GROUP",
       entity: "AffiliateGroup",
-      entityId: id
+      entityId: id,
+      oldData: { name: deleted.name }
     });
     
     revalidatePath("/admin/settings/affiliate/groups");

@@ -22,6 +22,7 @@ import * as ledgerService from "@/app/actions/admin/settings/affiliate/_services
 import * as analyticsService from "@/app/actions/admin/settings/affiliate/_services/dashboard-service";
 import * as groupService from "@/app/actions/admin/settings/affiliate/_services/group-service";
 import * as couponTagService from "@/app/actions/admin/settings/affiliate/_services/coupon-tag-service";
+import * as logService from "@/app/actions/admin/settings/affiliate/_services/log-service"; // ✅ Import Log Service
 import { serializePrismaData } from "@/lib/format-data"; 
 
 export const metadata = {
@@ -29,10 +30,18 @@ export const metadata = {
   description: "Advanced control center for affiliate marketing, MLM, and commission management.",
 };
 
+// ✅ TYPE DEFINITION UPDATED
 export default async function AffiliateMasterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; page?: string; search?: string; status?: string }>;
+  searchParams: Promise<{ 
+    view?: string; 
+    page?: string; 
+    search?: string; 
+    status?: string;
+    logType?: string; // ✅ Added
+    level?: string;   // ✅ Added
+  }>;
 }) {
   const params = await searchParams;
   const currentView = params.view || "overview";
@@ -69,7 +78,8 @@ export default async function AffiliateMasterPage({
             monthlyStats 
         };
         break;
-      case "partners": // Merged View: Users + Groups + Tags
+      
+      case "partners": 
         const [usersData, groupsList, tagsList] = await Promise.all([
           accountService.getAffiliates(page, 20, params.status as any, search),
           groupService.getAllGroups(),
@@ -146,14 +156,28 @@ export default async function AffiliateMasterPage({
         break;
         
       case "general":
-        // Fetch MLM Config specifically for the settings page
         data.mlmConfig = await db.affiliateMLMConfig.findUnique({ where: { id: "mlm_config" } });
         break;
+        
       case "tags":
         data.tags = await couponTagService.getAllTags();
         break;
+        
       case "coupons":
         data.coupons = await couponTagService.getAllAffiliateCoupons(); 
+        break;
+
+      case "logs": // ✅ Logs View Added
+        const logType = params.logType || "AUDIT"; 
+        const [auditLogs, systemLogs] = await Promise.all([
+            logService.getAuditLogs(page, 20, search),
+            logService.getSystemLogs(page, 20, params.level as string)
+        ]);
+        data.logs = { 
+            audit: auditLogs, 
+            system: systemLogs, 
+            currentTab: logType 
+        };
         break;
     }
   } catch (error: any) {

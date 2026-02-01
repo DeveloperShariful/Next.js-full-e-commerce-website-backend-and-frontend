@@ -277,7 +277,7 @@ model User {
   // Audit fields
   createdBy             String?
   updatedBy             String?
-
+  auditLogs             AuditLog[]
   addresses             Address[]
   paymentMethods        UserPaymentMethod[]
   orders                Order[]
@@ -1980,6 +1980,7 @@ model OfflinePaymentConfig {
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   action    String
   tableName String
   recordId  String

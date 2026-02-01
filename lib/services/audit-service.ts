@@ -30,10 +30,12 @@ export const auditService = {
         });
         return copy;
       };
+      
+      const finalUserId = userId && userId !== "system" ? userId : null;
 
       await db.auditLog.create({
         data: {
-          userId: userId || "system",
+          userId: finalUserId,
           action: action,
           tableName: entity,
           recordId: entityId,

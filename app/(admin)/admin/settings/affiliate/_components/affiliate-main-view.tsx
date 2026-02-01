@@ -8,7 +8,7 @@ import {
   LayoutDashboard, CreditCard, Settings, Trophy, Calculator, 
   Image as ImageIcon, Network, ShieldAlert, Code2, 
   Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2, Ticket, Tag,
-  Users
+  Users, Terminal 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationCenter } from "./notification-center";
@@ -31,6 +31,7 @@ import PixelList from "./Configuration/pixel-manager";
 import ProductRateManager from "./Configuration/product-rate-manager";
 import AffiliateGeneralConfigForm from "./Configuration/general-config-manager";
 import TagManager from "./Configuration/tag-manager";
+import LogViewer from "./log-viewer";
 
 interface Props {
   initialData: any;
@@ -87,6 +88,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         { id: "pixels", label: "Tracking Pixels", icon: Code2 },
         { id: "tags", label: "System Tags", icon: Tag },
         { id: "general", label: "System Settings", icon: Settings },
+        { id: "logs", label: "Activity Logs", icon: Terminal },
     ]}
   ];
 
@@ -151,7 +153,15 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
       case "domains": return initialData.domains ? <DomainList initialDomains={initialData.domains} /> : null;
       case "pixels": return initialData.pixels ? <PixelList pixels={initialData.pixels} /> : null;
       case "tags": return initialData.tags ? <TagManager initialTags={initialData.tags} /> : null;
-      case "coupons": return initialData.coupons ? <CouponManager initialCoupons={initialData.coupons} /> : null;
+      case "coupons": return initialData.coupons ? <CouponManager initialCoupons={initialData.coupons} /> : null; 
+      case "logs": return initialData.logs ? (
+        <LogViewer 
+          auditData={initialData.logs.audit} 
+          systemData={initialData.logs.system} 
+          currentPage={Number(searchParams.get("page")) || 1}
+          currentTab={initialData.logs.currentTab}
+        />
+      ) : null;
 
       case "general": return initialData.config ? (
         <AffiliateGeneralConfigForm 

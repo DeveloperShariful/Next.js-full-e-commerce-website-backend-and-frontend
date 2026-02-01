@@ -5,24 +5,45 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Link as LinkIcon, Copy, QrCode, ArrowRight, Loader2, Search, Globe, MousePointer2, Sparkles } from "lucide-react";
+import { Link as LinkIcon, QrCode, ArrowRight, Loader2, Search, Globe, MousePointer2, Sparkles } from "lucide-react";
 import { generateLinkAction } from "@/app/actions/storefront/affiliates/mutations/generate-link";
 import CopyButton from "./copy-button"; 
 
-interface Props {
-  initialLinks: any[];
-  campaigns: any[];
-  userId: string;
-  defaultSlug: string;
-  baseUrl?: string;
-  paramName?: string;
+interface Campaign {
+  id: string;
+  name: string;
 }
 
-export default function LinkManager({ initialLinks, campaigns, userId, defaultSlug, baseUrl = "https://gobike.au", paramName = "ref" }: Props) {
+interface AffiliateLink {
+  id: string;
+  slug: string;
+  destinationUrl: string;
+  clickCount: number;
+  campaign?: { name: string } | null;
+}
+
+interface Props {
+  initialLinks: AffiliateLink[];
+  campaigns: Campaign[];
+  userId: string;
+  defaultSlug: string;
+  baseUrl?: string;   // Dynamic Base URL
+  paramName?: string; // Dynamic Param Name (ref/aff)
+}
+
+export default function LinkManager({ 
+  initialLinks, 
+  campaigns, 
+  userId, 
+  defaultSlug, 
+  baseUrl = typeof window !== 'undefined' ? window.location.origin : " ", // Fallback to window origin
+  paramName = " " // Default fallback if config is missing
+}: Props) {
   const [isPending, startTransition] = useTransition();
   const [searchTerm, setSearchTerm] = useState("");
   
-  const { register, handleSubmit, reset } = useForm({
+  // React Hook Form Setup
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: {
       destinationUrl: "",
       customSlug: "",
@@ -30,30 +51,36 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
     }
   });
 
+  // Handle Form Submission
   const onSubmit = (data: any) => {
     startTransition(async () => {
-      const res = await generateLinkAction({ ...data, userId });
+      const formData = { ...data, userId }; // Pass userId dynamically
+      const res = await generateLinkAction(formData);
+      
       if (res.success) {
         toast.success("Link created successfully!");
         reset();
+        // The page will automatically revalidate if you used revalidatePath in server action
       } else {
         toast.error(res.message);
       }
     });
   };
 
-  const defaultLink = `${baseUrl}?${paramName}=${defaultSlug}`;
+  // Dynamic Main Link Construction
+  const defaultLink = `${baseUrl}/?${paramName}=${defaultSlug}`;
 
-  // Filter Links
+  // Filter Links Dynamically
   const filteredLinks = initialLinks.filter(link => 
     link.destinationUrl.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    link.slug.toLowerCase().includes(searchTerm.toLowerCase())
+    link.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    link.campaign?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
       
-      {/* 1. HERO CARD (Default Link) */}
+      {/* 1. HERO CARD (Dynamic Main Link) */}
       <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-8 text-white shadow-lg">
         {/* Background Patterns */}
         <div className="absolute top-0 right-0 -mr-10 -mt-10 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -78,7 +105,7 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* 2. LEFT: GENERATOR FORM */}
+        {/* 2. LEFT: GENERATOR FORM (Dynamic) */}
         <div className="lg:col-span-1">
           <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm sticky top-24">
             <div className="mb-6 pb-4 border-b border-gray-100">
@@ -89,30 +116,50 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              
+              {/* Destination URL Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 uppercase">Target URL</label>
                 <input 
-                  {...register("destinationUrl", { required: true })}
-                  placeholder="https://gobike.au/product/helmet"
+                  {...register("destinationUrl", { 
+                    required: "Destination URL is required",
+                    pattern: {
+                        value: /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/,
+                        message: "Please enter a valid URL"
+                    }
+                  })}
+                  placeholder={`${baseUrl}/shop/helmet`}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 />
+                {errors.destinationUrl && <p className="text-xs text-red-500">{errors.destinationUrl.message as string}</p>}
               </div>
               
+              {/* Custom Slug Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 uppercase">Custom Slug (Optional)</label>
                 <div className="flex items-center">
                   <span className="bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2.5 text-xs text-gray-500 font-medium">go/</span>
                   <input 
-                    {...register("customSlug")}
+                    {...register("customSlug", {
+                        pattern: {
+                            value: /^[a-zA-Z0-9-_]+$/,
+                            message: "Alphanumeric, dashes & underscores only"
+                        }
+                    })}
                     placeholder="summer-sale"
                     className="w-full border border-gray-300 rounded-r-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                   />
                 </div>
+                {errors.customSlug && <p className="text-xs text-red-500">{errors.customSlug.message as string}</p>}
               </div>
 
+              {/* Campaign Select (Dynamic) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 uppercase">Campaign (Track Source)</label>
-                <select {...register("campaignId")} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                <select 
+                    {...register("campaignId")} 
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all cursor-pointer"
+                >
                   <option value="">No Campaign</option>
                   {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -130,7 +177,7 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
           </div>
         </div>
 
-        {/* 3. RIGHT: LINKS LIST */}
+        {/* 3. RIGHT: LINKS LIST (Dynamic Data) */}
         <div className="lg:col-span-2 space-y-4">
           
           {/* List Header & Search */}
@@ -155,14 +202,17 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
                     <p>No links found.</p>
                 </div>
             ) : (
-                filteredLinks.map((link) => (
+                filteredLinks.map((link) => {
+                    const shortUrl = `${baseUrl}/go/${link.slug}`;
+                    
+                    return (
                     <div key={link.id} className="bg-white p-5 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                             
                             {/* Link Info */}
                             <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-bold text-indigo-700 text-base bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <span className="font-bold text-indigo-700 text-base bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 break-all">
                                         /go/{link.slug}
                                     </span>
                                     {link.campaign && (
@@ -172,14 +222,14 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
                                     )}
                                 </div>
                                 <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                                    <ArrowRight className="w-3 h-3" /> {link.destinationUrl}
+                                    <ArrowRight className="w-3 h-3 shrink-0" /> <span className="truncate">{link.destinationUrl}</span>
                                 </p>
                             </div>
 
                             {/* Stats */}
                             <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-lg border border-gray-100 shrink-0">
                                 <div className="text-center px-2">
-                                    <span className="block font-bold text-lg text-gray-900 leading-tight">{link.clickCount}</span>
+                                    <span className="block font-bold text-lg text-gray-900 leading-tight">{link.clickCount.toLocaleString()}</span>
                                     <span className="text-[10px] text-gray-400 uppercase font-bold flex items-center gap-1">
                                         <MousePointer2 className="w-3 h-3" /> Clicks
                                     </span>
@@ -187,11 +237,11 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
                             </div>
                         </div>
                         
-                        {/* Actions (ALWAYS VISIBLE NOW) */}
-                        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between sm:justify-start gap-3">
-                            <div className="flex-1 sm:flex-none">
+                        {/* Actions */}
+                        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between sm:justify-start gap-3 flex-wrap">
+                            <div className="flex-1 sm:flex-none min-w-[120px]">
                                 <CopyButton 
-                                    text={`${baseUrl}/go/${link.slug}`} 
+                                    text={shortUrl} 
                                     className="w-full sm:w-auto bg-gray-900 text-white hover:bg-black border-0 py-2 px-4 shadow-sm" 
                                 />
                             </div>
@@ -199,13 +249,18 @@ export default function LinkManager({ initialLinks, campaigns, userId, defaultSl
                                 <QrCode className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">QR Code</span>
                             </button>
-                            <button className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm ml-auto sm:ml-0">
+                            <a 
+                                href={shortUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm ml-auto sm:ml-0 decoration-0"
+                            >
                                 <Globe className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">Test Link</span>
-                            </button>
+                            </a>
                         </div>
                     </div>
-                ))
+                )})
             )}
           </div>
         </div>

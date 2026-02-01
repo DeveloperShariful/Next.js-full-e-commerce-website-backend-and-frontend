@@ -64,8 +64,6 @@ export default function GroupManager({ initialGroups }: Props) {
     setGroups(initialGroups);
   }, [initialGroups]);
 
-  // --- Filter & Sort Logic ---
-  
   const filteredGroups = useMemo(() => {
     let result = [...groups];
 
@@ -438,20 +436,46 @@ function SortableHeader({ label, field, currentSort, currentDir, onSort }: any) 
 
 function GroupConfigModal({ isOpen, onClose, initialData }: any) {
     const [isPending, startTransition] = useTransition();
+    const { symbol } = useGlobalStore(); 
+    const currency = symbol || "$";
     
-    const { register, handleSubmit, watch, formState: { errors } } = useForm({
+    // ১. watch ফাংশনটি বের করে নিন
+    const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm({
         defaultValues: {
-            name: initialData?.name || "",
-            description: initialData?.description || "",
-            commissionRate: initialData?.commissionRate ? Number(initialData.commissionRate) : "",
-            isDefault: initialData?.isDefault || false,
-             commissionType: initialData?.commissionType || "PERCENTAGE" 
+            name: "",
+            description: "",
+            commissionRate: "",
+            isDefault: false,
+            commissionType: "PERCENTAGE" 
         }
     });
 
+    const commissionType = watch("commissionType");
+
+    useEffect(() => {
+        if (isOpen) {
+            if (initialData) {
+                reset({
+                    name: initialData.name,
+                    description: initialData.description || "",
+                    commissionRate: initialData.commissionRate ? String(initialData.commissionRate) : "",
+                    isDefault: initialData.isDefault || false,
+                    commissionType: initialData.commissionType || "PERCENTAGE"
+                });
+            } else {
+                reset({
+                    name: "",
+                    description: "",
+                    commissionRate: "",
+                    isDefault: false,
+                    commissionType: "PERCENTAGE"
+                });
+            }
+        }
+    }, [initialData, isOpen, reset]);
+
     const onSubmit = (data: any) => {
         startTransition(async () => {
-            // ✅ Call Service Method Directly
             const res = await upsertGroupAction({ ...data, id: initialData?.id });
             if(res.success) {
                 toast.success(res.message);
@@ -465,10 +489,6 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
 
     if(!isOpen) return null;
 
-    // টাইপ অনুযায়ী আইকন এবং প্লেসহোল্ডার চেঞ্জ করার জন্য
-    const commissionType = watch("commissionType");
-    const { symbol } = useGlobalStore(); 
-    const currency = symbol || "";
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -479,11 +499,11 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
                     <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-black" /></button>
                 </div>
                 
-                {/* Scrollable Form Body */}
+                {/* Body */}
                 <div className="p-6 overflow-y-auto">
                     <form id="group-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                         
-                        {/* Group Name */}
+                        {/* Name */}
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-gray-700 uppercase">Group Name</label>
                             <input 
@@ -505,42 +525,58 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
                             />
                         </div>
 
-                        {/* 🔥 UPDATED: Commission Structure (Type + Rate) */}
+                        {/* Commission Structure */}
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold text-gray-700 uppercase">Commission Structure</label>
                             
                             <div className="flex gap-3">
-                                {/* Type Selector */}
-                                <div className="w-1/3">
-                                    <select 
-                                        {...register("commissionType")} 
-                                        className="w-full h-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-black/5 outline-none font-medium cursor-pointer"
+                                {/* Type Selector Buttons */}
+                                <div className="flex p-1 bg-gray-100 rounded-lg border border-gray-200 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => setValue("commissionType", "PERCENTAGE")}
+                                        className={cn(
+                                            "px-3 py-2 text-xs font-bold rounded-md flex items-center gap-1 transition-all",
+                                            commissionType === "PERCENTAGE" 
+                                                ? "bg-white text-black shadow-sm ring-1 ring-black/5" 
+                                                : "text-gray-500 hover:text-gray-700"
+                                        )}
                                     >
-                                        <option value="PERCENTAGE">Percent (%)</option>
-                                        <option value="FIXED">Fixed ({currency})</option>
-                                    </select>
+                                        <Percent className="w-3 h-3" /> %
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setValue("commissionType", "FIXED")}
+                                        className={cn(
+                                            "px-3 py-2 text-xs font-bold rounded-md flex items-center gap-1 transition-all",
+                                            commissionType === "FIXED" 
+                                                ? "bg-white text-black shadow-sm ring-1 ring-black/5" 
+                                                : "text-gray-500 hover:text-gray-700"
+                                        )}
+                                    >
+                                        <DollarSign className="w-3 h-3" /> Fixed
+                                    </button>
                                 </div>
 
                                 {/* Rate Input */}
                                 <div className="relative flex-1">
-                                    <div className="absolute left-3 top-2.5 text-gray-400 pointer-events-none">
-                                        {commissionType === "FIXED" ? (
-                                            <DollarSign className="w-4 h-4" />
-                                        ) : (
-                                            <Percent className="w-4 h-4" />
-                                        )}
+                                    <div className="absolute left-3 top-2.5 text-gray-400 pointer-events-none font-bold text-xs">
+                                        {/* Dynamic Icon based on watch value */}
+                                        {commissionType === "FIXED" ? currency : <Percent className="w-3.5 h-3.5" />}
                                     </div>
                                     <input 
                                         type="number" 
                                         step="0.01" 
                                         {...register("commissionRate")} 
-                                        className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" 
-                                        placeholder={commissionType === "FIXED" ? "e.g. 50.00" : "e.g. 10"} 
+                                        className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all font-bold" 
+                                        placeholder={commissionType === "FIXED" ? "50.00" : "10"} 
                                     />
                                 </div>
                             </div>
                             <p className="text-[10px] text-gray-400 pt-1">
-                                Choose between Percentage or Fixed Amount. Leave empty to use system default.
+                                {commissionType === "FIXED" 
+                                    ? `Affiliates will earn a flat ${currency} amount per order.` 
+                                    : "Affiliates will earn a percentage of the order subtotal."}
                             </p>
                         </div>
 
@@ -560,7 +596,7 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
                     </form>
                 </div>
 
-                {/* Footer Actions */}
+                {/* Footer */}
                 <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0">
                     <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
                     <button type="submit" form="group-form" disabled={isPending} className="px-6 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 flex items-center gap-2 shadow-lg active:scale-95 transition-all">

@@ -48,7 +48,8 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
     });
   };
 
-  const enableMLM = (initialData?.config as any)?.enableMLM ?? false;
+  const config = initialData?.config || {};
+  const enableMLM = config.enableMLM ?? false;
 
   const MENU_ITEMS = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
@@ -67,7 +68,18 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
 
     switch (activeTab) {
       case "overview": return initialData.dashboard ? <DashboardOverview data={initialData.dashboard} currency={currency} userName={profile.name} /> : null;
-      case "links": return initialData.marketing ? <LinkManager initialLinks={initialData.marketing.links} campaigns={initialData.marketing.campaigns} userId={profile.userId} defaultSlug={profile.slug} /> : null;
+      case "links": 
+        return initialData.marketing ? (
+            <LinkManager 
+                initialLinks={initialData.marketing.links} 
+                campaigns={initialData.marketing.campaigns} 
+                userId={profile.userId} 
+                defaultSlug={profile.slug}
+                baseUrl={config.baseUrl} 
+                paramName={config.paramName}
+            />
+        ) : null;
+
       case "creatives": return initialData.creatives ? <CreativeGallery creatives={initialData.creatives} /> : null;
       case "network": return initialData.network ? <NetworkBrowser data={initialData.network} /> : null;
       case "payouts": return initialData.finance ? <PayoutManager data={initialData.finance} userId={profile.userId} currency={currency} /> : null;

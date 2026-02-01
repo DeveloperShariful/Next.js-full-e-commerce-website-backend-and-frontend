@@ -6,6 +6,16 @@ import { db } from "@/lib/prisma";
 import { syncUser } from "@/lib/auth-sync"; 
 import { redirect } from "next/navigation";
 
+export async function requireUser() {
+  const user = await syncUser();
+
+  if (!user) {
+    return redirect("/sign-in");
+  }
+
+  return user.id;
+}
+
 export async function getAuthAffiliate() {
   const user = await syncUser();
 
@@ -23,7 +33,7 @@ export async function getAuthAffiliate() {
   });
 
   if (!affiliate) {
-    redirect("/affiliate/join");
+    redirect("/affiliates/register"); 
   }
 
   if (affiliate.status === "REJECTED" || affiliate.status === "SUSPENDED") {

@@ -11,12 +11,10 @@ export async function GET(req: Request) {
     if (!affiliateId) {
       return NextResponse.json({ pixels: [] });
     }
-
-    // ১. একটিভ পিক্সেল খুঁজে বের করা
     const pixels = await db.affiliatePixel.findMany({
       where: {
         affiliateId: affiliateId,
-        isEnabled: true, // শুধুমাত্র এনাবল করা পিক্সেল
+        isEnabled: true, 
       },
       select: {
         id: true,

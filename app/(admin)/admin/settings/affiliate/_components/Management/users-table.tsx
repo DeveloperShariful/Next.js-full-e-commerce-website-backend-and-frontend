@@ -271,7 +271,10 @@ export default function AffiliateUsersTable({
     // 2. Group Override
     if (user.groupName && user.groupName !== "No Group" && user.groupRate) {
         return { 
-            main: `${user.groupRate}%`, 
+            // ✅ এখানে চেক করা হচ্ছে groupType FIXED কিনা
+            main: user.groupType === "FIXED"
+                ? `${currencySymbol}${user.groupRate}`
+                : `${user.groupRate}%`, 
             sub: `${user.groupName}`, 
             isDefault: false 
         };

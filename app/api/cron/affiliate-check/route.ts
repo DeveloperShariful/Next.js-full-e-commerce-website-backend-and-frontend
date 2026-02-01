@@ -4,11 +4,10 @@ import { NextResponse } from "next/server";
 import { auditService } from "@/lib/services/audit-service";
 import { processDailyJobs } from "@/app/actions/admin/settings/affiliate/cron-service";
 
-export const dynamic = 'force-dynamic'; // Prevent caching
+export const dynamic = 'force-dynamic'; 
 
 export async function GET(req: Request) {
   try {
-    // 1. Security Check
     const { searchParams } = new URL(req.url);
     const secret = searchParams.get('secret');
     
@@ -16,7 +15,6 @@ export async function GET(req: Request) {
       await auditService.systemLog("WARN", "CRON_API", "Unauthorized cron attempt", { ip: "external" });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
     console.log("🔄 Starting Affiliate Cron Job via API...");
     const result = await processDailyJobs();
 

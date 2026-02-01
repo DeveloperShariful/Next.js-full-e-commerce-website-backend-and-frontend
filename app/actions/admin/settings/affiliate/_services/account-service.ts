@@ -1,6 +1,5 @@
 // File: app/actions/admin/settings/affiliate/_services/account-service.ts
 
-
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -48,8 +47,8 @@ export async function getAffiliates(
       orderBy: { createdAt: "desc" },
       include: {
         user: { select: { id: true, name: true, email: true, image: true } },
-        tier: { select: { name: true, commissionRate: true, commissionType: true } },
-        group: { select: { id: true, name: true, commissionRate: true } },
+        tier: { select: { id: true, name: true, commissionRate: true, commissionType: true } },
+        group: { select: { id: true, name: true, commissionRate: true, commissionType: true } },
         tags: { select: { id: true, name: true } },
         coupons: { select: { code: true } },
         referrals: {
@@ -79,6 +78,7 @@ export async function getAffiliates(
       tierType: account.tier?.commissionType || "PERCENTAGE",
       groupName: account.group?.name || "No Group",
       groupRate: account.group?.commissionRate ? DecimalMath.toNumber(account.group.commissionRate) : null,
+      groupType: account.group?.commissionType || "PERCENTAGE", 
       tags: account.tags.map(t => t.name),
       coupons: account.coupons.map(c => c.code),
       balance: DecimalMath.toNumber(account.balance),

@@ -14,8 +14,6 @@ export async function updateStripeSettings(
 ) {
   try {
     const validated = StripeSettingsSchema.parse(values)
-
-    // 1. Stripe Connection Validatiom
     if (validated.enableStripe) {
       const secretKeyToCheck = validated.testMode 
         ? validated.testSecretKey 
@@ -40,14 +38,12 @@ export async function updateStripeSettings(
       }
     }
 
-    // 2. Encryption
     const liveSecretKey = validated.liveSecretKey ? encrypt(validated.liveSecretKey) : ""
     const liveWebhookSecret = validated.liveWebhookSecret ? encrypt(validated.liveWebhookSecret) : ""
     
     const testSecretKey = validated.testSecretKey ? encrypt(validated.testSecretKey) : ""
     const testWebhookSecret = validated.testWebhookSecret ? encrypt(validated.testWebhookSecret) : ""
 
-    // 3. Database Transaction with INCREASED TIMEOUT
     await db.$transaction(async (tx) => {
       await tx.paymentMethodConfig.update({
         where: { id: paymentMethodId },
@@ -135,9 +131,8 @@ export async function updateStripeSettings(
         }
       })
     }, {
-        // 🔥 FIX: কানেকশনের জন্য ১০ সেকেন্ড এবং ট্রানজ্যাকশনের জন্য ২০ সেকেন্ড সময় দেওয়া হলো
-        maxWait: 10000, // default: 2000
-        timeout: 20000  // default: 5000
+        maxWait: 10000, 
+        timeout: 20000  
     })
 
     revalidatePath("/admin/settings/payments")

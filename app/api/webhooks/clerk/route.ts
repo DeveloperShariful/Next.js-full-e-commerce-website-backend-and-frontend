@@ -11,8 +11,6 @@ export async function POST(req: Request) {
   if (!WEBHOOK_SECRET) {
     throw new Error('Please add CLERK_WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local')
   }
-
-  // [FIX] headers() এর আগে await বসানো হয়েছে
   const headerPayload = await headers();
   const svix_id = headerPayload.get("svix-id");
   const svix_timestamp = headerPayload.get("svix-timestamp");
@@ -47,7 +45,6 @@ export async function POST(req: Request) {
 
   if (eventType === "user.created") {
     const { id, email_addresses, first_name, last_name, image_url } = evt.data;
-    
     const email = email_addresses[0]?.email_address;
     const name = `${first_name || ""} ${last_name || ""}`.trim();
 

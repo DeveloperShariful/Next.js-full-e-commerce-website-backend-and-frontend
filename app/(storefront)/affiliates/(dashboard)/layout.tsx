@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/prisma";
-import { requireUser } from "@/app/actions/storefront/affiliates/auth-helper";
+// ✅ getAuthAffiliate ইমপোর্ট করা আছে
+import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
 import { AlertTriangle, Ban, LifeBuoy, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -11,13 +12,17 @@ export default async function AffiliateDashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // 1. Auth Check
-  const userId = await requireUser();
+
+  // ✅ FIX: ফাংশনটি কল করে ডাটা একটি ভেরিয়েবলে নিলাম
+  const authSession = await getAuthAffiliate();
+  
+  // ✅ FIX: অবজেক্ট থেকে userId (string) বের করলাম
+  const userId = authSession.userId; 
 
   // 2. Fetch Account & Global Settings
   const [affiliateAccount, settings] = await Promise.all([
     db.affiliateAccount.findUnique({
-      where: { userId },
+      where: { userId }, // ✅ এখন এটি স্ট্রিং পাচ্ছে, তাই এরর হবে না
       select: { id: true, status: true, slug: true }
     }),
     db.storeSettings.findUnique({
@@ -79,6 +84,5 @@ export default async function AffiliateDashboardLayout({
     );
   }
 
-  // 6. ✅ Render Page Directly (No intermediate Shell)
   return <div className="bg-gray-50 min-h-screen">{children}</div>;
 }

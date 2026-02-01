@@ -81,52 +81,77 @@ export async function upsertRateAction(data: {
 
     const rateDecimal = DecimalMath.toDecimal(data.rate);
 
+    if (data.affiliateId && data.groupId) {
+      return { success: false, message: "Cannot assign to both Affiliate and Group at once." };
+    }
+
+    const payload = {
+      rate: rateDecimal,
+      type: data.type,
+      isDisabled: data.isDisabled,
+      affiliateId: data.affiliateId || null,
+      groupId: data.groupId || null,
+    };
     if (data.id) {
       await db.affiliateProductRate.update({
         where: { id: data.id },
-        data: {
-          rate: rateDecimal,
-          type: data.type,
-          isDisabled: data.isDisabled,
-          affiliateId: data.affiliateId || null,
-          groupId: data.groupId || null
-        }
+        data: payload
       });
-    } else {
-      const existing = await db.affiliateProductRate.findFirst({
-        where: {
-          productId: data.productId,
-          affiliateId: data.affiliateId || null,
-          groupId: data.groupId || null
-        }
-      });
+    } 
+    else {
+      if (data.affiliateId) {
+        await db.affiliateProductRate.upsert({
+          where: {
+            productId_affiliateId: {
+              productId: data.productId,
+              affiliateId: data.affiliateId
+            }
+          },
+          create: { productId: data.productId, ...payload },
+          update: payload
+        });
+      } else if (data.groupId) {
+        await db.affiliateProductRate.upsert({
+          where: {
+            productId_groupId: {
+              productId: data.productId,
+              groupId: data.groupId
+            }
+          },
+          create: { productId: data.productId, ...payload },
+          update: payload
+        });
+      } else {
+        const existingGlobal = await db.affiliateProductRate.findFirst({
+          where: { productId: data.productId, affiliateId: null, groupId: null }
+        });
 
-      if (existing) return { success: false, message: "Rule already exists for this target combination." };
-
-      await db.affiliateProductRate.create({
-        data: {
-          productId: data.productId,
-          rate: rateDecimal,
-          type: data.type,
-          isDisabled: data.isDisabled,
-          affiliateId: data.affiliateId || null,
-          groupId: data.groupId || null
+        if (existingGlobal) {
+          await db.affiliateProductRate.update({
+            where: { id: existingGlobal.id },
+            data: payload
+          });
+        } else {
+          await db.affiliateProductRate.create({
+            data: { productId: data.productId, ...payload }
+          });
         }
-      });
+      }
     }
 
     await auditService.log({
         userId: actor.id,
         action: "UPSERT_PRODUCT_RATE",
         entity: "AffiliateProductRate",
-        entityId: data.id || "NEW",
+        entityId: data.id || "UPSERT",
         newData: data
     });
 
     revalidatePath("/admin/settings/affiliate/product-rates");
-    return { success: true, message: "Commission override saved." };
+    return { success: true, message: "Commission override saved successfully." };
   } catch (error: any) {
-    return { success: false, message: error.message };
+    console.error(error);
+    return { success: false, message: error.message || "Database error occurred." };
   }
 }
 

@@ -3,15 +3,24 @@
 import { Suspense } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
-import { serializePrismaData } from "@/lib/format-data"; // ✅ Serialization Utility Added
+import { serializePrismaData } from "@/lib/format-data"; 
 
-// Services
-import { dashboardService } from "@/app/actions/storefront/affiliates/_services/dashboard-service";
-import { marketingService } from "@/app/actions/storefront/affiliates/_services/marketing-service";
-import { financeService } from "@/app/actions/storefront/affiliates/_services/finance-service";
-import { networkService } from "@/app/actions/storefront/affiliates/_services/network-service";
-import { settingsService } from "@/app/actions/storefront/affiliates/_services/settings-service";
-import { requireUser } from "@/app/actions/storefront/affiliates/auth-helper";
+// Services - UPDATED IMPORTS (Named Exports)
+// ❌ dashboardService ইমপোর্ট বাদ দেওয়া হয়েছে
+// ✅ সরাসরি ফাংশনগুলো ইমপোর্ট করা হয়েছে
+import { 
+  getProfile, 
+  getStats, 
+  getRecentActivity, 
+  getPerformanceChart 
+} from "@/app/actions/storefront/affiliates/_services/dashboard-service";
+
+import { getLinks, getCampaigns, getCreatives } from "@/app/actions/storefront/affiliates/_services/marketing-service";
+import { getWalletData, getPayoutHistory, getLedger } from "@/app/actions/storefront/affiliates/_services/finance-service";
+import { getSponsor, getNetworkTree, getNetworkStats } from "@/app/actions/storefront/affiliates/_services/network-service";
+import { getSettings } from "@/app/actions/storefront/affiliates/_services/settings-service";
+
+import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
 import { db } from "@/lib/prisma";
 
 export const metadata = {
@@ -23,13 +32,15 @@ export default async function AffiliateStorefrontPage({
 }: {
   searchParams: Promise<{ view?: string; page?: string; search?: string }>;
 }) {
-  const userId = await requireUser();
+  const authSession = await getAuthAffiliate();
+  const userId = authSession.userId; 
+
   const params = await searchParams;
   const currentView = params.view || "overview";
   
-  // 1. Fetch Profile & Global Settings (Always Required)
   const [profile, storeSettings] = await Promise.all([
-    dashboardService.getProfile(userId),
+    // ✅ FIX: dashboardService.getProfile এর বদলে সরাসরি getProfile
+    getProfile(userId),
     db.storeSettings.findUnique({ where: { id: "settings" } })
   ]);
 
@@ -43,68 +54,66 @@ export default async function AffiliateStorefrontPage({
     );
   }
 
-  // ✅ Prepare Configuration (Dynamic Param & Base URL)
   const affiliateConfig = (storeSettings?.affiliateConfig as any) || {};
   const appConfig = {
-    paramName: affiliateConfig.referralParam || "ref", // Dynamic Parameter
+    paramName: affiliateConfig.referralParam || "ref", 
     baseUrl: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
     currency: storeSettings?.currencySymbol || "$",
   };
 
   const data: any = {
     profile,
-    config: { ...affiliateConfig, ...appConfig }, // Merged Config
+    config: { ...affiliateConfig, ...appConfig }, 
   };
 
-  // 2. Conditional Data Fetching based on View
   try {
     switch (currentView) {
       case "overview":
         const [stats, recentActivity, chartData] = await Promise.all([
-          dashboardService.getStats(profile.id),
-          dashboardService.getRecentActivity(profile.id),
-          dashboardService.getPerformanceChart(profile.id)
+          // ✅ FIX: সরাসরি ফাংশন কল
+          getStats(profile.id),
+          getRecentActivity(profile.id),
+          getPerformanceChart(profile.id)
         ]);
         data.dashboard = { stats, recentActivity, chartData };
         break;
 
       case "links":
         const [links, campaigns] = await Promise.all([
-          marketingService.getLinks(profile.id),
-          marketingService.getCampaigns(profile.id)
+          getLinks(profile.id),
+          getCampaigns(profile.id)
         ]);
-        // Pass essential data for LinkManager
         data.marketing = { 
             links, 
             campaigns, 
             defaultSlug: profile.slug,
-            ...appConfig // Pass baseUrl & paramName
+            ...appConfig 
         };
         break;
 
       case "creatives":
-        data.creatives = await marketingService.getCreatives();
+        data.creatives = await getCreatives();
         break;
 
       case "network":
         const [sponsor, tree, netStats] = await Promise.all([
-          networkService.getSponsor(profile.id),
-          networkService.getNetworkTree(profile.id),
-          networkService.getNetworkStats(profile.id)
+          getSponsor(profile.id),
+          getNetworkTree(profile.id),
+          getNetworkStats(profile.id)
         ]);
         data.network = { sponsor, tree, stats: netStats };
         break;
 
       case "payouts":
         const [wallet, payoutHistory] = await Promise.all([
-          financeService.getWalletData(profile.id),
-          financeService.getPayoutHistory(profile.id)
+          getWalletData(profile.id),
+          getPayoutHistory(profile.id)
         ]);
         data.finance = { wallet, history: payoutHistory };
         break;
 
       case "ledger":
-        data.ledger = await financeService.getLedger(profile.id, 50);
+        data.ledger = await getLedger(profile.id, 50);
         break;
 
       case "reports":
@@ -119,16 +128,14 @@ export default async function AffiliateStorefrontPage({
         break;
 
       case "settings":
-        data.settings = await settingsService.getSettings(userId);
+        data.settings = await getSettings(userId);
         break;
     }
   } catch (error) {
     console.error("Affiliate Data Fetch Error:", error);
-    // You can handle error state or pass error to client view
     data.error = "Failed to load data. Please try refreshing.";
   }
 
-  // ✅ Serialize Data before passing to Client Component
   const serializedData = serializePrismaData(data);
 
   return (

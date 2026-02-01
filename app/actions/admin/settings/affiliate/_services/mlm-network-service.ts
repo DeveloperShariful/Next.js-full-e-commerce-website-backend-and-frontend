@@ -125,6 +125,8 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
     const result = mlmSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
 
+    const levelRatesJson = result.data.levelRates as Prisma.JsonObject;
+
     await db.affiliateMLMConfig.upsert({
       where: { id: "mlm_config" },
       create: {
@@ -132,13 +134,13 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
         isEnabled: result.data.isEnabled,
         maxLevels: result.data.maxLevels,
         commissionBasis: result.data.commissionBasis,
-        levelRates: result.data.levelRates,
+        levelRates: levelRatesJson,
       },
       update: {
         isEnabled: result.data.isEnabled,
         maxLevels: result.data.maxLevels,
         commissionBasis: result.data.commissionBasis,
-        levelRates: result.data.levelRates,
+        levelRates: levelRatesJson,
       }
     });
 

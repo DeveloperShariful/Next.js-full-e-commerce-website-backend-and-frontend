@@ -5,14 +5,19 @@
 import { AffiliateLedger } from "@prisma/client";
 import { format } from "date-fns";
 import { ArrowUpRight, ArrowDownLeft, FileText, Download } from "lucide-react";
+// ✅ IMPORT ADDED
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface Props {
-  transactions: AffiliateLedger[];
-  currency: string;
+  // Prisma types might mismatch with serialized data, using 'any' for safety here or you can define a DTO
+  transactions: any[]; 
 }
 
-export default function TransactionLedger({ transactions, currency }: Props) {
-  
+export default function TransactionLedger({ transactions }: Props) {
+  // ✅ GLOBAL STORE USAGE
+  const { formatPrice, symbol } = useGlobalStore();
+  const currency = symbol || "$";
+
   const getTypeConfig = (type: string) => {
     switch (type) {
       case "COMMISSION":
@@ -88,12 +93,12 @@ export default function TransactionLedger({ transactions, currency }: Props) {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className={`font-mono font-bold text-sm ${config.color}`}>
-                          {config.sign}{currency}{item.amount.toNumber().toFixed(2)}
+                          {config.sign}{formatPrice(item.amount)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="inline-block text-right">
-                            <span className="block font-mono text-gray-700 text-sm font-medium">{currency}{item.balanceAfter.toNumber().toFixed(2)}</span>
+                            <span className="block font-mono text-gray-700 text-sm font-medium">{formatPrice(item.balanceAfter)}</span>
                             <span className="block text-[10px] text-gray-400">Post Balance</span>
                         </div>
                       </td>

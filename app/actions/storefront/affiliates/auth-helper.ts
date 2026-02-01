@@ -1,39 +1,34 @@
 ////app/actions/storefront/affiliates/auth-helper.ts
 
-import { auth } from "@clerk/nextjs/server";
+"use server";
+
 import { db } from "@/lib/prisma";
+import { syncUser } from "@/lib/auth-sync"; 
 import { redirect } from "next/navigation";
 
-export async function getAuthUser() {
-  // ১. Clerk থেকে লগইন করা ইউজারের Clerk ID নেওয়া
-  const { userId: clerkId } = await auth();
-
-  if (!clerkId) {
-    return null;
-  }
-
-  // ২. সেই Clerk ID দিয়ে আপনার ডাটাবেস থেকে আসল User (UUID) খুঁজে বের করা
-  const user = await db.user.findUnique({
-    where: { clerkId: clerkId }, // নিশ্চিত হোন আপনার স্কিমাতে clerkId আছে
-    select: { id: true }
-  });
+export async function getAuthAffiliate() {
+  const user = await syncUser();
 
   if (!user) {
-    // যদি Clerk এ থাকে কিন্তু ডাটাবেসে না থাকে
-    return null;
+    redirect("/sign-in");
   }
 
-  // ৩. ডাটাবেসের UUID রিটার্ন করা
-  return user.id;
-}
+  const affiliate = await db.affiliateAccount.findUnique({
+    where: { userId: user.id },
+    include: {
+      user: true,
+      tier: true,
+      group: true
+    }
+  });
 
-// এই ফাংশনটি পেজে ব্যবহার করবেন, এটি ইউজার না পেলে অটোমেটিক লগইন পেজে পাঠাবে
-export async function requireUser() {
-  const userId = await getAuthUser();
-  
-  if (!userId) {
-    redirect("/sign-in"); // অথবা আপনার লগইন রাউট
+  if (!affiliate) {
+    redirect("/affiliate/join");
   }
-  
-  return userId;
+
+  if (affiliate.status === "REJECTED" || affiliate.status === "SUSPENDED") {
+    throw new Error("Your affiliate account is suspended or rejected.");
+  }
+
+  return affiliate;
 }

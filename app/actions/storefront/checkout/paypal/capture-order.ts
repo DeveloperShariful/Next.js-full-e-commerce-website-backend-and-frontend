@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { clearCart } from "../../cart/clear-cart";
+import { cookies } from "next/headers"; // ✅ Added cookies
 
 async function getAccessToken(clientId: string, clientSecret: string, isSandbox: boolean) {
     const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
@@ -46,12 +47,25 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
 
         if(!cart) throw new Error("Cart not found");
 
+        // ✅ 1. Affiliate Tracking Logic (Added)
+        const cookieStore = await cookies();
+        const affiliateSlug = cookieStore.get("affiliate_token")?.value;
+        let affiliateId: string | null = null;
+
+        if (affiliateSlug) {
+            const affiliate = await db.affiliateAccount.findUnique({
+                where: { slug: affiliateSlug, status: "ACTIVE" },
+                select: { id: true }
+            });
+            if (affiliate) {
+                affiliateId = affiliate.id;
+            }
+        }
+
         const newOrder = await db.$transaction(async (tx) => {
-            // 1. Order Number
             const count = await tx.order.count();
             const orderNumber = `ORD-${1000 + count + 1}`;
 
-            // 2. Create Order
             const order = await tx.order.create({
                 data: {
                     orderNumber,
@@ -60,12 +74,16 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
                     paymentMethod: "PayPal",
                     paymentId: captureId,
                     total: totalAmount,
-                    subtotal: totalAmount, // (Note: You can store exact breakdown if needed)
+                    subtotal: totalAmount, 
                     shippingTotal: 0, 
                     guestEmail: customerInfo.email,
                     billingAddress: customerInfo,
                     shippingAddress: shippingInfo,
                     shippingMethod: shippingMethodId,
+                    
+                    // ✅ Saving Affiliate ID
+                    affiliateId: affiliateId,
+
                     items: {
                         create: cart.items.map(item => ({
                             productName: item.product.name,
@@ -79,7 +97,6 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
                 }
             });
 
-            // 3. Transaction Log
             await tx.orderTransaction.create({
                 data: {
                     orderId: order.id,
@@ -93,7 +110,7 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
                 }
             });
 
-            // 4. 🔥 STOCK DEDUCTION (The Missing Part)
+            // Stock Deduction
             for (const item of cart.items) {
                 if (item.variantId && item.variant?.trackQuantity) {
                     await tx.productVariant.update({ 
@@ -112,6 +129,19 @@ export async function capturePayPalOrder(payPalOrderId: string, cartId: string, 
         });
 
         await clearCart();
+
+        // ✅ 2. Trigger Affiliate Engine (Added)
+        // পেপাল অর্ডার কনফার্ম হওয়ার সাথে সাথে কমিশন ক্যালকুলেট করার জন্য API কল করা হচ্ছে
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        fetch(`${appUrl}/api/affiliate/process-order`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": process.env.INTERNAL_API_KEY!
+            },
+            body: JSON.stringify({ orderId: newOrder.id })
+        }).catch(err => console.error("PayPal Affiliate Trigger Failed:", err));
+
         return { success: true, orderId: newOrder.id };
     } 
     

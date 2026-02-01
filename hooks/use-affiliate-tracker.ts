@@ -8,17 +8,12 @@ import { useEffect, useRef } from "react";
 export function useAffiliateTracker() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  // React Strict Mode এ দুইবার লগ হওয়া আটকানোর জন্য ref ব্যবহার করা হচ্ছে
   const hasLogged = useRef(false);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
-    
-    // যদি URL এ ref থাকে এবং এখনো লগ না হয়ে থাকে
     if (ref && !hasLogged.current) {
       hasLogged.current = true;
-
-      // ব্যাকগ্রাউন্ডে API কল (ইউজারকে ব্লক করবে না)
       const logClick = async () => {
         try {
           await fetch("/api/tracking/click", {

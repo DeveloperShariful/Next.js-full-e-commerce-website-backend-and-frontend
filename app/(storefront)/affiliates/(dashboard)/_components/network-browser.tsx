@@ -3,166 +3,155 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, ChevronDown, User, DollarSign, Users, ShieldCheck, TrendingUp } from "lucide-react";
+import { User, ChevronRight, ChevronDown, Network, Search, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import { NetworkNode } from "@/app/actions/storefront/affiliates/_services/network-service";
+// ✅ IMPORT GLOBAL STORE
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface Props {
   data: {
     sponsor: any;
     tree: NetworkNode[];
-    stats: any;
+    stats: { directRecruits: number; activePartners: number };
   };
 }
 
-export default function NetworkBrowser({ data }: Props) {
-  const { sponsor, tree, stats } = data;
+// Internal Recursive Tree Component
+const TreeNode = ({ node }: { node: NetworkNode }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const hasChildren = node.children && node.children.length > 0;
+  
+  // ✅ GLOBAL STORE USAGE
+  const { formatPrice } = useGlobalStore();
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-      
-      {/* 1. Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Sponsor */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex items-center gap-4 relative overflow-hidden">
-          <div className="absolute right-0 top-0 p-3 opacity-5">
-             <ShieldCheck className="w-24 h-24" />
-          </div>
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-100 relative z-10">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div className="relative z-10">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Your Sponsor</p>
-            {sponsor ? (
-              <div className="mt-1">
-                <p className="font-bold text-gray-900 text-lg">{sponsor.user.name}</p>
-                <p className="text-xs text-gray-500">@{sponsor.slug}</p>
-              </div>
+    <div className="pl-4 border-l border-gray-200 ml-2">
+      <div 
+        className={cn(
+          "flex items-center justify-between p-3 rounded-lg border mb-2 transition-all cursor-pointer hover:shadow-sm",
+          isOpen ? "bg-indigo-50 border-indigo-200" : "bg-white border-gray-200 hover:border-indigo-200"
+        )}
+        onClick={() => hasChildren && setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-3">
+          {hasChildren ? (
+            isOpen ? <ChevronDown className="w-4 h-4 text-indigo-500" /> : <ChevronRight className="w-4 h-4 text-gray-400" />
+          ) : (
+            <div className="w-4" /> 
+          )}
+          
+          <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden">
+            {node.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={node.avatar} alt={node.name} className="w-full h-full object-cover" />
             ) : (
-              <div className="mt-1">
-                <p className="font-bold text-gray-900 text-lg">GoBike Official</p>
-                <p className="text-xs text-gray-500 italic">Root Partner</p>
-              </div>
+              <User className="w-4 h-4 text-gray-400" />
             )}
           </div>
-        </div>
-
-        {/* Direct Team */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
-            <Users className="w-6 h-6" />
-          </div>
+          
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Direct Recruits</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.directRecruits}</p>
-            <p className="text-xs text-gray-500">Level 1 Partners</p>
+            <h4 className="text-sm font-semibold text-gray-900">{node.name}</h4>
+            <p className="text-[10px] text-gray-500">Joined {format(new Date(node.joinedAt), "MMM d, yyyy")}</p>
           </div>
         </div>
 
-        {/* Network Volume */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-green-50 text-green-600 rounded-xl border border-green-100">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Partners</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.activePartners}</p>
-            <p className="text-xs text-gray-500">Total Downline</p>
-          </div>
+        <div className="text-right">
+          <span className="block text-xs font-bold text-gray-900">
+            {formatPrice(node.totalSales)}
+          </span>
+          <span className="text-[10px] text-gray-500 uppercase">Sales</span>
         </div>
       </div>
 
-      {/* 2. Interactive Tree */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm min-h-[500px] overflow-hidden flex flex-col">
-        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-          <h3 className="font-bold text-gray-900">Organization Hierarchy</h3>
-        </div>
-        
-        <div className="p-6 overflow-auto custom-scrollbar flex-1">
-           {tree.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center py-20">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                  <Users className="w-8 h-8 text-gray-300" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">Your Team is Empty</h3>
-                <p className="text-sm text-gray-500 mt-2 max-w-sm">
-                  Start inviting people using your referral link. When they join, they will appear here as your downline.
-                </p>
-              </div>
-           ) : (
-              <div className="min-w-[600px]">
-                 {tree.map((node) => (
-                    <TreeNode key={node.id} node={node} />
-                 ))}
-              </div>
-           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Recursive Node Component (Visual Style Updated)
-function TreeNode({ node }: { node: NetworkNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const hasChildren = node.children.length > 0;
-
-  return (
-    <div className="pl-6 relative border-l border-gray-200 ml-4 my-2">
-      {/* Connector */}
-      <div className="absolute top-6 left-0 w-6 h-px bg-gray-200" />
-      
-      <div className="py-1">
-        <div 
-          onClick={() => hasChildren && setIsOpen(!isOpen)}
-          className={cn(
-            "flex items-center gap-4 p-3 rounded-xl border bg-white transition-all w-full md:w-fit min-w-[320px]",
-            hasChildren ? "cursor-pointer hover:shadow-md hover:border-indigo-300" : "border-gray-200",
-            isOpen ? "ring-2 ring-indigo-50 border-indigo-200" : ""
-          )}
-        >
-          {/* Avatar */}
-          <div className="relative">
-             <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200 text-gray-500 text-xs font-bold">
-               {node.avatar ? (
-                 <img src={node.avatar} alt="" className="w-full h-full object-cover" />
-               ) : (
-                 node.name.charAt(0)
-               )}
-             </div>
-             <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold ring-2 ring-white">
-               L{node.level}
-             </div>
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-bold text-gray-900 truncate">{node.name}</h4>
-            <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
-              <span className="flex items-center gap-1 font-medium text-green-600 bg-green-50 px-1.5 rounded">
-                 <DollarSign className="w-3 h-3" /> {node.totalSales.toLocaleString()}
-              </span>
-              <span>{new Date(node.joinedAt).toLocaleDateString()}</span>
-            </div>
-          </div>
-
-          {/* Expander */}
-          {hasChildren && (
-            <div className={cn("p-1 rounded-full bg-gray-50 transition-transform", isOpen && "rotate-90 bg-indigo-50 text-indigo-600")}>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Children Container */}
+      {/* Recursive Children */}
       {isOpen && hasChildren && (
-        <div className="animate-in slide-in-from-top-2 fade-in duration-200">
+        <div className="animate-in slide-in-from-top-1 fade-in duration-200">
           {node.children.map((child) => (
             <TreeNode key={child.id} node={child} />
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+export default function NetworkBrowser({ data }: Props) {
+  const { sponsor, tree, stats } = data;
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+      
+      {/* Network Header Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-xl p-6 text-white shadow-lg">
+          <h3 className="text-indigo-100 text-xs font-bold uppercase tracking-wider mb-1">My Sponsor</h3>
+          {sponsor ? (
+            <div className="flex items-center gap-3 mt-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                <span className="font-bold text-sm">{sponsor.user.name?.charAt(0)}</span>
+              </div>
+              <div>
+                <p className="font-bold text-lg leading-tight">{sponsor.user.name}</p>
+                <p className="text-xs text-indigo-200 truncate max-w-[150px]">{sponsor.user.email}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-indigo-100">You are a top-level partner.</p>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-green-50 rounded-lg text-green-600">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 font-bold uppercase">Direct Recruits</p>
+            <h3 className="text-2xl font-bold text-gray-900">{stats.directRecruits}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-purple-50 rounded-lg text-purple-600">
+            <Network className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 font-bold uppercase">Total Team</p>
+            <h3 className="text-2xl font-bold text-gray-900">{stats.activePartners}</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Tree Visualization */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden min-h-[400px]">
+        <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+          <h3 className="font-bold text-gray-900">Network Tree</h3>
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-3 top-2.5 text-gray-400" />
+            <input 
+              placeholder="Search partner..." 
+              className="pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+        </div>
+        
+        <div className="p-6">
+          {tree.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Network className="w-10 h-10 mx-auto mb-2 opacity-20" />
+              <p>You haven't recruited anyone yet.</p>
+              <p className="text-xs mt-1">Share your link to grow your team!</p>
+            </div>
+          ) : (
+            <div className="-ml-6">
+              {tree.map((node) => (
+                <TreeNode key={node.id} node={node} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

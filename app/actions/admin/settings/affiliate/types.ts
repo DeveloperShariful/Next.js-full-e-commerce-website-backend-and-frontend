@@ -3,9 +3,6 @@
 import { z } from "zod";
 import { affiliateGeneralSchema } from "./schemas";
 import { AffiliateStatus, PayoutStatus, PayoutMethod, MediaType, Role, DiscountType } from "@prisma/client";
-
-// ... (KEEP ALL PREVIOUS TYPES AS IS - DO NOT REMOVE) ...
-
 /**
  * ==================================================================
  * 3. ENTERPRISE EVENT BUS TYPES (NEW)
@@ -36,7 +33,7 @@ export interface AffiliateEventPayload {
 export interface MLMConfigDTO {
   isEnabled: boolean;
   maxLevels: number;
-  commissionBasis: "SALES_AMOUNT" | "PROFIT_MARGIN" | "CV"; // Enhanced basis
+  commissionBasis: "SALES_AMOUNT" | "PROFIT_MARGIN" | "CV"; 
   levelRates: Record<string, number>;
 }
 
@@ -64,14 +61,12 @@ export interface TaxComplianceStatus {
 }
 
 export type IdempotencyScope = "ORDER_PROCESS" | "PAYOUT_RELEASE";
-
-// Extend existing config DTO
 export interface AffiliateConfigDTOExtended extends AffiliateConfigDTO {
   requireTaxFormForPayout?: boolean;
-  taxFormThreshold?: number; // e.g. $600
+  taxFormThreshold?: number; 
   enableProfitMarginProtection?: boolean;
-  minProfitMargin?: number; // e.g. 5%
-  postbackUrlSecret?: string; // For S2S Postbacks
+  minProfitMargin?: number; 
+  postbackUrlSecret?: string; 
 }
 /**
  * ==================================================================
@@ -85,8 +80,6 @@ export type AffiliatePermission =
   | "MANAGE_CONFIGURATION"
   | "MANAGE_NETWORK"
   | "MANAGE_FRAUD"; 
-
-  
 /**
  * ==================================================================
  * 2. SHARED TYPES
@@ -158,6 +151,7 @@ export interface AffiliateUserTableItem {
   tierName: string;
   groupName: string;
   groupRate?: number | null;
+  groupType?: "PERCENTAGE" | "FIXED"; 
   tierRate?: number | null;
   tierType?: "PERCENTAGE" | "FIXED";
   tags: string[];

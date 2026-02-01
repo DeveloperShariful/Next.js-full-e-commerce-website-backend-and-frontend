@@ -313,10 +313,10 @@ export default function GroupManager({ initialGroups }: Props) {
                     <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5">
                             <div className={cn("p-1.5 rounded-lg", group.commissionRate ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400")}>
-                                <Percent className="w-3.5 h-3.5" />
+                                {group.commissionType === "FIXED" ? <DollarSign className="w-3.5 h-3.5" /> : <Percent className="w-3.5 h-3.5" />}
                             </div>
                             <span className={cn("font-mono font-bold text-sm", group.commissionRate ? "text-gray-900" : "text-gray-400 italic")}>
-                                {group.commissionRate ? `${Number(group.commissionRate)}%` : "Global"}
+                                {group.commissionRate ? (group.commissionType === "FIXED" ? `${currency}${Number(group.commissionRate)}` : `${Number(group.commissionRate)}%`): "Global" }
                             </span>
                         </div>
                     </td>

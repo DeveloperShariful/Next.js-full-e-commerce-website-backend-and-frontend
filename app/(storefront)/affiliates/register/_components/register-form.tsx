@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react"; 
-import { registerAffiliateAction } from "@/app/actions/storefront/affiliates/mutations/register-affiliate";
+import { registerAffiliateAction } from "@/app/actions/storefront/affiliates/_services/register-affiliate";
 import { useRouter } from "next/navigation";
 
 // ✅ FIX: Zod schema fix

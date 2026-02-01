@@ -2,185 +2,189 @@
 
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { 
-  LayoutDashboard, Link as LinkIcon, ImageIcon, Network, 
-  CreditCard, ScrollText, PieChart, Settings, Menu, X, Loader2, LogOut
-} from "lucide-react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { LayoutDashboard, Link as LinkIcon, Image as ImageIcon, Users, Wallet, FileText, BarChart3, Settings, Menu, X } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { SignOutButton } from "@clerk/nextjs";
-import { NotificationCenter } from "./notification-center"; 
 
-// Import Tab Components
+// Components
 import DashboardOverview from "./dashboard-overview";
 import LinkManager from "./link-manager";
-import CreativeGallery from "./creative-gallery";
-import NetworkBrowser from "./network-browser";
 import PayoutManager from "./payout-manager";
 import TransactionLedger from "./transaction-ledger";
-import ConversionReport from "./conversion-report";
+import NetworkBrowser from "./network-browser";
 import SettingsForm from "./settings-form";
 
+// Interfaces
 interface Props {
-  initialData: any;
+  initialData: {
+    profile: any;
+    dashboard?: any;
+    marketing?: any;
+    creatives?: any[];
+    network?: any;
+    finance?: any;
+    ledger?: any[];
+    reports?: any;
+    settings?: any;
+    config: any;
+  };
   currentView: string;
 }
 
 export default function AffiliateMainView({ initialData, currentView }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
-  const [activeTab, setActiveTab] = useState(currentView);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    setActiveTab(currentView);
-  }, [currentView]);
+  const { profile, dashboard, marketing, creatives, network, finance, ledger, reports, settings } = initialData;
 
-  const handleTabChange = (view: string) => {
-    setActiveTab(view);
-    setIsMobileMenuOpen(false);
-    startTransition(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("view", view);
-      router.push(`/affiliates?${params.toString()}`);
-    });
+  const handleNav = (view: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("view", view);
+    router.push(`${pathname}?${params.toString()}`);
+    setSidebarOpen(false); 
   };
 
-  const config = initialData?.config || {};
-  const enableMLM = config.enableMLM ?? false;
-
-  const MENU_ITEMS = [
+  const navItems = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
     { id: "links", label: "Marketing Links", icon: LinkIcon },
     { id: "creatives", label: "Creatives", icon: ImageIcon },
-    ...(enableMLM ? [{ id: "network", label: "My Network", icon: Network }] : []),
-    { id: "payouts", label: "Finances", icon: CreditCard },
-    { id: "ledger", label: "Ledger", icon: ScrollText },
-    { id: "reports", label: "Reports", icon: PieChart },
+    { id: "network", label: "My Network", icon: Users },
+    { id: "payouts", label: "Payouts", icon: Wallet },
+    { id: "ledger", label: "Ledger", icon: FileText },
+    { id: "reports", label: "Reports", icon: BarChart3 },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  const ActiveComponent = () => {
-    if (!initialData) return null;
-    const { currency, profile } = initialData;
+  // Render Active Component
+  const renderContent = () => {
+    switch (currentView) {
+      case "overview":
+        return <DashboardOverview data={dashboard} userName={profile.name} />;
+      
+      case "links":
+        return <LinkManager 
+          initialLinks={marketing.links} 
+          campaigns={marketing.campaigns} 
+          userId={profile.userId}
+          defaultSlug={marketing.defaultSlug}
+          // baseUrl এবং paramName এখন LinkManager নিজেই হ্যান্ডেল করবে বা প্রপস থেকে নেবে
+          baseUrl={marketing.baseUrl}
+          paramName={marketing.paramName}
+        />;
 
-    switch (activeTab) {
-      case "overview": return initialData.dashboard ? <DashboardOverview data={initialData.dashboard} currency={currency} userName={profile.name} /> : null;
-      case "links": 
-        return initialData.marketing ? (
-            <LinkManager 
-                initialLinks={initialData.marketing.links} 
-                campaigns={initialData.marketing.campaigns} 
-                userId={profile.userId} 
-                defaultSlug={profile.slug}
-                baseUrl={config.baseUrl} 
-                paramName={config.paramName}
-            />
-        ) : null;
+      case "creatives":
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2">
+             {creatives?.map((c: any) => (
+                <div key={c.id} className="bg-white p-4 rounded-xl border shadow-sm group hover:shadow-md transition-all">
+                   <div className="aspect-video bg-gray-100 rounded-lg mb-3 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.url} alt={c.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                   </div>
+                   <h3 className="font-bold text-sm text-gray-900">{c.title}</h3>
+                   <a href={c.url} download target="_blank" rel="noreferrer" className="block w-full mt-3 bg-black text-white py-2 rounded-lg text-xs font-bold text-center hover:bg-gray-800 transition-colors">
+                     Download Asset
+                   </a>
+                </div>
+             ))}
+          </div>
+        );
 
-      case "creatives": return initialData.creatives ? <CreativeGallery creatives={initialData.creatives} /> : null;
-      case "network": return initialData.network ? <NetworkBrowser data={initialData.network} /> : null;
-      case "payouts": return initialData.finance ? <PayoutManager data={initialData.finance} userId={profile.userId} currency={currency} /> : null;
-      case "ledger": return initialData.ledger ? <TransactionLedger transactions={initialData.ledger} currency={currency} /> : null;
-      case "reports": return initialData.reports ? <ConversionReport conversions={initialData.reports.conversions} currency={currency} /> : null;
-      case "settings": return initialData.settings ? <SettingsForm userId={profile.userId} initialData={initialData.settings} /> : null;
-      default: return null;
+      case "network":
+        return <NetworkBrowser data={network} />;
+
+      case "payouts":
+        return <PayoutManager data={finance} userId={profile.userId} />;
+
+      case "ledger":
+        // ✅ FIX: ledger undefined হলে empty array পাস হবে
+        return <TransactionLedger transactions={ledger || []} />;
+
+      case "settings":
+        return <SettingsForm userId={profile.userId} initialData={settings} />;
+
+      default:
+        return <div>Page not found</div>;
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row w-full min-h-screen">
+    <div className="flex min-h-screen bg-gray-50/50">
       
-      {/* MOBILE HEADER (Fixed Top) */}
-      <div className="lg:hidden w-full bg-white border-b border-gray-200 h-16 px-4 flex justify-between items-center sticky top-0 z-1 shadow-sm">
-        <span className="font-bold text-gray-900 flex items-center gap-2">
-          GoBike<span className="text-indigo-600">.</span> Partner
-        </span>
-        <div className="flex items-center gap-3">
-            <NotificationCenter />
-            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
-              {isMobileMenuOpen ? <X className="w-5 h-5"/> : <Menu className="w-5 h-5"/>}
-            </button>
-        </div>
-      </div>
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
 
-      {/* MOBILE OVERLAY */}
-      <div 
-        className={cn(
-            "fixed inset-0 top-16 z-1 bg-black/50 lg:hidden transition-opacity", 
-            isMobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
-        )} 
-        onClick={() => setIsMobileMenuOpen(false)} 
-      />
-
-      {/* SIDEBAR */}
+      {/* Sidebar */}
       <aside className={cn(
-        "fixed top-16 left-0 bottom-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-auto lg:top-0 lg:z-0 overflow-y-auto custom-scrollbar shadow-xl lg:shadow-none flex flex-col",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="h-16 hidden lg:flex items-center px-6 border-b border-gray-100 bg-gray-50/50">
-           <span className="font-bold text-xl text-gray-900">GoBike<span className="text-indigo-600">.</span> Partner</span>
-        </div>
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100">
+            <span className="font-bold text-xl tracking-tight">GoBike. Partner</span>
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-gray-500">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-        <div className="flex-1 p-3 space-y-1">
-          {MENU_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id)}
-                className={cn(
-                  "flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
-                  isActive 
-                    ? "bg-indigo-50 text-indigo-700 shadow-sm" 
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                )}
-              >
-                <Icon className={cn("w-5 h-5", isActive ? "text-indigo-600" : "text-gray-400")} />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="p-4 border-t border-gray-100">
-            <SignOutButton redirectUrl="/">
-                <button className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-all">
-                    <LogOut className="w-5 h-5" /> Sign Out
+          {/* Nav */}
+          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+            {navItems.map((item) => {
+              const isActive = currentView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleNav(item.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200",
+                    isActive 
+                      ? "bg-indigo-50 text-indigo-700 shadow-sm" 
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  )}
+                >
+                  <item.icon className={cn("w-5 h-5", isActive ? "text-indigo-600" : "text-gray-400")} />
+                  {item.label}
                 </button>
-            </SignOutButton>
+              );
+            })}
+          </nav>
+
+          {/* User Profile Footer */}
+          <div className="p-4 border-t border-gray-100">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
+                {profile.name?.charAt(0) || "U"}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">{profile.name}</p>
+                <p className="text-xs text-gray-500 truncate">{profile.email}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </aside>
 
-      {/* CONTENT AREA */}
-      <main className="flex-1 w-full min-w-0 bg-gray-50/30 relative min-h-screen">
-        
-        {/* Desktop Header */}
-        <div className="hidden lg:flex h-16 bg-white border-b border-gray-200 items-center justify-between px-8 sticky top-0 z-30">
-           <h2 className="text-lg font-bold text-gray-800 capitalize">
-              {MENU_ITEMS.find(m => m.id === activeTab)?.label}
-           </h2>
-           <div className="flex items-center gap-4">
-              <NotificationCenter />
-              {/* User Avatar Placeholder */}
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
-                {initialData?.profile?.name?.charAt(0)}
-              </div>
-           </div>
-        </div>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile Header */}
+        <header className="h-16 lg:hidden flex items-center justify-between px-4 bg-white border-b border-gray-200">
+          <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-gray-600">
+            <Menu className="w-6 h-6" />
+          </button>
+          <span className="font-bold text-lg">Partner Dashboard</span>
+          <div className="w-8" />
+        </header>
 
-        {/* Loading Overlay */}
-        {isPending && (
-            <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-            </div>
-        )}
-
-        <div className={cn("p-4 md:p-8 transition-opacity duration-200 max-w-[1600px] w-full mx-auto", isPending ? "opacity-50" : "opacity-100")}>
-            <ActiveComponent />
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            {renderContent()}
+          </div>
         </div>
       </main>
     </div>

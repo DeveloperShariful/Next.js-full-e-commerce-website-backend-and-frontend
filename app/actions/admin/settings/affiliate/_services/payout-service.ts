@@ -10,12 +10,14 @@ import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { protectAction } from "../permission-service";
 
+// =========================================
+// READ OPERATIONS
+// =========================================
+
 export async function getPayouts(page: number = 1, limit: number = 20, status?: PayoutStatus) {
   await protectAction("MANAGE_FINANCE");
-
   const skip = (page - 1) * limit;
-  const where: Prisma.AffiliatePayoutWhereInput = status ? { status } : {};
-
+  const where: Prisma.AffiliatePayoutWhereInput = { ...(status && { status }),};
   const [total, data] = await Promise.all([
     db.affiliatePayout.count({ where }),
     db.affiliatePayout.findMany({
@@ -36,39 +38,46 @@ export async function getPayouts(page: number = 1, limit: number = 20, status?: 
   const items: PayoutQueueItem[] = data.map(p => ({
     id: p.id,
     affiliateId: p.affiliateId,
-    affiliateName: p.affiliate.user.name || "Unknown",
-    affiliateEmail: p.affiliate.user.email,
+    affiliateName: p.affiliate?.user?.name || "Deleted User",
+    affiliateEmail: p.affiliate?.user?.email || "N/A",
     amount: DecimalMath.toNumber(p.amount),
     method: p.method,
     status: p.status,
     requestedAt: p.createdAt,
-    bankDetails: p.affiliate.bankDetails,
-    paypalEmail: p.affiliate.paypalEmail,
-    riskScore: p.affiliate.riskScore
+    bankDetails: p.affiliate?.bankDetails,
+    paypalEmail: p.affiliate?.paypalEmail,
+    riskScore: p.affiliate?.riskScore || 0
   }));
 
   return { items, total, totalPages: Math.ceil(total / limit) };
 }
+
+// =========================================
+// WALLET PROCESSING (Internal Store Credit)
+// =========================================
 
 async function processStoreCreditPayout(
   tx: Prisma.TransactionClient,
   payoutId: string,
   userId: string,
   amount: number | string | Prisma.Decimal,
-  actorId: string
+  actorId: string,
+  affiliateId: string 
 ) {
   const creditAmount = DecimalMath.toDecimal(amount);
 
   if (DecimalMath.lte(creditAmount, 0)) {
     throw new Error("Invalid payout amount");
   }
+  const affiliate = await tx.affiliateAccount.findFirst({
+    where: { id: affiliateId, deletedAt: null }, 
+    select: { id: true, version: true }
+  });
 
-  let wallet = await tx.wallet.findUnique({ where: { userId } });
-  if (!wallet) {
-    wallet = await tx.wallet.create({
-      data: { userId, balance: new Prisma.Decimal(0) }
-    });
-  }
+  if (!affiliate) throw new Error("Affiliate account not found or deleted. Payout blocked.");
+
+  const updateResult = await tx.affiliateAccount.updateMany({ where: { id: affiliateId, version: affiliate.version },data: {	version: { increment: 1 } } });
+  if (updateResult.count === 0) { throw new Error("System is busy (Race Condition). Please try again."); }
 
   await tx.affiliatePayout.update({
     where: { id: payoutId },
@@ -79,14 +88,18 @@ async function processStoreCreditPayout(
       note: "Credited to Wallet automatically"
     }
   });
-
+  let wallet = await tx.wallet.findUnique({ where: { userId } });
+  if (!wallet) {
+    wallet = await tx.wallet.create({
+      data: { userId, balance: new Prisma.Decimal(0) }
+    });
+  }
   await tx.wallet.update({
     where: { userId },
     data: {
       balance: { increment: creditAmount }
     }
   });
-
   await tx.walletTransaction.create({
     data: {
       walletId: wallet.id,
@@ -96,7 +109,6 @@ async function processStoreCreditPayout(
       reference: `PAYOUT-${payoutId}`
     }
   });
-
   await auditService.log({
     userId: actorId,
     action: "WALLET_CREDIT",
@@ -116,6 +128,10 @@ export async function getWalletBalance(userId: string) {
   return DecimalMath.toNumber(wallet?.balance || 0);
 }
 
+// =========================================
+// PAYOUT ACTIONS (Approve/Reject)
+// =========================================
+
 export async function markAsPaid(payoutId: string, transactionId?: string, note?: string) {
   const actor = await protectAction("MANAGE_FINANCE");
 
@@ -126,26 +142,25 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
     });
 
     if (!payout) throw new Error("Payout not found");
-
     if (payout.status === "COMPLETED") throw new Error("Payout is already completed.");
-
-    if (payout.affiliate.riskScore > 70) {
-      throw new Error(`Blocked: Risk Score ${payout.affiliate.riskScore}/100 too high.`);
-    }
-
-    if (payout.affiliate.kycStatus !== "VERIFIED") {
-      throw new Error(`Blocked: Affiliate KYC is ${payout.affiliate.kycStatus}. Must be VERIFIED.`);
-    }
-
+    if (!payout.affiliate) throw new Error("Affiliate account no longer exists.");
+    if (payout.affiliate.riskScore > 70) throw new Error(`Blocked: Risk Score ${payout.affiliate.riskScore}/100 too high.`);
+    if (payout.affiliate.kycStatus !== "VERIFIED") throw new Error(`Blocked: Affiliate KYC is ${payout.affiliate.kycStatus}. Must be VERIFIED.`);
     if (payout.method === "STORE_CREDIT") {
       await processStoreCreditPayout(
         tx,
         payout.id,
         payout.affiliate.userId,
         DecimalMath.toNumber(payout.amount),
-        actor.id
+        actor.id,
+        payout.affiliateId 
       );
     } else {
+      await tx.affiliateAccount.update({
+          where: { id: payout.affiliateId },
+          data: { version: { increment: 1 } }
+      });
+
       await tx.affiliatePayout.update({
         where: { id: payoutId },
         data: {
@@ -156,7 +171,6 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
         }
       });
     }
-
     await tx.notificationQueue.create({
       data: {
         channel: "EMAIL",
@@ -185,7 +199,6 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
   revalidatePath("/admin/settings/affiliate/payouts");
   return { success: true };
 }
-
 export async function rejectPayout(payoutId: string, reason: string) {
   const actor = await protectAction("MANAGE_FINANCE");
 
@@ -202,39 +215,40 @@ export async function rejectPayout(payoutId: string, reason: string) {
       where: { id: payoutId },
       data: { status: "CANCELLED", note: reason }
     });
-
-    const updatedAffiliate = await tx.affiliateAccount.update({
-      where: { id: payout.affiliateId },
-      data: { balance: { increment: payout.amount } }
-    });
-
-    await tx.affiliateLedger.create({
-      data: {
-        affiliateId: payout.affiliateId,
-        type: "REFUND_DEDUCTION",
-        amount: payout.amount,
-        balanceBefore: DecimalMath.sub(updatedAffiliate.balance, payout.amount),
-        balanceAfter: updatedAffiliate.balance,
-        description: `Payout Rejected: ${reason}`,
-        referenceId: payout.id
-      }
-    });
-
-    await tx.notificationQueue.create({
-      data: {
-        channel: "EMAIL",
-        recipient: payout.affiliate.user.email,
-        templateSlug: "PAYOUT_REJECTED",
-        status: "PENDING",
-        userId: payout.affiliate.userId,
-        content: "",
-        metadata: {
-          affiliate_name: payout.affiliate.user.name,
-          payout_amount: payout.amount.toString(),
-          rejection_reason: reason
-        }
-      }
-    });
+    const affiliateExists = await tx.affiliateAccount.findFirst({ where: { id: payout.affiliateId, deletedAt: null } });
+    
+    if (affiliateExists) {
+        const updatedAffiliate = await tx.affiliateAccount.update({
+            where: { id: payout.affiliateId },
+            data: { balance: { increment: payout.amount } }
+        });
+        await tx.affiliateLedger.create({
+            data: {
+                affiliateId: payout.affiliateId,
+                type: "REFUND_DEDUCTION", 
+                amount: payout.amount,
+                balanceBefore: DecimalMath.sub(updatedAffiliate.balance, payout.amount),
+                balanceAfter: updatedAffiliate.balance,
+                description: `Payout Rejected: ${reason}`,
+                referenceId: payout.id
+            }
+        });
+        await tx.notificationQueue.create({
+            data: {
+                channel: "EMAIL",
+                recipient: payout.affiliate.user.email,
+                templateSlug: "PAYOUT_REJECTED",
+                status: "PENDING",
+                userId: payout.affiliate.userId,
+                content: "",
+                metadata: {
+                    affiliate_name: payout.affiliate.user.name,
+                    payout_amount: payout.amount.toString(),
+                    rejection_reason: reason
+                }
+            }
+        });
+    }
 
     await auditService.log({
       userId: actor.id,
@@ -269,7 +283,7 @@ export async function getInvoiceData(payoutId: string) {
     invoiceNo: `INV-${payout.id.substring(0, 8).toUpperCase()}`,
     date: payout.createdAt.toISOString().split("T")[0],
     storeName: settings?.storeName || "GoBike Store",
-    affiliateName: payout.affiliate.user.name,
+    affiliateName: payout.affiliate.user.name || "Deleted User",
     affiliateEmail: payout.affiliate.user.email,
     amount: payout.amount.toNumber(),
     method: payout.method,

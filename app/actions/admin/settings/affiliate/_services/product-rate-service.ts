@@ -18,14 +18,19 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
   await protectAction("VIEW_ANALYTICS");
 
   const skip = (page - 1) * limit;
-
-  const where: Prisma.AffiliateProductRateWhereInput = search ? {
-    OR: [
-      { product: { name: { contains: search, mode: "insensitive" } } },
-      { affiliate: { user: { name: { contains: search, mode: "insensitive" } } } },
-      { group: { name: { contains: search, mode: "insensitive" } } }
-    ]
-  } : {};
+  const where: Prisma.AffiliateProductRateWhereInput = {
+    product: {
+      deletedAt: null, 
+      ...(search && { name: { contains: search, mode: "insensitive" } })
+    },
+    ...(search && {
+      OR: [
+        { product: { name: { contains: search, mode: "insensitive" } } },
+        { affiliate: { user: { name: { contains: search, mode: "insensitive" } } } },
+        { group: { name: { contains: search, mode: "insensitive" } } }
+      ]
+    })
+  };
 
   const [total, data] = await Promise.all([
     db.affiliateProductRate.count({ where }),
@@ -36,7 +41,15 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
       orderBy: { createdAt: "desc" },
       include: {
         product: {
-          select: { id: true, name: true, slug: true, price: true, images: true }
+          select: { 
+            id: true, 
+            name: true, 
+            slug: true, 
+            price: true, 
+            images: true,
+            affiliateCommissionRate: true,
+            affiliateCommissionType: true
+          }
         },
         affiliate: {
           select: { id: true, slug: true, user: { select: { name: true, email: true } } }
@@ -53,13 +66,20 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
 
 export async function searchProducts(query: string) {
   await protectAction("MANAGE_CONFIGURATION");
+  
   return await db.product.findMany({
     where: {
       name: { contains: query, mode: "insensitive" },
-      status: "ACTIVE"
+      status: "ACTIVE",
+      deletedAt: null 
     },
     take: 10,
-    select: { id: true, name: true, price: true }
+    select: { 
+        id: true, 
+        name: true, 
+        price: true,
+        affiliateCommissionRate: true 
+    }
   });
 }
 
@@ -78,12 +98,16 @@ export async function upsertRateAction(data: {
 }): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
-
     const rateDecimal = DecimalMath.toDecimal(data.rate);
 
     if (data.affiliateId && data.groupId) {
       return { success: false, message: "Cannot assign to both Affiliate and Group at once." };
     }
+
+    const productExists = await db.product.findFirst({
+        where: { id: data.productId, deletedAt: null }
+    });
+    if (!productExists) return { success: false, message: "Product not found or deleted." };
 
     const payload = {
       rate: rateDecimal,
@@ -92,6 +116,7 @@ export async function upsertRateAction(data: {
       affiliateId: data.affiliateId || null,
       groupId: data.groupId || null,
     };
+
     if (data.id) {
       await db.affiliateProductRate.update({
         where: { id: data.id },
@@ -186,8 +211,20 @@ export async function bulkImportRatesAction(rates: {
     if (rates.length === 0) return { success: false, message: "No data provided" };
     if (rates.length > 500) return { success: false, message: "Limit 500 rows per import" };
 
+    const productIds = rates.map(r => r.productId);
+    const validProducts = await db.product.findMany({
+        where: { id: { in: productIds }, deletedAt: null },
+        select: { id: true }
+    });
+    const validIdSet = new Set(validProducts.map(p => p.id));
+    const validRates = rates.filter(r => validIdSet.has(r.productId));
+
+    if (validRates.length < rates.length) {
+        console.warn(`Skipped ${rates.length - validRates.length} invalid products in import`);
+    }
+
     await db.$transaction(async (tx) => {
-      for (const r of rates) {
+      for (const r of validRates) {
          const existing = await tx.affiliateProductRate.findFirst({
            where: { productId: r.productId, affiliateId: null, groupId: null }
          });
@@ -210,11 +247,11 @@ export async function bulkImportRatesAction(rates: {
       action: "BULK_IMPORT_RATES",
       entity: "AffiliateProductRate",
       entityId: "BULK",
-      meta: { count: rates.length }
+      meta: { count: validRates.length }
     });
 
     revalidatePath("/admin/settings/affiliate/product-rates");
-    return { success: true, message: `Imported ${rates.length} rates successfully.` };
+    return { success: true, message: `Imported ${validRates.length} rates successfully.` };
   } catch (error: any) {
     return { success: false, message: "Bulk import failed." };
   }

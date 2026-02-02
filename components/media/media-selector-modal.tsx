@@ -12,9 +12,7 @@ import { toast } from "react-hot-toast";
 
 interface MediaSelectorModalProps {
   onClose: () => void;
-  // 🔥 UPDATE: Return type can be single item or array of items
   onSelect: (media: MediaItem | MediaItem[]) => void; 
-  // 🔥 NEW: Prop to enable multi-selection
   allowMultiple?: boolean; 
 }
 
@@ -23,14 +21,9 @@ export function MediaSelectorModal({ onClose, onSelect, allowMultiple = false }:
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  
-  // 🔥 UPDATE: Manage Array of IDs for selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  // Fetch Media
   const fetchMedia = async () => {
     setLoading(true);
-    // Note: We will add pagination to getAllMedia in the next step
     const res = await getAllMedia(search, "newest", "IMAGE", "ALL");
     if (res.success) setMedia(res.data as any);
     setLoading(false);

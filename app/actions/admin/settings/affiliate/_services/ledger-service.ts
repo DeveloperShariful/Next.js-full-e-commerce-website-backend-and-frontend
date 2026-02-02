@@ -8,17 +8,15 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
-import { protectAction } from "../permission-service"; 
+import { protectAction } from "../permission-service";
 
 // =========================================
 // READ OPERATIONS
 // =========================================
 export async function getLedgerHistory(page: number = 1, limit: number = 20, type?: string) {
   await protectAction("MANAGE_FINANCE");
-
   const skip = (page - 1) * limit;
   const where: Prisma.AffiliateLedgerWhereInput = type ? { type: type as any } : {};
-
   const [total, data] = await Promise.all([
     db.affiliateLedger.count({ where }),
     db.affiliateLedger.findMany({
@@ -64,40 +62,38 @@ export async function createAdjustmentAction(
 ): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_FINANCE");
-
     if (!amount || amount <= 0) return { success: false, message: "Amount must be greater than 0" };
     if (!note) return { success: false, message: "Reason/Note is required" };
-
     const adjustAmount = DecimalMath.toDecimal(amount);
-    await db.$transaction(async (tx) => {
-        const affiliate = await tx.affiliateAccount.findUnique({ 
-            where: { id: affiliateId },
-            select: { id: true, balance: true } 
-        });
-        
-        if (!affiliate) throw new Error("Affiliate not found");
 
+    await db.$transaction(async (tx) => {
+        const affiliate = await tx.affiliateAccount.findFirst({ 
+            where: { id: affiliateId, deletedAt: null },
+            select: { id: true, balance: true } 
+        });       
+        if (!affiliate) throw new Error("Affiliate not found or deleted");
         let updatedAffiliate;
 
         if (type === "BONUS") {
             updatedAffiliate = await tx.affiliateAccount.update({
                 where: { id: affiliateId },
-                data: { balance: { increment: adjustAmount } },
+                data: { 
+                    balance: { increment: adjustAmount },
+                    totalEarnings: { increment: adjustAmount } 
+                },
                 select: { balance: true }
             });
         } else {
             updatedAffiliate = await tx.affiliateAccount.update({
                 where: { id: affiliateId },
-                data: { balance: { decrement: adjustAmount } },
+                data: { 
+                    balance: { decrement: adjustAmount }
+                },
                 select: { balance: true }
             });
         }
-
         const balanceAfter = updatedAffiliate.balance;
-        const balanceBefore = type === "BONUS" 
-            ? DecimalMath.sub(balanceAfter, adjustAmount)
-            : DecimalMath.add(balanceAfter, adjustAmount);
-
+        const balanceBefore = type === "BONUS"  ? DecimalMath.sub( balanceAfter, adjustAmount) : DecimalMath.add( balanceAfter, adjustAmount);
         await tx.affiliateLedger.create({
             data: {
                 affiliateId,
@@ -109,7 +105,6 @@ export async function createAdjustmentAction(
                 referenceId: `MANUAL-${actor.id}-${Date.now()}`
             }
         });
-
         await auditService.log({
             userId: actor.id,
             action: "MANUAL_ADJUSTMENT",
@@ -121,7 +116,6 @@ export async function createAdjustmentAction(
 
     revalidatePath("/admin/settings/affiliate/ledger");
     return { success: true, message: "Adjustment applied successfully." };
-
   } catch (error: any) {
     return { success: false, message: error.message };
   }

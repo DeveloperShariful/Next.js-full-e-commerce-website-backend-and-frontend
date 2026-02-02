@@ -3,7 +3,8 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+// ✅ ১. সঠিক Enum টি ইমপোর্ট করুন
+import { Prisma, AffiliateDocumentStatus } from "@prisma/client"; 
 import { auditService } from "@/lib/services/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
@@ -16,7 +17,20 @@ export async function getDocuments(page: number = 1, limit: number = 20, status?
   await protectAction("MANAGE_PARTNERS"); 
 
   const skip = (page - 1) * limit;
-  const where: Prisma.AffiliateDocumentWhereInput = status && status !== "ALL" ? { status } : {};
+
+  // ✅ ২. Type Guard: চেক করুন status স্ট্রিংটি আসলে Valid Enum কি না
+  let whereStatus: AffiliateDocumentStatus | undefined;
+
+  // যদি status থাকে, "ALL" না হয় এবং সেটি Enum লিস্টের মধ্যে থাকে
+  if (status && status !== "ALL") {
+    const isValid = Object.values(AffiliateDocumentStatus).includes(status as AffiliateDocumentStatus);
+    if (isValid) {
+      whereStatus = status as AffiliateDocumentStatus;
+    }
+  }
+
+  // ✅ ৩. এখন আর 'as any' দরকার নেই, কারণ whereStatus এখন সঠিক টাইপের
+  const where: Prisma.AffiliateDocumentWhereInput = whereStatus ? { status: whereStatus } : {};
 
   const [total, data] = await Promise.all([
     db.affiliateDocument.count({ where }),
@@ -62,11 +76,10 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
       });
 
       if (!doc) throw new Error("Document not found");
-
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
-          status: "VERIFIED",
+          status: AffiliateDocumentStatus.APPROVED, 
           verifiedAt: new Date(),
           rejectionReason: null
         }
@@ -74,17 +87,16 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
       const pendingDocs = await tx.affiliateDocument.count({
         where: {
           affiliateId: doc.affiliateId,
-          status: { not: "VERIFIED" }
+          status: { not: AffiliateDocumentStatus.APPROVED } 
         }
       });
 
       if (pendingDocs === 0) {
         await tx.affiliateAccount.update({
           where: { id: doc.affiliateId },
-          data: { kycStatus: "VERIFIED" }
+          data: { kycStatus: "VERIFIED" } 
         });
       }
-
       await tx.notificationQueue.create({
           data: {
               channel: "EMAIL",
@@ -133,7 +145,7 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
       await tx.affiliateDocument.update({
         where: { id: documentId },
         data: {
-          status: "REJECTED",
+          status: AffiliateDocumentStatus.REJECTED, 
           rejectionReason: reason,
           verifiedAt: null
         }
@@ -151,7 +163,7 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
               templateSlug: "KYC_REJECTED",
               status: "PENDING",
               userId: doc.affiliate.userId,
-              content: "", // Required
+              content: "",
               metadata: { 
                   affiliate_name: doc.affiliate.user.name || "Partner",
                   document_type: doc.type.replace("_", " "),

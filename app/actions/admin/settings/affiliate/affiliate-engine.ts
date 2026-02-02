@@ -12,7 +12,7 @@ import { auditService } from "@/lib/services/audit-service";
 
 export async function processOrder(orderId: string) {
   const order = await db.order.findUnique({
-    where: { id: orderId },
+    where: { id: orderId, deletedAt: null }, 
     include: {
       items: {
         include: {
@@ -23,15 +23,16 @@ export async function processOrder(orderId: string) {
               name: true,
               costPerItem: true,
               affiliateCommissionRate: true,
-              affiliateCommissionType: true 
+              affiliateCommissionType: true,
+              disableAffiliate: true 
             }
           }
         }
       },
-      discount: true,
+      discount: true, 
       user: {
         include: {
-          orders: { select: { id: true }, take: 2 }
+          orders: { select: { id: true }, take: 2 } 
         }
       }
     },
@@ -55,7 +56,7 @@ export async function processOrder(orderId: string) {
     attributionSource = "COUPON";
   } else if (!affiliateId && order.userId) {
     const user = await db.user.findUnique({
-      where: { id: order.userId },
+      where: { id: order.userId, deletedAt: null },
       select: { referredByAffiliateId: true }
     });
     if (user?.referredByAffiliateId) {
@@ -66,8 +67,8 @@ export async function processOrder(orderId: string) {
 
   if (!affiliateId) return { success: false, error: "NO_AFFILIATE" };
 
-  const affiliate = await db.affiliateAccount.findUnique({
-    where: { id: affiliateId },
+  const affiliate = await db.affiliateAccount.findFirst({
+    where: { id: affiliateId, deletedAt: null },
     include: { group: true, tier: true, user: true }
   });
 
@@ -94,40 +95,96 @@ export async function processOrder(orderId: string) {
     }
   }
 
+  const isGiftCardPayment = order.paymentMethod === "GIFT_CARD"; 
+
+  const productIds = order.items.map(i => i.productId).filter(Boolean) as string[];
+  
+  const [userRates, groupRates] = await Promise.all([
+    db.affiliateProductRate.findMany({
+      where: { 
+        productId: { in: productIds }, 
+        affiliateId: affiliate.id
+      }
+    }),
+    affiliate.groupId ? db.affiliateProductRate.findMany({
+      where: { 
+        productId: { in: productIds }, 
+        groupId: affiliate.groupId
+      }
+    }) : Promise.resolve([])
+  ]);
+
+  const userRateMap = new Map(userRates.map(r => [r.productId, r]));
+  const groupRateMap = new Map(groupRates.map(r => [r.productId, r]));
+
   let totalCommission = new Prisma.Decimal(0);
   let totalProfit = new Prisma.Decimal(0);
-  
+  let matchedRuleId: string | null = null; 
   const itemsBreakdown: any[] = [];
   const globalRules = await getCachedGlobalRules();
+  
   const orderSubtotal = DecimalMath.toDecimal(order.subtotal);
   const orderTotal = DecimalMath.toDecimal(order.total);
   const isNewCustomer = !order.user || order.user.orders.length <= 1;
 
   for (const item of order.items) {
-    let rate = new Prisma.Decimal(0);
-    let type = "PERCENTAGE";
-    let source = "GLOBAL_DEFAULT";
-    let isExcluded = false;
+    if (!item.productId) continue;
 
     const cost = item.product?.costPerItem ? DecimalMath.toDecimal(item.product.costPerItem) : new Prisma.Decimal(0);
     const itemProfit = DecimalMath.sub(item.total, DecimalMath.mul(cost, item.quantity));
     totalProfit = DecimalMath.add(totalProfit, itemProfit);
 
-    const userProductRate = await db.affiliateProductRate.findFirst({
-      where: { productId: item.productId!, affiliateId: affiliate.id }
-    });
+    if (item.product?.disableAffiliate) {
+      itemsBreakdown.push({
+        orderItemId: item.id,
+        productId: item.productId,
+        productName: item.productName,
+        sku: item.sku,
+        commission: 0,
+        status: "EXCLUDED_BY_PRODUCT",
+        profit: itemProfit
+      });
+      continue;
+    }
 
-    const groupProductRate = !userProductRate && affiliate.groupId ? await db.affiliateProductRate.findFirst({
-      where: { productId: item.productId!, groupId: affiliate.groupId }
-    }) : null;
+    let rate = new Prisma.Decimal(0);
+    let type = "PERCENTAGE";
+    let source = "GLOBAL_DEFAULT";
+    let isExcluded = false;
+
+    const userProductRate = userRateMap.get(item.productId);
+    const groupProductRate = groupRateMap.get(item.productId);
+
+    if (userProductRate && userProductRate.isDisabled) {
+        isExcluded = true;
+        source = "USER_OVERRIDE_DISABLED";
+    } else if (!userProductRate && groupProductRate && groupProductRate.isDisabled) {
+        isExcluded = true;
+        source = "GROUP_OVERRIDE_DISABLED";
+    }
+
+    if (isExcluded) {
+      itemsBreakdown.push({
+        orderItemId: item.id,
+        productId: item.productId,
+        productName: item.productName,
+        sku: item.sku,
+        commission: 0,
+        status: "EXCLUDED",
+        source,
+        profit: itemProfit 
+      });
+      continue;
+    }
 
     let matchedRule = null;
+    
     for (const rule of globalRules) {
       const conditions = rule.conditions as any;
       let isMatch = true;
 
       if (conditions.minOrderAmount && DecimalMath.lt(orderTotal, conditions.minOrderAmount)) isMatch = false;
-
+      
       if (conditions.categoryIds && conditions.categoryIds.length > 0) {
         if (!item.product || !item.product.categoryId || !conditions.categoryIds.includes(item.product.categoryId)) {
           isMatch = false;
@@ -146,12 +203,10 @@ export async function processOrder(orderId: string) {
     }
 
     if (userProductRate) {
-      if (userProductRate.isDisabled) isExcluded = true;
       rate = userProductRate.rate;
       type = userProductRate.type;
       source = "PRODUCT_USER_OVERRIDE";
     } else if (groupProductRate) {
-      if (groupProductRate.isDisabled) isExcluded = true;
       rate = groupProductRate.rate;
       type = groupProductRate.type;
       source = "PRODUCT_GROUP_OVERRIDE";
@@ -160,6 +215,15 @@ export async function processOrder(orderId: string) {
       rate = DecimalMath.toDecimal(action.value);
       type = action.type;
       source = `RULE: ${matchedRule.name}`;
+      matchedRuleId = matchedRule.id; 
+    } else if (order.discount?.affiliateCommissionRate) {
+      rate = order.discount.affiliateCommissionRate;
+      if (order.discount.type === 'FIXED_AMOUNT' || order.discount.type === 'FIXED_CART' || order.discount.type === 'FIXED_PRODUCT') {
+         type = "FIXED";
+      } else {
+         type = "PERCENTAGE";
+      }
+      source = "COUPON_RATE";
     } else if (item.product?.affiliateCommissionRate) {
         rate = item.product.affiliateCommissionRate;
         type = item.product.affiliateCommissionType || "PERCENTAGE";
@@ -178,20 +242,10 @@ export async function processOrder(orderId: string) {
       source = "GLOBAL_DEFAULT";
     }
 
-    if (isExcluded) {
-      itemsBreakdown.push({
-        orderItemId: item.id,
-        productId: item.productId,
-        sku: item.sku,
-        commission: 0,
-        status: "EXCLUDED"
-      });
-      continue;
-    }
-
     let itemBasePrice = DecimalMath.fromOrder(
       item.total,
-      item.tax, 0,
+      item.tax, 
+      0, 
       config.excludeTax,
       config.excludeShipping
     );
@@ -214,11 +268,11 @@ export async function processOrder(orderId: string) {
       quantity: item.quantity,
       price: item.price,
       total: item.total,
-      profit: itemProfit,
       rate: rate.toString(),
       type,
       source,
       commission: itemComm,
+      profit: itemProfit, 
       isRefunded: false
     });
   }
@@ -241,11 +295,13 @@ export async function processOrder(orderId: string) {
         status: "PENDING",
         commissionType: "PERCENTAGE",
         commissionRate: new Prisma.Decimal(0),
-        availableAt: availableDate,
+        commissionRuleId: matchedRuleId, 
+        isRecurring: false, 
         metadata: {
           itemsBreakdown,
           attribution: attributionSource,
-          totalProfit: totalProfit
+          totalProfit: totalProfit,
+          isGiftCard: isGiftCardPayment
         }
       }
     });
@@ -283,6 +339,7 @@ export async function processOrder(orderId: string) {
       }
     });
 
+    // Notification
     await tx.notificationQueue.create({
       data: {
         channel: "EMAIL",
@@ -304,10 +361,7 @@ export async function processOrder(orderId: string) {
 }
 
 export async function processRefund(orderId: string, refundedItemIds: string[]) {
-  const referral = await db.referral.findFirst({
-    where: { orderId }
-  });
-
+  const referral = await db.referral.findFirst({ where: { orderId } });
   if (!referral) return { success: false, error: "NO_REFERRAL_FOUND" };
   if (referral.status === "REJECTED") return { success: true, message: "ALREADY_REJECTED" };
 
@@ -327,10 +381,8 @@ export async function processRefund(orderId: string, refundedItemIds: string[]) 
   if (DecimalMath.isZero(refundDeduction)) return { success: true, message: "NO_COMMISSION_TO_REFUND" };
 
   await db.$transaction(async (tx) => {
-    
     if (referral.status === "PENDING") {
       const newCommission = DecimalMath.sub(referral.commissionAmount, refundDeduction);
-      
       if (DecimalMath.lte(newCommission, 0)) {
         await tx.referral.update({
           where: { id: referral.id },
@@ -342,16 +394,17 @@ export async function processRefund(orderId: string, refundedItemIds: string[]) 
           data: { commissionAmount: newCommission, metadata: { ...referral.metadata as any, itemsBreakdown: updatedBreakdown } }
         });
       }
-    } 
-    
-    else if (referral.status === "PAID" || referral.status === "APPROVED") {
+    } else if (referral.status === "PAID" || referral.status === "APPROVED") {
       const affiliate = await tx.affiliateAccount.findUnique({ where: { id: referral.affiliateId! }});
       if(affiliate) {
         await tx.affiliateAccount.update({
           where: { id: affiliate.id },
-          data: { balance: { decrement: refundDeduction }, totalEarnings: { decrement: refundDeduction } }
+          data: { 
+            balance: { decrement: refundDeduction }, 
+            totalEarnings: { decrement: refundDeduction } 
+          }
         });
-
+        
         await tx.affiliateLedger.create({
           data: {
             affiliateId: affiliate.id,
@@ -364,7 +417,6 @@ export async function processRefund(orderId: string, refundedItemIds: string[]) 
           }
         });
       }
-      
       await tx.referral.update({
         where: { id: referral.id },
         data: { metadata: { ...referral.metadata as any, itemsBreakdown: updatedBreakdown } }

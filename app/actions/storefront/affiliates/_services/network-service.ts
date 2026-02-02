@@ -1,6 +1,6 @@
 //app/actions/storefront/affiliates/_services/network-service.ts
 
-"use server"; // ✅ MUST BE AT THE TOP
+"use server";
 
 import { db } from "@/lib/prisma";
 
@@ -14,13 +14,6 @@ export interface NetworkNode {
   children: NetworkNode[];
 }
 
-// ==========================================
-// READ SERVICES (Named Exports)
-// ==========================================
-
-/**
- * Get Upline (Sponsor) Info
- */
 export async function getSponsor(affiliateId: string) {
   const me = await db.affiliateAccount.findUnique({
     where: { id: affiliateId },
@@ -38,14 +31,11 @@ export async function getSponsor(affiliateId: string) {
   });
 }
 
-/**
- * Get Downline Tree (Up to 3 Levels Deep for Performance)
- */
 export async function getNetworkTree(affiliateId: string): Promise<NetworkNode[]> {
-  
-  // Helper to fetch children recursively
+  const config = await db.affiliateMLMConfig.findUnique({ where: { id: "mlm_config" } });
+  const MAX_DEPTH = config?.isEnabled ? (config.maxLevels || 3) : 0;
   const fetchChildren = async (parentId: string, currentLevel: number): Promise<NetworkNode[]> => {
-    if (currentLevel > 3) return []; // Enterprise Limit: Depth control
+    if (currentLevel > MAX_DEPTH) return []; 
 
     const children = await db.affiliateAccount.findMany({
       where: { parentId },
@@ -57,7 +47,6 @@ export async function getNetworkTree(affiliateId: string): Promise<NetworkNode[]
     const nodes: NetworkNode[] = [];
 
     for (const child of children) {
-      // Recursion
       const grandChildren = await fetchChildren(child.id, currentLevel + 1);
       
       nodes.push({
@@ -65,7 +54,7 @@ export async function getNetworkTree(affiliateId: string): Promise<NetworkNode[]
         name: child.user.name || "Unknown Partner",
         avatar: child.user.image,
         level: currentLevel,
-        totalSales: child.totalEarnings.toNumber(), // Performance Indicator
+        totalSales: child.totalEarnings.toNumber(),
         joinedAt: child.createdAt,
         children: grandChildren
       });
@@ -77,18 +66,12 @@ export async function getNetworkTree(affiliateId: string): Promise<NetworkNode[]
   return await fetchChildren(affiliateId, 1);
 }
 
-/**
- * Get Network Stats (Total Team Size)
- */
 export async function getNetworkStats(affiliateId: string) {
-  // Level 1 count (Direct Recruits)
   const directRecruits = await db.affiliateAccount.count({
     where: { parentId: affiliateId }
   });
-
-  // Total Downline Count (Recursive is expensive, keeping simple for dashboard)
   return {
     directRecruits,
-    activePartners: directRecruits // Placeholder for activity logic
+    activePartners: directRecruits 
   };
 }

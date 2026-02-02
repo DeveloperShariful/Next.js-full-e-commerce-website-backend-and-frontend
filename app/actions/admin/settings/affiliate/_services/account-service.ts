@@ -26,6 +26,7 @@ export async function getAffiliates(
   const skip = (page - 1) * limit;
 
   const where: Prisma.AffiliateAccountWhereInput = {
+    deletedAt: null, 
     ...(status && { status }),
     ...(groupId && { groupId }),
     ...(tagId && { tags: { some: { id: tagId } } }),
@@ -102,8 +103,8 @@ export async function getAffiliates(
 }
 
 export async function getAffiliateDetails(id: string) {
-  const account = await db.affiliateAccount.findUnique({
-    where: { id },
+  const account = await db.affiliateAccount.findFirst({
+    where: { id, deletedAt: null },
     include: {
       user: {
           include: {
@@ -122,7 +123,7 @@ export async function getAffiliateDetails(id: string) {
     }
   });
 
-  if(!account) throw new Error("Affiliate not found");
+  if(!account) throw new Error("Affiliate not found or deleted");
   return account;
 }
 
@@ -134,7 +135,7 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
-    const current = await db.affiliateAccount.findUnique({ where: { id } });
+    const current = await db.affiliateAccount.findFirst({ where: { id, deletedAt: null } });
     if (!current) return { success: false, message: "Affiliate not found" };
 
     const payload: Partial<AffiliateAccount> = { status: "ACTIVE" };
@@ -148,7 +149,6 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
           include: { user: true },
           data: changes as Prisma.AffiliateAccountUncheckedUpdateInput
         });
-
         await tx.notificationQueue.create({
             data: {
                 channel: "EMAIL",
@@ -160,8 +160,6 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
                 metadata: { affiliate_name: updated.user.name || "Partner" }
             }
         });
-
-        // Log Audit
         await auditService.log({
             userId: actor.id,
             action: "UPDATE",
@@ -184,7 +182,7 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
-    const current = await db.affiliateAccount.findUnique({ where: { id } });
+    const current = await db.affiliateAccount.findFirst({ where: { id, deletedAt: null } });
     if (!current) return { success: false, message: "Affiliate not found" };
 
     const payload: Partial<AffiliateAccount> = { 
@@ -235,14 +233,12 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
   }
 }
 
-// --- BULK ACTIONS ---
-
 export async function bulkStatusAction(ids: string[], status: AffiliateStatus): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
     const existing = await db.affiliateAccount.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, deletedAt: null },
       select: { id: true, status: true, userId: true, user: { select: { email: true, name: true } } }
     });
 
@@ -273,8 +269,6 @@ export async function bulkStatusAction(ids: string[], status: AffiliateStatus): 
                 });
             }
         }
-
-        // 3. Audit
         await auditService.log({
           userId: actor.id,
           action: "BULK_UPDATE",
@@ -297,7 +291,7 @@ export async function bulkGroupAction(ids: string[], groupId: string): Promise<A
     const actor = await protectAction("MANAGE_PARTNERS");
 
     await db.affiliateAccount.updateMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, deletedAt: null },
       data: { groupId }
     });
 
@@ -323,7 +317,7 @@ export async function bulkTagAction(ids: string[], tagId: string): Promise<Actio
 
     await db.$transaction(
       ids.map(id => db.affiliateAccount.update({
-          where: { id },
+          where: { id, deletedAt: null }, 
           data: { tags: { connect: { id: tagId } } }
       }))
     );
@@ -350,7 +344,10 @@ export async function bulkDeleteAction(ids: string[]): Promise<ActionResponse> {
 
     await db.affiliateAccount.updateMany({
       where: { id: { in: ids } },
-      data: { status: "REJECTED" }
+      data: { 
+          status: "REJECTED",
+          deletedAt: new Date() 
+      }
     });
 
     await auditService.log({
@@ -362,7 +359,7 @@ export async function bulkDeleteAction(ids: string[]): Promise<ActionResponse> {
     });
 
     revalidatePath("/admin/settings/affiliate/users");
-    return { success: true, message: "Selected users marked as Rejected (Data Preserved)." };
+    return { success: true, message: "Selected users moved to trash." };
   } catch (error: any) {
     return { success: false, message: "Bulk delete failed." };
   }
@@ -376,11 +373,11 @@ export async function updateCommissionAction(
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
-    const current = await db.affiliateAccount.findUnique({ where: { id } });
+    const current = await db.affiliateAccount.findFirst({ where: { id, deletedAt: null } });
     if (!current) return { success: false, message: "Affiliate not found" };
 
     const payload: Partial<AffiliateAccount> = {
-      commissionRate: rate ? DecimalMath.toDecimal(rate) : null,
+      commissionRate: rate !== null ? DecimalMath.toDecimal(rate) : null,
       commissionType: type
     };
 

@@ -5,17 +5,16 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
 import { serializePrismaData } from "@/lib/format-data"; 
 
-// Services - UPDATED IMPORTS (Named Exports)
-// ❌ dashboardService ইমপোর্ট বাদ দেওয়া হয়েছে
-// ✅ সরাসরি ফাংশনগুলো ইমপোর্ট করা হয়েছে
 import { 
   getProfile, 
   getStats, 
   getRecentActivity, 
-  getPerformanceChart 
+  getPerformanceChart,
+  getTierProgress, 
+  getActiveRules   
 } from "@/app/actions/storefront/affiliates/_services/dashboard-service";
 
-import { getLinks, getCampaigns, getCreatives } from "@/app/actions/storefront/affiliates/_services/marketing-service";
+import { getLinks, getCampaigns, getCreatives, getCoupons } from "@/app/actions/storefront/affiliates/_services/marketing-service";
 import { getWalletData, getPayoutHistory, getLedger } from "@/app/actions/storefront/affiliates/_services/finance-service";
 import { getSponsor, getNetworkTree, getNetworkStats } from "@/app/actions/storefront/affiliates/_services/network-service";
 import { getSettings } from "@/app/actions/storefront/affiliates/_services/settings-service";
@@ -39,7 +38,6 @@ export default async function AffiliateStorefrontPage({
   const currentView = params.view || "overview";
   
   const [profile, storeSettings] = await Promise.all([
-    // ✅ FIX: dashboardService.getProfile এর বদলে সরাসরি getProfile
     getProfile(userId),
     db.storeSettings.findUnique({ where: { id: "settings" } })
   ]);
@@ -69,13 +67,14 @@ export default async function AffiliateStorefrontPage({
   try {
     switch (currentView) {
       case "overview":
-        const [stats, recentActivity, chartData] = await Promise.all([
-          // ✅ FIX: সরাসরি ফাংশন কল
+        const [stats, recentActivity, chartData, tierProgress, activeRules] = await Promise.all([
           getStats(profile.id),
           getRecentActivity(profile.id),
-          getPerformanceChart(profile.id)
+          getPerformanceChart(profile.id),
+          getTierProgress(profile.id),
+          getActiveRules()
         ]);
-        data.dashboard = { stats, recentActivity, chartData };
+        data.dashboard = { stats, recentActivity, chartData, tierProgress, activeRules };
         break;
 
       case "links":
@@ -89,6 +88,12 @@ export default async function AffiliateStorefrontPage({
             defaultSlug: profile.slug,
             ...appConfig 
         };
+        break;
+
+      // ✅ NEW: Separate View for Coupons
+      case "coupons":
+        const coupons = await getCoupons(profile.id);
+        data.marketing = { coupons }; // Reuse marketing object structure
         break;
 
       case "creatives":

@@ -3,22 +3,27 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "../permission-service"; 
-import { MediaType } from "@prisma/client";
+import { protectAction } from "../permission-service";
+import { MediaType, AnnouncementType } from "@prisma/client";
+import { getAllGroups } from "./group-service"; 
+import { getAllTiers } from "./tier-service";
 
 const announcementSchema = z.object({
+  id: z.string().optional(), 
   title: z.string().min(3),
   content: z.string().min(5),
-  type: z.enum(["INFO", "WARNING", "SUCCESS"]),
+  type: z.nativeEnum(AnnouncementType),
   isActive: z.boolean().default(true),
+  startsAt: z.union([z.string(), z.date()]),
+  expiresAt: z.union([z.string(), z.date()]).optional().nullable(),
   groupIds: z.array(z.string()).optional(),
   tierIds: z.array(z.string()).optional(),
-  startsAt: z.date().optional(),
-  expiresAt: z.date().optional().nullable(),
+  affiliateIds: z.array(z.string()).optional(), 
 });
 
 const creativeSchema = z.object({
@@ -35,11 +40,13 @@ const creativeSchema = z.object({
 
 type CreativeInput = z.infer<typeof creativeSchema>;
 
+// =========================================
+// READ OPERATIONS
+// =========================================
+
 export async function getAllAnnouncements(page: number = 1, limit: number = 20) {
   await protectAction("MANAGE_CONFIGURATION");
-
   const skip = (page - 1) * limit;
-
   const [total, data] = await Promise.all([
     db.affiliateAnnouncement.count(),
     db.affiliateAnnouncement.findMany({
@@ -60,14 +67,50 @@ export async function getAllAnnouncements(page: number = 1, limit: number = 20) 
   };
 }
 
+export async function getAllCreatives() {
+  try {
+    await protectAction("MANAGE_CONFIGURATION"); 
+
+    return await db.affiliateCreative.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: {
+          select: { usages: true }
+        }
+      }
+    });
+  } catch (error) {
+    throw new Error("Failed to load creatives.");
+  }
+}
+
+// =========================================
+// WRITE OPERATIONS
+// =========================================
+
+export async function getTargetingOptions() {
+    const [groups, tiers] = await Promise.all([
+        db.affiliateGroup.findMany({
+            select: { id: true, name: true }
+        }),
+        db.affiliateTier.findMany({
+            select: { id: true, name: true }
+        })
+    ]);
+    return { groups, tiers };
+}
+
 export async function createAnnouncementAction(data: z.infer<typeof announcementSchema>): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
-
     const result = announcementSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
-
     const payload = result.data;
+    const startDate = new Date(payload.startsAt);
+    const endDate = payload.expiresAt ? new Date(payload.expiresAt) : null;
+    if (endDate && startDate > endDate) {
+        return { success: false, message: "End date cannot be before start date." };
+    }
 
     const announcement = await db.affiliateAnnouncement.create({
       data: {
@@ -75,8 +118,8 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
         content: payload.content,
         type: payload.type,
         isActive: payload.isActive,
-        startsAt: payload.startsAt || new Date(),
-        expiresAt: payload.expiresAt,
+        startsAt: startDate,
+        expiresAt: endDate,
         targetGroups: payload.groupIds ? {
           connect: payload.groupIds.map(id => ({ id }))
         } : undefined,
@@ -104,9 +147,7 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
 export async function deleteAnnouncementAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
-
     await db.affiliateAnnouncement.delete({ where: { id } });
-
     await auditService.log({
       userId: actor.id,
       action: "DELETE_ANNOUNCEMENT",
@@ -123,13 +164,18 @@ export async function deleteAnnouncementAction(id: string): Promise<ActionRespon
 
 export async function toggleAnnouncementStatusAction(id: string, isActive: boolean): Promise<ActionResponse> {
   try {
-    await protectAction("MANAGE_CONFIGURATION");
-
+    const actor = await protectAction("MANAGE_CONFIGURATION");
     await db.affiliateAnnouncement.update({
       where: { id },
       data: { isActive }
+    });   
+    await auditService.log({
+        userId: actor.id,
+        action: "UPDATE_ANNOUNCEMENT_STATUS",
+        entity: "AffiliateAnnouncement",
+        entityId: id,
+        newData: { isActive }
     });
-
     revalidatePath("/admin/settings/affiliate/announcements");
     return { success: true, message: "Status updated." };
   } catch (error: any) {
@@ -137,32 +183,12 @@ export async function toggleAnnouncementStatusAction(id: string, isActive: boole
   }
 }
 
-export async function getAllCreatives() {
-  try {
-    await protectAction("MANAGE_CONFIGURATION"); 
-
-    return await db.affiliateCreative.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: {
-          select: { usages: true }
-        }
-      }
-    });
-  } catch (error) {
-    throw new Error("Failed to load creatives.");
-  }
-}
-
 export async function upsertCreativeAction(data: CreativeInput): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
-
     const result = creativeSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
-
     const payload = result.data;
-    
     const dbPayload = {
       title: payload.title,
       type: payload.type,
@@ -203,7 +229,6 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
     return { success: false, message: "Operation failed." };
   }
 }
-
 export async function deleteCreativeAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
@@ -245,5 +270,57 @@ export async function trackCreativeUsageAction(creativeId: string, affiliateId: 
   } catch (error) {
     console.error("Failed to track usage", error);
     return { success: false };
+  }
+}
+
+export async function upsertAnnouncementAction(data: z.infer<typeof announcementSchema>): Promise<ActionResponse> {
+  try {
+    const actor = await protectAction("MANAGE_CONFIGURATION");
+    const result = announcementSchema.safeParse(data);
+    if (!result.success) return { success: false, message: "Validation failed." };
+    const payload = result.data;
+    const startDate = new Date(payload.startsAt);
+    const endDate = payload.expiresAt ? new Date(payload.expiresAt) : null;
+    const dbData: Prisma.AffiliateAnnouncementCreateInput = {
+        title: payload.title,
+        content: payload.content,
+        type: payload.type,
+        isActive: payload.isActive,
+        startsAt: startDate,
+        expiresAt: endDate,
+    };
+
+    const relations = {
+        targetGroups: payload.groupIds ? { set: payload.groupIds.map(id => ({ id })) } : { set: [] },
+        targetTiers: payload.tierIds ? { set: payload.tierIds.map(id => ({ id })) } : { set: [] },
+    };
+
+    if (payload.id) {
+        await db.affiliateAnnouncement.update({
+            where: { id: payload.id },
+            data: { ...dbData, ...relations }
+        });
+    } else {
+        await db.affiliateAnnouncement.create({
+            data: {
+                ...dbData,
+                targetGroups: { connect: payload.groupIds?.map(id => ({ id })) },
+                targetTiers: { connect: payload.tierIds?.map(id => ({ id })) },
+            }
+        });
+    }
+
+    await auditService.log({
+      userId: actor.id,
+      action: payload.id ? "UPDATE_ANNOUNCEMENT" : "CREATE_ANNOUNCEMENT",
+      entity: "AffiliateAnnouncement",
+      entityId: payload.id || "NEW",
+      newData: payload
+    });
+
+    revalidatePath("/admin/settings/affiliate/announcements");
+    return { success: true, message: payload.id ? "Announcement updated." : "Announcement published." };
+  } catch (error: any) {
+    return { success: false, message: error.message };
   }
 }

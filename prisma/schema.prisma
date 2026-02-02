@@ -202,6 +202,19 @@ enum NotificationChannel {
   PUSH
 }
 
+enum AffiliateDocumentType {
+  PASSPORT
+  DRIVING_LICENSE
+  NATIONAL_ID
+  TAX_FORM
+}
+
+enum AffiliateDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum EventStatus {
   PENDING
   PROCESSING
@@ -250,6 +263,43 @@ enum LedgerType {
   REFUND_DEDUCTION
 }
 
+enum FraudRuleType {
+  IP_CLICK_LIMIT
+  CONVERSION_RATE_LIMIT
+  ORDER_VALUE_LIMIT
+  BLACKLIST_COUNTRY
+}
+
+enum FraudAction {
+  BLOCK
+  FLAG
+  SUSPEND
+}
+
+enum MLMBasis {
+  SALES_AMOUNT
+  PROFIT
+}
+
+enum AnnouncementType {
+  INFO
+  WARNING
+  SUCCESS
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
 // ==========================================
 // 3. USER, AUTH & SYSTEM
 // ==========================================
@@ -1396,8 +1446,8 @@ model QuestionAnswer {
 model SupportTicket {
   id           String          @id @default(uuid())
   subject      String
-  status       String          @default("open")
-  priority     String          @default("medium")
+  status       TicketStatus    @default(OPEN)
+  priority     TicketPriority  @default(MEDIUM)
   userId       String
   user         User            @relation("UserCreatedTickets", fields: [userId], references: [id], onDelete: Cascade)
   assignedToId String?
@@ -2024,6 +2074,7 @@ model AffiliateAccount {
   commissionRate  Decimal?         @db.Decimal(5, 2)
   commissionType  CommissionType   @default(PERCENTAGE)      
   balance         Decimal          @default(0.00) @db.Decimal(12, 2)
+  version          Int              @default(1)
   totalEarnings   Decimal          @default(0.00) @db.Decimal(12, 2)
   storeCredit     Decimal          @default(0.00) @db.Decimal(12, 2)
   paymentDetailsConfigured Boolean @default(false)
@@ -2031,6 +2082,7 @@ model AffiliateAccount {
   cookieDuration    Int?      @default(30)         
   riskScore         Float     @default(0.0)        
   autoApprovePayout Boolean   @default(false)
+  isKyced           Boolean   @default(false)
   
   kycStatus       String   @default("NOT_SUBMITTED")
   taxId           String?
@@ -2049,14 +2101,11 @@ model AffiliateAccount {
   vatNumber         String?
   tierId          String?
   tier            AffiliateTier?   @relation(fields: [tierId], references: [id], onDelete: SetNull)
-  
-  // FIXED: MLM Tree with materialized path for better performance
   parentId        String?
   parent          AffiliateAccount? @relation("AffiliateMLM", fields: [parentId], references: [id], onDelete: SetNull)
   downlines       AffiliateAccount[] @relation("AffiliateMLM")
   mlmPath         String?          // e.g., "root.user1.user2" for fast ancestor queries
   mlmLevel        Int       @default(0)
-  
   referrals       Referral[]
   customerReferrals User[]         @relation("CustomerReferral")
   clicks          AffiliateClick[]
@@ -2090,14 +2139,15 @@ model AffiliateDocument {
   id              String   @id @default(uuid())
   affiliateId     String
   affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  type            String
+  type            AffiliateDocumentType
+  status          AffiliateDocumentStatus    @default(PENDING)
+  adminComment    String?
   documentNumber  String?
-  fileUrl         String
-  status          String   @default("PENDING")
+  fileUrl         String                     @default("PENDING")
   rejectionReason String?
   verifiedAt      DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
 
   @@index([affiliateId])
   @@index([status])
@@ -2161,8 +2211,6 @@ model AffiliateClick {
   deviceFingerprint String?                                      
   city              String?                                     
   processingTime    Int? 
-  
-  // NEW: Archiving logic
   isArchived        Boolean          @default(false) 
   
   createdAt         DateTime         @default(now())
@@ -2219,6 +2267,7 @@ model Referral {
   @@index([paidAt])
   @@index([isFlagged])
   @@index([orderId])
+  @@index([affiliateId, createdAt(sort: Desc)])
 }
 
 model AffiliatePayout {
@@ -2329,7 +2378,7 @@ model AffiliateCommissionRule {
   productIds           String[] 
   categoryIds          String[]
   affiliateSpecificIds String[] 
-  
+  description          String?  @db.Text
   conditions           Json    
   action               Json     
   startDate            DateTime?
@@ -2396,7 +2445,7 @@ model AffiliateAnnouncement {
   id          String   @id @default(uuid())
   title       String
   content     String   @db.Text
-  type        String   @default("INFO")
+  type        AnnouncementType   @default(INFO)
   isActive    Boolean  @default(true)
   startsAt    DateTime @default(now())
   expiresAt   DateTime?
@@ -2410,9 +2459,9 @@ model AffiliateAnnouncement {
 
 model AffiliateFraudRule {
   id          String   @id @default(uuid())
-  type        String   
+  type        FraudRuleType   
   value       String   
-  action      String   @default("BLOCK")
+  action      FraudAction   @default(FLAG)
   reason      String?
   createdAt   DateTime @default(now())
 
@@ -2490,6 +2539,6 @@ model AffiliateMLMConfig {
   isEnabled      Boolean  @default(false)
   maxLevels      Int      @default(3)
   levelRates     Json     // e.g., {"1": 10, "2": 5, "3": 2}
-  commissionBasis String  @default("SALES_AMOUNT") 
+  commissionBasis MLMBasis  @default(SALES_AMOUNT) 
   updatedAt      DateTime @default(now()) @updatedAt
 }

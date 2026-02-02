@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
 import { db } from "@/lib/prisma";
-
 import * as statsService from "@/app/actions/admin/settings/affiliate/_services/dashboard-service";
 import * as accountService from "@/app/actions/admin/settings/affiliate/_services/account-service"; 
 import * as payoutService from "@/app/actions/admin/settings/affiliate/_services/payout-service";
@@ -22,7 +21,7 @@ import * as ledgerService from "@/app/actions/admin/settings/affiliate/_services
 import * as analyticsService from "@/app/actions/admin/settings/affiliate/_services/dashboard-service";
 import * as groupService from "@/app/actions/admin/settings/affiliate/_services/group-service";
 import * as couponTagService from "@/app/actions/admin/settings/affiliate/_services/coupon-tag-service";
-import * as logService from "@/app/actions/admin/settings/affiliate/_services/log-service"; // ✅ Import Log Service
+import * as logService from "@/app/actions/admin/settings/affiliate/_services/log-service"; 
 import { serializePrismaData } from "@/lib/format-data"; 
 
 export const metadata = {
@@ -30,7 +29,6 @@ export const metadata = {
   description: "Advanced control center for affiliate marketing, MLM, and commission management.",
 };
 
-// ✅ TYPE DEFINITION UPDATED
 export default async function AffiliateMasterPage({
   searchParams,
 }: {
@@ -39,8 +37,8 @@ export default async function AffiliateMasterPage({
     page?: string; 
     search?: string; 
     status?: string;
-    logType?: string; // ✅ Added
-    level?: string;   // ✅ Added
+    logType?: string; 
+    level?: string;   
   }>;
 }) {
   const params = await searchParams;
@@ -167,24 +165,26 @@ export default async function AffiliateMasterPage({
         data.coupons = await couponTagService.getAllAffiliateCoupons(); 
         break;
 
-      case "logs": // ✅ Logs View Added
+      case "logs": 
         const logType = params.logType || "AUDIT"; 
-        const [auditLogs, systemLogs] = await Promise.all([
-            logService.getAuditLogs(page, 20, search),
-            logService.getSystemLogs(page, 20, params.level as string)
-        ]);
-        data.logs = { 
-            audit: auditLogs, 
-            system: systemLogs, 
-            currentTab: logType 
-        };
+        
+        if (logType === "SYSTEM") {
+            data.logs = {
+                system: await logService.getSystemLogs(page, 20, params.level as string),
+                currentTab: "SYSTEM"
+            };
+        } else {
+            data.logs = {
+                audit: await logService.getAuditLogs(page, 20, search),
+                currentTab: "AUDIT"
+            };
+        }
         break;
     }
   } catch (error: any) {
     console.error("Affiliate Dashboard Error:", error);
     data.error = error.message || "Failed to load module data. Please try again.";
   }
-
   return (
     <div className="bg-white min-h-[calc(100vh-64px)] w-full"> 
       <Suspense fallback={
@@ -200,7 +200,10 @@ export default async function AffiliateMasterPage({
             <p className="text-gray-500 max-w-md mt-2">{data.error}</p>
           </div>
         ) : (
-          <AffiliateMainView initialData={serializePrismaData(data) } currentView={currentView} />
+          <AffiliateMainView 
+            initialData={serializePrismaData(data)} 
+            currentView={currentView} 
+          />
         )}
       </Suspense>
     </div>

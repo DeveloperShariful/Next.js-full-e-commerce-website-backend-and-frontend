@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { Ticket, Plus, Trash2, Loader2, X, User, Save, DollarSign, Percent, Edit, Search, Check } from "lucide-react";
+import { Ticket, Plus, Trash2, Loader2, X, User, Save, DollarSign, Percent, Edit, Search, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
@@ -20,9 +20,10 @@ interface Coupon {
   code: string;
   value: number;
   type: "PERCENTAGE" | "FIXED_AMOUNT" | string;
+  affiliateCommissionRate?: number | null; // NEW FIELD
   affiliate?: {
     id: string;
-    user: { name: string | null; email?: string }; // Email added for search context
+    user: { name: string | null; email?: string };
     slug?: string;
   } | null;
   usedCount: number;
@@ -50,7 +51,7 @@ export default function CouponManager({ initialCoupons }: { initialCoupons: any[
     startTransition(async () => {
         const res = await unlinkCouponAction(id);
         if(res.success) {
-            toast.success("Coupon removed");
+            toast.success(res.message);
             setCoupons(prev => prev.filter(c => c.id !== id));
         } else {
             toast.error(res.message);
@@ -81,7 +82,8 @@ export default function CouponManager({ initialCoupons }: { initialCoupons: any[
                 <thead className="bg-gray-50 border-b border-gray-200 text-[10px] uppercase font-bold text-gray-500">
                     <tr>
                         <th className="px-6 py-3">Code</th>
-                        <th className="px-6 py-3">Value</th>
+                        <th className="px-6 py-3">Discount</th>
+                        <th className="px-6 py-3">Commission Override</th>
                         <th className="px-6 py-3">Assigned To</th>
                         <th className="px-6 py-3">Usage</th>
                         <th className="px-6 py-3 text-right">Action</th>
@@ -89,7 +91,7 @@ export default function CouponManager({ initialCoupons }: { initialCoupons: any[
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {coupons.length === 0 ? (
-                        <tr><td colSpan={5} className="p-10 text-center text-gray-400 text-xs">No active coupons found.</td></tr>
+                        <tr><td colSpan={6} className="p-10 text-center text-gray-400 text-xs">No active coupons found.</td></tr>
                     ) : (
                         coupons.map(c => (
                             <tr key={c.id} className="hover:bg-gray-50/60 transition-colors group">
@@ -100,6 +102,15 @@ export default function CouponManager({ initialCoupons }: { initialCoupons: any[
                                 </td>
                                 <td className="px-6 py-4 font-medium text-gray-700">
                                     {c.type === "PERCENTAGE" ? `${c.value}%` : formatPrice(c.value)}
+                                </td>
+                                <td className="px-6 py-4">
+                                    {c.affiliateCommissionRate ? (
+                                        <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100">
+                                            {c.affiliateCommissionRate}% / Fixed
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] text-gray-400">Default Rate</span>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4">
                                     {c.affiliate ? (
@@ -154,7 +165,9 @@ function CouponModal({ onClose, onSuccess, initialData }: { onClose: () => void,
             code: initialData?.code || "",
             value: initialData?.value || 10,
             type: initialData?.type || "PERCENTAGE",
-            affiliateId: initialData?.affiliate?.id || ""
+            affiliateId: initialData?.affiliate?.id || "",
+            // NEW: Default Commission Rate
+            affiliateCommissionRate: initialData?.affiliateCommissionRate || ""
         }
     });
 
@@ -202,7 +215,8 @@ function CouponModal({ onClose, onSuccess, initialData }: { onClose: () => void,
                     data.code,
                     Number(data.value),
                     data.type,
-                    data.affiliateId || undefined
+                    data.affiliateId || undefined,
+                    data.affiliateCommissionRate ? Number(data.affiliateCommissionRate) : undefined // NEW
                 );
             } else {
                 // Create Mode
@@ -210,12 +224,13 @@ function CouponModal({ onClose, onSuccess, initialData }: { onClose: () => void,
                     data.affiliateId || undefined, 
                     data.code, 
                     Number(data.value), 
-                    data.type
+                    data.type,
+                    data.affiliateCommissionRate ? Number(data.affiliateCommissionRate) : undefined // NEW
                 );
             }
             
             if(res.success) {
-                toast.success(initialData ? "Coupon updated" : "Coupon created");
+                toast.success(initialData ? "Coupon updated successfully" : "Coupon created successfully");
                 onSuccess();
                 onClose();
             } else {
@@ -225,8 +240,8 @@ function CouponModal({ onClose, onSuccess, initialData }: { onClose: () => void,
     };
 
     return (
-        <div className="fixed inset-0 z-[10] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-200 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
                 
                 <div className="px-5 py-4 border-b flex justify-between items-center bg-gray-50/50">
                     <h3 className="font-bold text-gray-900 text-sm">{initialData ? "Edit Coupon" : "Create New Coupon"}</h3>
@@ -236,7 +251,6 @@ function CouponModal({ onClose, onSuccess, initialData }: { onClose: () => void,
                 <div className="overflow-y-auto p-5">
                     <form id="coupon-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                         
-                        {/* Code Input */}
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-bold text-gray-500 uppercase">Coupon Code</label>
                             <div className="relative">
@@ -274,6 +288,22 @@ function CouponModal({ onClose, onSuccess, initialData }: { onClose: () => void,
                             </div>
                         </div>
 
+                        {/* NEW: Affiliate Commission Rate Override */}
+                        <div className="space-y-1.5 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                                Affiliate Commission (Optional)
+                                <span title="Overrides Global/Tier/Group rules when this coupon is used."> <AlertCircle className="w-3 h-3 text-gray-400 cursor-help" /></span>
+                            </label>
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                {...register("affiliateCommissionRate")} 
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500/10 focus:border-green-500 outline-none" 
+                                placeholder="Leave empty to use default rules"
+                            />
+                            <p className="text-[10px] text-gray-400">If set, this rate applies instead of standard commission.</p>
+                        </div>
+
                         {/* Affiliate Search Dropdown */}
                         <div className="space-y-1.5 relative">
                             <label className="text-[10px] font-bold text-gray-500 uppercase">Assign to Affiliate</label>
@@ -297,7 +327,6 @@ function CouponModal({ onClose, onSuccess, initialData }: { onClose: () => void,
                                 )}
                             </div>
                             
-                            {/* Hidden ID Input */}
                             <input type="hidden" {...register("affiliateId")} />
 
                             {/* Dropdown Results */}

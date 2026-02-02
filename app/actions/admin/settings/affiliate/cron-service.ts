@@ -7,7 +7,7 @@ import { auditService } from "@/lib/services/audit-service";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { updateRiskScore } from "./_services/fraud-service";
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = Number(process.env.AFFILIATE_CRON_BATCH_SIZE) || 100;
 
 export async function processDailyJobs() {
   try {
@@ -26,13 +26,13 @@ export async function processDailyJobs() {
 
 export async function processPendingReferrals() {
   const now = new Date();
-  
   const readyReferrals = await db.referral.findMany({
     where: {
       status: "PENDING",
       availableAt: { lte: now }
     },
-    take: BATCH_SIZE 
+    take: BATCH_SIZE,
+    orderBy: { createdAt: "asc" } 
   });
 
   if (readyReferrals.length === 0) return;
@@ -40,19 +40,28 @@ export async function processPendingReferrals() {
   const results = await Promise.allSettled(readyReferrals.map(async (ref) => {
     return await db.$transaction(async (tx) => {
         
-        const affiliate = await tx.affiliateAccount.findUnique({
-            where: { id: ref.affiliateId! }
+        const affiliate = await tx.affiliateAccount.findFirst({
+            where: { 
+                id: ref.affiliateId, 
+                deletedAt: null 
+            }
         });
 
-        if (!affiliate) throw new Error(`Affiliate ${ref.affiliateId} not found`);
+        if (!affiliate) {
+            await tx.referral.update({
+                where: { id: ref.id },
+                data: { 
+                    status: "REJECTED", 
+                    adminNote: "System Auto-Reject: Affiliate Account Deleted" 
+                }
+            });
+            throw new Error(`Affiliate ${ref.affiliateId} not found or deleted`);
+        }
 
-        const balanceBefore = affiliate.balance;
-        const balanceAfter = DecimalMath.add(balanceBefore, ref.commissionAmount);
-
-        await tx.affiliateAccount.update({
-          where: { id: ref.affiliateId! },
+        const updatedAffiliate = await tx.affiliateAccount.update({
+          where: { id: affiliate.id },
           data: {
-            balance: balanceAfter,
+            balance: { increment: ref.commissionAmount },
             totalEarnings: { increment: ref.commissionAmount }
           }
         });
@@ -67,18 +76,17 @@ export async function processPendingReferrals() {
 
         await tx.affiliateLedger.create({
           data: {
-            affiliateId: ref.affiliateId!,
+            affiliateId: ref.affiliateId,
             type: "COMMISSION",
             amount: ref.commissionAmount,
-            balanceBefore: balanceBefore, 
-            balanceAfter: balanceAfter,   
+            balanceBefore: DecimalMath.sub(updatedAffiliate.balance, ref.commissionAmount), 
+            balanceAfter: updatedAffiliate.balance,    
             description: ref.isMlmReward ? `MLM Reward Released: #${ref.orderId}` : `Commission Released: #${ref.orderId}`,
             referenceId: `REL-${ref.id}` 
           }
         });
 
         const user = await tx.user.findUnique({ where: { id: affiliate.userId } });
-
         if (user?.email) {
             await tx.notificationQueue.create({
                 data: {
@@ -87,7 +95,7 @@ export async function processPendingReferrals() {
                     templateSlug: "COMMISSION_APPROVED",
                     status: "PENDING",
                     userId: affiliate.userId,
-                    content: "", 
+                    content: "",
                     metadata: {
                         amount: ref.commissionAmount.toString(),
                         order_id: ref.orderId
@@ -111,51 +119,50 @@ export async function processPendingReferrals() {
 export async function runTierUpgrades() {
   const tiers = await db.affiliateTier.findMany({ orderBy: { minSalesAmount: 'desc' } });
   
-  const activeAffiliates = await db.affiliateAccount.findMany({
-    where: { 
+  for (const targetTier of tiers) {
+    if (targetTier.minSalesAmount.toNumber() === 0 && targetTier.minSalesCount === 0) continue;
+    const eligibleAffiliates = await db.affiliateAccount.findMany({
+      where: {
         status: "ACTIVE",
-        updatedAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) } 
-    },
-    include: { tier: true, user: true }
-  });
+        deletedAt: null, 
+        tierId: { not: targetTier.id }, 
+        totalEarnings: { gte: targetTier.minSalesAmount }, 
+      },
+      select: { id: true, userId: true, tierId: true, user: { select: { email: true, name: true } } },
+      take: BATCH_SIZE 
+    });
 
-  for (const affiliate of activeAffiliates) {
-      try {
-        const earnings = affiliate.totalEarnings.toNumber();
-        const salesCount = await db.referral.count({ 
-            where: { affiliateId: affiliate.id, status: { in: ["APPROVED", "PAID"] } } 
-        });
-        
-        const eligibleTier = tiers.find(t => earnings >= t.minSalesAmount.toNumber() && salesCount >= t.minSalesCount);
+    for (const affiliate of eligibleAffiliates) {
+       try {
+           const salesCount = await db.referral.count({ 
+               where: { affiliateId: affiliate.id, status: { in: ["APPROVED", "PAID"] } } 
+           });
 
-        if (eligibleTier && eligibleTier.id !== affiliate.tierId) {
-            const currentReq = affiliate.tier?.minSalesAmount.toNumber() || 0;
-            
-            if (eligibleTier.minSalesAmount.toNumber() > currentReq) {
-                await db.affiliateAccount.update({ 
-                    where: { id: affiliate.id }, 
-                    data: { tierId: eligibleTier.id } 
-                });
-                
-                await db.notificationQueue.create({
-                    data: {
-                        channel: "EMAIL",
-                        recipient: affiliate.user.email,
-                        templateSlug: "TIER_UPGRADED",
-                        status: "PENDING",
-                        userId: affiliate.userId,
-                        content: "", 
-                        metadata: { 
-                            affiliate_name: affiliate.user.name, 
-                            tier_name: eligibleTier.name 
-                        }
-                    }
-                });
-            }
-        }
-      } catch (err) {
-          console.error(`Tier Check Failed for ${affiliate.id}`, err);
-      }
+           if (salesCount >= targetTier.minSalesCount) {
+               await db.affiliateAccount.update({
+                   where: { id: affiliate.id },
+                   data: { tierId: targetTier.id }
+               });
+               
+               await db.notificationQueue.create({
+                   data: {
+                       channel: "EMAIL",
+                       recipient: affiliate.user.email,
+                       templateSlug: "TIER_UPGRADED",
+                       status: "PENDING",
+                       userId: affiliate.userId,
+                       content: "",
+                       metadata: { 
+                           affiliate_name: affiliate.user.name, 
+                           tier_name: targetTier.name 
+                       }
+                   }
+               });
+           }
+       } catch (err) {
+           console.error(`Tier Upgrade Failed for ${affiliate.id}`, err);
+       }
+    }
   }
 }
 

@@ -8,7 +8,8 @@ import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { affiliateGeneralSchema } from "../schemas";
 import { getChanges } from "../get-changes";
-import { protectAction } from "../permission-service"; 
+import { protectAction } from "../permission-service";
+import { DecimalMath } from "@/lib/utils/decimal-math";
 
 // =========================================
 // READ OPERATIONS
@@ -22,11 +23,8 @@ export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
         affiliateConfig: true,
       },
     });
-
-    if (!settings) return null;
-
-    const genConfig = (settings.generalConfig as any) || {};
-    const affConfig = (settings.affiliateConfig as AffiliateConfigDTO) || {};
+    const genConfig = (settings?.generalConfig as any) || {};
+    const affConfig = (settings?.affiliateConfig as AffiliateConfigDTO) || {};
 
     return {
       isActive: genConfig.enableAffiliateProgram ?? false,
@@ -49,12 +47,33 @@ export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
       minimumPayout: Number(affConfig.minimumPayout) || 50,
       payoutMethods: Array.isArray(affConfig.payoutMethods) 
         ? affConfig.payoutMethods 
-        : ["STORE_CREDIT"],
+        : ["STORE_CREDIT"], 
       commissionRate: Number(affConfig.commissionRate) || 10,
       commissionType: affConfig.commissionType || "PERCENTAGE",
     };
   } catch (error) {
-    throw new Error("Failed to load configuration");
+    console.error("Failed to load settings:", error);
+    return {
+        isActive: false,
+        programName: "Affiliate Program",
+        commissionRate: 10,
+        commissionType: "PERCENTAGE",
+        payoutMethods: ["STORE_CREDIT"],
+        minimumPayout: 50,
+        holdingPeriod: 14,
+        autoApprovePayout: false,
+        cookieDuration: 30,
+        slugLimit: 5,
+        referralParam: "ref",
+        excludeShipping: true,
+        excludeTax: true,
+        autoApplyCoupon: false,
+        zeroValueReferrals: false,
+        allowSelfReferral: false,
+        isLifetimeLinkOnPurchase: false,
+        customSlugsEnabled: false,
+        autoCreateSlug: false
+    };
   }
 }
 
@@ -65,6 +84,7 @@ export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
 export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
+    
     const result = affiliateGeneralSchema.safeParse(data);
     if (!result.success) {
       return {
@@ -106,14 +126,12 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
     if (!hasChanges) {
         return { success: true, message: "No changes detected." };
     }
-
     const rawSettings = await db.storeSettings.findUnique({
       where: { id: "settings" },
       select: { generalConfig: true, affiliateConfig: true },
     });
 
     const existingGeneral = (rawSettings?.generalConfig as any) || {};
-    
     const newGeneralConfig = {
       ...existingGeneral,
       enableAffiliateProgram: payload.isActive,
@@ -128,7 +146,7 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
       await tx.storeSettings.upsert({
         where: { id: "settings" },
         create: {
-          storeName: "My Store",
+          storeName: "My Store", 
           currency: "AUD",
           generalConfig: newGeneralConfig,
           affiliateConfig: newAffiliateConfig as any,
@@ -145,7 +163,7 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
         entity: "StoreSettings",
         entityId: "settings",
         oldData: oldValues, 
-        newData: changes,   
+        newData: changes,    
         meta: { module: "AFFILIATE_CONFIG" }
       });
     });
@@ -153,6 +171,7 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
     revalidatePath("/admin/settings/affiliate");
     return { success: true, message: "Configuration updated successfully." };
   } catch (error: any) {
+    console.error(error);
     return { success: false, message: error.message || "Internal server error." };
   }
 }

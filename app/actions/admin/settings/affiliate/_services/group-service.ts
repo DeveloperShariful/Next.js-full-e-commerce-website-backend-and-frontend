@@ -10,7 +10,7 @@ import { DecimalMath } from "@/lib/utils/decimal-math";
 import { z } from "zod";
 import { protectAction } from "../permission-service";
 import { Prisma } from "@prisma/client";
-import { getChanges } from "../get-changes"; 
+import { getChanges } from "../get-changes";
 
 const groupSchema = z.object({
   id: z.string().optional(),
@@ -29,7 +29,6 @@ type GroupInput = z.infer<typeof groupSchema>;
 
 export async function getAllGroups() {
   await protectAction("MANAGE_PARTNERS");
-
   return await db.affiliateGroup.findMany({
     include: {
       _count: { 
@@ -116,10 +115,19 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
       // CREATE SCENARIO
       // =========================================================
       else {
+        let baseSlug = payload.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        let slug = baseSlug;
+        let counter = 1;
+        
+        while (await tx.affiliateGroup.findUnique({ where: { slug } })) {
+            slug = `${baseSlug}-${counter}`;
+            counter++;
+        }
+
         const created = await tx.affiliateGroup.create({
           data: {
             name: payload.name,
-            slug: payload.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+            slug: slug,
             description: payload.description,
             commissionRate: rateValue,
             commissionType: payload.commissionType,
@@ -154,9 +162,16 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
 export async function deleteGroupAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
-    const count = await db.affiliateAccount.count({ where: { groupId: id } });
-    if (count > 0) {
-        return { success: false, message: `Cannot delete: ${count} affiliates are in this group.` };
+    const [affiliateCount, rateCount] = await Promise.all([
+        db.affiliateAccount.count({ where: { groupId: id } }), 
+        db.affiliateProductRate.count({ where: { groupId: id } }) 
+    ]);
+
+    if (affiliateCount > 0) {
+        return { success: false, message: `Cannot delete: ${affiliateCount} affiliates are currently in this group.` };
+    }
+    if (rateCount > 0) {
+        return { success: false, message: `Cannot delete: ${rateCount} commission overrides rely on this group.` };
     }
 
     const deleted = await db.affiliateGroup.delete({ where: { id } });

@@ -4,22 +4,47 @@
 
 import { db } from "@/lib/prisma";
 import { format, eachDayOfInterval, subDays, startOfDay, endOfDay } from "date-fns";
-import { revalidatePath, unstable_cache } from "next/cache";
-import { nanoid } from "nanoid";
-import { CommissionType } from "@prisma/client";
-import { cookies } from "next/headers";
-import { getAuthAffiliate } from "../auth-helper"; // Helper if needed inside actions
+import { unstable_cache } from "next/cache";
+import { AnnouncementType, CommissionType } from "@prisma/client";
 
 // ==========================================
-// READ SERVICES (Named Exports)
+// 1. PROFILE & STATS (OPTIMIZED)
 // ==========================================
 
 export async function getProfile(userId: string) {
   const affiliate = await db.affiliateAccount.findUnique({
     where: { userId },
-    include: {
-      tier: true,
-      user: { select: { name: true, email: true, image: true } }
+    select: {
+      id: true,
+      userId: true,
+      slug: true,
+      status: true,
+      balance: true,       
+      totalEarnings: true, 
+      commissionRate: true, 
+      commissionType: true,
+      user: { 
+        select: { 
+          name: true, 
+          email: true, 
+          image: true 
+        } 
+      },
+      tier: {
+        select: {
+          id: true,
+          name: true,
+          icon: true,
+          commissionRate: true, 
+          commissionType: true
+        }
+      },
+      group: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
     }
   });
 
@@ -33,86 +58,217 @@ export async function getProfile(userId: string) {
     avatar: affiliate.user.image,
     slug: affiliate.slug,
     status: affiliate.status,
+    balance: affiliate.balance.toNumber(),
+    totalEarnings: affiliate.totalEarnings.toNumber(),
     tier: affiliate.tier ? {
       name: affiliate.tier.name,
       icon: affiliate.tier.icon,
       commissionRate: affiliate.tier.commissionRate.toNumber(),
       commissionType: affiliate.tier.commissionType
     } : null,
-    balance: affiliate.balance.toNumber(),
+    group: affiliate.group ? {
+      id: affiliate.group.id,
+      name: affiliate.group.name
+    } : null
   };
 }
 
 export async function getStats(affiliateId: string) {
-  const [clicks, referrals] = await Promise.all([
-    db.affiliateClick.count({ where: { affiliateId } }),
-    db.referral.aggregate({
-      where: { affiliateId, status: { in: ["APPROVED", "PAID"] } },
-      _count: { id: true },
-      _sum: { commissionAmount: true }
-    })
-  ]);
+  return await unstable_cache(async () => {
+    const [clicks, referrals] = await Promise.all([
+      db.affiliateClick.count({ where: { affiliateId } }),
+      db.referral.aggregate({
+        where: { affiliateId, status: { in: ["APPROVED", "PAID"] } },
+        _count: { id: true },
+        _sum: { commissionAmount: true }
+      })
+    ]);
 
-  const totalReferrals = referrals._count.id;
-  
-  // Unpaid Earnings (Current Balance)
-  const account = await db.affiliateAccount.findUnique({
+    const account = await db.affiliateAccount.findUnique({ 
+        where: { id: affiliateId },
+        select: { balance: true }
+    });
+
+    const totalReferrals = referrals._count.id;
+    const totalEarnings = referrals._sum.commissionAmount?.toNumber() || 0;
+
+    return {
+      clicks,
+      referrals: totalReferrals,
+      conversionRate: clicks > 0 ? (totalReferrals / clicks) * 100 : 0,
+      unpaidEarnings: account?.balance.toNumber() || 0,
+      totalEarnings,
+      nextPayoutDate: null 
+    };
+  }, [`affiliate-stats-${affiliateId}`], { revalidate: 600 })();
+}
+
+// ==========================================
+// 2. ENTERPRISE FEATURES
+// ==========================================
+
+export async function getAnnouncements(affiliateId: string) {
+  const affiliate = await db.affiliateAccount.findUnique({
     where: { id: affiliateId },
-    select: { balance: true }
+    select: { groupId: true, tierId: true }
   });
 
+  if (!affiliate) return [];
+
+  const announcements = await db.affiliateAnnouncement.findMany({
+    where: {
+      isActive: true,
+      startsAt: { lte: new Date() },
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gte: new Date() } }
+      ],
+      AND: [
+        {
+          OR: [
+            { targetGroups: { none: {} }, targetTiers: { none: {} } },
+            { targetGroups: { some: { id: affiliate.groupId || "x" } } },
+            { targetTiers: { some: { id: affiliate.tierId || "x" } } }
+          ]
+        }
+      ]
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    select: { 
+        id: true,
+        title: true,
+        content: true,
+        type: true,
+        createdAt: true
+    }
+  });
+
+  return announcements.map(a => ({
+    id: a.id,
+    title: a.title,
+    message: a.content,
+    type: a.type as AnnouncementType,
+    date: a.createdAt
+  }));
+}
+
+export async function getTierProgress(affiliateId: string) {
+  const affiliate = await db.affiliateAccount.findUnique({
+    where: { id: affiliateId },
+    select: { 
+        totalEarnings: true, // Decimal
+        tierId: true,
+        tier: { select: { name: true } }
+    }
+  });
+
+  if (!affiliate) return null;
+
+  const currentEarnings = affiliate.totalEarnings.toNumber();
+  const currentTierId = affiliate.tierId;
+
+  const allTiers = await db.affiliateTier.findMany({
+    orderBy: { minSalesAmount: "asc" },
+    select: { 
+        id: true,
+        name: true,
+        minSalesAmount: true, 
+        commissionRate: true,
+        commissionType: true
+    }
+  });
+
+  const currentIndex = allTiers.findIndex(t => t.id === currentTierId);
+  const nextTier = allTiers[currentIndex + 1];
+
+  if (!nextTier) {
+    return { 
+      currentTierName: affiliate.tier?.name || "Top Tier",
+      nextTierName: null,
+      progress: 100,
+      amountNeeded: 0,
+      isMaxTier: true,
+      nextTierType: null,
+      nextTierRate: 0
+    };
+  }
+
+  const target = nextTier.minSalesAmount.toNumber();
+  const progress = Math.min((currentEarnings / target) * 100, 100);
+
   return {
-    clicks,
-    referrals: totalReferrals,
-    conversionRate: clicks > 0 ? (totalReferrals / clicks) * 100 : 0,
-    unpaidEarnings: account?.balance.toNumber() || 0,
-    totalEarnings: referrals._sum.commissionAmount?.toNumber() || 0,
-    nextPayoutDate: null 
+    currentTierName: affiliate.tier?.name,
+    nextTierName: nextTier.name,
+    nextTierRate: nextTier.commissionRate.toNumber(),
+    nextTierType: nextTier.commissionType,
+    progress,
+    amountNeeded: Math.max(target - currentEarnings, 0),
+    isMaxTier: false
   };
 }
 
-// 🚀 Performance Chart with Caching (From Option A Idea)
-export async function getPerformanceChart(affiliateId: string) {
-  return await unstable_cache(
-    async () => {
-      const end = endOfDay(new Date());
-      const start = startOfDay(subDays(end, 29)); // Last 30 Days
+export async function getActiveRules() {
+  const rules = await db.affiliateCommissionRule.findMany({
+    where: {
+      isActive: true,
+      OR: [{ startDate: null }, { startDate: { lte: new Date() } }],
+      AND: [{ OR: [{ endDate: null }, { endDate: { gte: new Date() } }] }]
+    },
+    orderBy: { priority: "desc" },
+    select: { 
+        id: true,
+        name: true,
+        description: true,
+        action: true
+    }
+  });
 
-      // Fetch raw data (Grouped by Date logic can be complex in Prisma, so fetching raw and processing in JS)
+  return rules.map(r => ({
+    id: r.id,
+    name: r.name,
+    description: r.description || "Special commission offer",
+    type: (r.action as any).type as CommissionType,
+    value: Number((r.action as any).value)
+  }));
+}
+
+// ==========================================
+// 3. CHARTS & ACTIVITY
+// ==========================================
+
+export async function getPerformanceChart(affiliateId: string) {
+  return await unstable_cache(async () => {
+      const end = endOfDay(new Date());
+      const start = startOfDay(subDays(end, 29));
+
       const rawReferrals = await db.referral.findMany({
         where: {
           affiliateId,
           createdAt: { gte: start, lte: end },
           status: { in: ["APPROVED", "PAID"] }
         },
-        select: { createdAt: true, commissionAmount: true }
+        select: { createdAt: true, commissionAmount: true } 
       });
 
       const days = eachDayOfInterval({ start, end });
       
       return days.map(day => {
         const dateKey = format(day, "yyyy-MM-dd");
-        
-        // Filter transactions for this specific day
-        const dayTransactions = rawReferrals.filter(r => 
-          format(r.createdAt, "yyyy-MM-dd") === dateKey
-        );
-        
-        // Sum earnings
+        const dayTransactions = rawReferrals.filter(r => format(r.createdAt, "yyyy-MM-dd") === dateKey);
         const dailyEarnings = dayTransactions.reduce((sum, item) => 
           sum + item.commissionAmount.toNumber(), 0
         );
 
         return {
-          date: format(day, "yyyy-MM-dd"), // Full date for sorting
-          displayDate: format(day, "MMM dd"), // Display format
+          date: format(day, "yyyy-MM-dd"),
+          displayDate: format(day, "MMM dd"),
           earnings: dailyEarnings,
-          clicks: 0 // If you track daily clicks, add query here
         };
       });
     },
-    [`affiliate-chart-${affiliateId}`], // Cache Key
-    { revalidate: 3600 } // Revalidate every 1 hour
+    [`affiliate-chart-${affiliateId}`],
+    { revalidate: 3600 }
   )();
 }
 
@@ -121,70 +277,21 @@ export async function getRecentActivity(affiliateId: string) {
     where: { affiliateId },
     orderBy: { createdAt: "desc" },
     take: 5,
-    include: { order: { select: { orderNumber: true } } }
+    select: { 
+        id: true,
+        commissionAmount: true,
+        createdAt: true,
+        status: true,
+        order: { select: { orderNumber: true } }
+    }
   });
 
   return referrals.map(r => ({
     id: r.id,
     type: "REFERRAL",
     description: `Commission earned #${r.order.orderNumber}`,
-    amount: r.commissionAmount.toNumber(),
+    amount: r.commissionAmount.toNumber(), 
     date: r.createdAt,
     status: r.status
   }));
-}
-
-// ==========================================
-// MUTATIONS (Server Actions)
-// ==========================================
-
-export async function registerAffiliateAction(userId: string) {
-  try {
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user) return { success: false, message: "User not found." };
-
-    const existing = await db.affiliateAccount.findUnique({ where: { userId } });
-    if (existing) return { success: false, message: "You are already an affiliate." };
-
-    // Generate unique slug
-    const baseSlug = user.name?.toLowerCase().replace(/[^a-z0-9]/g, "") || "partner";
-    const slug = `${baseSlug}-${nanoid(4)}`;
-
-    // MLM Logic: Check for Parent Cookie
-    const cookieStore = await cookies();
-    const parentSlug = cookieStore.get("affiliate_token")?.value;
-    
-    let parentId: string | null = null;
-
-    if (parentSlug) {
-      const parent = await db.affiliateAccount.findUnique({
-        where: { slug: parentSlug, status: "ACTIVE" }
-      });
-      // Prevent self-referral
-      if (parent && parent.userId !== userId) {
-        parentId = parent.id;
-      }
-    }
-
-    // Create Account
-    await db.affiliateAccount.create({
-      data: {
-        userId,
-        slug,
-        status: "ACTIVE", // Or 'PENDING' based on your policy
-        parentId: parentId,
-        balance: 0,
-        totalEarnings: 0,
-        commissionRate: 10, // Default rate
-        commissionType: CommissionType.PERCENTAGE,
-      }
-    });
-
-    revalidatePath("/affiliates");
-    return { success: true, message: "Registration successful!" };
-    
-  } catch (error: any) {
-    console.error("Register Error:", error);
-    return { success: false, message: "Failed to register. Please try again." };
-  }
 }

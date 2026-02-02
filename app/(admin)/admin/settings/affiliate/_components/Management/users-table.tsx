@@ -255,9 +255,7 @@ export default function AffiliateUsersTable({
     });
   }, [data, sortField, sortDirection]);
 
-  // --- Helper: Dynamic Commission Display ---
   const getCommissionDisplay = (user: AffiliateUserTableItem) => {
-    // 1. Custom Override (Highest Priority)
     if (user.commissionRate !== null && user.commissionRate !== undefined) {
         return { 
             main: user.commissionType === "FIXED" 
@@ -271,7 +269,6 @@ export default function AffiliateUsersTable({
     // 2. Group Override
     if (user.groupName && user.groupName !== "No Group" && user.groupRate) {
         return { 
-            // ✅ এখানে চেক করা হচ্ছে groupType FIXED কিনা
             main: user.groupType === "FIXED"
                 ? `${currencySymbol}${user.groupRate}`
                 : `${user.groupRate}%`, 
@@ -503,7 +500,7 @@ export default function AffiliateUsersTable({
                                 {user.name}
                             </button>
                             {user.riskScore > 50 && (
-                                <div title="High Risk User" className="cursor-help bg-red-50 p-0.5 rounded">
+                                <div title={`High Risk Score: ${user.riskScore}/100`} className="cursor-help bg-red-50 p-0.5 rounded border border-red-100 animate-pulse">
                                     <ShieldAlert className="w-3.5 h-3.5 text-red-500 shrink-0" />
                                 </div>
                             )}
@@ -526,7 +523,6 @@ export default function AffiliateUsersTable({
                         </div>
                       </div>
                     </td>
-
                     {/* Commission Rate */}
                     <td className="px-6 py-4">
                       <div className="flex flex-col items-start gap-1">
@@ -538,12 +534,16 @@ export default function AffiliateUsersTable({
                         </span>
                       </div>
                     </td>
-
                     {/* Status */}
-                    <td className="px-6 py-4">
-                      <StatusBadge status={user.status} />
+                   <td className="px-6 py-4">
+                      <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border shadow-sm",
+                        user.status === "ACTIVE" ? "bg-green-50 text-green-700 border-green-200" :
+                        user.status === "PENDING" ? "bg-orange-50 text-orange-700 border-orange-200 animate-pulse" :
+                        user.status === "SUSPENDED" ? "bg-red-50 text-red-700 border-red-200" :"bg-gray-100 text-gray-600 border-gray-200" 
+                       )}>
+                       {user.status}
+                     </span>
                     </td>
-
                     {/* Stats */}
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">

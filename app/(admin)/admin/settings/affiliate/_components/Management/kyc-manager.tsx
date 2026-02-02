@@ -61,7 +61,8 @@ export default function KycManager({ initialDocuments }: Props) {
                     onChange={(e) => setFilter(e.target.value)}
                 >
                     <option value="PENDING">Pending</option>
-                    <option value="VERIFIED">Verified</option>
+                    {/* ✅ FIX: Value changed to APPROVED */}
+                    <option value="APPROVED">Approved</option>
                     <option value="REJECTED">Rejected</option>
                     <option value="ALL">All Files</option>
                 </select>
@@ -117,8 +118,9 @@ export default function KycManager({ initialDocuments }: Props) {
                          {new Date(doc.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4">
+                         {/* ✅ FIX: Logic updated to APPROVED */}
                          <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border", 
-                            doc.status === "VERIFIED" ? "bg-green-50 text-green-700 border-green-100" :
+                            doc.status === "APPROVED" ? "bg-green-50 text-green-700 border-green-100" :
                             doc.status === "REJECTED" ? "bg-red-50 text-red-700 border-red-100" :
                             "bg-yellow-50 text-yellow-700 border-yellow-100 animate-pulse"
                          )}>
@@ -145,6 +147,7 @@ export default function KycManager({ initialDocuments }: Props) {
             doc={viewingDoc} 
             onClose={() => setViewingDoc(null)}
             onUpdate={(status: string) => {
+                // @ts-ignore
                 setDocuments(docs => docs.map(d => d.id === viewingDoc.id ? { ...d, status } : d));
                 setViewingDoc(null);
             }}
@@ -163,7 +166,8 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
             const res = await verifyDocumentAction(doc.id);
             if(res.success) {
                 toast.success(res.message);
-                onUpdate("VERIFIED");
+                // ✅ FIX: Update status to APPROVED
+                onUpdate("APPROVED");
             } else {
                 toast.error(res.message);
             }
@@ -198,6 +202,7 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
 
                 <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                     <div className="flex-1 bg-slate-900 flex items-center justify-center p-6 relative group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img 
                             src={doc.fileUrl} 
                             alt="KYC Document" 
@@ -206,6 +211,7 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
                         <a 
                             href={doc.fileUrl} 
                             target="_blank" 
+                            rel="noreferrer"
                             className="absolute bottom-6 right-6 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg backdrop-blur-md flex items-center gap-2 text-sm font-medium transition-all"
                         >
                             <Download className="w-4 h-4" /> Download Original
@@ -217,7 +223,12 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Submitted By</h4>
                             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
                                 <div className="w-10 h-10 rounded-full bg-white border overflow-hidden flex items-center justify-center shrink-0">
-                                    {doc.affiliate.user.image ? <img src={doc.affiliate.user.image} className="w-full h-full object-cover" /> : <span className="font-bold text-gray-400">{doc.affiliate.user.name?.charAt(0)}</span>}
+                                    {doc.affiliate.user.image ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={doc.affiliate.user.image} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="font-bold text-gray-400">{doc.affiliate.user.name?.charAt(0)}</span>
+                                    )}
                                 </div>
                                 <div className="overflow-hidden">
                                     <div className="font-bold text-sm text-gray-900 truncate">{doc.affiliate.user.name}</div>
@@ -249,7 +260,7 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
                                     className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95"
                                 >
                                     {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                    Verify Document
+                                    Approve Document
                                 </button>
                                 <button 
                                     onClick={handleReject}
@@ -262,9 +273,10 @@ function ReviewModal({ doc, onClose, onUpdate }: any) {
                             </div>
                         ) : (
                             <div className={cn("mt-auto p-4 rounded-xl text-center font-bold border flex flex-col items-center gap-2", 
-                                doc.status === "VERIFIED" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
+                                // ✅ FIX: Logic updated to APPROVED
+                                doc.status === "APPROVED" ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
                             )}>
-                                {doc.status === "VERIFIED" ? <CheckCircle className="w-8 h-8"/> : <XCircle className="w-8 h-8"/>}
+                                {doc.status === "APPROVED" ? <CheckCircle className="w-8 h-8"/> : <XCircle className="w-8 h-8"/>}
                                 Document is {doc.status}
                             </div>
                         )}

@@ -5,7 +5,7 @@
 import { useState, useTransition } from "react";
 import { PayoutQueueItem } from "@/app/actions/admin/settings/affiliate/types"; 
 import { toast } from "sonner";
-import { Check, X, FileText, ExternalLink, Loader2, AlertCircle, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Check, X, FileText, ExternalLink, Loader2, AlertCircle, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
@@ -135,12 +135,22 @@ export default function PayoutsTable({ data }: Props) {
                 ) : (
                     data.map((item) => {
                         const isHighRisk = (item.riskScore || 0) > 70;
+                        const isDeleted = item.affiliateName === "Deleted User";
                         
                         return (
                         <tr key={item.id} className="hover:bg-gray-50/60 transition-colors group">
                             <td className="px-4 py-3">
-                                <div className="font-bold text-gray-900 text-xs">{item.affiliateName}</div>
-                                <div className="text-[10px] text-gray-500">{item.affiliateEmail}</div>
+                                {isDeleted ? (
+                                    <div className="flex items-center gap-2 text-red-500">
+                                        <UserX className="w-4 h-4"/>
+                                        <div className="font-bold text-xs">Deleted User</div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="font-bold text-gray-900 text-xs">{item.affiliateName}</div>
+                                        <div className="text-[10px] text-gray-500">{item.affiliateEmail}</div>
+                                    </>
+                                )}
                             </td>
                             <td className="px-4 py-3 font-mono font-bold text-gray-800 text-sm">
                                 {formatPrice(item.amount)}
@@ -191,9 +201,9 @@ export default function PayoutsTable({ data }: Props) {
                                         </button>
                                         <button 
                                             onClick={() => handlePay(item.id, item.method)} 
-                                            disabled={isPending || isHighRisk} 
+                                            disabled={isPending || isHighRisk || isDeleted} 
                                             className="flex items-center gap-1 px-3 py-1.5 bg-black text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title={isHighRisk ? "Blocked: High Risk" : "Approve & Pay"}
+                                            title={isHighRisk ? "Blocked: High Risk" : isDeleted ? "Blocked: User Deleted" : "Approve & Pay"}
                                         >
                                             {isPending ? <Loader2 className="w-3 h-3 animate-spin"/> : <Check className="w-3 h-3" />}
                                             Pay

@@ -9,20 +9,35 @@ import { protectAction } from "../permission-service";
 // =========================================
 // AUDIT LOGS (User Actions)
 // =========================================
-export async function getAuditLogs(page: number = 1, limit: number = 20, search?: string) {
-  await protectAction("MANAGE_CONFIGURATION"); // High level permission
+export async function getAuditLogs(
+  page: number = 1, 
+  limit: number = 20, 
+  search?: string,
+  dateRange?: { from: Date; to: Date } 
+) {
+  await protectAction("MANAGE_CONFIGURATION"); 
 
   const skip = (page - 1) * limit;
   
-  const where: Prisma.AuditLogWhereInput = search ? {
-    OR: [
-      { action: { contains: search, mode: "insensitive" } },
-      { tableName: { contains: search, mode: "insensitive" } },
-      { user: { name: { contains: search, mode: "insensitive" } } },
-      { user: { email: { contains: search, mode: "insensitive" } } },
-      { recordId: { contains: search } }
+  const where: Prisma.AuditLogWhereInput = {
+    AND: [
+        search ? {
+            OR: [
+                { action: { contains: search, mode: "insensitive" } },
+                { tableName: { contains: search, mode: "insensitive" } },
+                { user: { name: { contains: search, mode: "insensitive" } } },
+                { user: { email: { contains: search, mode: "insensitive" } } },
+                { recordId: { contains: search, mode: "insensitive" } } 
+            ]
+        } : {},
+        dateRange ? {
+            createdAt: {
+                gte: dateRange.from,
+                lte: dateRange.to
+            }
+        } : {}
     ]
-  } : {};
+  };
 
   const [total, data] = await Promise.all([
     db.auditLog.count({ where }),
@@ -45,12 +60,27 @@ export async function getAuditLogs(page: number = 1, limit: number = 20, search?
 // =========================================
 // SYSTEM LOGS (Errors & Events)
 // =========================================
-export async function getSystemLogs(page: number = 1, limit: number = 20, level?: string) {
+export async function getSystemLogs(
+    page: number = 1, 
+    limit: number = 20, 
+    level?: string,
+    search?: string 
+) {
   await protectAction("MANAGE_CONFIGURATION");
 
   const skip = (page - 1) * limit;
   
-  const where: Prisma.SystemLogWhereInput = level && level !== "ALL" ? { level } : {};
+  const where: Prisma.SystemLogWhereInput = {
+    AND: [
+        (level && level !== "ALL") ? { level } : {},
+        search ? {
+            OR: [
+                { message: { contains: search, mode: "insensitive" } },
+                { source: { contains: search, mode: "insensitive" } }
+            ]
+        } : {}
+    ]
+  };
 
   const [total, data] = await Promise.all([
     db.systemLog.count({ where }),
@@ -78,7 +108,6 @@ export async function deleteLogsAction(ids: string[], type: "AUDIT" | "SYSTEM") 
         where: { id: { in: ids } }
       });
     }
-
     
     if (type !== "AUDIT") { 
        await db.auditLog.create({

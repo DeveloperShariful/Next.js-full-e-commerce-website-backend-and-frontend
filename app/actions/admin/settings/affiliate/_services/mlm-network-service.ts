@@ -3,20 +3,25 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, MLMBasis } from "@prisma/client";
 import { getCachedMLMConfig } from "@/lib/services/settings-cache";
 import { DecimalMath } from "@/lib/utils/decimal-math";
 import { ActionResponse, NetworkNode } from "../types";
 import { z } from "zod";
 import { revalidatePath, unstable_cache } from "next/cache";
 import { protectAction } from "../permission-service";
+import { auditService } from "@/lib/services/audit-service";
 
 const mlmSchema = z.object({
   isEnabled: z.boolean(),
   maxLevels: z.number().min(1).max(10),
-  commissionBasis: z.enum(["SALES_AMOUNT", "PROFIT"]),
+  commissionBasis: z.nativeEnum(MLMBasis),
   levelRates: z.record(z.string(), z.number()),
 });
+
+// =========================================
+// CORE ENGINE: CALCULATE & DISTRIBUTE
+// =========================================
 
 export async function distributeMLMCommission(
   tx: Prisma.TransactionClient,
@@ -29,17 +34,14 @@ export async function distributeMLMCommission(
   const config = await getCachedMLMConfig();
 
   if (!config.isEnabled) return;
-
   let baseAmount = new Prisma.Decimal(0);
-
-  if (config.commissionBasis === "PROFIT") {
+  if (config.commissionBasis === MLMBasis.PROFIT) {
     baseAmount = DecimalMath.toDecimal(profitAmount);
   } else {
     baseAmount = DecimalMath.toDecimal(salesAmount);
   }
 
   if (DecimalMath.lte(baseAmount, 0)) return;
-
   const upline = await getUpline(directAffiliateId, config.maxLevels);
 
   if (upline.length === 0) return;
@@ -49,7 +51,8 @@ export async function distributeMLMCommission(
 
   for (const node of upline) {
     const levelKey = node.level.toString();
-    const ratePercent = config.levelRates[levelKey] || 0;
+    const rates = config.levelRates as Record<string, number>;
+    const ratePercent = rates[levelKey] || 0;
 
     if (ratePercent <= 0) continue;
 
@@ -68,6 +71,7 @@ export async function distributeMLMCommission(
         commissionType: "PERCENTAGE",
         commissionRate: new Prisma.Decimal(ratePercent),
         isMlmReward: true,
+        isRecurring: false,
         fromDownlineId: node.level === 1 ? null : directAffiliateId,
         availableAt: availableDate,
         metadata: {
@@ -82,22 +86,21 @@ export async function distributeMLMCommission(
 }
 
 export async function getUpline(startAffiliateId: string, maxLevels: number) {
-  const startNode = await db.affiliateAccount.findUnique({
-    where: { id: startAffiliateId },
+  const startNode = await db.affiliateAccount.findFirst({
+    where: { id: startAffiliateId, deletedAt: null }, 
     select: { mlmPath: true, parentId: true }
   });
 
   if (!startNode || !startNode.mlmPath) return [];
-
   const pathIds = startNode.mlmPath.split('.');
   const ancestorIds = pathIds.filter(id => id !== startAffiliateId).reverse().slice(0, maxLevels);
 
   if (ancestorIds.length === 0) return [];
-
   const validAncestors = await db.affiliateAccount.findMany({
     where: {
       id: { in: ancestorIds },
-      status: "ACTIVE"
+      status: "ACTIVE",
+      deletedAt: null 
     },
     select: { id: true }
   });
@@ -109,7 +112,7 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
     const id = ancestorIds[i];
     if (validSet.has(id)) {
       tree.push({
-        level: i + 1,
+        level: i + 1, 
         affiliateId: id
       });
     }
@@ -117,6 +120,10 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
 
   return tree;
 }
+
+// =========================================
+// CONFIGURATION ACTIONS
+// =========================================
 
 export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Promise<ActionResponse> {
   try {
@@ -144,6 +151,14 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
       }
     });
 
+    await auditService.log({
+        userId: actor.id,
+        action: "UPDATE_MLM_CONFIG",
+        entity: "AffiliateMLMConfig",
+        entityId: "mlm_config",
+        newData: result.data
+    });
+
     revalidatePath("/admin/settings/affiliate/network");
     return { success: true, message: "Network settings saved." };
   } catch (error: any) {
@@ -151,14 +166,20 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
   }
 }
 
+// =========================================
+// TREE VISUALIZATION (READ)
+// =========================================
+
 export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[]> {
+  const cacheKey = `network-tree-${rootAffiliateId || 'global'}`;
+
   return await unstable_cache(
     async () => {
       let pathFilter = {};
 
       if (rootAffiliateId) {
-        const root = await db.affiliateAccount.findUnique({
-          where: { id: rootAffiliateId },
+        const root = await db.affiliateAccount.findFirst({
+          where: { id: rootAffiliateId, deletedAt: null },
           select: { mlmPath: true }
         });
         if (root?.mlmPath) {
@@ -167,10 +188,10 @@ export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[
           };
         }
       }
-
       const affiliates = await db.affiliateAccount.findMany({
         where: {
           status: "ACTIVE",
+          deletedAt: null, 
           ...pathFilter
         },
         select: {
@@ -181,7 +202,7 @@ export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[
           user: { select: { name: true, image: true } },
           _count: { select: { downlines: true } }
         },
-        take: 5000
+        take: 500
       });
 
       const nodeMap = new Map<string, NetworkNode>();
@@ -225,7 +246,7 @@ export async function getMLMTree(rootAffiliateId?: string): Promise<NetworkNode[
 
       return tree;
     },
-    [`network-tree-${rootAffiliateId || 'global'}`],
+    [cacheKey],
     { tags: ["affiliate-network"], revalidate: 300 }
   )();
 }
@@ -238,9 +259,9 @@ export async function getNodeStats(affiliateId: string) {
       _count: { id: true }
     }),
     db.affiliateAccount.count({
-      where: { mlmPath: { contains: affiliateId }, id: { not: affiliateId } }
+      where: { mlmPath: { contains: affiliateId }, id: { not: affiliateId }, deletedAt: null }
     }),
-    db.wallet.findUnique({ where: { userId: affiliateId }, select: { balance: true } })
+    db.wallet.findUnique({ where: { userId: affiliateId } })
   ]);
 
   return {

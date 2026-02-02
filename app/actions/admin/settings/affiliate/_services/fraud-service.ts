@@ -3,21 +3,22 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { Prisma, FraudRuleType, FraudAction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { getCachedFraudRules } from "@/lib/services/settings-cache";
 import { ActionResponse } from "../types";
 import { z } from "zod";
-import { protectAction } from "../permission-service"; 
+import { protectAction } from "../permission-service";
 
 // ==============================================================================
 // PART 1: FRAUD RULES CONFIGURATION (Schema & CRUD)
 // ==============================================================================
 
 const ruleSchema = z.object({
-  type: z.enum(["IP_CLICK_LIMIT", "CONVERSION_RATE_LIMIT", "ORDER_VALUE_LIMIT", "BLACKLIST_COUNTRY"]),
+  type: z.nativeEnum(FraudRuleType),
   value: z.string().min(1, "Threshold value is required"),
-  action: z.enum(["BLOCK", "FLAG", "SUSPEND"]).default("FLAG"),
+ action: z.nativeEnum(FraudAction).default(FraudAction.FLAG),
   reason: z.string().optional(),
 });
 
@@ -88,8 +89,8 @@ export async function deleteFraudRuleAction(id: string): Promise<ActionResponse>
 // ==============================================================================
 
 export async function detectSelfReferral(affiliateId: string, buyerEmail: string, buyerIp: string): Promise<boolean> {
-  const affiliate = await db.affiliateAccount.findUnique({
-    where: { id: affiliateId },
+  const affiliate = await db.affiliateAccount.findFirst({
+    where: { id: affiliateId, deletedAt: null },
     select: { user: { select: { email: true } } }
   });
 
@@ -136,7 +137,6 @@ export async function checkDeviceFingerprint(affiliateId: string, fingerprint: s
 export async function updateRiskScore(affiliateId: string) {
   let score = 0;
   const rules = await getCachedFraudRules();
-
   const [referralsCount, clickCount, flaggedCount] = await Promise.all([
     db.referral.count({ where: { affiliateId } }),
     db.affiliateClick.count({ where: { affiliateId } }),
@@ -144,7 +144,6 @@ export async function updateRiskScore(affiliateId: string) {
   ]);
 
   const conversionRate = clickCount > 0 ? (referralsCount / clickCount) * 100 : 0;
-
   for (const rule of rules) {
     const threshold = Number(rule.value);
     
@@ -166,19 +165,16 @@ export async function updateRiskScore(affiliateId: string) {
 
   if (recentReferrals.length === 5) {
       const timeDiff = recentReferrals[0].createdAt.getTime() - recentReferrals[4].createdAt.getTime();
-      if (timeDiff < 5 * 60 * 1000) {
+      if (timeDiff < 5 * 60 * 1000) { 
           score += 40;
           await logFraudAlert(affiliateId, "RAPID_TRANSACTIONS", "5 orders in < 5 mins");
       }
   }
-
   if (score > 100) score = 100;
-
   await db.affiliateAccount.update({
     where: { id: affiliateId },
     data: { riskScore: score }
   });
-
   if (score >= 80) {
     await db.affiliateAccount.update({
       where: { id: affiliateId },
@@ -202,7 +198,10 @@ export async function getHighRiskAffiliates() {
   await protectAction("MANAGE_FRAUD");
 
   return await db.affiliateAccount.findMany({
-    where: { riskScore: { gt: 50 } }, 
+    where: { 
+        riskScore: { gt: 50 },
+        deletedAt: null 
+    }, 
     include: { 
       user: { select: { name: true, email: true } } 
     },

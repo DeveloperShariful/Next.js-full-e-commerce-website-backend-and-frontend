@@ -5,14 +5,13 @@
 import { db } from "@/lib/prisma";
 import { syncUser } from "@/lib/auth-sync"; 
 import { redirect } from "next/navigation";
+import { serializePrismaData } from "@/lib/format-data"; // ✅ Import helper
 
 export async function requireUser() {
   const user = await syncUser();
-
   if (!user) {
     return redirect("/sign-in");
   }
-
   return user.id;
 }
 
@@ -40,5 +39,6 @@ export async function getAuthAffiliate() {
     throw new Error("Your affiliate account is suspended or rejected.");
   }
 
-  return affiliate;
+  // ✅ FIX: Serialize before returning to prevent Decimal errors anywhere
+  return serializePrismaData(affiliate);
 }

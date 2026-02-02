@@ -35,6 +35,7 @@ export async function getAllAffiliateCoupons() {
     ...c,
     value: DecimalMath.toNumber(c.value),
     minSpend: c.minSpend ? DecimalMath.toNumber(c.minSpend) : null,
+    affiliateCommissionRate: c.affiliateCommissionRate ? DecimalMath.toNumber(c.affiliateCommissionRate) : null, 
   }));
 }
 
@@ -52,10 +53,11 @@ export async function getAllTags() {
 // =========================================
 
 export async function createAndLinkCouponAction(
-  affiliateId: string, 
+  affiliateId: string | undefined, 
   code: string, 
   value: number, 
-  type: "PERCENTAGE" | "FIXED_AMOUNT" 
+  type: "PERCENTAGE" | "FIXED_AMOUNT",
+  affiliateCommissionRate?: number 
 ): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
@@ -72,6 +74,7 @@ export async function createAndLinkCouponAction(
         value: DecimalMath.toDecimal(value),
         isActive: true,
         affiliateId: affiliateId && affiliateId.trim() !== "" ? affiliateId : null, 
+        affiliateCommissionRate: affiliateCommissionRate ? DecimalMath.toDecimal(affiliateCommissionRate) : null,
         description: affiliateId ? `Affiliate Exclusive` : `General Coupon`,
         usageLimit: null, 
         startDate: new Date(),
@@ -82,8 +85,8 @@ export async function createAndLinkCouponAction(
         userId: actor.id,
         action: "CREATE_COUPON",
         entity: "AffiliateAccount",
-        entityId: affiliateId,
-        meta: { code, value, type }
+        entityId: affiliateId || "GENERAL",
+        meta: { code, value, type, affiliateCommissionRate }
     });
 
     revalidatePath("/admin/settings/affiliate");
@@ -100,7 +103,10 @@ export async function unlinkCouponAction(couponId: string): Promise<ActionRespon
 
     await db.discount.update({
         where: { id: couponId },
-        data: { affiliateId: null }
+        data: { 
+            affiliateId: null,
+            affiliateCommissionRate: null 
+        }
     });
 
     revalidatePath("/admin/settings/affiliate");
@@ -115,6 +121,9 @@ export async function createTagAction(name: string): Promise<ActionResponse> {
     const actor = await protectAction("MANAGE_PARTNERS");
 
     if (!name || name.length < 2) return { success: false, message: "Tag name too short." };
+
+    const existing = await db.affiliateTag.findUnique({ where: { name: name.trim() }});
+    if(existing) return { success: false, message: "Tag already exists." };
 
     const tag = await db.affiliateTag.create({
       data: { name: name.trim() }
@@ -131,7 +140,7 @@ export async function createTagAction(name: string): Promise<ActionResponse> {
     revalidatePath("/admin/settings/affiliate");
     return { success: true, message: "Tag created." };
   } catch (error: any) {
-    return { success: false, message: "Tag already exists or failed." };
+    return { success: false, message: "Failed to create tag." };
   }
 }
 
@@ -162,14 +171,14 @@ export async function updateCouponAction(
   code: string,
   value: number,
   type: "PERCENTAGE" | "FIXED_AMOUNT",
-  affiliateId?: string
+  affiliateId?: string,
+  affiliateCommissionRate?: number 
 ): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
     if (code.length < 3) return { success: false, message: "Code too short" };
 
-    // Check uniqueness (excluding self)
     const exists = await db.discount.findFirst({
       where: { 
         code: code.toUpperCase(), 
@@ -186,6 +195,7 @@ export async function updateCouponAction(
         type: type,
         value: DecimalMath.toDecimal(value),
         affiliateId: affiliateId && affiliateId.trim() !== "" ? affiliateId : null,
+        affiliateCommissionRate: affiliateCommissionRate ? DecimalMath.toDecimal(affiliateCommissionRate) : null,
         description: affiliateId ? `Affiliate Exclusive` : `General Coupon`,
       }
     });
@@ -195,7 +205,7 @@ export async function updateCouponAction(
       action: "UPDATE_COUPON",
       entity: "Discount",
       entityId: id,
-      newData: { code, value, type, affiliateId }
+      newData: { code, value, type, affiliateId, affiliateCommissionRate }
     });
 
     revalidatePath("/admin/settings/affiliate");
@@ -206,7 +216,6 @@ export async function updateCouponAction(
   }
 }
 
-// ✅ NEW: Search affiliates for dropdown
 export async function searchAffiliatesForDropdown(query: string) {
   await protectAction("MANAGE_PARTNERS");
   
@@ -217,7 +226,8 @@ export async function searchAffiliatesForDropdown(query: string) {
         { user: { email: { contains: query, mode: "insensitive" } } },
         { slug: { contains: query, mode: "insensitive" } }
       ],
-      status: "ACTIVE"
+      status: "ACTIVE",
+      deletedAt: null 
     },
     take: 5,
     select: {

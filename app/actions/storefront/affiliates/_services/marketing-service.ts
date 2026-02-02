@@ -29,6 +29,7 @@ type LinkInput = z.infer<typeof linkSchema>;
 async function createLinkInternal(affiliateId: string, destinationUrl: string, customSlug?: string, campaignId?: string) {
   const settings = await db.storeSettings.findUnique({ where: { id: "settings" } });
   const config = (settings?.affiliateConfig as any) || {};
+  
   const linkCount = await db.affiliateLink.count({ where: { affiliateId } });
   const limit = Number(config.slugLimit) || 10;
   
@@ -49,7 +50,6 @@ async function createLinkInternal(affiliateId: string, destinationUrl: string, c
       throw new Error("This alias is already taken. Please try another.");
     }
   } else {
-
     slug = nanoid(7); 
   }
 
@@ -72,8 +72,12 @@ export async function getLinks(affiliateId: string) {
   return await db.affiliateLink.findMany({
     where: { affiliateId },
     orderBy: { createdAt: "desc" },
-    include: {
-      campaign: { select: { name: true } }
+    select: { // ✅ Only needed fields
+        id: true,
+        slug: true,
+        destinationUrl: true,
+        clickCount: true,
+        campaign: { select: { name: true } }
     }
   });
 }
@@ -81,7 +85,15 @@ export async function getLinks(affiliateId: string) {
 export async function getCreatives() {
   return await db.affiliateCreative.findMany({
     where: { isActive: true },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
+    select: { // ✅ Only needed fields
+        id: true,
+        title: true,
+        type: true,
+        url: true,
+        width: true,
+        height: true
+    }
   });
 }
 
@@ -90,6 +102,36 @@ export async function getCampaigns(affiliateId: string) {
     where: { affiliateId },
     select: { id: true, name: true }
   });
+}
+
+export async function getCoupons(affiliateId: string) {
+  const coupons = await db.discount.findMany({
+    where: { 
+        affiliateId,
+        isActive: true 
+    },
+    orderBy: { createdAt: "desc" },
+    select: { // ✅ Select needed fields + Decimal fields
+        id: true,
+        code: true,
+        type: true,
+        value: true, // Decimal
+        usedCount: true,
+        usageLimit: true,
+        endDate: true
+    }
+  });
+
+  // ✅ Convert Decimal to Number
+  return coupons.map(c => ({
+      id: c.id,
+      code: c.code,
+      discountType: c.type === "FIXED_AMOUNT" ? "FIXED" : "PERCENTAGE", 
+      discountValue: c.value.toNumber(), // ✅ Fixed
+      usageCount: c.usedCount,
+      usageLimit: c.usageLimit,
+      expiresAt: c.endDate
+  }));
 }
 
 // ==========================================
@@ -104,6 +146,7 @@ export async function generateLinkAction(data: LinkInput) {
     if (!result.success) {
       return { success: false, message: result.error.issues[0].message };
     }
+
     await createLinkInternal(
       affiliate.id,
       result.data.destinationUrl,
@@ -111,7 +154,7 @@ export async function generateLinkAction(data: LinkInput) {
       result.data.campaignId || undefined
     );
 
-    revalidatePath("/affiliates/marketing/links");
+    revalidatePath("/affiliates?view=links");
     return { success: true, message: "Link generated successfully!" };
 
   } catch (error: any) {

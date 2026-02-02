@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/services/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
@@ -44,8 +44,8 @@ export async function getRules() {
     await protectAction("MANAGE_CONFIGURATION"); 
     return await db.affiliateCommissionRule.findMany({
       orderBy: [
-        { isActive: "desc" }, 
         { priority: "desc" }, 
+        { createdAt: "desc" }
       ],
     });
   } catch (error) {
@@ -84,8 +84,8 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
       name: payload.name,
       isActive: payload.isActive,
       priority: payload.priority,
-      conditions: payload.conditions,
-      action: payload.action,
+      conditions: payload.conditions, 
+      action: payload.action,         
       startDate: payload.startDate ? new Date(payload.startDate) : null,
       endDate: payload.endDate ? new Date(payload.endDate) : null,
       affiliateSpecificIds: payload.affiliateSpecificIds,
@@ -123,7 +123,7 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
 
 export async function reorderRulesAction(items: { id: string; priority: number }[]): Promise<ActionResponse> {
   try {
-    await protectAction("MANAGE_CONFIGURATION");
+    const actor = await protectAction("MANAGE_CONFIGURATION");
 
     await db.$transaction(
       items.map((item) =>
@@ -133,6 +133,14 @@ export async function reorderRulesAction(items: { id: string; priority: number }
         })
       )
     );
+    
+    await auditService.log({
+        userId: actor.id,
+        action: "REORDER_RULES",
+        entity: "AffiliateCommissionRule",
+        entityId: "BULK",
+        meta: { count: items.length }
+    });
 
     revalidatePath("/admin/settings/affiliate/rules");
     return { success: true, message: "Priorities updated." };

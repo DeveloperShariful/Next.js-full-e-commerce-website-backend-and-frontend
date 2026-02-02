@@ -23,16 +23,27 @@ export const auditService = {
 
       const sanitize = (data: any) => {
         if (!data) return null;
-        const copy = { ...data };
-        const sensitiveKeys = ['password', 'token', 'secret', 'key', 'apiKey'];
-        sensitiveKeys.forEach(k => {
-          if (copy[k]) copy[k] = '***MASKED***';
-        });
-        return copy;
+        try {
+          const copy = JSON.parse(JSON.stringify(data)); 
+          const sensitiveKeys = ['password', 'token', 'secret', 'key', 'apiKey', 'creditCard'];
+          
+          const clean = (obj: any) => {
+            for (const key in obj) {
+              if (sensitiveKeys.some(s => key.toLowerCase().includes(s))) {
+                obj[key] = '***MASKED***';
+              } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                clean(obj[key]);
+              }
+            }
+          };
+          clean(copy);
+          return copy;
+        } catch (e) {
+          return "Data sanitization failed"; 
+        }
       };
       
       const finalUserId = userId && userId !== "system" ? userId : null;
-
       await db.auditLog.create({
         data: {
           userId: finalUserId,
@@ -53,12 +64,30 @@ export const auditService = {
 
   async systemLog(level: "INFO" | "WARN" | "ERROR" | "CRITICAL", source: string, message: string, context?: any) {
     try {
+      let safeContext = context;
+      if (context instanceof Error) {
+        safeContext = {
+            name: context.name,
+            message: context.message,
+            stack: process.env.NODE_ENV === 'development' ? context.stack : undefined,
+            cause: (context as any).cause
+        };
+      } else if (typeof context === 'object' && context?.error instanceof Error) {
+         safeContext = {
+            ...context,
+            error: {
+                message: context.error.message,
+                stack: process.env.NODE_ENV === 'development' ? context.error.stack : undefined
+            }
+         };
+      }
+
       await db.systemLog.create({
         data: {
           level,
           source,
           message,
-          context: context ?? Prisma.JsonNull
+          context: safeContext ?? Prisma.JsonNull
         }
       });
     } catch (e) {

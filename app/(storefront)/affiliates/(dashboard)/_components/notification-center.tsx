@@ -3,32 +3,42 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, Info, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+// ✅ Import Server Action
+import { getAnnouncements } from "@/app/actions/storefront/affiliates/_services/dashboard-service";
+import { formatDistanceToNow } from "date-fns";
+import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
 
-// Mock Notification Type (Replace with real DB schema later)
 interface Notification {
   id: string;
   title: string;
   message: string;
-  time: string;
-  read: boolean;
-  type: "info" | "success" | "warning";
+  type: "INFO" | "WARNING" | "SUCCESS";
+  date: Date | string;
 }
-
-// Temporary Mock Data
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: "1", title: "Payout Approved", message: "Your withdrawal of $150 has been processed.", time: "2 hours ago", read: false, type: "success" },
-  { id: "2", title: "New Feature", message: "Check out the new Creative Gallery!", time: "1 day ago", read: false, type: "info" },
-  { id: "3", title: "Profile Incomplete", message: "Please add your bank details to receive payouts.", time: "2 days ago", read: true, type: "warning" },
-];
 
 export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // ✅ Fetch Real Notifications
+  useEffect(() => {
+    async function fetchNotifs() {
+      try {
+        const session = await getAuthAffiliate(); // Verify Auth
+        const data = await getAnnouncements(session.id);
+        setNotifications(data as any);
+      } catch (error) {
+        console.error("Failed to fetch notifications");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchNotifs();
+  }, []);
 
   // Close on click outside
   useEffect(() => {
@@ -41,8 +51,12 @@ export function NotificationCenter() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const getIcon = (type: string) => {
+    switch (type) {
+        case "WARNING": return <AlertTriangle className="w-4 h-4 text-orange-600" />;
+        case "SUCCESS": return <CheckCircle className="w-4 h-4 text-green-600" />;
+        default: return <Info className="w-4 h-4 text-blue-600" />;
+    }
   };
 
   return (
@@ -51,39 +65,36 @@ export function NotificationCenter() {
       {/* Trigger Button */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-indigo-600 focus:outline-none"
+        className="relative p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 hover:text-black focus:outline-none"
       >
         <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
+        {notifications.length > 0 && (
           <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full animate-pulse" />
         )}
       </button>
 
       {/* Dropdown Panel */}
       <div className={cn(
-        "absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden origin-top-right transition-all duration-200 z-50",
+        "absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden origin-top-right transition-all duration-200 z-50",
         isOpen ? "scale-100 opacity-100 visible" : "scale-95 opacity-0 invisible"
       )}>
         
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 backdrop-blur-sm">
           <h4 className="font-bold text-sm text-gray-900">Notifications</h4>
-          {unreadCount > 0 && (
-            <button 
-              onClick={markAllRead} 
-              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-            >
-              <CheckCheck className="w-3 h-3" /> Mark all read
-            </button>
-          )}
+          <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded-full text-gray-600 font-medium">
+            {notifications.length} New
+          </span>
         </div>
 
         {/* List */}
         <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
-          {notifications.length === 0 ? (
+          {loading ? (
+             <div className="p-8 flex justify-center text-indigo-600"><Loader2 className="w-6 h-6 animate-spin"/></div>
+          ) : notifications.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
               <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
-              <p className="text-xs">No notifications yet.</p>
+              <p className="text-xs">No new announcements.</p>
             </div>
           ) : (
             <div>
@@ -91,24 +102,32 @@ export function NotificationCenter() {
                 <div 
                   key={n.id} 
                   className={cn(
-                    "p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer group relative",
-                    !n.read ? "bg-indigo-50/30" : "opacity-70 hover:opacity-100"
+                    "p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-default group relative",
+                    n.type === "WARNING" ? "bg-orange-50/30" : "bg-white"
                   )}
                 >
-                  {!n.read && <span className="absolute left-2 top-5 w-1.5 h-1.5 bg-indigo-500 rounded-full" />}
-                  <div className="pl-2">
-                    <div className="flex justify-between items-start mb-1">
-                      <h5 className={cn("text-sm", !n.read ? "font-bold text-gray-900" : "font-medium text-gray-700")}>
-                        {n.title}
-                      </h5>
-                      <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">{n.time}</span>
+                  <div className="flex gap-3">
+                    <div className={cn("mt-0.5 p-1.5 rounded-full shrink-0 h-fit", 
+                        n.type === "WARNING" ? "bg-orange-100" : n.type === "SUCCESS" ? "bg-green-100" : "bg-blue-100"
+                    )}>
+                        {getIcon(n.type)}
                     </div>
-                    <p className="text-xs text-gray-500 leading-relaxed">{n.message}</p>
+                    <div>
+                        <div className="flex justify-between items-start mb-1">
+                            <h5 className="text-sm font-bold text-gray-900 leading-tight pr-4">{n.title}</h5>
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">{formatDistanceToNow(new Date(n.date), { addSuffix: true })}</span>
+                        </div>
+                        <p className="text-xs text-gray-600 leading-relaxed">{n.message}</p>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+        
+        <div className="p-2 bg-gray-50 border-t border-gray-100 text-center">
+            <button className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">View All Updates</button>
         </div>
       </div>
     </div>

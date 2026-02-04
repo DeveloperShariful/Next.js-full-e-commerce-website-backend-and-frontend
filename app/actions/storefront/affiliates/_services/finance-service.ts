@@ -119,7 +119,9 @@ export async function requestPayoutAction(data: PayoutInput) {
       return { success: false, message: `Minimum withdrawal amount is ${currency}${minPayout}` };
     }
 
-    const currentBalance = affiliate.balance.toNumber();
+    // ✅ FIX: Safe Balance Check (Using Number constructor instead of .toNumber())
+    const currentBalance = Number(affiliate.balance);
+
     if (currentBalance < amount) {
       console.log(`❌ [Payout] Failed: Insufficient Balance. Has: ${currentBalance}, Needs: ${amount}`);
       return { success: false, message: `Insufficient balance.` };
@@ -159,6 +161,7 @@ export async function requestPayoutAction(data: PayoutInput) {
     console.log("🔄 [Payout] Processing Transaction...");
     
     await db.$transaction(async (tx) => {
+      // ✅ Note: tx.update returns a raw Prisma object, so .toNumber() works here
       const updatedAffiliate = await tx.affiliateAccount.update({
         where: { id: affiliate.id },
         data: { balance: { decrement: amount } }

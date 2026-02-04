@@ -16,6 +16,7 @@ interface OrderInput {
   shippingMethodId: string;
   paymentMethod: string;
   customerNote?: string;
+  couponCode?: string | null; 
 }
 
 interface OrderItemData {
@@ -40,7 +41,6 @@ export async function createOrder(data: OrderInput) {
       return { success: false, error: "Cart is empty" };
     }
 
-    // 1. Affiliate Tracking Logic
     const cookieStore = await cookies();
     const affiliateSlug = cookieStore.get("affiliate_token")?.value;
     let affiliateId: string | null = null;
@@ -95,9 +95,41 @@ export async function createOrder(data: OrderInput) {
       }
       shippingCost = validCost;
     }
+    let discountAmount = 0;
+    
+    if (data.couponCode) {
+        const coupon = await db.discount.findUnique({
+            where: { code: data.couponCode } 
+        });
 
-    const grandTotal = subtotal + shippingCost;
+        if (coupon && coupon.isActive) {
+             const now = new Date();
+             const isValidDate = (!coupon.startDate || coupon.startDate <= now) && 
+                                 (!coupon.endDate || coupon.endDate >= now);
+             const limitNotReached = !coupon.usageLimit || coupon.usedCount < coupon.usageLimit;
+             const minSpendVal = coupon.minSpend ? Number(coupon.minSpend) : 0;
+             const minOrderMet = subtotal >= minSpendVal;
 
+             if (isValidDate && limitNotReached && minOrderMet) {
+                 const val = Number(coupon.value);
+                 
+                 if (coupon.type === "FIXED_AMOUNT") { 
+                     discountAmount = val;
+                 } else if (coupon.type === "PERCENTAGE") {
+                     discountAmount = (subtotal * val) / 100;
+                 } else {
+                      discountAmount = (subtotal * val) / 100;
+                 }
+
+                 if (discountAmount > subtotal) {
+                     discountAmount = subtotal;
+                 }
+             }
+        }
+    }
+
+
+    const grandTotal = Math.max(0, subtotal + shippingCost - discountAmount);
     const newOrder = await db.$transaction(async (tx) => {
       const count = await tx.order.count();
       const orderNumber = `ORD-${1000 + count + 1}`;
@@ -107,9 +139,12 @@ export async function createOrder(data: OrderInput) {
           orderNumber,
           status: OrderStatus.PENDING, 
           paymentStatus: PaymentStatus.UNPAID,
+          
           subtotal: subtotal, 
           shippingTotal: shippingCost,
+          discountTotal: discountAmount, 
           total: grandTotal,
+          couponCode: data.couponCode || null, 
           
           guestEmail: data.billing.email,
           shippingAddress: data.shipping,
@@ -119,7 +154,6 @@ export async function createOrder(data: OrderInput) {
           shippingMethod: data.shippingMethodId,
           customerNote: data.customerNote,
           
-          // Saving Affiliate ID
           affiliateId: affiliateId,
 
           items: {
@@ -144,12 +178,18 @@ export async function createOrder(data: OrderInput) {
              });
            }
         }
+        
+        if (data.couponCode && discountAmount > 0) {
+            await tx.discount.update({
+                where: { code: data.couponCode },
+                data: { usedCount: { increment: 1 } }
+            });
+        }
       }
 
       return order;
     });
 
-    // Send Notifications
     await sendNotification({
       trigger: "ORDER_PENDING",
       recipient: data.billing.email,
@@ -174,10 +214,10 @@ export async function createOrder(data: OrderInput) {
 
     const isOffline = data.paymentMethod.startsWith('offline') || data.paymentMethod === 'cod' || data.paymentMethod === 'bank_transfer';
     
+    // ১০. কার্ট ক্লিয়ার এবং অ্যাফিলিয়েট ট্রিগার
     if (isOffline) {
       await clearCart();
 
-      // Trigger Affiliate Engine for Offline Orders
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
       fetch(`${appUrl}/api/affiliate/process-order`, {
         method: "POST",
@@ -193,7 +233,7 @@ export async function createOrder(data: OrderInput) {
       success: true, 
       orderId: newOrder.id, 
       orderNumber: newOrder.orderNumber, 
-      orderKey: "key_" + newOrder.id,
+      orderKey: "key_" + newOrder.id, 
       grandTotal: grandTotal 
     };
 

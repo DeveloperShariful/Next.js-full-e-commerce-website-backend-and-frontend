@@ -1,25 +1,48 @@
 //app/(storefront)/checkout/_components/OrderSummary.tsx
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { useGlobalStore } from '@/app/providers/global-store-provider';
+import { Tag, X } from 'lucide-react'; // আইকনের জন্য (অপশনাল)
 
 interface CartItem { id: string; name: string; quantity: number; price: number; image?: string; }
 interface ShippingOption { id: string; label: string; cost: number; }
 
 interface OrderSummaryProps { 
   cartItems: CartItem[]; 
-  totals: { subtotal: number; shipping: number; total: number; };
+  totals: { subtotal: number; shipping: number; total: number; discount: number }; 
   rates: ShippingOption[]; 
   selectedRateId: string; 
   onRateSelect: (rateId: string) => void;
-  // নতুন প্রপ
   isLoadingShipping: boolean;
+  onApplyCoupon: (code: string) => Promise<void>;
+  onRemoveCoupon: () => void;
+  appliedCouponCode: string;
+  isApplyingCoupon: boolean;
 }
 
-export default function OrderSummary({ cartItems, totals, rates, selectedRateId, onRateSelect, isLoadingShipping }: OrderSummaryProps) {
+export default function OrderSummary({ 
+  cartItems, 
+  totals, 
+  rates, 
+  selectedRateId, 
+  onRateSelect, 
+  isLoadingShipping,
+  onApplyCoupon,
+  onRemoveCoupon,
+  appliedCouponCode,
+  isApplyingCoupon
+}: OrderSummaryProps) {
   
   const { formatPrice, primaryColor } = useGlobalStore();
+  const [couponInput, setCouponInput] = useState('');
+
+  const handleApplyClick = async () => {
+    if (!couponInput.trim()) return;
+    await onApplyCoupon(couponInput);
+    setCouponInput(''); // ইনপুট ক্লিয়ার করা
+  };
 
   return (
     <div className="bg-[#f9f9f9] border border-[#e0e0e0] rounded-lg p-2 md:p-6 w-full"> 
@@ -56,6 +79,52 @@ export default function OrderSummary({ cartItems, totals, rates, selectedRateId,
         </div>
       </div>
 
+      {/* ================= COUPON SECTION (Added Here) ================= */}
+      <div className="border-t border-[#e0e0e0] mt-4 pt-4">
+        {appliedCouponCode ? (
+          // কুপন অ্যাপ্লাই করার পর যা দেখাবে
+          <div className="flex justify-between items-center bg-green-50 border border-green-200 p-3 rounded text-sm">
+            <div className="flex items-center gap-2 text-green-700">
+              <Tag size={16} />
+              <span className="font-semibold">Coupon: {appliedCouponCode}</span>
+            </div>
+            <button 
+              onClick={onRemoveCoupon}
+              className="text-red-500 hover:text-red-700 font-medium text-xs flex items-center gap-1"
+            >
+              <X size={14} /> Remove
+            </button>
+          </div>
+        ) : (
+          // কুপন ইনপুট ফিল্ড
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value)}
+              placeholder="Coupon code"
+              className="flex-grow border border-[#ddd] rounded px-3 py-2 text-sm focus:outline-none focus:border-black transition-colors"
+            />
+            <button 
+              onClick={handleApplyClick}
+              disabled={isApplyingCoupon || !couponInput.trim()}
+              className="bg-[#333] text-white px-4 py-2 rounded text-sm font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isApplyingCoupon ? '...' : 'Apply'}
+            </button>
+          </div>
+        )}
+
+        {/* Discount Row (যদি ডিসকাউন্ট থাকে তবেই দেখাবে) */}
+        {totals.discount > 0 && (
+          <div className="flex justify-between items-center text-base text-green-600 mt-3 animate-fadeIn">
+            <p className="font-semibold text-[1rem]">Discount</p>
+            <span className="font-semibold text-[1rem]">- {formatPrice(totals.discount)}</span>
+          </div>
+        )}
+      </div>
+      {/* =============================================================== */}
+
       {/* Shipping Section */}
       <div className="border-t border-[#e0e0e0] mt-4 pt-4">
         <div className="flex flex-col">
@@ -64,13 +133,11 @@ export default function OrderSummary({ cartItems, totals, rates, selectedRateId,
           </div>
           
           <div className="flex flex-col gap-[0.2rem]">
-            {/* ১. যদি লোডিং হয়, তবে স্পিনার বা টেক্সট দেখাবে */}
             {isLoadingShipping ? (
                <div className="p-4 text-left text-[#777] animate-pulse">
-                  calculating shipping rates...
+                 calculating shipping rates...
                </div>
             ) : 
-            /* ২. যদি রেট থাকে, তবে লিস্ট দেখাবে */
             rates.length > 0 ? (
               rates.map((rate) => (
                 <div 
@@ -95,7 +162,6 @@ export default function OrderSummary({ cartItems, totals, rates, selectedRateId,
                 </div>
               ))
             ) : (
-              /* ৩. যদি রেট না থাকে */
               <div className="p-4 text-left text-[#777]">
                 <p>Enter address to calculate shipping.</p>
               </div>
@@ -107,7 +173,6 @@ export default function OrderSummary({ cartItems, totals, rates, selectedRateId,
         <div className="flex justify-between items-center text-[#555] text-[1.6rem] font-bold border-t-2 border-[#333] pt-4 mt-2 md:text-[1.5rem] md:pt-3">
           <span className="text-[#1d1d1d] text-[1.6rem] font-extrabold">Total</span>
           <span className="font-semibold text-black">
-             
              {isLoadingShipping ? '...' : formatPrice(totals.total)}
           </span>
         </div>

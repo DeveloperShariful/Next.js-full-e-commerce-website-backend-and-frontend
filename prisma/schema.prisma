@@ -2120,7 +2120,10 @@ model AffiliateAccount {
   paypalEmail     String?
   registrationNotes String?        @db.Text
   adminNotes        String?        @db.Text
-  
+  website         String?
+  socialProfile   String?
+  promotionMethod String?
+
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   deletedAt       DateTime?

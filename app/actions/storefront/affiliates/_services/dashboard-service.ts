@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { format, eachDayOfInterval, subDays, startOfDay, endOfDay } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { AnnouncementType, CommissionType } from "@prisma/client";
+import { serializePrismaData } from "@/lib/format-data";
 
 // ==========================================
 // 1. PROFILE & STATS (OPTIMIZED)
@@ -71,6 +72,28 @@ export async function getProfile(userId: string) {
       name: affiliate.group.name
     } : null
   };
+}
+
+export async function getActiveContests() {
+  const contests = await db.affiliateContest.findMany({
+    where: {
+      isActive: true,
+      startDate: { lte: new Date() },
+      endDate: { gte: new Date() }
+    },
+    orderBy: { endDate: "asc" },
+    take: 3, 
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      endDate: true,
+      prizes: true, 
+      criteria: true  
+    }
+  });
+
+  return serializePrismaData(contests);
 }
 
 export async function getStats(affiliateId: string) {

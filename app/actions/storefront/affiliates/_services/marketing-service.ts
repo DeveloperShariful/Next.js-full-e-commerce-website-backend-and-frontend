@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getAuthAffiliate } from "../auth-helper"; 
+import { serializePrismaData } from "@/lib/format-data";
 
 // ==========================================
 // 1. VALIDATION SCHEMAS
@@ -72,7 +73,7 @@ export async function getLinks(affiliateId: string) {
   return await db.affiliateLink.findMany({
     where: { affiliateId },
     orderBy: { createdAt: "desc" },
-    select: { // ✅ Only needed fields
+    select: { 
         id: true,
         slug: true,
         destinationUrl: true,
@@ -86,7 +87,7 @@ export async function getCreatives() {
   return await db.affiliateCreative.findMany({
     where: { isActive: true },
     orderBy: { createdAt: "desc" },
-    select: { // ✅ Only needed fields
+    select: { 
         id: true,
         title: true,
         type: true,
@@ -111,27 +112,76 @@ export async function getCoupons(affiliateId: string) {
         isActive: true 
     },
     orderBy: { createdAt: "desc" },
-    select: { // ✅ Select needed fields + Decimal fields
+    select: {
         id: true,
         code: true,
         type: true,
-        value: true, // Decimal
+        value: true, 
         usedCount: true,
         usageLimit: true,
         endDate: true
     }
   });
 
-  // ✅ Convert Decimal to Number
   return coupons.map(c => ({
       id: c.id,
       code: c.code,
       discountType: c.type === "FIXED_AMOUNT" ? "FIXED" : "PERCENTAGE", 
-      discountValue: c.value.toNumber(), // ✅ Fixed
+      discountValue: c.value.toNumber(), 
       usageCount: c.usedCount,
       usageLimit: c.usageLimit,
       expiresAt: c.endDate
   }));
+}
+
+export async function getContestLeaderboard(contestId: string) {
+  try {
+    const contest = await db.affiliateContest.findUnique({
+      where: { id: contestId },
+      select: { startDate: true, endDate: true, criteria: true }
+    });
+
+    if (!contest) return { success: false, message: "Contest not found" };
+
+    const leaderboardRaw = await db.referral.groupBy({
+      by: ['affiliateId'],
+      where: {
+        createdAt: { gte: contest.startDate, lte: contest.endDate,},
+        status: "APPROVED" },_sum: {commissionAmount: true, }, _count: { id: true }, orderBy: { _sum: {commissionAmount: 'desc'}
+      },
+      take: 10 
+    });
+
+    const affiliateIds = leaderboardRaw.map(l => l.affiliateId);
+    if (affiliateIds.length === 0) {
+        return { success: true, data: [] };
+    }
+
+    const affiliates = await db.affiliateAccount.findMany({
+      where: { id: { in: affiliateIds as string[] } }, 
+      select: {
+        id: true,
+        user: { select: { name: true, image: true } }
+      }
+    });
+
+    const leaderboard = leaderboardRaw.map((entry, index) => {
+      const affiliate = affiliates.find(a => a.id === entry.affiliateId);
+      return {
+        rank: index + 1,
+        name: affiliate?.user.name || "Unknown Partner",
+        avatar: affiliate?.user.image,
+        score: entry._sum.commissionAmount || 0, 
+        salesCount: entry._count.id || 0
+      };
+    });
+
+    return { success: true, data: serializePrismaData(leaderboard) };
+
+  } catch (error) {
+    console.error("Leaderboard Error:", error);
+    return { success: false, message: "Failed to load leaderboard" };
+  }
 }
 
 // ==========================================

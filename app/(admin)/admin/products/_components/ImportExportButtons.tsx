@@ -16,7 +16,6 @@ export default function ImportExportButtons() {
         setLoading(true);
         const res = await exportProductsCSV();
         if (res.success && res.csv) {
-            // ব্রাউজারে ডাউনলোড শুরু করা
             const blob = new Blob([res.csv], { type: "text/csv" });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");

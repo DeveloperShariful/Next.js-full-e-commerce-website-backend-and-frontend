@@ -4,54 +4,92 @@ import { Suspense } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
 import { serializePrismaData } from "@/lib/format-data"; 
-
+import { db } from "@/lib/prisma";
+import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
 import { 
-  getProfile, 
   getStats, 
   getRecentActivity, 
-  getPerformanceChart,
+  getPerformanceChart, 
   getTierProgress, 
-  getActiveRules   
+  getActiveRules, 
+  getActiveContests // ✅ Already imported
 } from "@/app/actions/storefront/affiliates/_services/dashboard-service";
-
 import { getLinks, getCampaigns, getCreatives, getCoupons } from "@/app/actions/storefront/affiliates/_services/marketing-service";
 import { getWalletData, getPayoutHistory, getLedger } from "@/app/actions/storefront/affiliates/_services/finance-service";
 import { getSponsor, getNetworkTree, getNetworkStats } from "@/app/actions/storefront/affiliates/_services/network-service";
 import { getSettings } from "@/app/actions/storefront/affiliates/_services/settings-service";
 
-import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
-import { db } from "@/lib/prisma";
-
 export const metadata = {
   title: "Partner Dashboard | GoBike",
 };
 
-export default async function AffiliateStorefrontPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ view?: string; page?: string; search?: string }>;
-}) {
-  const authSession = await getAuthAffiliate();
-  const userId = authSession.userId; 
-
-  const params = await searchParams;
-  const currentView = params.view || "overview";
-  
-  const [profile, storeSettings] = await Promise.all([
-    getProfile(userId),
-    db.storeSettings.findUnique({ where: { id: "settings" } })
-  ]);
+export default async function AffiliateStorefrontPage() {
+  const profile = await getAuthAffiliate(); 
 
   if (!profile) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center p-6">
         <AlertTriangle className="w-12 h-12 text-yellow-500 mb-4" />
         <h2 className="text-xl font-bold text-gray-900">Access Restricted</h2>
-        <p className="text-gray-500 mt-2">Your affiliate account is pending approval or does not exist.</p>
       </div>
     );
   }
 
+  // 1. Fetch ALL Data in Parallel
+  const [
+    storeSettings,
+    // Dashboard Data
+    stats, recentActivity, chartData, tierProgress, activeRules, activeContests, // ✅ Added activeContests variable
+    // Marketing Data
+    links, campaigns, creatives, coupons, 
+    // Finance Data
+    wallet, payoutHistory, ledger,
+    // Network Data
+    sponsor, tree, netStats, 
+    // Settings
+    settings, 
+    // Reports
+    conversions 
+  ] = await Promise.all([ 
+    db.storeSettings.findUnique({ where: { id: "settings" } }),
+    
+    // Dashboard Data Calls
+    getStats(profile.id),
+    getRecentActivity(profile.id),
+    getPerformanceChart(profile.id),
+    getTierProgress(profile.id),
+    getActiveRules(),
+    getActiveContests(), // ✅ Added Function Call
+
+    // Marketing Data Calls
+    getLinks(profile.id),
+    getCampaigns(profile.id),
+    getCreatives(),
+    getCoupons(profile.id),
+
+    // Finance Data Calls
+    getWalletData(profile.id),
+    getPayoutHistory(profile.id),
+    getLedger(profile.id, 50),
+
+    // Network Data Calls
+    getSponsor(profile.id),
+    getNetworkTree(profile.id),
+    getNetworkStats(profile.id),
+
+    // Settings Call
+    getSettings(profile.userId),
+
+    // Reports Call
+    db.referral.findMany({
+        where: { affiliateId: profile.id },
+        include: { order: { select: { orderNumber: true, total: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 20 
+    })
+  ]);
+
+  // 2. Prepare Config
   const affiliateConfig = (storeSettings?.affiliateConfig as any) || {};
   const appConfig = {
     paramName: affiliateConfig.referralParam || "ref", 
@@ -59,89 +97,29 @@ export default async function AffiliateStorefrontPage({
     currency: storeSettings?.currencySymbol || "$",
   };
 
-  const data: any = {
+  // 3. Construct the COMPLETE Data Object
+  const fullData = {
     profile,
-    config: { ...affiliateConfig, ...appConfig }, 
+    config: { ...affiliateConfig, ...appConfig },
+    dashboard: { 
+        stats, 
+        recentActivity, 
+        chartData, 
+        tierProgress, 
+        activeRules, 
+        activeContests // ✅ Added to dashboard object
+    },
+    marketing: { links, campaigns, creatives, coupons, defaultSlug: profile.slug, ...appConfig },
+    creatives, 
+    finance: { wallet, history: payoutHistory },
+    ledger,
+    network: { sponsor, tree, stats: netStats },
+    reports: { conversions },
+    settings
   };
 
-  try {
-    switch (currentView) {
-      case "overview":
-        const [stats, recentActivity, chartData, tierProgress, activeRules] = await Promise.all([
-          getStats(profile.id),
-          getRecentActivity(profile.id),
-          getPerformanceChart(profile.id),
-          getTierProgress(profile.id),
-          getActiveRules()
-        ]);
-        data.dashboard = { stats, recentActivity, chartData, tierProgress, activeRules };
-        break;
-
-      case "links":
-        const [links, campaigns] = await Promise.all([
-          getLinks(profile.id),
-          getCampaigns(profile.id)
-        ]);
-        data.marketing = { 
-            links, 
-            campaigns, 
-            defaultSlug: profile.slug,
-            ...appConfig 
-        };
-        break;
-
-      // ✅ NEW: Separate View for Coupons
-      case "coupons":
-        const coupons = await getCoupons(profile.id);
-        data.marketing = { coupons }; // Reuse marketing object structure
-        break;
-
-      case "creatives":
-        data.creatives = await getCreatives();
-        break;
-
-      case "network":
-        const [sponsor, tree, netStats] = await Promise.all([
-          getSponsor(profile.id),
-          getNetworkTree(profile.id),
-          getNetworkStats(profile.id)
-        ]);
-        data.network = { sponsor, tree, stats: netStats };
-        break;
-
-      case "payouts":
-        const [wallet, payoutHistory] = await Promise.all([
-          getWalletData(profile.id),
-          getPayoutHistory(profile.id)
-        ]);
-        data.finance = { wallet, history: payoutHistory };
-        break;
-
-      case "ledger":
-        data.ledger = await getLedger(profile.id, 50);
-        break;
-
-      case "reports":
-        data.reports = {
-          conversions: await db.referral.findMany({
-            where: { affiliateId: profile.id },
-            include: { order: { select: { orderNumber: true, total: true } } },
-            orderBy: { createdAt: "desc" },
-            take: 100
-          })
-        };
-        break;
-
-      case "settings":
-        data.settings = await getSettings(userId);
-        break;
-    }
-  } catch (error) {
-    console.error("Affiliate Data Fetch Error:", error);
-    data.error = "Failed to load data. Please try refreshing.";
-  }
-
-  const serializedData = serializePrismaData(data);
+  // 4. Serialize to prevent Decimal errors
+  const serializedData = serializePrismaData(fullData);
 
   return (
     <div className="w-full min-h-screen bg-gray-50/30">
@@ -151,7 +129,7 @@ export default async function AffiliateStorefrontPage({
             <p className="text-sm text-gray-500 font-medium">Loading Dashboard...</p>
         </div>
       }>
-        <AffiliateMainView initialData={serializedData} currentView={currentView} />
+        <AffiliateMainView initialData={serializedData} />
       </Suspense>
     </div>
   );

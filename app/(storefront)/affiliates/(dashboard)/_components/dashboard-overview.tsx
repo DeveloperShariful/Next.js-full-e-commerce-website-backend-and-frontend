@@ -12,12 +12,7 @@ import Link from "next/link";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
-// ✅ IMPORT GLOBAL STORE
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-
-// =========================================================
-// UI HELPERS
-// =========================================================
 
 const safeNumber = (val: any) => Number(val) || 0;
 
@@ -60,7 +55,6 @@ function StatsCard({ title, value, icon: Icon, description, trend, color = "blue
             trend === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
           )}>
             {trend === "up" ? <ArrowUpRight className="w-3 h-3 mr-1"/> : <ArrowDownRight className="w-3 h-3 mr-1"/>}
-            {/* Dynamic Trend can be added here if backend sends it */}
             12% 
           </span>
         )}
@@ -84,7 +78,6 @@ function StatsCard({ title, value, icon: Icon, description, trend, color = "blue
 // =========================================================
 
 function PerformanceChart({ data }: { data: any[] }) {
-  // ✅ DYNAMIC CURRENCY
   const { symbol, formatPrice } = useGlobalStore();
   const currency = symbol || "$";
 
@@ -204,14 +197,13 @@ function ActivityItem({ activity }: { activity: any }) {
 }
 
 // =========================================================
-// ✅ COMPONENT 4: TIER PROGRESS CARD (FIXED)
+// COMPONENT 4: TIER PROGRESS CARD
 // =========================================================
 function TierProgressCard({ data }: { data: any }) {
     const { formatPrice } = useGlobalStore();
     
     if (!data) return null;
 
-    // ✅ Dynamic Rate Display (Currency or Percentage)
     const rateDisplay = data.nextTierType === "FIXED" 
         ? formatPrice(data.nextTierRate) 
         : `${data.nextTierRate}%`;
@@ -267,7 +259,7 @@ function TierProgressCard({ data }: { data: any }) {
 }
 
 // =========================================================
-// ✅ COMPONENT 5: ACTIVE RULES (FIXED)
+// COMPONENT 5: ACTIVE RULES & BONUSES
 // =========================================================
 function ActiveRulesList({ rules }: { rules: any[] }) {
     const { formatPrice } = useGlobalStore();
@@ -281,7 +273,6 @@ function ActiveRulesList({ rules }: { rules: any[] }) {
             </h3>
             <div className="space-y-3">
                 {rules.map((rule) => {
-                    // ✅ Dynamic Bonus Display
                     const bonusDisplay = rule.type === "FIXED" 
                         ? formatPrice(rule.value) 
                         : `${rule.value}%`;
@@ -307,6 +298,51 @@ function ActiveRulesList({ rules }: { rules: any[] }) {
 }
 
 // =========================================================
+// COMPONENT 6: ACTIVE CONTESTS (NEW)
+// =========================================================
+function ActiveContestsList({ contests }: { contests: any[] }) {
+    const { formatPrice } = useGlobalStore();
+
+    if (!contests || contests.length === 0) return null;
+
+    const getPrizeDisplay = (prizes: any) => {
+        if (!prizes) return "TBD";
+        if (typeof prizes === "string" || typeof prizes === "number") return formatPrice(Number(prizes));
+        if (typeof prizes === "object" && prizes["1st"]) return `${formatPrice(Number(prizes["1st"]))} (1st)`;
+        return "View Details";
+    };
+
+    return (
+        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+             {/* Decor */}
+             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10" />
+
+             <div className="relative z-10">
+                <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-300" /> Active Contests
+                </h3>
+                <div className="space-y-3">
+                    {contests.map((contest) => (
+                         <div key={contest.id} className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/10 hover:bg-white/20 transition-colors">
+                            <h4 className="font-bold text-sm truncate">{contest.title}</h4>
+                            <div className="flex justify-between items-center mt-2 text-xs text-indigo-100">
+                                <span className="text-white font-medium">
+                                    Prize: {getPrizeDisplay(contest.prizes)}
+                                </span>
+                                <span className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded">
+                                    <Calendar className="w-3 h-3" /> 
+                                    {contest.endDate ? format(new Date(contest.endDate), "MMM d") : "N/A"}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+             </div>
+        </div>
+    );
+}
+
+// =========================================================
 // MAIN COMPONENT: DASHBOARD OVERVIEW
 // =========================================================
 
@@ -317,32 +353,47 @@ interface DashboardProps {
     chartData: any[];
     tierProgress?: any; 
     activeRules?: any[];
+    activeContests?: any[]; // ✅ Added
   };
-  userName: string;
+  userName?: string | null;
+  userStatus?: string; // ✅ Added
 }
 
-export default function DashboardOverview({ data, userName }: DashboardProps) {
-  const { stats, recentActivity, chartData, tierProgress, activeRules } = data;
+export default function DashboardOverview({ data, userName, userStatus = "PENDING" }: DashboardProps) {
+  const { stats, recentActivity, chartData, tierProgress, activeRules, activeContests } = data;
   const { formatPrice } = useGlobalStore();
-
+  const firstName = (userName || "Partner").split(" ")[0];
+  
   const totalEarnings = safeNumber(stats.totalEarnings);
   const unpaidEarnings = safeNumber(stats.unpaidEarnings);
   const clicks = safeNumber(stats.clicks);
   const referrals = safeNumber(stats.referrals);
   const conversionRate = safeNumber(stats.conversionRate);
 
+  // Status Badge Color Logic
+  const getStatusColor = (status: string) => {
+      if (status === "ACTIVE") return "bg-green-100 text-green-700 border-green-200";
+      if (status === "PENDING") return "bg-yellow-100 text-yellow-700 border-yellow-200";
+      if (status === "REJECTED") return "bg-red-100 text-red-700 border-red-200";
+      return "bg-gray-100 text-gray-700 border-gray-200";
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-500">
-      
-      {/* 1. Top Section: Welcome & Tier Status */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Welcome Banner */}
           <div className="lg:col-span-2 relative overflow-hidden bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
             <div className="relative z-10 flex flex-col justify-between h-full">
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-                  Hello, {userName.split(" ")[0]}! 👋
-                </h1>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+                        Hello, {firstName}! 👋
+                    </h1>
+                    {/* ✅ STATUS BADGE */}
+                    <span className={cn("px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider", getStatusColor(userStatus))}>
+                        {userStatus}
+                    </span>
+                </div>
                 <p className="text-gray-500 text-sm max-w-md leading-relaxed">
                   You have generated <span className="text-black font-bold">{formatPrice(totalEarnings)}</span> in lifetime revenue. 
                   Check out your new marketing assets!
@@ -395,8 +446,13 @@ export default function DashboardOverview({ data, userName }: DashboardProps) {
           </div>
         </div>
 
-        {/* Right Column: Activity & Rules */}
+        {/* Right Column: Activity & Rules & Contests */}
         <div className="space-y-6">
+            {/* ✅ Active Contests (NEW) */}
+            {activeContests && activeContests.length > 0 && (
+                <ActiveContestsList contests={activeContests} />
+            )}
+
             {/* Active Rules Widget */}
             {activeRules && activeRules.length > 0 && (
                 <ActiveRulesList rules={activeRules} />

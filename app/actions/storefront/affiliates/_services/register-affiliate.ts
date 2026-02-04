@@ -3,74 +3,91 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { requireUser } from "../auth-helper";
 import { nanoid } from "nanoid";
-import { CommissionType } from "@prisma/client";
-import { cookies } from "next/headers";
-import { auth, currentUser } from "@clerk/nextjs/server"; 
+import { revalidatePath } from "next/cache";
 
-export async function registerAffiliateAction() {
+// Type definition for the input
+interface RegisterInput {
+  slug?: string;
+  website?: string;
+  socialProfile?: string;
+  promotionMethod?: string;
+}
+
+export async function registerAffiliateAction(data?: RegisterInput) {
   try {
-    const { userId: clerkId } = await auth();
-    const user = await currentUser();
-    if (!clerkId || !user) {
-      return { success: false, message: "Unauthorized. Please login first." };
-    }
-    const dbUser = await db.user.findUnique({ 
-        where: { email: user.emailAddresses[0].emailAddress } 
+    // 1. Authenticate User
+    const userId = await requireUser();
+
+    // 2. Check if already an affiliate
+    const existing = await db.affiliateAccount.findUnique({
+      where: { userId },
     });
 
-    if (!dbUser) {
-        return { success: false, message: "User profile not found in database." };
-    }
-    const userId = dbUser.id; 
-    const existing = await db.affiliateAccount.findUnique({ where: { userId } });
     if (existing) {
-      return { success: false, message: "You are already an affiliate partner." };
+      return { success: false, message: "You are already a partner." };
     }
-    const settings = await db.storeSettings.findUnique({ where: { id: "settings" } });
-    const affiliateConfig = (settings?.affiliateConfig as any) || {};
-    const defaultRate = Number(affiliateConfig.defaultCommissionRate) || 10; 
-    const baseSlug = dbUser.name?.toLowerCase().replace(/[^a-z0-9]/g, "") || "partner";
-    const slug = `${baseSlug}-${nanoid(4)}`;
-    const cookieStore = await cookies();
-    const parentSlug = cookieStore.get("affiliate_token")?.value;
-    
-    let parentId: string | null = null;
-    let mlmPath: string = `root.${userId}`; 
-    let mlmLevel: number = 0; 
 
-    if (parentSlug) {
-      const parent = await db.affiliateAccount.findUnique({
-        where: { slug: parentSlug, status: "ACTIVE" }
+    // 3. Get Store Settings (Check if registration is enabled)
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { affiliateConfig: true },
+    });
+
+    const config = (settings?.affiliateConfig as any) || {};
+    if (config.registrationEnabled === false) {
+      return { success: false, message: "Registration is currently closed." };
+    }
+
+    // 4. Handle SLUG (Custom or Auto-generated)
+    let finalSlug = "";
+
+    if (data?.slug && data.slug.trim() !== "") {
+      // Validate Custom Slug format
+      const slugRegex = /^[a-zA-Z0-9-_]+$/;
+      if (!slugRegex.test(data.slug)) {
+        return { success: false, message: "Invalid slug format. Use letters, numbers, hyphens only." };
+      }
+
+      // Check Uniqueness
+      const isTaken = await db.affiliateAccount.findUnique({
+        where: { slug: data.slug },
       });
 
-      if (parent && parent.userId !== userId) {
-        parentId = parent.id;
-        mlmPath = `${parent.mlmPath || 'root'}.${userId}`;
-        mlmLevel = (parent.mlmLevel || 0) + 1;
+      if (isTaken) {
+        return { success: false, message: "This handle is already taken. Please choose another." };
       }
+
+      finalSlug = data.slug;
+    } else {
+      // Generate random slug if none provided
+      finalSlug = nanoid(8);
     }
+
+    // 5. Create Affiliate Account
     await db.affiliateAccount.create({
       data: {
         userId,
-        slug,
-        status: "ACTIVE", 
-        parentId: parentId,
-        mlmPath: mlmPath,   
-        mlmLevel: mlmLevel, 
+        slug: finalSlug,
+        status: config.autoApprove ? "ACTIVE" : "PENDING",
+        commissionRate: config.defaultCommissionRate || 10, // Default 10%
+        commissionType: "PERCENTAGE",
+        cookieDuration: config.cookieDuration || 30,
         balance: 0,
         totalEarnings: 0,
-        commissionRate: defaultRate, 
-        commissionType: CommissionType.PERCENTAGE,
-      }
+        website: data?.website,
+        socialProfile: data?.socialProfile,
+        promotionMethod: data?.promotionMethod,
+      },
     });
 
+    // 6. Revalidate & Return Success
     revalidatePath("/affiliates");
-    return { success: true, message: "Welcome to the Partner Program!" };
-    
+    return { success: true, message: "Account created successfully!" };
+
   } catch (error: any) {
-    console.error("Register Error:", error);
-    return { success: false, message: "Failed to register. Please try again." };
+    console.error("Register Affiliate Error:", error);
+    return { success: false, message: "Something went wrong. Please try again." };
   }
 }

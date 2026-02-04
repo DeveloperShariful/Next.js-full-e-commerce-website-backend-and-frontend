@@ -11,10 +11,11 @@ interface AuditParams {
   entityId: string;
   oldData?: any;
   newData?: any;
+  meta?: any;
 }
 
 export const auditService = {
-  async log({ userId, action, entity, entityId, oldData, newData }: AuditParams) {
+  async log({ userId, action, entity, entityId, oldData, newData, meta }: AuditParams) {
     try {
       const headerList = await headers();
       const ip = headerList.get("x-forwarded-for") || "unknown";

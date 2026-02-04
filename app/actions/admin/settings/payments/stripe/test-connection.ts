@@ -15,14 +15,12 @@ export async function testStripeConnection(paymentMethodId: string) {
       return { success: false, error: "Configuration not found." }
     }
 
-    // 1. Get the correct encrypted key based on mode
     const encryptedKey = config.testMode ? config.testSecretKey : config.liveSecretKey
 
     if (!encryptedKey) {
       return { success: false, error: "No API Key found." }
     }
 
-    // 2. Decrypt the key before using it
     const secretKey = decrypt(encryptedKey)
 
     if (!secretKey) {

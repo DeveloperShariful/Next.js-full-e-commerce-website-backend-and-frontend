@@ -27,8 +27,6 @@ export async function clearPaypalSettings(paymentMethodId: string) {
         webhookId: null
       }
     })
-
-    // Disable the method as credentials are gone
     await db.paymentMethodConfig.update({
       where: { id: paymentMethodId },
       data: { isEnabled: false }

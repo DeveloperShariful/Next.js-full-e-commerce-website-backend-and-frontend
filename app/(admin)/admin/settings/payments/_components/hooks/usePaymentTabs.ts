@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 
-// সব ধরণের ট্যাবের নাম এখানে ডিফাইন করা হলো
 export type TabType = 
   | "general" 
   | "methods" 
@@ -10,8 +9,8 @@ export type TabType =
   | "advanced" 
   | "webhooks" 
   | "danger" 
-  | "paylater" // PayPal এর জন্য
-  | "cheque"   // Offline methods এর জন্য
+  | "paylater" 
+  | "cheque"   
   | "cod"
   | "bank"
 

@@ -3,10 +3,11 @@
 import * as z from "zod"
 import { PaymentIntent, PaymentMode, PayPalButtonColor, PayPalButtonLabel, PayPalButtonLayout, PayPalButtonShape, PayPalLandingPage } from "@prisma/client"
 
-const booleanField = z.boolean().nullable().optional()
+const booleanField = z.boolean().optional().default(false)
 const stringField = z.string().nullable().optional()
 const numberField = z.coerce.number().min(0).nullable().optional()
 
+// Shared Limits & Surcharge Schema
 const LimitsAndSurchargeSchema = z.object({
   minOrderAmount: numberField,
   maxOrderAmount: numberField,
@@ -16,11 +17,15 @@ const LimitsAndSurchargeSchema = z.object({
   taxableSurcharge: booleanField
 })
 
+// General Payment Status Schema
 export const PaymentStatusSchema = z.object({
   isEnabled: z.boolean(),
   mode: z.nativeEnum(PaymentMode).optional()
 })
 
+// ==========================================
+// 1. STRIPE SCHEMA
+// ==========================================
 export const StripeSettingsSchema = LimitsAndSurchargeSchema.extend({
   enableStripe: booleanField,
   testMode: booleanField,
@@ -58,7 +63,7 @@ export const StripeSettingsSchema = LimitsAndSurchargeSchema.extend({
   googlePayEnabled: booleanField,
   paymentRequestButtons: booleanField,
   
-  // 🔥 NEW: Buy Now Pay Later Options
+  // BNPL Options
   klarnaEnabled: booleanField,
   afterpayEnabled: booleanField,
   zipEnabled: booleanField,
@@ -67,6 +72,9 @@ export const StripeSettingsSchema = LimitsAndSurchargeSchema.extend({
   debugLog: booleanField
 })
 
+// ==========================================
+// 2. PAYPAL SCHEMA
+// ==========================================
 export const PaypalSettingsSchema = LimitsAndSurchargeSchema.extend({
   isEnabled: booleanField, 
   sandbox: booleanField,
@@ -109,14 +117,19 @@ export const PaypalSettingsSchema = LimitsAndSurchargeSchema.extend({
   debugLog: booleanField
 })
 
+// ==========================================
+// 3. OFFLINE METHODS SCHEMAS
+// ==========================================
+
 export const BankTransferSchema = LimitsAndSurchargeSchema.extend({
+  isEnabled: booleanField, // ✅ Added isEnabled
   name: z.string().min(1, "Method name is required"),
   description: stringField,
   instructions: stringField,
   bankDetails: z.array(z.object({
-    accountName: z.string().optional(),
-    accountNumber: z.string().optional(),
-    bankName: z.string().optional(),
+    name: z.string().min(1, "Account Name required"), // Changed to 'name' to match typical usage
+    accountNumber: z.string().min(1, "Account Number required"),
+    bankName: z.string().min(1, "Bank Name required"),
     sortCode: z.string().optional(),
     iban: z.string().optional(),
     bic: z.string().optional()
@@ -124,6 +137,7 @@ export const BankTransferSchema = LimitsAndSurchargeSchema.extend({
 })
 
 export const ChequeSchema = LimitsAndSurchargeSchema.extend({
+  isEnabled: booleanField, // ✅ Added isEnabled
   name: z.string().min(1, "Method name is required"),
   description: stringField,
   instructions: stringField,
@@ -132,6 +146,7 @@ export const ChequeSchema = LimitsAndSurchargeSchema.extend({
 })
 
 export const CodSchema = LimitsAndSurchargeSchema.extend({
+  isEnabled: booleanField, // ✅ Added isEnabled
   name: z.string().min(1, "Method name is required"),
   description: stringField,
   instructions: stringField,

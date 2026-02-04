@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 
 const ENCRYPTION_KEY = process.env.PAYMENT_ENCRYPTION_KEY || 'default-32-char-key-must-change-it'; 
-const IV_LENGTH = 16; // AES ব্লকের জন্য
+const IV_LENGTH = 16; 
 
 export function encrypt(text: string): string {
   if (!text) return text;

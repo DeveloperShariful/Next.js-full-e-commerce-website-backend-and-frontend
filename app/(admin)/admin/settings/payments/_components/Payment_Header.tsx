@@ -1,7 +1,7 @@
 // app/admin/settings/payments/_components/Payment_Header.tsx
 "use client"
 import { Button } from "@/components/ui/button"
-import { resetPaymentMethodsDB } from "@/app/actions/admin/settings/payments/reset-db"
+import { resetPaymentMethodsDB } from "@/app/actions/admin/settings/payments/payments-dashboard"
 import { toast } from "sonner"
 import { RefreshCw } from "lucide-react"
 import { useRouter } from "next/navigation"

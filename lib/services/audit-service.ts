@@ -1,4 +1,4 @@
-//lib/services/audit-service.ts
+// File: lib/services/audit-service.ts
 
 import { db } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -11,11 +11,10 @@ interface AuditParams {
   entityId: string;
   oldData?: any;
   newData?: any;
-  meta?: any;
 }
 
 export const auditService = {
-  async log({ userId, action, entity, entityId, oldData, newData, meta }: AuditParams) {
+  async log({ userId, action, entity, entityId, oldData, newData }: AuditParams) {
     try {
       const headerList = await headers();
       const ip = headerList.get("x-forwarded-for") || "unknown";
@@ -25,7 +24,7 @@ export const auditService = {
         if (!data) return null;
         try {
           const copy = JSON.parse(JSON.stringify(data)); 
-          const sensitiveKeys = ['password', 'token', 'secret', 'key', 'apiKey', 'creditCard'];
+          const sensitiveKeys = ['password', 'token', 'secret', 'key', 'apikey', 'creditcard', 'cvv'];
           
           const clean = (obj: any) => {
             for (const key in obj) {

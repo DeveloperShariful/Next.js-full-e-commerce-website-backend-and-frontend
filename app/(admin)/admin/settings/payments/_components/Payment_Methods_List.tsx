@@ -1,30 +1,68 @@
 // app/admin/settings/payments/_components/Payment_Methods_List.tsx
+
+
 "use client"
 
 import { useState } from "react"
 import { PaymentMethodWithConfig } from "@/app/(admin)/admin/settings/payments/types"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Settings2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 
-// Correct Imports based on our file structure
-import { Payment_Status_Badge } from "./Payment_Status_Badge"
-import { togglePaymentMethodStatus } from "@/app/actions/admin/settings/payments/toggle-method-status"
+import { togglePaymentMethodStatus } from "@/app/actions/admin/settings/payments/payments-dashboard"
 
 // Modals
-import { Stripe_Main_Modal } from "./Payment_Gateways/Stripe/Stripe_Main_Modal"
-import { Paypal_Main_Modal } from "./Payment_Gateways/Paypal/Paypal_Main_Modal"
-import { Bank_Transfer_Modal } from "./Offline_Methods/Bank_Transfer_Modal"
-import { Cheque_Modal } from "./Offline_Methods/Cheque_Modal"
-import { COD_Modal } from "./Offline_Methods/COD_Modal"
+import { Stripe_Main_Modal } from "./Stripe/Stripe_Main_Modal"
+import { Paypal_Main_Modal } from "./Paypal/Paypal_Main_Modal"
+import { Bank_Transfer_Modal } from "./Bank_Transfer_Modal"
+import { Cheque_Modal } from "./Cheque_Modal"
+import { COD_Modal } from "./COD_Modal"
+
+// ==========================================
+// INTERNAL SUB-COMPONENT: STATUS BADGE
+// ==========================================
+
+interface PaymentStatusBadgeProps {
+  isEnabled: boolean
+  mode?: "TEST" | "LIVE"
+}
+
+const PaymentStatusBadge = ({ isEnabled, mode }: PaymentStatusBadgeProps) => {
+  if (!isEnabled) {
+    return (
+      <Badge variant="outline" className="text-muted-foreground border-dashed">
+        Inactive
+      </Badge>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+        Active
+      </Badge>
+      
+      {mode === "TEST" && (
+        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200">
+          Test Mode
+        </Badge>
+      )}
+    </div>
+  )
+}
+
+// ==========================================
+// MAIN COMPONENT: PAYMENT METHODS LIST
+// ==========================================
 
 interface Props {
   initialMethods: PaymentMethodWithConfig[]
 }
 
-// Export name must match exactly what page.tsx expects
 export const Payment_Methods_List = ({ initialMethods }: Props) => {
   const router = useRouter()
 
@@ -80,7 +118,7 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">{method.name}</h3>
-                <Payment_Status_Badge isEnabled={method.isEnabled} mode={method.mode} />
+                <PaymentStatusBadge isEnabled={method.isEnabled} mode={method.mode} />
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 max-w-lg">
                 {method.description || "No description available."}

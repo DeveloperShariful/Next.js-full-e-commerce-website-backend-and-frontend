@@ -16,8 +16,6 @@ export async function savePaypalManualCreds(
   }
 ) {
   try {
-    // ১. PayPal ক্রেডেনশিয়াল ভেরিফাই করা (প্লেইন টেক্সট দিয়ে)
-    // ভেরিফিকেশনের জন্য এনক্রিপ্ট করার দরকার নেই, কারণ এটি লাইভ PayPal API তে যাচ্ছে
     const verification = await verifyPaypalCredentials(
       data.sandbox, 
       data.clientId, 
@@ -30,43 +28,29 @@ export async function savePaypalManualCreds(
         error: verification.message || "Invalid Client ID or Secret." 
       }
     }
-
-    // ২. সিক্রেট কি এনক্রিপ্ট করা (ডাটাবেসের জন্য)
     const encryptedSecret = encrypt(data.clientSecret)
-
-    // ৩. ডাটা প্রস্তুত করা
     const updateData = data.sandbox
       ? {
           sandbox: true,
-          sandboxClientId: data.clientId, // Client ID পাবলিক, তাই এনক্রিপ্ট জরুরি না
-          sandboxClientSecret: encryptedSecret, // 🔒 Encrypted
+          sandboxClientId: data.clientId, 
+          sandboxClientSecret: encryptedSecret, 
           sandboxEmail: data.email,
           merchantId: data.merchantId,
         }
       : {
           sandbox: false,
           liveClientId: data.clientId,
-          liveClientSecret: encryptedSecret, // 🔒 Encrypted
+          liveClientSecret: encryptedSecret, 
           liveEmail: data.email,
           merchantId: data.merchantId,
         }
-
-    // ৪. ডাটাবেসে সেভ করা
     await db.paypalConfig.upsert({
       where: { paymentMethodId },
-      create: {
-        paymentMethodId,
-        ...updateData,
-        isOnboarded: false,
-        title: "PayPal",
+      create: { paymentMethodId, ...updateData, isOnboarded: false, title: "PayPal",
       },
-      update: {
-        ...updateData,
-        isOnboarded: false,
+      update: { ...updateData, isOnboarded: false,
       }
     })
-
-    // ৫. মেথড এনাবল করা
     await db.paymentMethodConfig.update({
       where: { id: paymentMethodId },
       data: {
@@ -83,11 +67,9 @@ export async function savePaypalManualCreds(
   }
 }
 
-// ভেরিফিকেশন হেল্পার (প্লেইন টেক্সট কি ব্যবহার করবে)
+
 async function verifyPaypalCredentials(isSandbox: boolean, clientId: string, clientSecret: string) {
-  const baseUrl = isSandbox 
-    ? "https://api-m.sandbox.paypal.com" 
-    : "https://api-m.paypal.com"
+  const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com"
 
   try {
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")

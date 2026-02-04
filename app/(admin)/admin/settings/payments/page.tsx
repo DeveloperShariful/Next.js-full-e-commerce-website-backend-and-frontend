@@ -1,5 +1,5 @@
 // app/admin/settings/payments/page.tsx
-import { getAllPaymentMethods } from "@/app/actions/admin/settings/payments/get-all-payments"
+import { getAllPaymentMethods } from "@/app/actions/admin/settings/payments/payments-dashboard"
 import { Payment_Header } from "./_components/Payment_Header"
 import { Payment_Methods_List } from "./_components/Payment_Methods_List"
 

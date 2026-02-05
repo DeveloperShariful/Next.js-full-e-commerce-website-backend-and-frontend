@@ -4,7 +4,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { decrypt } from "@/app/actions/admin/settings/payments/crypto"; // Assuming API key might be encrypted
+import { decrypt } from "@/app/actions/admin/settings/payments/crypto"; 
 
 interface QuoteParams {
   items: any[];
@@ -17,7 +17,7 @@ interface QuoteParams {
 }
 
 export async function getTransdirectQuotes({ items, receiver }: QuoteParams) {
-  // console.log("\n🚀 [START] Transdirect Quote Request");
+
 
   try {
     const config = await db.transdirectConfig.findUnique({
@@ -25,13 +25,9 @@ export async function getTransdirectQuotes({ items, receiver }: QuoteParams) {
     });
 
     if (!config || !config.isEnabled || !config.apiKey) {
-      // console.error("❌ ERROR: Transdirect API Key Missing or Disabled");
       return { success: false, quotes: [] };
     }
-    
-    // Decrypt API Key if stored encrypted
     const apiKey = config.apiKey.startsWith("U2F") ? decrypt(config.apiKey) : config.apiKey;
-
     const formattedItems = items.map(item => {
         const weight = Number(item.weight) > 0 ? Number(item.weight) : 0.5;
         const length = Number(item.length) > 0 ? Number(item.length) : 10;

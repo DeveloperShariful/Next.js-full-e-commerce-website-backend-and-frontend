@@ -2,186 +2,173 @@
 
 'use client';
 
-import Image from 'next/image';
-import React, { useRef, useMemo } from 'react';
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
-import ExpressCheckouts from './ExpressCheckouts';
-import PayPalPaymentGateway from './PaypalPaymentGateway';
-import StripePaymentGateway from './StripePaymentGateway'; 
-import { PaymentOption } from '@/app/actions/storefront/checkout/get-available-payments';
-
-interface CustomerInfo { 
-  firstName?: string; 
-  lastName?: string; 
-  email?: string; 
-  phone?: string; 
-  address1?: string; 
-  city?: string; 
-  state?: string; 
-  postcode?: string; 
-}
+import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
+import { useState } from 'react';
+import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
+import PayPalPaymentGateway from './PaypalPaymentGateway'; 
+import { createPaymentIntent } from '@/app/actions/storefront/checkout/stripe-payment';
 
 interface PaymentMethodsProps {
-  paymentOptions: PaymentOption[];
+  paymentOptions: any[];
   selectedPaymentMethod: string;
   onPaymentMethodChange: (methodId: string) => void;
-  onPlaceOrder: (paymentData?: { transaction_id?: string; paymentMethodId?: string; }) => Promise<{ orderId: string; orderKey: string } | void | null>;
+  onPlaceOrder: (paymentData?: { transaction_id?: string; paymentMethodId?: string; shippingAddress?: any }) => Promise<any>;
   isPlacingOrder: boolean;
-  isShippingSelected: boolean;
   total: number;
-  customerInfo: CustomerInfo;
+  isShippingSelected: boolean;
+  customerInfo: any;
   paypalClientId: string;
   stripePublishableKey: string;
   cartId: string;
-  shippingInfo: any; 
+  shippingInfo: any;
   selectedShippingId: string;
+  couponCode?: string; // ✅ Added couponCode support
 }
 
-export default function PaymentMethods(props: PaymentMethodsProps) {
-  const { 
-    paymentOptions, selectedPaymentMethod, onPaymentMethodChange, total, onPlaceOrder, 
-    isPlacingOrder, isShippingSelected, customerInfo, paypalClientId, stripePublishableKey,
-    cartId, shippingInfo, selectedShippingId
-  } = props;
+export default function PaymentMethods({
+  paymentOptions,
+  selectedPaymentMethod,
+  onPaymentMethodChange,
+  onPlaceOrder,
+  isPlacingOrder,
+  total,
+  isShippingSelected,
+  customerInfo,
+  cartId,
+  shippingInfo,
+  selectedShippingId,
+  couponCode // ✅ Destructured
+}: PaymentMethodsProps) {
+  
+  const stripe = useStripe();
+  const elements = useElements();
+  const router = useRouter();
+  const [stripeError, setStripeError] = useState<string | null>(null);
 
-  const stripeFormRef = useRef<HTMLFormElement>(null);
+  // 💳 Handle Stripe Payment Logic
+  const handleStripePayment = async () => {
+    if (!stripe || !elements) return;
 
-  // PayPal Config
-  const initialPayPalOptions = useMemo(() => {
-    if (!paypalClientId) return null;
-    return {
-      clientId: paypalClientId,
-      currency: "AUD",
-      intent: "capture",
-      components: "buttons,messages", 
-    };
-  }, [paypalClientId]);
+    // 1. Create Order in DB (Pending Status)
+    const orderData = await onPlaceOrder({ paymentMethodId: selectedPaymentMethod });
+    if (!orderData?.orderId) return;
 
-  // Icons Helper
-  const getGatewayIcon = (option: PaymentOption): React.ReactNode => {
-    if (option.provider === 'paypal') return <Image src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" width={80} height={20} className="h-6 w-auto" unoptimized />;
-    if (option.id === 'stripe_klarna') return <Image src="https://x.klarnacdn.net/payment-method/assets/badges/generic/klarna.svg" alt="Klarna" width={50} height={20} className="h-6 w-auto" />;
-    if (option.id.includes('afterpay')) return <Image src="https://static.afterpay.com/integration/logo-afterpay-colour.svg" alt="Afterpay" width={80} height={20} className="h-6 w-auto" unoptimized />;
-    if (option.id.includes('zip')) return <Image src="https://static.zipmoney.com.au/assets/default/footer-logo/zip-logo-black.svg" alt="Zip" width={60} height={20} className="h-6 w-auto" unoptimized />;
-    if (option.id === 'stripe_card') return <span className="flex items-center gap-1"><Image src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" width={30} height={20} className="h-5 w-5 rounded-[2px]" /><Image src="https://js.stripe.com/v3/fingerprinted/img/mastercard-4d8844094130711885b5e41b28c9848f.svg" alt="Mastercard" width={30} height={20} className="h-5 w-5 rounded-[2px]" /></span>;
-    return null;
-  };
+    // 2. Create Payment Intent (Server Side)
+    const { clientSecret, error } = await createPaymentIntent(
+        cartId, 
+        selectedShippingId, 
+        shippingInfo, 
+        couponCode // ✅ Pass coupon code to calculate correct total
+    );
 
-  const handlePlaceOrderClick = () => {
-    if (selectedPaymentMethod && selectedPaymentMethod.startsWith('stripe') && stripeFormRef.current) {
-      // Trigger the form inside StripePaymentGateway
-      stripeFormRef.current.requestSubmit();
-    } else {
-      // Offline payments
-      onPlaceOrder({ paymentMethodId: selectedPaymentMethod });
+    if (error) {
+        setStripeError(error);
+        toast.error(error);
+        return;
+    }
+
+    // 3. Confirm Payment with Stripe
+    const result = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/order-success?order_id=${orderData.orderId}`,
+        payment_method_data: {
+            billing_details: {
+                name: `${customerInfo.firstName} ${customerInfo.lastName}`,
+                email: customerInfo.email,
+                phone: customerInfo.phone,
+                address: {
+                    line1: customerInfo.address1,
+                    city: customerInfo.city,
+                    state: customerInfo.state,
+                    postal_code: customerInfo.postcode,
+                    country: 'AU',
+                }
+            }
+        }
+      },
+    });
+
+    if (result.error) {
+      setStripeError(result.error.message || "Payment failed");
+      toast.error(result.error.message || "Payment failed");
     }
   };
 
-  const renderContent = () => (
-    <div className="w-full flex flex-col gap-2.5">
-        
-        {/* Express Checkouts (Apple/Google Pay) */}
-        {stripePublishableKey && (
-            <ExpressCheckouts 
-                total={total} 
-                onOrderPlace={onPlaceOrder} 
-                isShippingSelected={isShippingSelected} 
-                stripePublishableKey={stripePublishableKey} 
-                cartId={cartId} // 👈 Pass Cart ID
-                selectedShippingId={selectedShippingId}
-            />
-        )}
-        
-        {/* Payment Methods List */}
-        <div className="border border-[#e0e0e0] rounded-lg overflow-hidden flex flex-col">
-          {paymentOptions.map(option => (
-            <div key={option.id} className="border-b border-[#e0e0e0] last:border-b-0">
-              <div 
-                className={`flex items-center p-[18px_20px] cursor-pointer transition-colors duration-200 ${selectedPaymentMethod === option.id ? 'bg-[#f0f0f0]' : 'bg-[#f9f9f9] hover:bg-[#f0f0f0]'}`} 
-                onClick={() => onPaymentMethodChange(option.id)}
-              >
-                <input 
-                    type="radio" 
-                    id={option.id} 
-                    name="payment_method" 
-                    value={option.id} 
-                    checked={selectedPaymentMethod === option.id} 
-                    readOnly 
-                    className="w-[18px] h-[18px] mr-[15px] shrink-0 accent-[#333]" 
-                />
-                <label htmlFor={option.id} className="font-semibold text-base grow cursor-pointer text-[#333]">{option.name}</label>
-                <div className="ml-[15px]">{getGatewayIcon(option)}</div>
-              </div>
-              
-              {selectedPaymentMethod === option.id && (
-                  <div className="p-[20px] bg-white border-t border-[#e0e0e0]">
-                      {option.provider === 'stripe' && (
-                        <StripePaymentGateway 
-                            ref={stripeFormRef} 
-                            selectedPaymentMethod={selectedPaymentMethod} 
-                            onPlaceOrder={onPlaceOrder} 
-                            customerInfo={customerInfo} 
-                            total={total} 
-                        />
-                      )}
-                      {option.provider === 'offline' && option.description && (
-                        <p className="text-sm text-[#555] leading-relaxed m-0" dangerouslySetInnerHTML={{ __html: option.description }} />
-                      )}
-                      {option.provider === 'paypal' && (
-                        <p className="text-sm text-[#555] m-0">{option.description || "Pay securely with PayPal."}</p>
-                      )}
-                  </div>
-              )}
-            </div>
-          ))}
-        </div>
+  // Find the currently selected method object
+  const selectedMethod = paymentOptions.find(m => m.id === selectedPaymentMethod);
 
-        {/* Bottom Actions */}
-        <div className="w-full mt-2.5">
-          {selectedPaymentMethod === 'paypal' ? (
-            <div className="min-h-[150px] mt-4">
-                {initialPayPalOptions ? (
-                    <PayPalPaymentGateway 
-                        total={total} 
-                        isPlacingOrder={isPlacingOrder} 
-                        onPlaceOrder={onPlaceOrder} 
-                        isShippingSelected={isShippingSelected}
-                        cartId={cartId}
-                        shippingInfo={shippingInfo}
-                        selectedShippingId={selectedShippingId}
-                        customerInfo={customerInfo}
-                        onSuccess={(orderId) => {
-                            window.location.href = `/order-success?order_id=${orderId}`;
-                        }}
-                    />
-                ) : (
-                    <div className="p-4 text-center text-red-500 bg-red-50 rounded">
-                        PayPal configuration missing.
+  return (
+    <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm">
+      <h3 className="text-lg font-semibold mb-4 border-b pb-2">Payment Method</h3>
+      
+      <div className="space-y-4">
+        {paymentOptions.map((option) => (
+          <div 
+            key={option.id} 
+            className={`border rounded-lg p-4 cursor-pointer transition-all ${selectedPaymentMethod === option.id ? 'border-black bg-gray-50' : 'border-gray-200'}`} 
+            onClick={() => onPaymentMethodChange(option.id)}
+          >
+            <div className="flex items-center gap-3">
+              <input 
+                type="radio" 
+                name="payment_method" 
+                checked={selectedPaymentMethod === option.id} 
+                onChange={() => onPaymentMethodChange(option.id)}
+                className="w-4 h-4 accent-black"
+              />
+              <span className="font-medium">{option.name}</span>
+            </div>
+            
+            {/* Payment Details Section */}
+            {selectedPaymentMethod === option.id && (
+              <div className="mt-4 pl-7 animate-in fade-in slide-in-from-top-2">
+                <p className="text-sm text-gray-600 mb-4">{option.description}</p>
+                
+                {/* 🟢 STRIPE ELEMENT */}
+                {option.provider === 'stripe' && (
+                    <div className="mb-4">
+                        <PaymentElement />
+                        {stripeError && <div className="text-red-500 text-sm mt-2">{stripeError}</div>}
                     </div>
                 )}
-            </div>
-          ) : (
-            selectedPaymentMethod && (
-                <button 
-                    onClick={handlePlaceOrderClick} 
-                    disabled={isPlacingOrder || !isShippingSelected} 
-                    className="w-full p-4 bg-[#1a1a1a] text-white border-none rounded-lg text-base font-bold cursor-pointer mt-5 transition-colors duration-200 hover:bg-[#333] disabled:bg-[#ccc] disabled:cursor-not-allowed"
-                >
-                    {isPlacingOrder ? 'Processing...' : `Place Order`}
-                </button>
-            )
-          )}
-        </div>
+
+                {/* 🔵 PAYPAL BUTTONS */}
+                {option.provider === 'paypal' && (
+                    <PayPalPaymentGateway 
+                        total={total}
+                        isPlacingOrder={isPlacingOrder}
+                        onPlaceOrder={onPlaceOrder}
+                        isShippingSelected={isShippingSelected}
+                        cartId={cartId}
+                        customerInfo={customerInfo}
+                        shippingInfo={shippingInfo}
+                        selectedShippingId={selectedShippingId}
+                        onSuccess={(orderId) => router.push(`/order-success?order_id=${orderId}`)}
+                       // couponCode={couponCode || null} // ✅ Correct Prop Passing (No 'paymentOptions' here)
+                    />
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Place Order Button (Only for Stripe & Offline) */}
+      {/* PayPal has its own buttons, so we hide this main button when PayPal is selected */}
+      {selectedMethod?.provider !== 'paypal' && (
+          <button 
+            onClick={selectedMethod?.provider === 'stripe' ? handleStripePayment : () => onPlaceOrder()}
+            disabled={isPlacingOrder || !selectedPaymentMethod}
+            className="w-full mt-6 bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {isPlacingOrder 
+              ? 'Processing...' 
+              : `Place Order ${total > 0 ? `($${total.toFixed(2)})` : ''}`
+            }
+          </button>
+      )}
     </div>
   );
-
-  if (initialPayPalOptions) {
-    return (
-        <PayPalScriptProvider options={initialPayPalOptions}>
-            {renderContent()}
-        </PayPalScriptProvider>
-    );
-  }
-
-  return renderContent();
 }

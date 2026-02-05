@@ -11,7 +11,6 @@ import { PaymentMethodWithConfig, PaypalConfigType } from "@/app/(admin)/admin/s
 import { z } from "zod"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
-
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form"
 import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,8 +30,6 @@ export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
       payLaterEnabled: config.payLaterEnabled ?? true,
       payLaterMessaging: config.payLaterMessaging ?? true,
       payLaterMessageTheme: config.payLaterMessageTheme || "light",
-      
-      // Other Defaults (Required for Schema Validation)
       isEnabled: method.isEnabled,
       sandbox: !!config.sandbox,
       title: method.name || "",
@@ -59,8 +56,7 @@ export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
       buttonShape: config.buttonShape || "RECT",
       payLaterLocations: config.payLaterLocations || [],
       invoicePrefix: config.invoicePrefix || "",
-      debugLog: !!config.debugLog,
-      
+      debugLog: !!config.debugLog,     
       minOrderAmount: method.minOrderAmount ?? null,
       maxOrderAmount: method.maxOrderAmount ?? null,
       surchargeEnabled: method.surchargeEnabled ?? false,
@@ -94,8 +90,6 @@ export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-              
-              {/* Enable Pay Later */}
               <FormField
                 control={form.control}
                 name="payLaterEnabled"
@@ -113,8 +107,6 @@ export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
                   </FormItem>
                 )}
               />
-
-              {/* Enable Messaging*/}
               <FormField
                 control={form.control}
                 name="payLaterMessaging"
@@ -135,8 +127,6 @@ export const Paypal_PayLater = ({ method, config }: PayLaterProps) => {
 
           </CardContent>
         </Card>
-
-        {/* Save Button */}
         <div className="flex justify-end">
             <Button type="submit" disabled={isPending}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

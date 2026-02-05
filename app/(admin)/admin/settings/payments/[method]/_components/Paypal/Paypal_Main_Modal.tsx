@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Settings, CreditCard, Sliders, Activity, Palette, MessageSquare, AlertTriangle, Webhook } from "lucide-react"
 import { PaymentMethodWithConfig } from "@/app/(admin)/admin/settings/payments/types"
 import { cn } from "@/lib/utils"
-
-// Components Import
 import { Paypal_General_Form } from "./Paypal_General_Form"
 import { Paypal_Connection_Tabs } from "./Paypal_Connection_Tabs"
 import { Paypal_SmartButtons } from "./Paypal_SmartButtons"
@@ -21,7 +19,6 @@ interface PaypalMainModalProps {
   method: PaymentMethodWithConfig
 }
 
-// Tab Definition
 const TABS = [
   { id: "general", label: "General", icon: Sliders },
   { id: "methods", label: "Connection", icon: CreditCard },
@@ -34,10 +31,7 @@ const TABS = [
 
 export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
   const [open, setOpen] = useState(false)
-  
-  // 👇 Local State for Tabs (No external hook needed)
   const [activeTab, setActiveTab] = useState("general")
-  
   const paypalConfig = method.paypalConfig
   if (!paypalConfig) return null
 
@@ -50,7 +44,7 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-[1100px] w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden flex flex-col bg-white">
+      <DialogContent className="sm:max-w-[1100px] w-[95vw] max-h-[90vh] h-fit p-0 gap-0 overflow-hidden flex flex-col bg-white">
         <DialogHeader className="px-6 py-4 border-b flex-shrink-0 bg-gray-50/50">
           <DialogTitle className="text-xl flex items-center gap-2">
             <span className="font-bold text-[#003087]">PayPal</span> Configuration
@@ -58,7 +52,6 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
         </DialogHeader>
         
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-          {/* Sidebar */}
           <div className="w-full md:w-64 bg-gray-50/50 border-b md:border-b-0 md:border-r flex-shrink-0 flex md:flex-col gap-1 p-2 md:p-4 overflow-x-auto md:overflow-y-auto scrollbar-hide">
             {TABS.map((tab) => (
               <button
@@ -82,8 +75,6 @@ export const Paypal_Main_Modal = ({ method }: PaypalMainModalProps) => {
               </button>
             ))}
           </div>
-
-          {/* Main Content */}
           <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-white">
             <div className="max-w-2xl mx-auto pb-10">
               

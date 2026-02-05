@@ -8,6 +8,7 @@ import { clearCart } from "../cart/clear-cart";
 import { calculateShippingServerSide } from "./get-shipping-rates";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { cookies } from "next/headers";
+import { validateCoupon } from "./validate-coupon";
 
 interface OrderInput {
   cartId: string;
@@ -15,10 +16,12 @@ interface OrderInput {
   shipping: any;
   shippingMethodId: string;
   paymentMethod: string;
+  paymentIntentId?: string; // For Stripe
   customerNote?: string;
   couponCode?: string | null; 
 }
 
+// ✅ Interface টি ফিরিয়ে আনা হয়েছে
 interface OrderItemData {
   productId: string;
   variantId: string | null;
@@ -56,6 +59,7 @@ export async function createOrder(data: OrderInput) {
     }
 
     let subtotal = 0;
+    // ✅ Type 'any[]' এর বদলে 'OrderItemData[]' ব্যবহার করা হলো
     const orderItemsData: OrderItemData[] = [];
 
     for (const item of cart.items) {
@@ -65,7 +69,7 @@ export async function createOrder(data: OrderInput) {
       const trackQuantity = item.variant ? item.variant.trackQuantity : item.product.trackQuantity;
       
       if (trackQuantity && currentStock < item.quantity) {
-        return { success: false, error: `Product ${item.product.name} is out of stock.` };
+        return { success: false, error: `Product "${item.product.name}" is out of stock.` };
       }
 
       subtotal += price * item.quantity;
@@ -95,62 +99,81 @@ export async function createOrder(data: OrderInput) {
       }
       shippingCost = validCost;
     }
+
     let discountAmount = 0;
-    
     if (data.couponCode) {
-        const coupon = await db.discount.findUnique({
-            where: { code: data.couponCode } 
-        });
-
-        if (coupon && coupon.isActive) {
-             const now = new Date();
-             const isValidDate = (!coupon.startDate || coupon.startDate <= now) && 
-                                 (!coupon.endDate || coupon.endDate >= now);
-             const limitNotReached = !coupon.usageLimit || coupon.usedCount < coupon.usageLimit;
-             const minSpendVal = coupon.minSpend ? Number(coupon.minSpend) : 0;
-             const minOrderMet = subtotal >= minSpendVal;
-
-             if (isValidDate && limitNotReached && minOrderMet) {
-                 const val = Number(coupon.value);
-                 
-                 if (coupon.type === "FIXED_AMOUNT") { 
-                     discountAmount = val;
-                 } else if (coupon.type === "PERCENTAGE") {
-                     discountAmount = (subtotal * val) / 100;
-                 } else {
-                      discountAmount = (subtotal * val) / 100;
-                 }
-
-                 if (discountAmount > subtotal) {
-                     discountAmount = subtotal;
-                 }
-             }
+        const couponRes = await validateCoupon(data.couponCode, data.cartId);
+        if (couponRes.success && couponRes.discountAmount) {
+            discountAmount = couponRes.discountAmount;
         }
     }
 
+    let surcharge = 0;
+    let paymentGatewayName = "OFFLINE";
 
-    const grandTotal = Math.max(0, subtotal + shippingCost - discountAmount);
+    if (data.paymentMethod === 'stripe_card' || data.paymentMethod.startsWith('stripe_')) {
+        paymentGatewayName = "STRIPE";
+        const stripeConf = await db.stripeConfig.findFirst({ include: { paymentMethod: true } });
+        if (stripeConf?.paymentMethod.surchargeEnabled) {
+             surcharge = stripeConf.paymentMethod.surchargeType === 'percentage'
+                ? ((subtotal + shippingCost - discountAmount) * Number(stripeConf.paymentMethod.surchargeAmount)) / 100
+                : Number(stripeConf.paymentMethod.surchargeAmount);
+        }
+    } 
+    else if (data.paymentMethod === 'paypal') {
+        paymentGatewayName = "PAYPAL";
+        const paypalConf = await db.paypalConfig.findFirst({ include: { paymentMethod: true } });
+        if (paypalConf?.paymentMethod.surchargeEnabled) {
+             surcharge = paypalConf.paymentMethod.surchargeType === 'percentage'
+                ? ((subtotal + shippingCost - discountAmount) * Number(paypalConf.paymentMethod.surchargeAmount)) / 100
+                : Number(paypalConf.paymentMethod.surchargeAmount);
+        }
+    }
+    else {
+        const offlineConf = await db.paymentMethodConfig.findFirst({ where: { identifier: data.paymentMethod } });
+        if (offlineConf?.surchargeEnabled) {
+             surcharge = offlineConf.surchargeType === 'percentage'
+                ? ((subtotal + shippingCost - discountAmount) * Number(offlineConf.surchargeAmount)) / 100
+                : Number(offlineConf.surchargeAmount);
+        }
+    }
+
+    const grandTotal = Math.max(0, subtotal + shippingCost + surcharge - discountAmount);
+
     const newOrder = await db.$transaction(async (tx) => {
       const count = await tx.order.count();
       const orderNumber = `ORD-${1000 + count + 1}`;
 
+      // ✅ FIX 1: Explicit Type Definition (এই লাইনে এরর ছিল)
+      let initialStatus: OrderStatus = OrderStatus.PENDING;
+      let paymentStatus: PaymentStatus = PaymentStatus.UNPAID;
+
+      // যদি স্ট্রাইপ হয় এবং ক্লায়েন্ট সাইড থেকে কনফার্ম হয়ে আসে
+      if (paymentGatewayName === "STRIPE" && data.paymentIntentId) {
+         paymentStatus = PaymentStatus.PAID; 
+         initialStatus = OrderStatus.PROCESSING;
+      }
+
       const order = await tx.order.create({
         data: {
           orderNumber,
-          status: OrderStatus.PENDING, 
-          paymentStatus: PaymentStatus.UNPAID,
+          status: initialStatus,
+          paymentStatus: paymentStatus,
+          paymentGateway: paymentGatewayName,
+          paymentMethod: data.paymentMethod,
+          paymentId: data.paymentIntentId || null,
           
           subtotal: subtotal, 
           shippingTotal: shippingCost,
-          discountTotal: discountAmount, 
+          discountTotal: discountAmount,
+          surcharge: surcharge,
           total: grandTotal,
+          
           couponCode: data.couponCode || null, 
           
           guestEmail: data.billing.email,
           shippingAddress: data.shipping,
           billingAddress: data.billing,
-          
-          paymentMethod: data.paymentMethod,
           shippingMethod: data.shippingMethodId,
           customerNote: data.customerNote,
           
@@ -162,10 +185,7 @@ export async function createOrder(data: OrderInput) {
         }
       });
       
-      const isOffline = data.paymentMethod.startsWith('offline') || data.paymentMethod === 'cod' || data.paymentMethod === 'bank_transfer';
-      
-      if (isOffline) {
-        for (const item of cart.items) {
+      for (const item of cart.items) {
            if (item.variantId && item.variant?.trackQuantity) {
              await tx.productVariant.update({ 
                where: { id: item.variantId }, 
@@ -177,14 +197,13 @@ export async function createOrder(data: OrderInput) {
                data: { stock: { decrement: item.quantity } } 
              });
            }
-        }
-        
-        if (data.couponCode && discountAmount > 0) {
-            await tx.discount.update({
-                where: { code: data.couponCode },
-                data: { usedCount: { increment: 1 } }
-            });
-        }
+      }
+      
+      if (data.couponCode && discountAmount > 0) {
+          await tx.discount.update({
+              where: { code: data.couponCode },
+              data: { usedCount: { increment: 1 } }
+          });
       }
 
       return order;
@@ -212,27 +231,23 @@ export async function createOrder(data: OrderInput) {
       }
     }).catch(err => console.error("Admin Email Error:", err));
 
-    const isOffline = data.paymentMethod.startsWith('offline') || data.paymentMethod === 'cod' || data.paymentMethod === 'bank_transfer';
-    
-    // ১০. কার্ট ক্লিয়ার এবং অ্যাফিলিয়েট ট্রিগার
-    if (isOffline) {
-      await clearCart();
+    await clearCart();
 
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      fetch(`${appUrl}/api/affiliate/process-order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.INTERNAL_API_KEY!
-        },
-        body: JSON.stringify({ orderId: newOrder.id })
-      }).catch(err => console.error("Offline Affiliate Trigger Failed:", err));
-    }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    fetch(`${appUrl}/api/affiliate/process-order`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.INTERNAL_API_KEY!
+      },
+      body: JSON.stringify({ orderId: newOrder.id })
+    }).catch(err => console.error("Affiliate Trigger Failed:", err));
 
     return { 
       success: true, 
       orderId: newOrder.id, 
-      orderNumber: newOrder.orderNumber, 
+      orderNumber: newOrder.orderNumber,
+      // ✅ FIX 2: Added 'orderKey' to match client expectation
       orderKey: "key_" + newOrder.id, 
       grandTotal: grandTotal 
     };

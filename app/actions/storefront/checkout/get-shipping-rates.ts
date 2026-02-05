@@ -20,7 +20,6 @@ interface RateParams {
   };
 }
 
-// 🛠️ INTERNAL HELPER: Server-side validation এর জন্য এই ফাংশনটি
 export async function calculateShippingServerSide(cartId: string, address: any, selectedMethodId: string): Promise<number | null> {
     const rates = await getShippingRates({ cartId, address });
     const selectedRate = rates.find(r => r.id === selectedMethodId);
@@ -36,7 +35,6 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
     const generalConfig = settings?.generalConfig as any || {};
     const enablePickup = generalConfig.enablePickup === true;
 
-    // Address না থাকলে শুধু Pickup (যদি অন থাকে)
     if (!params || !params.address.postcode || !params.address.city) {
       return enablePickup 
         ? [{ id: 'pickup', label: 'Local Pickup', cost: 0.00 }]
@@ -52,7 +50,6 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
 
     if (!cart || cart.items.length === 0) return [];
 
-    // Transdirect এর জন্য আইটেম প্রস্তুত করা
     const itemsForQuote = cart.items.map(item => {
       const source = item.variant || item.product;
       return {
@@ -64,7 +61,6 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
       };
     });
 
-    // Transdirect API কল
     const quoteResult = await getTransdirectQuotes({
       items: itemsForQuote,
       receiver: {
@@ -76,9 +72,6 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
     });
 
     const dynamicRates: ShippingOption[] = [];
-
-    // Flat Rate / Free Shipping লজিক এখানে যুক্ত করতে পারেন (Database থেকে)
-    // আপাতত Transdirect + Pickup
     if (quoteResult.success && quoteResult.quotes.length > 0) {
       quoteResult.quotes.forEach((q: any) => {
         dynamicRates.push({
@@ -97,7 +90,6 @@ export async function getShippingRates(params?: RateParams): Promise<ShippingOpt
 
   } catch (error) {
     console.error("Get Shipping Rates Error:", error);
-    // Fallback logic if needed
     return [];
   }
 }

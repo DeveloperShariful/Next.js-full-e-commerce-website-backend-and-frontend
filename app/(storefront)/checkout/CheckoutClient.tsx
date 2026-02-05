@@ -17,7 +17,7 @@ import PaymentMethods from './_components/PaymentMethods';
 // Server Actions
 import { createOrder } from '@/app/actions/storefront/checkout/create-order';
 import { getShippingRates, ShippingOption } from '@/app/actions/storefront/checkout/get-shipping-rates';
-import { validateCoupon } from '@/app/actions/storefront/checkout/validate-coupon'; // ✅ Import validateCoupon
+import { validateCoupon } from '@/app/actions/storefront/checkout/validate-coupon'; 
 
 // Types
 interface ShippingFormData { 
@@ -358,6 +358,7 @@ function CheckoutClientComponent({
             cartId={cartId} 
             shippingInfo={shipToDifferentAddress ? shippingInfoRef.current : customerInfoRef.current}
             selectedShippingId={selectedShippingId}
+            couponCode={appliedCouponCode || undefined} 
         />
       </div>
     </div>

@@ -8,7 +8,6 @@ import { BankTransferSchema } from "@/app/(admin)/admin/settings/payments/schema
 import { updateBankTransferSettings } from "@/app/actions/admin/settings/payments/offline-payment-method"
 import { z } from "zod"
 import { toast } from "sonner"
-
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"

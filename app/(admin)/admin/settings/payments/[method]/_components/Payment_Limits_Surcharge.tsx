@@ -17,7 +17,6 @@ interface Props {
 
 export const Payment_Limits_Surcharge = ({ form }: Props) => {
   const [previewCost, setPreviewCost] = useState(0)
-  
   const surchargeType = form.watch("surchargeType")
   const surchargeAmount = form.watch("surchargeAmount") || 0
   const isEnabled = form.watch("surchargeEnabled")

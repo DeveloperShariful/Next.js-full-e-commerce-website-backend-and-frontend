@@ -33,17 +33,13 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
 
     for (const method of methods) {
       
-      // === STRIPE ===
       if (method.identifier === "stripe" && method.stripeConfig) {
         const config = method.stripeConfig
         const mode = config.testMode ? "TEST" : "LIVE"
-        
-        // 🔐 Security Fix: Decrypt keys properly
         const rawTestKey = config.testPublishableKey ? decrypt(config.testPublishableKey) : "";
         const rawLiveKey = config.livePublishableKey ? decrypt(config.livePublishableKey) : "";
         const stripePubKey = config.testMode ? rawTestKey : rawLiveKey;
 
-        // 1. Credit/Debit Card
         options.push({
           id: "stripe_card",
           provider: "stripe",
@@ -55,7 +51,6 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
           public_key: stripePubKey || undefined
         })
 
-        // 2. Klarna (BNPL)
         if (config.klarnaEnabled) {
              options.push({
                 id: "stripe_klarna",
@@ -69,7 +64,6 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
             })
         }
 
-        // 3. Afterpay (BNPL) - ✅ Added Back
         if (config.afterpayEnabled) {
             options.push({
                id: "stripe_afterpay_clearpay",
@@ -83,7 +77,6 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
             })
        }
 
-       // 4. Zip (BNPL) - ✅ Added Back
        if (config.zipEnabled) {
             options.push({
                id: "stripe_zip",
@@ -98,11 +91,8 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
        }
       } 
       
-      // === PAYPAL ===
       else if (method.identifier === "paypal" && method.paypalConfig) {
         const config = method.paypalConfig
-        
-        // 🔐 Security Fix: Ensure correct Client ID
         const rawSandboxId = config.sandboxClientId ? config.sandboxClientId : ""; 
         const rawLiveId = config.liveClientId ? config.liveClientId : "";
         const paypalClientId = config.sandbox ? rawSandboxId : rawLiveId;
@@ -119,7 +109,6 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
         })
       }
 
-      // === OFFLINE ===
       else {
         options.push({
           id: method.identifier,

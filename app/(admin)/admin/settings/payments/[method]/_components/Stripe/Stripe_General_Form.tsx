@@ -38,14 +38,12 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
       testMode: !!config.testMode,
       title: method.name || "Credit Card / Debit Card",
       description: method.description || "",
-      
       livePublishableKey: config.livePublishableKey || "",
       liveSecretKey: config.liveSecretKey || "",
       liveWebhookSecret: config.liveWebhookSecret || "",
       testPublishableKey: config.testPublishableKey || "",
       testSecretKey: config.testSecretKey || "",
       testWebhookSecret: config.testWebhookSecret || "",
-      
       paymentAction: config.paymentAction || PaymentIntent.CAPTURE,
       statementDescriptor: config.statementDescriptor || "",
       shortStatementDescriptor: config.shortStatementDescriptor || "",
@@ -57,8 +55,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
       paymentRequestButtons: config.paymentRequestButtons ?? true,
       buttonTheme: config.buttonTheme || "dark",
       debugLog: !!config.debugLog,
-
-      // Handle potential nulls from DB by nullish coalescing
       minOrderAmount: method.minOrderAmount ?? null,
       maxOrderAmount: method.maxOrderAmount ?? null,
       surchargeEnabled: method.surchargeEnabled ?? false,
@@ -85,7 +81,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         
         <Card>
           <CardContent className="pt-6 space-y-4">
@@ -96,9 +92,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
                   <div className="space-y-0.5">
                     <FormLabel className="text-base">Enable Stripe</FormLabel>
-                    <FormDescription>
-                      Accept credit card payments on checkout.
-                    </FormDescription>
+                    <FormDescription>Accept credit card payments on checkout.</FormDescription>
                   </div>
                   <FormControl>
                     <Switch checked={!!field.value} onCheckedChange={field.onChange} />
@@ -106,7 +100,6 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                 </FormItem>
               )}
             />
-            
             <FormField
               control={form.control}
               name="testMode"
@@ -114,9 +107,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-yellow-50/50 border-yellow-100">
                   <div className="space-y-0.5">
                     <FormLabel className="text-base text-yellow-900">Test Mode</FormLabel>
-                    <FormDescription className="text-yellow-700">
-                      Use test keys to simulate transactions without real money.
-                    </FormDescription>
+                    <FormDescription className="text-yellow-700">Use test keys to simulate transactions.</FormDescription>
                   </div>
                   <FormControl>
                     <Switch checked={!!field.value} onCheckedChange={field.onChange} />
@@ -133,9 +124,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
               <KeyRound className="h-5 w-5 text-[#635BFF]" />
               <CardTitle>API Credentials</CardTitle>
             </div>
-            <CardDescription>
-              Enter your {isTestMode ? "Test" : "Live"} API keys from the Stripe Dashboard.
-            </CardDescription>
+            <CardDescription>Enter your {isTestMode ? "Test" : "Live"} API keys.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {isTestMode ? (
@@ -146,9 +135,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Test Publishable Key</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} placeholder="pk_test_..." className="font-mono" />
-                      </FormControl>
+                      <FormControl><Input {...field} value={field.value ?? ""} className="font-mono" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -161,26 +148,12 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                       <FormLabel>Test Secret Key</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
-                          <Input 
-                            {...field} 
-                            value={field.value ?? ""}
-                            type={showSecret ? "text" : "password"} 
-                            placeholder="sk_test_..." 
-                            className="font-mono" 
-                          />
+                          <Input {...field} value={field.value ?? ""} type={showSecret ? "text" : "password"} className="font-mono" />
                         </FormControl>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => setShowSecret(!showSecret)}
-                        >
+                        <Button type="button" variant="outline" size="icon" onClick={() => setShowSecret(!showSecret)}>
                           {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
-                      <FormDescription>
-                        Starts with <code>sk_test_</code>. Keep this secret.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -194,9 +167,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Live Publishable Key</FormLabel>
-                      <FormControl>
-                        <Input {...field} value={field.value ?? ""} placeholder="pk_live_..." className="font-mono" />
-                      </FormControl>
+                      <FormControl><Input {...field} value={field.value ?? ""} className="font-mono" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -209,26 +180,12 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
                       <FormLabel>Live Secret Key</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
-                          <Input 
-                            {...field} 
-                            value={field.value ?? ""}
-                            type={showSecret ? "text" : "password"} 
-                            placeholder="sk_live_..." 
-                            className="font-mono" 
-                          />
+                          <Input {...field} value={field.value ?? ""} type={showSecret ? "text" : "password"} className="font-mono" />
                         </FormControl>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="icon"
-                          onClick={() => setShowSecret(!showSecret)}
-                        >
+                        <Button type="button" variant="outline" size="icon" onClick={() => setShowSecret(!showSecret)}>
                           {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
-                      <FormDescription>
-                        Starts with <code>sk_live_</code>. Never share this key.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -239,9 +196,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Display Settings</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Display Settings</CardTitle></CardHeader>
           <CardContent className="grid gap-4">
             <FormField
               control={form.control}
@@ -249,10 +204,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value ?? ""} />
-                  </FormControl>
-                  <FormDescription>Payment method name shown to customers.</FormDescription>
+                  <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -263,10 +215,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} value={field.value ?? ""} />
-                  </FormControl>
-                  <FormDescription>Payment method description shown to customers.</FormDescription>
+                  <FormControl><Textarea {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -276,8 +225,7 @@ export const Stripe_General_Form = ({ method, config }: GeneralFormProps) => {
 
         <Payment_Limits_Surcharge form={form} />
 
-        {/* Save Button */}
-        <div className="flex justify-end">
+        <div className="flex justify-end pt-4">
             <Button type="submit" disabled={isPending}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes

@@ -5,8 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import toast from 'react-hot-toast';
-import { createPayPalOrder } from '@/app/actions/storefront/checkout/paypal/create-order';
-import { capturePayPalOrder } from '@/app/actions/storefront/checkout/paypal/capture-order';
+import { createPayPalOrder , capturePayPalOrder} from '@/app/actions/storefront/checkout/paypal-payments';
 
 interface PayPalGatewayProps {
   total: number;

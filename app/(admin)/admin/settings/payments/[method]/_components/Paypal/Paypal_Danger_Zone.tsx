@@ -16,7 +16,6 @@ interface DangerZoneProps {
 export const Paypal_Danger_Zone = ({ methodId }: DangerZoneProps) => {
   const [isPending, setIsPending] = useState(false)
   const router = useRouter()
-
   const handleReset = async () => {
     if (!confirm("Are you sure? This will delete all PayPal credentials and connection data. This action cannot be undone.")) {
       return
@@ -46,7 +45,6 @@ export const Paypal_Danger_Zone = ({ methodId }: DangerZoneProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* 👇 RESPONSIVE FIX: flex-col on mobile, flex-row on desktop */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-red-100 bg-red-50 rounded-lg">
           <div className="space-y-1">
             <h4 className="font-medium text-red-900">Reset Configuration</h4>
@@ -54,8 +52,6 @@ export const Paypal_Danger_Zone = ({ methodId }: DangerZoneProps) => {
               Disconnects PayPal, removes all API keys, and disables the payment method.
             </p>
           </div>
-          
-          {/* 👇 BUTTON FIX: w-full on mobile, auto on desktop */}
           <Button 
             variant="destructive" 
             onClick={handleReset}

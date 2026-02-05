@@ -12,7 +12,6 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { PayPalButtonColor, PayPalButtonLabel, PayPalButtonLayout, PayPalButtonShape } from "@prisma/client"
 import { Loader2 } from "lucide-react"
-
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,7 +24,6 @@ interface SmartButtonsProps {
   config: PaypalConfigType
 }
 
-// 1. Locations List (কোথায় বাটন দেখাবে)
 const locations = [
   { id: "checkout", label: "Checkout Page" },
   { id: "cart", label: "Cart Page" },
@@ -57,11 +55,8 @@ export const Paypal_SmartButtons = ({ method, config }: SmartButtonsProps) => {
       buttonColor: config.buttonColor || PayPalButtonColor.GOLD,
       buttonShape: config.buttonShape || PayPalButtonShape.RECT,
       smartButtonLocations: config.smartButtonLocations || [],
-      // 👇 ডাটাবেস থেকে disabled ফান্ডিং সোর্সগুলো লোড করছি
       disableFunding: config.disableFunding || [], 
       requireFinalConfirmation: config.requireFinalConfirmation ?? true,
-      
-      // Other Defaults (Required for Schema Validation)
       isEnabled: method.isEnabled,
       sandbox: !!config.sandbox,
       title: method.name || "",
@@ -84,8 +79,7 @@ export const Paypal_SmartButtons = ({ method, config }: SmartButtonsProps) => {
       payLaterMessaging: config.payLaterMessaging ?? true,
       payLaterMessageTheme: config.payLaterMessageTheme || "light",
       invoicePrefix: config.invoicePrefix || "",
-      debugLog: !!config.debugLog,
-      
+      debugLog: !!config.debugLog,     
       minOrderAmount: method.minOrderAmount ?? null,
       maxOrderAmount: method.maxOrderAmount ?? null,
       surchargeEnabled: method.surchargeEnabled ?? false,
@@ -111,8 +105,6 @@ export const Paypal_SmartButtons = ({ method, config }: SmartButtonsProps) => {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
-        
-        {/* === SECTION 1: VISUAL STYLE === */}
         <Card>
           <CardHeader>
             <CardTitle>Button Appearance</CardTitle>
@@ -195,8 +187,6 @@ export const Paypal_SmartButtons = ({ method, config }: SmartButtonsProps) => {
             </div>
           </CardContent>
         </Card>
-
-        {/* === SECTION 2: PAYMENT METHODS (FUNDING SOURCES) === */}
         <Card>
           <CardHeader>
             <CardTitle>Payment Methods (Funding Sources)</CardTitle>
@@ -232,10 +222,8 @@ export const Paypal_SmartButtons = ({ method, config }: SmartButtonsProps) => {
                                   onCheckedChange={(checked) => {
                                     const currentDisabled = field.value || []
                                     if (checked) {
-                                      // Enable: Remove from disabled list
                                       field.onChange(currentDisabled.filter((id) => id !== source.id))
                                     } else {
-                                      // Disable: Add to disabled list
                                       field.onChange([...currentDisabled, source.id])
                                     }
                                   }}
@@ -296,8 +284,6 @@ export const Paypal_SmartButtons = ({ method, config }: SmartButtonsProps) => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Save Button */}
         <div className="flex justify-end">
             <Button type="submit" disabled={isPending}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

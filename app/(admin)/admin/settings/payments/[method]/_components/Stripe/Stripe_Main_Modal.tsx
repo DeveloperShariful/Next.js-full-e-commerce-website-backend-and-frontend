@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Settings, CreditCard, Sliders, Activity, Webhook } from "lucide-react"
 import { PaymentMethodWithConfig } from "@/app/(admin)/admin/settings/payments/types"
 import { cn } from "@/lib/utils"
-
-// Components
 import { Stripe_General_Form } from "./Stripe_General_Form"
 import { Stripe_Advanced } from "./Stripe_Advanced"
 import { Stripe_Webhook_Config } from "./Stripe_Webhook_Config"
@@ -28,10 +26,7 @@ const TABS = [
 
 export const Stripe_Main_Modal = ({ method }: StripeMainModalProps) => {
   const [open, setOpen] = useState(false)
-  
-  // 👇 Local State for Tabs (No external hook needed)
   const [activeTab, setActiveTab] = useState("general")
-
   const stripeConfig = method.stripeConfig
   if (!stripeConfig) return null
 
@@ -44,7 +39,7 @@ export const Stripe_Main_Modal = ({ method }: StripeMainModalProps) => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-[1000px] w-[95vw] h-[90vh] p-0 gap-0 overflow-hidden flex flex-col bg-white">
+      <DialogContent className="sm:max-w-[1000px] w-[95vw] max-h-[90vh] h-fit p-0 gap-0 overflow-hidden flex flex-col bg-white">
         <DialogHeader className="px-6 py-4 border-b flex-shrink-0 bg-gray-50/50">
           <DialogTitle className="text-xl flex items-center gap-2">
             <span className="font-bold text-[#635BFF]">Stripe</span> Configuration

@@ -10,16 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { 
-  AlertTriangle, 
-  Webhook, 
-  RefreshCw, 
-  CheckCircle2, 
-  XCircle, 
-  Globe, 
-  Link as LinkIcon, 
-  Trash2 
-} from "lucide-react"
+import { AlertTriangle, Webhook, RefreshCw, CheckCircle2, XCircle, Globe, Link as LinkIcon, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ==========================================
@@ -63,8 +54,6 @@ const PaypalWebhookStatusCard = ({
         </Badge>
       </CardHeader>
       <CardContent className="space-y-4">
-        
-        {/* Status Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-muted/30 p-3 rounded-md border gap-3">
           <div className="flex items-center gap-2">
             {isActive ? (
@@ -135,8 +124,7 @@ export const Paypal_Webhook_Tab = ({ methodId, config }: WebhookTabProps) => {
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false) 
   const [currentWebhookUrl, setCurrentWebhookUrl] = useState(config.webhookUrl)
-  const router = useRouter()
-  
+  const router = useRouter() 
   const isConnected = config.sandbox 
     ? (!!config.sandboxClientId && !!config.sandboxClientSecret)
     : (!!config.liveClientId && !!config.liveClientSecret)

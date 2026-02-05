@@ -11,7 +11,6 @@ import { PaymentMethodWithConfig, PaypalConfigType } from "@/app/(admin)/admin/s
 import { z } from "zod"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react" 
-
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -31,8 +30,6 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
     defaultValues: {
       invoicePrefix: config.invoicePrefix || "WC-",
       debugLog: !!config.debugLog,
-      
-      // Hidden / Defaults fields required for Schema validation
       isEnabled: method.isEnabled,
       sandbox: !!config.sandbox,
       title: method.name || "",
@@ -61,8 +58,7 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
       payLaterLocations: config.payLaterLocations || [],
       payLaterMessaging: config.payLaterMessaging ?? true,
       payLaterMessageTheme: config.payLaterMessageTheme || "light",
-      subtotalMismatchBehavior: config.subtotalMismatchBehavior || "add_line_item",
-      
+      subtotalMismatchBehavior: config.subtotalMismatchBehavior || "add_line_item",     
       minOrderAmount: method.minOrderAmount ?? null,
       maxOrderAmount: method.maxOrderAmount ?? null,
       surchargeEnabled: method.surchargeEnabled ?? false,
@@ -89,16 +85,12 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
     <div className="space-y-6 pb-20">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          
-          {/* Settings Card */}
           <Card>
             <CardHeader>
               <CardTitle>Advanced Options</CardTitle>
               <CardDescription>Configure technical parameters for PayPal.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              
-              {/* Invoice Prefix Field */}
               <FormField
                 control={form.control}
                 name="invoicePrefix"
@@ -115,8 +107,6 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
                   </FormItem>
                 )}
               />
-
-              {/* Debug Logging Switch */}
               <FormField
                 control={form.control}
                 name="debugLog"
@@ -136,8 +126,6 @@ export const Paypal_Advanced = ({ method, config }: AdvancedProps) => {
               />
             </CardContent>
           </Card>
-          
-          {/* Save Button */}
           <div className="flex justify-end">
             <Button type="submit" disabled={isPending}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

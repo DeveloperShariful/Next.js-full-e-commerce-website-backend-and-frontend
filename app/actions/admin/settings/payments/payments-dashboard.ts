@@ -123,3 +123,33 @@ export async function resetPaymentMethodsDB() {
     return { success: false, error: "Failed to reset DB." }
   }
 }
+
+export async function getPaymentMethodByIdentifier(identifier: string) {
+  try {
+    const method = await db.paymentMethodConfig.findUnique({
+      where: { identifier },
+      include: {
+        stripeConfig: true,
+        paypalConfig: true,
+        offlineConfig: true,
+      },
+    })
+
+    if (!method) return { success: false, error: "Method not found" }
+    if (method.stripeConfig) {
+      method.stripeConfig.liveSecretKey = decrypt(method.stripeConfig.liveSecretKey ?? "")
+      method.stripeConfig.liveWebhookSecret = decrypt(method.stripeConfig.liveWebhookSecret ?? "")
+      method.stripeConfig.testSecretKey = decrypt(method.stripeConfig.testSecretKey ?? "")
+      method.stripeConfig.testWebhookSecret = decrypt(method.stripeConfig.testWebhookSecret ?? "")
+    }
+
+    if (method.paypalConfig) {
+      method.paypalConfig.liveClientSecret = decrypt(method.paypalConfig.liveClientSecret ?? "")
+      method.paypalConfig.sandboxClientSecret = decrypt(method.paypalConfig.sandboxClientSecret ?? "")
+    }
+
+    return { success: true, data: JSON.parse(JSON.stringify(method)) }
+  } catch (error) {
+    return { success: false, error: "Failed to fetch configuration" }
+  }
+}

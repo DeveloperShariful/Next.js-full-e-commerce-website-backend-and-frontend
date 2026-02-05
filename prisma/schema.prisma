@@ -2660,7 +2660,7 @@ model SubscriptionInvoice {
   subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   amount         Decimal       @db.Decimal(12, 2)
   currency       String
-  status         String        @default("pending") // paid, open, void, uncollectible
+  status         String        @default("pending") 
   invoiceUrl     String?
   pdfUrl         String?
   periodStart    DateTime

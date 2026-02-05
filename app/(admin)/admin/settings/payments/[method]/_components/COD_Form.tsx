@@ -2,52 +2,35 @@
 
 "use client"
 
-import { useState, useTransition } from "react"
+import { useTransition } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { CodSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { updateCodSettings } from "@/app/actions/admin/settings/payments/offline-payment-method"
 import { z } from "zod"
 import { toast } from "sonner"
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Loader2, Settings } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Payment_Limits_Surcharge } from "./Payment_Limits_Surcharge"
 
-interface CodModalProps {
+interface CodFormProps {
   methodId: string
   config: any
   offlineConfig: any
 }
 
-export const COD_Modal = ({ methodId, config, offlineConfig }: CodModalProps) => {
-  const [open, setOpen] = useState(false)
+export const COD_Form = ({ methodId, config, offlineConfig }: CodFormProps) => {
   const [isPending, startTransition] = useTransition()
 
   const form = useForm({
-    resolver: zodResolver(CodSchema),
     defaultValues: {
       name: config.name || "Cash on Delivery",
       description: config.description || "",
       instructions: config.instructions || "",
+      isEnabled: !!config.isEnabled,
       enableForShippingMethods: offlineConfig?.enableForShippingMethods || [],
 
       minOrderAmount: config.minOrderAmount ?? null,
@@ -65,7 +48,6 @@ export const COD_Modal = ({ methodId, config, offlineConfig }: CodModalProps) =>
         .then((data) => {
           if (data.success) {
             toast.success("COD settings updated")
-            setOpen(false)
           } else {
             toast.error(data.error)
           }
@@ -74,22 +56,9 @@ export const COD_Modal = ({ methodId, config, offlineConfig }: CodModalProps) =>
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <Settings className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Cash on Delivery Settings</DialogTitle>
-          <DialogDescription>
-            Enable customers to pay upon receiving their order.
-          </DialogDescription>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
+        <div className="grid gap-4 bg-white p-6 border rounded-lg shadow-sm">
             <FormField
               control={form.control}
               name="name"
@@ -129,19 +98,17 @@ export const COD_Modal = ({ methodId, config, offlineConfig }: CodModalProps) =>
                 </FormItem>
               )}
             />
+        </div>
 
-            <Payment_Limits_Surcharge form={form} />
+        <Payment_Limits_Surcharge form={form} />
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+        <div className="flex justify-end pt-4">
+          <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Settings
+          </Button>
+        </div>
+      </form>
+    </Form>
   )
 }

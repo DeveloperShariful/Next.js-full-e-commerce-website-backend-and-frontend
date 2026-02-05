@@ -9,7 +9,7 @@ import { PaymentMethodWithConfig } from "@/app/(admin)/admin/settings/payments/t
 import { cn } from "@/lib/utils"
 
 // Hook & Type Import
-import { usePaymentTabs, TabType } from "../hooks/usePaymentTabs"
+import { usePaymentTabs, TabType } from "../../../_components/hooks/usePaymentTabs"
 
 // Components Import
 import { Paypal_General_Form } from "./Paypal_General_Form"

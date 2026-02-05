@@ -8,7 +8,7 @@ import { Settings, CreditCard, Sliders, Activity, Webhook } from "lucide-react"
 import { PaymentMethodWithConfig } from "@/app/(admin)/admin/settings/payments/types"
 import { cn } from "@/lib/utils"
 
-import { usePaymentTabs, TabType } from "../hooks/usePaymentTabs"
+import { usePaymentTabs, TabType } from "../../../_components/hooks/usePaymentTabs"
 
 // Components
 import { Stripe_General_Form } from "./Stripe_General_Form"

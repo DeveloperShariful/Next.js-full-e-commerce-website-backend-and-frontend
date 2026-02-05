@@ -2,52 +2,35 @@
 
 "use client"
 
-import { useState, useTransition } from "react"
+import { useTransition } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { ChequeSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { updateChequeSettings } from "@/app/actions/admin/settings/payments/offline-payment-method"
 import { z } from "zod"
 import { toast } from "sonner"
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Loader2, Settings } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Payment_Limits_Surcharge } from "./Payment_Limits_Surcharge"
 
-interface ChequeModalProps {
+interface ChequeFormProps {
   methodId: string
   config: any
   offlineConfig: any
 }
 
-export const Cheque_Modal = ({ methodId, config, offlineConfig }: ChequeModalProps) => {
-  const [open, setOpen] = useState(false)
+export const Cheque_Form = ({ methodId, config, offlineConfig }: ChequeFormProps) => {
   const [isPending, startTransition] = useTransition()
 
   const form = useForm({
-    resolver: zodResolver(ChequeSchema),
     defaultValues: {
       name: config.name || "Cheque Payment",
       description: config.description || "",
       instructions: config.instructions || "",
+      isEnabled: !!config.isEnabled,
       chequePayTo: offlineConfig?.chequePayTo || "",
       addressInfo: offlineConfig?.addressInfo || "",
 
@@ -66,7 +49,6 @@ export const Cheque_Modal = ({ methodId, config, offlineConfig }: ChequeModalPro
         .then((data) => {
           if (data.success) {
             toast.success("Cheque settings updated")
-            setOpen(false)
           } else {
             toast.error(data.error)
           }
@@ -75,22 +57,9 @@ export const Cheque_Modal = ({ methodId, config, offlineConfig }: ChequeModalPro
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <Settings className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Cheque Payment Settings</DialogTitle>
-          <DialogDescription>
-            Instructions for customers paying by cheque.
-          </DialogDescription>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-20">
+        <div className="grid gap-6 bg-white p-6 border rounded-lg shadow-sm">
             <FormField
               control={form.control}
               name="name"
@@ -160,19 +129,17 @@ export const Cheque_Modal = ({ methodId, config, offlineConfig }: ChequeModalPro
                 </FormItem>
               )}
             />
+        </div>
 
-            <Payment_Limits_Surcharge form={form} />
+        <Payment_Limits_Surcharge form={form} />
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+        <div className="flex justify-end pt-4">
+          <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save Settings
+          </Button>
+        </div>
+      </form>
+    </Form>
   )
 }

@@ -11,14 +11,12 @@ import Stripe from "stripe"
 
 interface RefundParams {
   orderId: string;
-  amount?: number; // Optional: If not provided, full refund
+  amount?: number; 
   reason?: string;
 }
 
 export async function processRefund({ orderId, amount, reason }: RefundParams) {
   const { userId } = await auth();
-
-  // 1. Fetch Order & Payment Details
   const order = await db.order.findUnique({
     where: { id: orderId },
     include: { transactions: true }
@@ -26,7 +24,6 @@ export async function processRefund({ orderId, amount, reason }: RefundParams) {
 
   if (!order) return { success: false, error: "Order not found" };
 
-  // Find the successful Capture/Sale transaction
   const chargeTransaction = order.transactions.find(
     t => (t.type === "SALE" || t.type === "CAPTURE") && t.status === "COMPLETED"
   );
@@ -35,7 +32,6 @@ export async function processRefund({ orderId, amount, reason }: RefundParams) {
     return { success: false, error: "No refundable transaction found for this order." };
   }
 
-  // Calculate Refund Amount
   const maxRefundable = Number(order.totalPaid) - Number(order.refundedAmount);
   const refundAmount = amount ? amount : maxRefundable;
 

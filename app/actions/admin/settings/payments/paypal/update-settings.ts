@@ -4,103 +4,108 @@
 
 import { db } from "@/lib/prisma"
 import { PaypalSettingsSchema } from "@/app/(admin)/admin/settings/payments/schemas"
-import { z } from "zod"
-import { revalidatePath } from "next/cache"
+import { secureAction } from "@/lib/security/server-action-wrapper"
 import { encrypt } from "../crypto"
-import { auditService } from "@/lib/services/audit-service"
-import { auth } from "@clerk/nextjs/server"
+import { z } from "zod"
 
-export async function updatePaypalSettings(
-  paymentMethodId: string,
-  values: z.infer<typeof PaypalSettingsSchema>
-) {
-  const { userId } = await auth();
+const UpdatePaypalSchema = PaypalSettingsSchema.extend({
+  paymentMethodId: z.string()
+});
 
-  try {
-
-    const validated = PaypalSettingsSchema.parse(values)
-    const oldConfig = await db.paypalConfig.findUnique({
-        where: { paymentMethodId },
+export async function updatePaypalSettings(paymentMethodId: string, values: z.infer<typeof PaypalSettingsSchema>) {
+  return secureAction(
+    { paymentMethodId, ...values },
+    {
+      actionName: "UPDATE_PAYPAL_SETTINGS",
+      auditEntity: "PaypalConfig",
+      schema: UpdatePaypalSchema,
+      role: "ADMIN",
+      idExtractor: (data) => data.id
+    },
+    async (input, user) => {
+      // 1. Fetch Old Data
+      const oldConfig = await db.paypalConfig.findUnique({
+        where: { paymentMethodId: input.paymentMethodId },
         include: { paymentMethod: true }
-    });
+      });
 
-    const liveClientSecret = validated.liveClientSecret ? encrypt(validated.liveClientSecret) : undefined
-    const sandboxClientSecret = validated.sandboxClientSecret ? encrypt(validated.sandboxClientSecret) : undefined
+      // 2. Encryption
+      const liveClientSecret = input.liveClientSecret ? encrypt(input.liveClientSecret) : undefined;
+      const sandboxClientSecret = input.sandboxClientSecret ? encrypt(input.sandboxClientSecret) : undefined;
 
-    await db.$transaction(async (tx) => {
-      await tx.paymentMethodConfig.update({
-        where: { id: paymentMethodId },
-        data: {
-          isEnabled: validated.isEnabled ?? false,
-          name: validated.title,
-          description: validated.description ?? "",
-          mode: validated.sandbox ? "TEST" : "LIVE",
-          minOrderAmount: validated.minOrderAmount ? Number(validated.minOrderAmount) : null,
-          maxOrderAmount: validated.maxOrderAmount ? Number(validated.maxOrderAmount) : null,         
-          surchargeEnabled: validated.surchargeEnabled ?? false,
-          surchargeType: validated.surchargeType ?? "fixed",
-          surchargeAmount: validated.surchargeAmount ? Number(validated.surchargeAmount) : 0,
-          taxableSurcharge: validated.taxableSurcharge ?? false
-        }
-      })
+      // 3. DB Transaction
+      const result = await db.$transaction(async (tx) => {
+        // Update Parent
+        await tx.paymentMethodConfig.update({
+          where: { id: input.paymentMethodId },
+          data: {
+            isEnabled: input.isEnabled ?? false,
+            name: input.title,
+            description: input.description ?? "",
+            mode: input.sandbox ? "TEST" : "LIVE",
+            minOrderAmount: input.minOrderAmount ? Number(input.minOrderAmount) : null,
+            maxOrderAmount: input.maxOrderAmount ? Number(input.maxOrderAmount) : null,
+            surchargeEnabled: input.surchargeEnabled ?? false,
+            surchargeType: input.surchargeType ?? "fixed",
+            surchargeAmount: input.surchargeAmount ? Number(input.surchargeAmount) : 0,
+            taxableSurcharge: input.taxableSurcharge ?? false
+          }
+        });
 
-      await tx.paypalConfig.update({
-        where: { paymentMethodId },
-        data: {
-          sandbox: validated.sandbox ?? false,
-          liveEmail: validated.liveEmail ?? null,
-          liveClientId: validated.liveClientId ?? null,
-          ...(liveClientSecret && { liveClientSecret }),         
-          sandboxEmail: validated.sandboxEmail ?? null,
-          sandboxClientId: validated.sandboxClientId ?? null,
-          ...(sandboxClientSecret && { sandboxClientSecret }),
-          title: validated.title,
-          description: validated.description ?? "",
-          intent: validated.intent ?? "CAPTURE",
-          instantPayments: validated.instantPayments ?? false,
-          brandName: validated.brandName ?? null,
-          landingPage: validated.landingPage ?? "LOGIN",
-          disableFunding: validated.disableFunding ?? [],
-          advancedCardEnabled: validated.advancedCardEnabled ?? false,
-          advancedCardTitle: validated.advancedCardTitle ?? "Debit & Credit Cards",
-          vaultingEnabled: validated.vaultingEnabled ?? false,
-          smartButtonLocations: validated.smartButtonLocations ?? [],
-          requireFinalConfirmation: validated.requireFinalConfirmation ?? true,
-          buttonLabel: validated.buttonLabel ?? "PAYPAL",
-          buttonLayout: validated.buttonLayout ?? "VERTICAL",
-          buttonColor: validated.buttonColor ?? "GOLD",
-          buttonShape: validated.buttonShape ?? "RECT",
-          payLaterEnabled: validated.payLaterEnabled ?? true,
-          payLaterLocations: validated.payLaterLocations ?? [],
-          payLaterMessaging: validated.payLaterMessaging ?? true,
-          payLaterMessageTheme: validated.payLaterMessageTheme ?? "light",
-          subtotalMismatchBehavior: validated.subtotalMismatchBehavior ?? "add_line_item",
-          invoicePrefix: validated.invoicePrefix ?? null,
-          debugLog: validated.debugLog ?? false,
-        }
-      })
-    })
+        // Update PayPal Config (ALL FIELDS MAPPED)
+        return await tx.paypalConfig.update({
+          where: { paymentMethodId: input.paymentMethodId },
+          data: {
+            sandbox: input.sandbox ?? false,
+            
+            // Credentials
+            liveEmail: input.liveEmail ?? null,
+            liveClientId: input.liveClientId ?? null,
+            ...(liveClientSecret && { liveClientSecret }),
+            sandboxEmail: input.sandboxEmail ?? null,
+            sandboxClientId: input.sandboxClientId ?? null,
+            ...(sandboxClientSecret && { sandboxClientSecret }),
+            
+            // General
+            title: input.title,
+            description: input.description ?? "",
+            intent: input.intent ?? "CAPTURE",
+            instantPayments: input.instantPayments ?? false,
+            brandName: input.brandName ?? null,
+            landingPage: input.landingPage ?? "LOGIN",
+            
+            // Buttons & Funding
+            disableFunding: input.disableFunding ?? [],
+            advancedCardEnabled: input.advancedCardEnabled ?? false,
+            advancedCardTitle: input.advancedCardTitle ?? "Debit & Credit Cards",
+            vaultingEnabled: input.vaultingEnabled ?? false,
+            smartButtonLocations: input.smartButtonLocations ?? [],
+            requireFinalConfirmation: input.requireFinalConfirmation ?? true,
+            buttonLabel: input.buttonLabel ?? "PAYPAL",
+            buttonLayout: input.buttonLayout ?? "VERTICAL",
+            buttonColor: input.buttonColor ?? "GOLD",
+            buttonShape: input.buttonShape ?? "RECT",
+            
+            // Pay Later
+            payLaterEnabled: input.payLaterEnabled ?? true,
+            payLaterLocations: input.payLaterLocations ?? [],
+            payLaterMessaging: input.payLaterMessaging ?? true,
+            payLaterMessageTheme: input.payLaterMessageTheme ?? "light",
+            
+            // Technical
+            subtotalMismatchBehavior: input.subtotalMismatchBehavior ?? "add_line_item",
+            invoicePrefix: input.invoicePrefix ?? null,
+            debugLog: input.debugLog ?? false,
+          }
+        });
+      });
 
-    await auditService.log({
-        userId: userId ?? "system",
-        action: "UPDATE_PAYPAL_SETTINGS",
-        entity: "PaypalConfig",
-        entityId: paymentMethodId,
-        oldData: {
-            enabled: oldConfig?.paymentMethod.isEnabled,
-            mode: oldConfig?.sandbox ? "TEST" : "LIVE"
-        },
-        newData: {
-            enabled: validated.isEnabled,
-            mode: validated.sandbox ? "TEST" : "LIVE",
-            surcharge: validated.surchargeEnabled ? `${validated.surchargeAmount}` : "Disabled"
-        }
-    });
-
-    revalidatePath("/admin/settings/payments")
-    return { success: true, message: "PayPal settings updated successfully." }
-  } catch (error) {
-    await auditService.systemLog("ERROR", "UPDATE_PAYPAL_SETTINGS", "Failed to update", { error });
-    return { success: false, error: "Failed to update PayPal settings. Check logs." }
-  }
+      return { 
+        success: true, 
+        data: result, 
+        oldData: oldConfig, 
+        message: "PayPal settings updated successfully." 
+      };
+    }
+  );
 }

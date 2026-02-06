@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { togglePaymentMethodStatus, resetPaymentMethodsDB } from "@/app/actions/admin/settings/payments/payments-dashboard"
+import { PaymentLogs } from "./PaymentLogs" // 👈 Import New Component
 
 interface PaymentStatusBadgeProps {
   isEnabled: boolean
@@ -19,24 +20,12 @@ interface PaymentStatusBadgeProps {
 
 const PaymentStatusBadge = ({ isEnabled, mode }: PaymentStatusBadgeProps) => {
   if (!isEnabled) {
-    return (
-      <Badge variant="outline" className="text-muted-foreground border-dashed">
-        Inactive
-      </Badge>
-    )
+    return <Badge variant="outline" className="text-muted-foreground border-dashed">Inactive</Badge>
   }
-
   return (
     <div className="flex items-center gap-2">
-      <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-        Active
-      </Badge>
-      
-      {mode === "TEST" && (
-        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200">
-          Test Mode
-        </Badge>
-      )}
+      <Badge variant="default" className="bg-green-600 hover:bg-green-700">Active</Badge>
+      {mode === "TEST" && <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">Test Mode</Badge>}
     </div>
   )
 }
@@ -58,7 +47,6 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
     }
   }
 
-  // 👇 Repair Database Logic
   const handleReset = async () => {
     if(!confirm("Fix missing methods? This will reset payment settings to default.")) return;
     const res = await resetPaymentMethodsDB()
@@ -71,20 +59,16 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
   }
 
   return (
-    <div className="space-y-4">
-      {/* 👇 Repair Button added here (Top Right) */}
+    <div className="space-y-8"> {/* Increased spacing */}
+      
+      {/* Action Bar */}
       <div className="flex justify-end">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleReset} 
-          className="gap-2 text-muted-foreground hover:text-foreground"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Repair Database
+        <Button variant="outline" size="sm" onClick={handleReset} className="gap-2 text-muted-foreground hover:text-foreground">
+          <RefreshCw className="h-4 w-4" /> Repair Database
         </Button>
       </div>
 
+      {/* Methods List */}
       <div className="divide-y divide-gray-200 dark:divide-gray-700 border rounded-lg bg-card">
         {initialMethods.map((method) => (
           <div key={method.id} className="flex flex-col sm:flex-row items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors gap-4">
@@ -92,13 +76,9 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
             {/* Info Section */}
             <div className="flex items-start gap-4 w-full sm:w-auto">
               <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
-                 {method.identifier === 'stripe' ? (
-                   <span className="font-bold text-[#635BFF] text-xl">S</span>
-                 ) : method.identifier === 'paypal' ? (
-                   <span className="font-bold text-[#003087] text-xl">P</span>
-                 ) : (
-                   <span className="font-bold text-gray-500 text-lg">{method.name.charAt(0)}</span>
-                 )}
+                 {method.identifier === 'stripe' ? <span className="font-bold text-[#635BFF] text-xl">S</span> : 
+                  method.identifier === 'paypal' ? <span className="font-bold text-[#003087] text-xl">P</span> : 
+                  <span className="font-bold text-gray-500 text-lg">{method.name.charAt(0)}</span>}
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
@@ -114,27 +94,22 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
             {/* Action Section */}
             <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={method.isEnabled}
-                  onCheckedChange={() => handleToggle(method.id, method.isEnabled)}
-                />
-                <span className="text-sm text-muted-foreground sm:hidden">
-                  {method.isEnabled ? "Enabled" : "Disabled"}
-                </span>
+                <Switch checked={method.isEnabled} onCheckedChange={() => handleToggle(method.id, method.isEnabled)} />
+                <span className="text-sm text-muted-foreground sm:hidden">{method.isEnabled ? "Enabled" : "Disabled"}</span>
               </div>
-              
-              {/* LINK TO DYNAMIC PAGE */}
               <Link href={`/admin/settings/payments/${method.identifier}`}>
                   <Button variant="outline" size="sm">
-                      <Settings2 className="w-4 h-4 mr-2" />
-                      Manage
-                      <ArrowRight className="w-3 h-3 ml-2 opacity-50" />
+                      <Settings2 className="w-4 h-4 mr-2" /> Manage <ArrowRight className="w-3 h-3 ml-2 opacity-50" />
                   </Button>
               </Link>
             </div>
           </div>
         ))}
       </div>
+
+      {/* 👇 New Logs Section Added Here */}
+      <PaymentLogs />
+      
     </div>
   )
 }

@@ -1,15 +1,18 @@
 // app/admin/settings/payments/_components/Stripe/Stripe_Connection_card.tsx
+
 "use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, User, RefreshCw, AlertCircle } from "lucide-react"
+import { Loader2, User, RefreshCw, AlertCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StripeConfigType } from "@/app/(admin)/admin/settings/payments/types"
 import { toast } from "sonner"
 import { testStripeConnection } from "@/app/actions/admin/settings/payments/stripe/test-connection"
+import { disconnectStripe } from "@/app/actions/admin/settings/payments/stripe/disconnect-stripe" 
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 interface ConnectionCardProps {
@@ -19,11 +22,15 @@ interface ConnectionCardProps {
 
 export const Stripe_Connection_Card = ({ config, methodId }: ConnectionCardProps) => {
   const [testing, setTesting] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [accountData, setAccountData] = useState<any>(null)
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "error">("idle")
+  const router = useRouter()
+
   const hasKeys = config.testMode ? !!config.testSecretKey : !!config.liveSecretKey;
   const isConfigured = config.isConnected || hasKeys;
+
   const checkConnection = async (isAuto = false) => {
     if (!isConfigured) {
         setLoading(false);
@@ -47,10 +54,28 @@ export const Stripe_Connection_Card = ({ config, methodId }: ConnectionCardProps
     setLoading(false)
   }
 
+  // 👇 New Disconnect Logic
+  const handleDisconnect = async () => {
+    if(!confirm("Are you sure? This will delete all Stripe keys from the database.")) return;
+    
+    setDisconnecting(true);
+    const res = await disconnectStripe(methodId);
+    
+    if (res.success) {
+        toast.success(res.message);
+        setAccountData(null);
+        setConnectionStatus("idle");
+        router.refresh();
+    } else {
+        toast.error(res.error || "Failed to disconnect");
+    }
+    setDisconnecting(false);
+  }
+
   useEffect(() => {
     if (isConfigured) checkConnection(true);
     else setLoading(false);
-  }, [config.testMode, methodId]);
+  }, [config.testMode, methodId, isConfigured]); // Added isConfigured dependency
 
   const getBadge = () => {
     if (!isConfigured) return <Badge variant="destructive" className="w-fit">Not Configured</Badge>;
@@ -130,7 +155,21 @@ export const Stripe_Connection_Card = ({ config, methodId }: ConnectionCardProps
             </Alert>
         )}
 
-        <div className="flex justify-end pt-2">
+        {/* Buttons Section */}
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            {/* 👇 Disconnect Button (Only shows if configured) */}
+            {isConfigured && (
+                <Button 
+                    variant="destructive" 
+                    onClick={handleDisconnect} 
+                    disabled={disconnecting || testing}
+                    className="w-full sm:w-auto"
+                >
+                    {disconnecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                    Disconnect
+                </Button>
+            )}
+
             <Button onClick={() => checkConnection(false)} disabled={!isConfigured || testing} variant="outline" className="w-full sm:w-auto">
             {testing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Refreshing...</> : <><RefreshCw className="h-4 w-4 mr-2" /> Refresh Connection</>}
             </Button>

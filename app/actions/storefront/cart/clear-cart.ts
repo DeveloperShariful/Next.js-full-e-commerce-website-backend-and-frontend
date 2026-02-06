@@ -14,7 +14,6 @@ export async function clearCart() {
       await db.cart.delete({
         where: { id: cartId }
       })
-      // কুকি ডিলেট করার দরকার নেই, নেক্সট টাইম ভিজিট করলে নতুন আইডি জেনারেট হবে
     }
     return { success: true }
   } catch (error) {

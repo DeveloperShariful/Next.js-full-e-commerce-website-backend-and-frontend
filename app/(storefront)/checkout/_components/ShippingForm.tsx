@@ -36,13 +36,8 @@ const selectStyles = {
 const FORM_DATA_SESSION_KEY = 'checkoutShippingFormData';
 
 export default function ShippingForm({ title, onAddressChange, defaultValues = {} }: ShippingFormProps) {
-  
-  // 1. Global Store থেকে ডাটা নিন
   const { address: storeAddress, primaryColor } = useGlobalStore(); 
-  
-  // স্টোরের কান্ট্রি ডিফল্ট হিসেবে ব্যবহার হবে
   const defaultCountry = storeAddress.country || "Australia"; 
-
   const [formData, setFormData] = useState<ShippingFormData>(() => {
     if (typeof window !== 'undefined') {
         try {
@@ -57,7 +52,6 @@ export default function ShippingForm({ title, onAddressChange, defaultValues = {
     };
   });
 
-  // Debounce Effect
   useEffect(() => {
     const timer = setTimeout(() => {
         onAddressChange(formData);
@@ -94,11 +88,9 @@ export default function ShippingForm({ title, onAddressChange, defaultValues = {
 
   const labelClass = "block text-sm font-semibold mb-2 text-[#333]";
   const inputClass = "w-full h-[48px] px-3 border border-[#ddd] rounded-[5px] text-base transition-colors duration-200 focus:outline-none focus:ring-[2px] focus:ring-opacity-20";
-
-  // Dynamic Style for Focus
   const focusStyle = {
       borderColor: primaryColor,
-      '--tw-ring-color': primaryColor // Tailwind ring color override variable logic needed or styled component
+      '--tw-ring-color': primaryColor 
   };
 
   const [mounted, setMounted] = useState(false);
@@ -114,7 +106,6 @@ export default function ShippingForm({ title, onAddressChange, defaultValues = {
       <div className="grid grid-cols-2 gap-5">
         <div className="col-span-2">
           <label className={labelClass}>Country / Region *</label>
-          {/* Dynamic Country */}
           <input type="text" value={defaultCountry} readOnly className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500`} />
         </div>
         <div className="col-span-2">

@@ -1,4 +1,4 @@
-// app/actions/settings/payments/paypal/clear-database.ts
+// app/actions/settings/payments/paypal/disconnect-paypal.ts
 "use server"
 
 import { db } from "@/lib/prisma"

@@ -4,7 +4,6 @@
 
 import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
-// Import from new location if you moved it, otherwise keep path
 import { validateCoupon } from "./validate-coupon"; 
 
 export async function getCartDetails(cartId: string | undefined) {
@@ -40,8 +39,6 @@ export async function getCartDetails(cartId: string | undefined) {
     if (!cart) {
         return { success: false, message: "Cart not found", data: null, appliedCoupon: null };
     }
-
-    // 🔥 FIX: Transform Prisma Decimal to Number for Client Compatibility
     const formattedCart = {
       ...cart,
       items: cart.items.map((item) => ({
@@ -61,14 +58,12 @@ export async function getCartDetails(cartId: string | undefined) {
       })),
     };
 
-    // --- COUPON LOGIC (Safe Mode) ---
     const cookieStore = await cookies();
     const savedCoupon = cookieStore.get("coupon")?.value;
     let appliedCoupon = null;
 
     if (savedCoupon) {
         try {
-            // Validate without setting cookies (read-only mode)
             const res = await validateCoupon(savedCoupon, cart.id, false);
 
             if (res.success) {

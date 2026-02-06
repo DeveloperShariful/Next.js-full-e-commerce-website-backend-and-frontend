@@ -5,21 +5,32 @@ import { getShippingRates } from '@/app/actions/storefront/checkout/get-shipping
 import { getCartDetails } from '@/app/actions/storefront/cart/get-cart-details';
 import { cookies } from 'next/headers';
 import CheckoutClient from './CheckoutClient';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function CheckoutPage() {
   const cookieStore = await cookies();
-  const cartId = cookieStore.get("cartId")?.value;
+  const cookieCartId = cookieStore.get("cartId")?.value;
 
-  // Initial Load (Default Rates)
+  // 1. Fetch Data
   const [paymentMethods, initialRates, cartResult] = await Promise.all([
     getAvailablePaymentMethods(),
-    getShippingRates(), // No params = default rates
-    getCartDetails(cartId)
+    getShippingRates(), 
+    getCartDetails(cookieCartId)
   ]);
 
-  const rawItems = cartResult.success && cartResult.data ? cartResult.data.items : [];
+  // 2. Resolve Active Cart ID (CRITICAL FIX)
+  // যদি কুকিতে আইডি না থাকে কিন্তু সার্ভার ইউজারের কার্ট খুঁজে পায়, তবে সেই আইডি ব্যবহার হবে।
+  const cartData = cartResult.success ? cartResult.data : null;
+  const activeCartId = cartData?.id || cookieCartId || "";
+
+  // যদি কোনো কার্ট না থাকে বা কার্ট খালি থাকে, শপে রিডাইরেক্ট করুন
+  if (!activeCartId || !cartData || cartData.items.length === 0) {
+      redirect('/cart');
+  }
+
+  const rawItems = cartData.items;
   
   const formattedCartItems = rawItems.map((item: any) => ({
     id: item.variantId || item.productId,
@@ -28,7 +39,6 @@ export default async function CheckoutPage() {
     price: item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price),
     quantity: item.quantity,
     image: item.variant?.image || item.product.featuredImage || "/placeholder.png",
-    // Transdirect needs these later
     weight: item.variant?.weight || item.product.weight,
     length: item.variant?.length || item.product.length,
     width: item.variant?.width || item.product.width,
@@ -47,7 +57,7 @@ export default async function CheckoutPage() {
           initialCartItems={formattedCartItems}
           stripePublishableKey={stripeMethod?.public_key || ""}
           paypalClientId={paypalMethod?.public_key || ""}
-          cartId={cartId || ""} // 👈 Passing Cart ID for dynamic rates
+          cartId={activeCartId} // ✅ Passing Verified Cart ID
         />
       </div>
     </div>

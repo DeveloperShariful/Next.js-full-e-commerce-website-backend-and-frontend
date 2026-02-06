@@ -4,6 +4,71 @@ import { db } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { Prisma } from "@prisma/client";
 
+// ==========================================
+// 1. SAFE DATA SERIALIZATION (New Helper)
+// ==========================================
+
+const serializePrismaData = (data: any): any => {
+  if (data === null || data === undefined) return data;
+  if (typeof data === "object" && "toNumber" in data) {
+    return data.toNumber(); 
+  }
+
+  if (typeof data === "bigint") {
+    return data.toString(); 
+  }
+  
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map((item) => serializePrismaData(item));
+  }
+  
+  if (typeof data === "object") {
+    const newObj: Record<string, any> = {};
+    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'apikey', 'creditcard', 'cvv'];
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        if (sensitiveKeys.some(s => key.toLowerCase().includes(s))) {
+          newObj[key] = '***MASKED***';
+        } else {
+          newObj[key] = serializePrismaData(data[key]);
+        }
+      }
+    }
+    return newObj;
+  }
+  return data;
+};
+
+// ==========================================
+// 2. SMART DIFFING ALGORITHM (New Helper)
+// ==========================================
+
+function calculateDiff(oldData: any, newData: any) {
+  if (!oldData || !newData) return null;
+  const diff: Record<string, { from: any; to: any }> = {};
+  const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+  const ignoredKeys = ['updatedAt', 'createdAt', 'lastLogin', 'version'];
+
+  allKeys.forEach(key => {
+    if (ignoredKeys.includes(key)) return;
+    const oldVal = serializePrismaData(oldData[key]);
+    const newVal = serializePrismaData(newData[key]);
+    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+      diff[key] = { from: oldVal ?? null, to: newVal ?? null };
+    }
+  });
+
+  return Object.keys(diff).length > 0 ? diff : null;
+}
+
+// ==========================================
+// 3. AUDIT SERVICE IMPLEMENTATION
+// ==========================================
+
 interface AuditParams {
   userId?: string;
   action: string;
@@ -20,38 +85,24 @@ export const auditService = {
       const headerList = await headers();
       const ip = headerList.get("x-forwarded-for") || "unknown";
       const userAgent = headerList.get("user-agent") || "system";
-
-      const sanitize = (data: any) => {
-        if (!data) return null;
-        try {
-          const copy = JSON.parse(JSON.stringify(data)); 
-          const sensitiveKeys = ['password', 'token', 'secret', 'key', 'apikey', 'creditcard', 'cvv'];
-          
-          const clean = (obj: any) => {
-            for (const key in obj) {
-              if (sensitiveKeys.some(s => key.toLowerCase().includes(s))) {
-                obj[key] = '***MASKED***';
-              } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-                clean(obj[key]);
-              }
-            }
-          };
-          clean(copy);
-          return copy;
-        } catch (e) {
-          return "Data sanitization failed"; 
-        }
+      const changes = (oldData && newData) ? calculateDiff(oldData, newData) : null;
+      const finalMeta = {
+        ...meta,
+        ...(changes ? { changes } : {})
       };
-      
+
+      const safeOldData = serializePrismaData(oldData);
+      const safeNewData = serializePrismaData(newData);    
       const finalUserId = userId && userId !== "system" ? userId : null;
+
       await db.auditLog.create({
         data: {
           userId: finalUserId,
           action: action,
           tableName: entity,
           recordId: entityId,
-          oldValues: sanitize(oldData) ?? Prisma.JsonNull,
-          newValues: sanitize(newData) ?? Prisma.JsonNull,
+          oldValues: safeOldData ?? Prisma.JsonNull,
+          newValues: safeNewData ?? Prisma.JsonNull,
           ipAddress: ip,
           userAgent: userAgent,
         }
@@ -81,6 +132,7 @@ export const auditService = {
             }
          };
       }
+      safeContext = serializePrismaData(safeContext);
 
       await db.systemLog.create({
         data: {

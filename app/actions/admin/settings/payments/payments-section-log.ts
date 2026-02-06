@@ -1,25 +1,34 @@
 // File: app/actions/settings/payments/payments-section-log.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
+import { auth } from "@clerk/nextjs/server"
 
-export async function getPaymentSystemLogs(source?: string) {
+export async function getPaymentAuditLogs() {
   try {
-    const whereClause = source 
-      ? { source } 
-      : { source: { in: ["STRIPE", "PAYPAL", "BANK_TRANSFER", "CHEQUE", "COD", "PAYMENT_GENERAL"] } };
-
-    const logs = await db.systemLog.findMany({
-      where: whereClause,
+    const { userId } = await auth(); 
+    const logs = await db.auditLog.findMany({
+      where: {
+        tableName: {
+          in: ["StripeConfig", "PaypalConfig", "PaymentMethodConfig", "OfflinePaymentConfig"]
+        }
+      },
+      include: {
+        user: {
+          select: { name: true, email: true, image: true }
+        }
+      },
       orderBy: {
         createdAt: "desc"
       },
-      take: 50
+      take: 50 
     })
 
     return { success: true, data: logs }
   } catch (error) {
-    return { success: false, error: "Failed to fetch logs" , data: [] }
+    console.error("Failed to fetch logs:", error);
+    return { success: false, error: "Failed to fetch logs", data: [] }
   }
 }
 

@@ -3,82 +3,89 @@
 "use server"
 
 import { db } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
-import { auditService } from "@/lib/services/audit-service"
+import { secureAction } from "@/lib/security/server-action-wrapper"
 import Stripe from "stripe"
+import { z } from "zod"
 
-interface RefundParams {
-  orderId: string;
-  amount?: number; 
-  reason?: string;
-}
+// Input Schema
+const RefundSchema = z.object({
+  orderId: z.string(),
+  amount: z.number().optional(),
+  reason: z.string().optional()
+});
 
-export async function processRefund({ orderId, amount, reason }: RefundParams) {
-  const { userId } = await auth();
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    include: { transactions: true }
-  });
+export async function processRefund(params: z.infer<typeof RefundSchema>) {
+  return secureAction(
+    params,
+    {
+      actionName: "PROCESS_REFUND",
+      auditEntity: "Order", 
+      schema: RefundSchema,
+      role: "ADMIN",
+      idExtractor: (data) => data.orderId 
+    },
+    async (input, user) => {
 
-  if (!order) return { success: false, error: "Order not found" };
+      const order = await db.order.findUnique({
+        where: { id: input.orderId },
+        include: { transactions: true }
+      });
 
-  const chargeTransaction = order.transactions.find(
-    t => (t.type === "SALE" || t.type === "CAPTURE") && t.status === "COMPLETED"
-  );
+      if (!order) throw new Error("Order not found");
 
-  if (!chargeTransaction) {
-    return { success: false, error: "No refundable transaction found for this order." };
-  }
+      // 2. Find Refundable Transaction
+      const chargeTransaction = order.transactions.find(
+        t => (t.type === "SALE" || t.type === "CAPTURE") && t.status === "COMPLETED"
+      );
 
-  const maxRefundable = Number(order.totalPaid) - Number(order.refundedAmount);
-  const refundAmount = amount ? amount : maxRefundable;
+      if (!chargeTransaction) throw new Error("No refundable transaction found for this order.");
 
-  if (refundAmount <= 0) return { success: false, error: "Refund amount must be greater than 0" };
-  if (refundAmount > maxRefundable) return { success: false, error: "Refund amount exceeds total paid." };
+      // 3. Validation
+      const maxRefundable = Number(order.totalPaid) - Number(order.refundedAmount);
+      const refundAmount = input.amount ? input.amount : maxRefundable;
 
-  try {
-    let gatewayRefundId = "";
-    let refundStatus = "pending";
+      if (refundAmount <= 0) throw new Error("Refund amount must be greater than 0");
+      if (refundAmount > maxRefundable) throw new Error("Refund amount exceeds refundable balance.");
 
-    // ============================================
-    // A. STRIPE REFUND LOGIC
-    // ============================================
-    if (chargeTransaction.gateway === "STRIPE") {
-        const config = await db.stripeConfig.findFirst({
-            where: { paymentMethod: { isEnabled: true } }
-        });
-        if (!config) throw new Error("Stripe config missing");
+      // 4. Gateway Processing
+      let gatewayRefundId = "";
+      let refundStatus = "pending";
 
+      // --- STRIPE ---
+      if (chargeTransaction.gateway === "STRIPE") {
+        const config = await db.stripeConfig.findFirst({ where: { paymentMethod: { isEnabled: true } } });
+        if (!config) throw new Error("Stripe config missing in DB.");
+        
         const secretKey = decrypt(config.testMode ? config.testSecretKey! : config.liveSecretKey!);
+        if(!secretKey) throw new Error("Stripe API key not found.");
+
         const stripe = new Stripe(secretKey, { apiVersion: "2025-01-27.acacia" as any });
 
         const refund = await stripe.refunds.create({
-            payment_intent: chargeTransaction.transactionId,
-            amount: Math.round(refundAmount * 100), // Convert to cents
-            reason: "requested_by_customer",
-            metadata: { order_id: orderId, reason: reason || "" }
+          payment_intent: chargeTransaction.transactionId,
+          amount: Math.round(refundAmount * 100), // Convert to cents
+          reason: "requested_by_customer",
+          metadata: { order_id: input.orderId, reason: input.reason || "" }
         });
-
+        
         gatewayRefundId = refund.id;
         refundStatus = refund.status === "succeeded" ? "COMPLETED" : "PENDING";
-    }
-
-    // ============================================
-    // B. PAYPAL REFUND LOGIC
-    // ============================================
-    else if (chargeTransaction.gateway === "PAYPAL") {
-        const config = await db.paypalConfig.findFirst({
-            where: { paymentMethod: { isEnabled: true } }
-        });
-        if (!config) throw new Error("PayPal config missing");
+      }
+      
+      // --- PAYPAL ---
+      else if (chargeTransaction.gateway === "PAYPAL") {
+        const config = await db.paypalConfig.findFirst({ where: { paymentMethod: { isEnabled: true } } });
+        if (!config) throw new Error("PayPal config missing.");
 
         const isSandbox = config.sandbox;
         const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
         const secret = decrypt(isSandbox ? config.sandboxClientSecret! : config.liveClientSecret!);
         
-        // Get Token
+        if (!clientId || !secret) throw new Error("PayPal credentials missing.");
+
+        // Get Access Token
         const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
         const tokenRes = await fetch(
             `https://api-m.${isSandbox ? "sandbox." : ""}paypal.com/v1/oauth2/token`,
@@ -89,11 +96,11 @@ export async function processRefund({ orderId, amount, reason }: RefundParams) {
             }
         );
         const tokenData = await tokenRes.json();
+        if(!tokenData.access_token) throw new Error("Failed to authenticate with PayPal.");
 
-        // Process Refund
-        const captureId = chargeTransaction.transactionId; // PayPal Capture ID
+        // Issue Refund
         const refundRes = await fetch(
-            `https://api-m.${isSandbox ? "sandbox." : ""}paypal.com/v2/payments/captures/${captureId}/refund`,
+            `https://api-m.${isSandbox ? "sandbox." : ""}paypal.com/v2/payments/captures/${chargeTransaction.transactionId}/refund`,
             {
                 method: "POST",
                 headers: { 
@@ -102,77 +109,67 @@ export async function processRefund({ orderId, amount, reason }: RefundParams) {
                 },
                 body: JSON.stringify({
                     amount: { value: refundAmount.toFixed(2), currency_code: order.currency },
-                    note_to_payer: reason
+                    note_to_payer: input.reason
                 })
             }
         );
-        
         const refundData = await refundRes.json();
-        if (!refundRes.ok) throw new Error(refundData.message || "PayPal refund failed");
+        if (!refundRes.ok) throw new Error(refundData.message || "PayPal refund failed.");
 
         gatewayRefundId = refundData.id;
         refundStatus = refundData.status === "COMPLETED" ? "COMPLETED" : "PENDING";
-    }
+      }
 
-    // ============================================
-    // C. DATABASE UPDATES (TRANSACTIONAL)
-    // ============================================
-    await db.$transaction(async (tx) => {
-        // 1. Create Refund Record
+      // 5. Database Updates (Transactional)
+      await db.$transaction(async (tx) => {
+        // Create Refund Record
         await tx.refund.create({
-            data: {
-                id: gatewayRefundId || undefined, // Use gateway ID as DB ID if possible, else UUID
-                orderId: order.id,
-                amount: refundAmount,
-                reason: reason,
-                status: refundStatus,
-                gatewayRefundId: gatewayRefundId,
-            }
+          data: {
+            orderId: order.id,
+            amount: refundAmount,
+            reason: input.reason,
+            status: refundStatus,
+            gatewayRefundId: gatewayRefundId,
+          }
         });
 
-        // 2. Log Transaction
+        // Log Transaction
         await tx.orderTransaction.create({
-            data: {
-                orderId: order.id,
-                gateway: chargeTransaction.gateway,
-                type: "REFUND",
-                amount: refundAmount,
-                currency: order.currency,
-                transactionId: gatewayRefundId || `REF-${Date.now()}`,
-                status: refundStatus,
-                parentTransactionId: chargeTransaction.id,
-                metadata: { reason }
-            }
+          data: {
+            orderId: order.id,
+            gateway: chargeTransaction.gateway,
+            type: "REFUND",
+            amount: refundAmount,
+            currency: order.currency,
+            transactionId: gatewayRefundId || `REF-${Date.now()}`,
+            status: refundStatus,
+            parentTransactionId: chargeTransaction.id,
+            metadata: { reason: input.reason }
+          }
         });
 
-        // 3. Update Order Totals & Status
+        // Update Order
         const newRefundedTotal = Number(order.refundedAmount) + refundAmount;
         const newStatus = newRefundedTotal >= Number(order.totalPaid) ? "REFUNDED" : "PARTIALLY_REFUNDED";
-        
+
         await tx.order.update({
-            where: { id: orderId },
-            data: {
-                refundedAmount: newRefundedTotal,
-                paymentStatus: newStatus, // Update Payment Enum
-                status: newStatus === "REFUNDED" ? "REFUNDED" : order.status // Optional: Update Order Status
-            }
+          where: { id: input.orderId },
+          data: {
+            refundedAmount: newRefundedTotal,
+            paymentStatus: newStatus,
+            status: newStatus === "REFUNDED" ? "REFUNDED" : order.status
+          }
         });
-    });
+      });
 
-    // 4. Audit Log
-    await auditService.log({
-        userId: userId ?? "system",
-        action: "PROCESS_REFUND",
-        entity: "Order",
-        entityId: orderId,
-        newData: { amount: refundAmount, gateway: chargeTransaction.gateway }
-    });
+      // 6. Revalidate UI
+      revalidatePath(`/admin/orders/${input.orderId}`);
 
-    revalidatePath(`/admin/orders/${orderId}`);
-    return { success: true, message: `Successfully refunded ${order.currency} ${refundAmount}` };
-
-  } catch (error: any) {
-    await auditService.systemLog("ERROR", "PROCESS_REFUND", error.message, { orderId });
-    return { success: false, error: error.message || "Refund failed" };
-  }
+      return { 
+        success: true, 
+        message: `Successfully refunded ${order.currency} ${refundAmount}`,
+        data: { orderId: input.orderId, amount: refundAmount, gatewayId: gatewayRefundId }
+      };
+    }
+  );
 }

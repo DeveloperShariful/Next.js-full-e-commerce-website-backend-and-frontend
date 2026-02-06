@@ -4,294 +4,181 @@
 
 import { db } from "@/lib/prisma";
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
-import { calculateShippingServerSide } from "./get-shipping-rates";
+import { secureAction } from "@/lib/security/server-action-wrapper";
+import { createOrder } from "./create-order";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
-import { clearCart } from "../cart/clear-cart";
-import { cookies } from "next/headers";
-import { validateCoupon } from "./validate-coupon";
+import { clearCart } from "../cart/clear-cart"; // ✅ Import clearCart
+import { z } from "zod";
 
-// --- Helper: Get Access Token ---
 async function getPayPalAccessToken(clientId: string, clientSecret: string, isSandbox: boolean) {
   const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
   const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   
-  const response = await fetch(`${baseUrl}/v1/oauth2/token`, {
-    method: "POST",
-    body: "grant_type=client_credentials",
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
-    cache: "no-store"
-  });
-  
-  const data = await response.json();
-  if (!data.access_token) throw new Error("Failed to get PayPal Access Token");
-  return data.access_token;
-}
-
-// ==========================================
-// 1. CREATE PAYPAL ORDER
-// ==========================================
-export async function createPayPalOrder(
-  cartId: string, 
-  shippingMethodId: string, 
-  shippingAddress: any,
-  couponCode?: string
-) {
   try {
-    const config = await db.paypalConfig.findFirst({
-        where: { paymentMethod: { isEnabled: true } },
-        include: { paymentMethod: true }
-    });
-    
-    if (!config) throw new Error("PayPal is not currently accepting payments.");
-
-    const isSandbox = config.sandbox;
-    const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
-    const rawSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret;
-    const clientSecret = rawSecret ? decrypt(rawSecret) : "";
-
-    if (!clientId || !clientSecret) throw new Error("PayPal Configuration Error");
-
-    // 🛡️ Calculate Totals Securely
-    const cart = await db.cart.findUnique({
-        where: { id: cartId },
-        include: { items: { include: { product: true, variant: true } } }
-    });
-
-    if (!cart || cart.items.length === 0) throw new Error("Cart is empty");
-
-    let subtotal = 0;
-    cart.items.forEach(item => {
-        const price = Number(item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price));
-        subtotal += price * item.quantity;
-    });
-
-    // Shipping
-    let shippingCost = 0;
-    if (shippingMethodId) {
-       const cost = await calculateShippingServerSide(cartId, shippingAddress, shippingMethodId);
-       shippingCost = cost || 0;
-    }
-
-    // Discount
-    let discount = 0;
-    if (couponCode) {
-        const couponRes = await validateCoupon(couponCode, cartId);
-        if (couponRes.success && couponRes.discountAmount) {
-            discount = couponRes.discountAmount;
-        }
-    }
-
-    // Surcharge (If Enabled)
-    let surcharge = 0;
-    if (config.paymentMethod.surchargeEnabled) {
-        if (config.paymentMethod.surchargeType === 'percentage') {
-             surcharge = ((subtotal + shippingCost - discount) * Number(config.paymentMethod.surchargeAmount)) / 100;
-        } else {
-             surcharge = Number(config.paymentMethod.surchargeAmount);
-        }
-    }
-
-    const total = (subtotal + shippingCost + surcharge - discount).toFixed(2);
-
-    const accessToken = await getPayPalAccessToken(clientId!, clientSecret, isSandbox);
-    const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
-
-    // Create Order Payload
-    const response = await fetch(`${baseUrl}/v2/checkout/orders`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        intent: config.intent || "CAPTURE",
-        purchase_units: [{
-          amount: {
-            currency_code: "AUD",
-            value: total,
-            breakdown: {
-                item_total: { currency_code: "AUD", value: subtotal.toFixed(2) },
-                shipping: { currency_code: "AUD", value: shippingCost.toFixed(2) },
-                handling: surcharge > 0 ? { currency_code: "AUD", value: surcharge.toFixed(2) } : undefined,
-                discount: discount > 0 ? { currency_code: "AUD", value: discount.toFixed(2) } : undefined
-            }
-          },
-          description: `Order from GoBike`,
-          invoice_id: config.invoicePrefix ? `${config.invoicePrefix}${Date.now()}` : undefined
-        }],
-        application_context: {
-            brand_name: config.brandName || "GoBike",
-            landing_page: config.landingPage || "LOGIN",
-            user_action: "PAY_NOW",
-            shipping_preference: "SET_PROVIDED_ADDRESS"
-        }
-      }),
-    });
-
-    const orderData = await response.json();
-    
-    if (orderData.status === "CREATED") {
-        return { success: true, orderID: orderData.id };
-    } else {
-        console.error("PayPal Create Failed:", orderData);
-        throw new Error("Failed to initialize PayPal.");
-    }
-
+      const response = await fetch(`${baseUrl}/v1/oauth2/token`, {
+        method: "POST",
+        body: "grant_type=client_credentials",
+        headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
+        cache: "no-store"
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || !data.access_token) {
+          console.error("❌ PayPal Token Error:", JSON.stringify(data, null, 2));
+          throw new Error(`Auth Failed: ${data.error_description || "Check Client ID/Secret"}`);
+      }
+      return data.access_token;
   } catch (error: any) {
-    console.error("PayPal Create Error:", error.message);
-    return { success: false, error: error.message };
+      console.error("❌ PayPal Network Error:", error.message);
+      throw new Error("Could not connect to PayPal");
   }
 }
 
-// ==========================================
-// 2. CAPTURE PAYPAL ORDER
-// ==========================================
-export async function capturePayPalOrder(
-  payPalOrderId: string, 
-  cartId: string, 
-  customerInfo: any, 
-  shippingInfo: any, 
-  shippingMethodId: string,
-  couponCode?: string
-) {
-  try {
-    const config = await db.paypalConfig.findFirst({ where: { paymentMethod: { isEnabled: true } } });
-    if (!config) throw new Error("PayPal config missing");
-    
-    const isSandbox = config.sandbox;
-    const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
-    const rawSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret;
-    const clientSecret = rawSecret ? decrypt(rawSecret) : "";
+const CreatePayPalSchema = z.object({
+    cartId: z.string(),
+    shippingMethodId: z.string(),
+    shippingAddress: z.any(),
+    billingAddress: z.any(),
+    couponCode: z.string().optional(),
+    customerNote: z.string().optional()
+});
 
-    const accessToken = await getPayPalAccessToken(clientId!, clientSecret, isSandbox);
-    const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+export async function createPayPalOrder(params: z.infer<typeof CreatePayPalSchema>) {
+    return secureAction(params, { actionName: "CREATE_PAYPAL_ORDER", schema: CreatePayPalSchema, role: "PUBLIC" }, async (input) => {
+        
+        // 1. Create DB Order but KEEP CART (retainCart: true)
+        const orderRes = await createOrder({
+            cartId: input.cartId,
+            billing: input.billingAddress,
+            shipping: input.shippingAddress,
+            shippingMethodId: input.shippingMethodId,
+            paymentMethod: "paypal",
+            couponCode: input.couponCode || null,
+            customerNote: input.customerNote,
+            retainCart: true // ✅ Fix: Don't clear cart yet!
+        });
 
-    const response = await fetch(`${baseUrl}/v2/checkout/orders/${payPalOrderId}/capture`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }
+        if (!orderRes.success || !orderRes.orderId) {
+            throw new Error(orderRes.error || "Failed to create local order");
+        }
+
+        const dbOrderId = orderRes.orderId;
+        const grandTotal = Number(orderRes.grandTotal).toFixed(2);
+
+        // 2. Fetch Config
+        const config = await db.paypalConfig.findFirst({ where: { paymentMethod: { isEnabled: true } }, include: { paymentMethod: true } });
+        if (!config) throw new Error("PayPal Unavailable");
+
+        const isSandbox = config.sandbox;
+        const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
+        const rawSecret = isSandbox ? config.sandboxClientSecret : config.liveClientSecret;
+        const secret = rawSecret ? decrypt(rawSecret) : "";
+        
+        if (!clientId || !secret) throw new Error("PayPal Credentials Missing");
+
+        // 3. Get Token
+        const accessToken = await getPayPalAccessToken(clientId, secret, isSandbox);
+        const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+
+        // 4. Create PayPal Order
+        const payload = {
+            intent: config.intent || "CAPTURE",
+            purchase_units: [{
+                reference_id: dbOrderId,
+                custom_id: dbOrderId,
+                amount: {
+                    currency_code: "AUD",
+                    value: grandTotal
+                },
+                description: `Order ${orderRes.orderNumber}`
+            }]
+        };
+
+        const response = await fetch(`${baseUrl}/v2/checkout/orders`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        
+        if (response.ok && data.status === "CREATED") {
+            // Update DB with PayPal ID
+            await db.order.update({
+                where: { id: dbOrderId },
+                data: { paymentId: data.id }
+            });
+            
+            return { success: true, orderID: data.id, dbOrderId: dbOrderId };
+        } else {
+            // Log full error for debugging
+            console.error("❌ PayPal API Error:", JSON.stringify(data, null, 2));
+            const issue = data.details?.[0]?.issue || data.name || "Unknown Error";
+            throw new Error(`PayPal Rejected: ${issue}`);
+        }
     });
+}
 
-    const data = await response.json();
+const CapturePayPalSchema = z.object({
+    payPalOrderId: z.string(),
+    dbOrderId: z.string()
+});
 
-    if (data.status === "COMPLETED") {
-        const captureId = data.purchase_units[0].payments.captures[0].id;
-        const totalAmount = parseFloat(data.purchase_units[0].payments.captures[0].amount.value);
+export async function capturePayPalOrder(params: z.infer<typeof CapturePayPalSchema>) {
+    return secureAction(params, { actionName: "CAPTURE_PAYPAL_ORDER", schema: CapturePayPalSchema, role: "PUBLIC" }, async (input) => {
+        const config = await db.paypalConfig.findFirst({ where: { paymentMethod: { isEnabled: true } } });
+        if(!config) throw new Error("Config missing");       
+        
+        const isSandbox = config.sandbox;
+        const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
+        const secret = decrypt(isSandbox ? config.sandboxClientSecret! : config.liveClientSecret!);
+        const accessToken = await getPayPalAccessToken(clientId!, secret, isSandbox);
+        const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 
-        // Fetch Cart for Final Database Order
-        const cart = await db.cart.findUnique({ 
-            where: { id: cartId },
-            include: { items: { include: { product: true, variant: true } } }
+        const response = await fetch(`${baseUrl}/v2/checkout/orders/${input.payPalOrderId}/capture`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }
         });
-        if(!cart) throw new Error("Cart not found");
 
-        // Calculate Breakdown for DB
-        let subtotal = 0;
-        cart.items.forEach(item => {
-           const price = Number(item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price));
-           subtotal += price * item.quantity;
-        });
+        const data = await response.json();
 
-        // Calculate Discount
-        let discountTotal = 0;
-        if (couponCode) {
-             const v = await validateCoupon(couponCode, cartId);
-             if(v.success && v.discountAmount) discountTotal = v.discountAmount;
-        }
-
-        // Affiliate Check
-        const cookieStore = await cookies();
-        const affiliateSlug = cookieStore.get("affiliate_token")?.value;
-        let affiliateId: string | null = null;
-        if (affiliateSlug) {
-            const affiliate = await db.affiliateAccount.findUnique({ where: { slug: affiliateSlug }, select: { id: true } });
-            if (affiliate) affiliateId = affiliate.id;
-        }
-
-        const newOrder = await db.$transaction(async (tx) => {
-            const count = await tx.order.count();
-            const orderNumber = `ORD-${1000 + count + 1}`;
-
-            const order = await tx.order.create({
-                data: {
-                    orderNumber,
-                    status: OrderStatus.PROCESSING,
-                    paymentStatus: PaymentStatus.PAID,
-                    paymentGateway: "PAYPAL",
-                    paymentMethod: "PayPal Wallet",
-                    paymentId: captureId,
-                    capturedAt: new Date(),
-                    
-                    total: totalAmount,
-                    subtotal: subtotal,
-                    shippingTotal: (totalAmount - subtotal + discountTotal), // Rough estimate or recalculate
-                    discountTotal: discountTotal,
-                    couponCode: couponCode || null,
-
-                    guestEmail: customerInfo.email,
-                    billingAddress: customerInfo,
-                    shippingAddress: shippingInfo,
-                    shippingMethod: shippingMethodId,
-                    
-                    affiliateId: affiliateId,
-
-                    items: {
-                        create: cart.items.map(item => ({
-                            productName: item.product.name,
-                            productId: item.productId,
-                            variantId: item.variantId,
-                            quantity: item.quantity,
-                            price: Number(item.variant?.price || item.product.price),
-                            total: Number(item.variant?.price || item.product.price) * item.quantity
-                        }))
-                    },
-                    transactions: {
-                        create: {
-                             gateway: "PAYPAL",
-                             type: "SALE",
-                             amount: totalAmount,
-                             currency: "AUD",
-                             transactionId: captureId,
-                             status: "COMPLETED",
-                             rawResponse: data
-                        }
+        if ((data.status === "COMPLETED") || (data.status === "APPROVED")) {
+            const captureId = data.purchase_units[0].payments.captures[0].id;
+            
+            await db.$transaction(async (tx) => {
+                await tx.order.update({
+                    where: { id: input.dbOrderId },
+                    data: {
+                        status: OrderStatus.PROCESSING,
+                        paymentStatus: PaymentStatus.PAID,
+                        paymentId: captureId,
+                        capturedAt: new Date(),
+                        paymentGateway: "PAYPAL",
                     }
-                }
+                });
+
+                await tx.orderTransaction.create({
+                    data: {
+                        orderId: input.dbOrderId,
+                        gateway: "PAYPAL",
+                        type: "SALE",
+                        amount: data.purchase_units[0].amount.value,
+                        currency: "AUD",
+                        transactionId: captureId,
+                        status: "COMPLETED",
+                        rawResponse: data 
+                    }
+                });
             });
 
-            // Stock Update
-            for (const item of cart.items) {
-                if (item.variantId && item.variant?.trackQuantity) {
-                    await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
-                } else if (item.product.trackQuantity) {
-                    await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity } } });
-                }
-            }
-            
-            // Coupon Usage Update
-            if (couponCode) {
-                 await tx.discount.update({ where: { code: couponCode }, data: { usedCount: { increment: 1 } } });
-            }
+            // ✅ CRITICAL FIX: Clear Cart ONLY AFTER successful capture
+            await clearCart();
 
-            return order;
-        });
-
-        await clearCart();
+            return { success: true, orderId: input.dbOrderId };
+        }
         
-        // Trigger Affiliate (Async)
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        fetch(`${appUrl}/api/affiliate/process-order`, {
-             method: "POST", 
-             headers: { "Content-Type": "application/json", "x-api-key": process.env.INTERNAL_API_KEY! },
-             body: JSON.stringify({ orderId: newOrder.id })
-        }).catch(err => console.error(err));
-
-        return { success: true, orderId: newOrder.id };
-    } 
-    
-    return { success: false, error: "Payment could not be captured." };
-
-  } catch (error: any) {
-    console.error("Capture Error:", error);
-    return { success: false, error: error.message || "Failed to capture payment." };
-  }
+        console.error("❌ Capture Failed:", data);
+        throw new Error("Payment capture failed");
+    });
 }

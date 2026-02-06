@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, Loader2 } from "lucide-react"
-import { clearPaypalSettings } from "@/app/actions/admin/settings/payments/paypal/clear-database"
+import { clearPaypalSettings } from "@/app/actions/admin/settings/payments/paypal/disconnect-paypal"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 

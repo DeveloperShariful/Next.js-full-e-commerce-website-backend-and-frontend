@@ -7,80 +7,28 @@ import { loadStripe } from '@stripe/stripe-js';
 import { useEffect, useReducer, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-
-// Child Components
 import OrderNotes from './_components/OrderNotes';
 import ShippingForm from './_components/ShippingForm';
 import OrderSummary from './_components/OrderSummary';
 import PaymentMethods from './_components/PaymentMethods';
-
-// Server Actions
+import CheckoutSubmitButton from './_components/CheckoutSubmitButton'; // ✅ New Component
 import { createOrder } from '@/app/actions/storefront/checkout/create-order';
 import { getShippingRates, ShippingOption } from '@/app/actions/storefront/checkout/get-shipping-rates';
-import { validateCoupon } from '@/app/actions/storefront/checkout/validate-coupon'; 
+import { validateCoupon } from '@/app/actions/storefront/checkout/validate-coupon';
 
-// Types
 interface ShippingFormData { 
-    firstName: string; 
-    lastName: string; 
-    address1: string; 
-    city: string; 
-    state: string; 
-    postcode: string; 
-    email: string; 
-    phone: string; 
+    firstName: string; lastName: string; address1: string; city: string; state: string; postcode: string; email: string; phone: string; 
 }
-
 interface CartItem { 
-    id: string; 
-    databaseId: string; 
-    name: string; 
-    price: number; 
-    quantity: number; 
-    image?: string; 
+    id: string; databaseId: string; name: string; price: number; quantity: number; image?: string; 
 }
 
-// State Management
 type State = { 
-    customerInfo: Partial<ShippingFormData>; 
-    shippingRates: ShippingOption[]; 
-    selectedShippingId: string; 
-    selectedPaymentMethod: string; 
-    orderNotes: string; 
-    addressInputStarted: boolean; 
-    shipToDifferentAddress: boolean;
-    shippingInfo: Partial<ShippingFormData>;
-    // Coupon States
-    appliedCouponCode: string;
-    discountAmount: number;
-    loading: { order: boolean; shipping: boolean; coupon: boolean }; 
+    customerInfo: Partial<ShippingFormData>; shippingRates: ShippingOption[]; selectedShippingId: string; selectedPaymentMethod: string; orderNotes: string; addressInputStarted: boolean; shipToDifferentAddress: boolean; shippingInfo: Partial<ShippingFormData>; appliedCouponCode: string; discountAmount: number; loading: { order: boolean; shipping: boolean; coupon: boolean }; 
 };
+type Action = | { type: 'SET_CUSTOMER_INFO'; payload: Partial<ShippingFormData> } | { type: 'SET_SHIPPING_INFO'; payload: Partial<ShippingFormData> } | { type: 'SET_SHIPPING_RATES'; payload: ShippingOption[] } | { type: 'SET_SELECTED_SHIPPING'; payload: string } | { type: 'SET_SELECTED_PAYMENT_METHOD'; payload: string } | { type: 'SET_ORDER_NOTES'; payload: string } | { type: 'SET_ADDRESS_INPUT_STARTED'; payload: boolean } | { type: 'SET_SHIP_TO_DIFFERENT_ADDRESS'; payload: boolean } | { type: 'SET_COUPON_DATA'; payload: { code: string; amount: number } } | { type: 'SET_LOADING'; key: keyof State['loading']; payload: boolean };
 
-type Action = 
-    | { type: 'SET_CUSTOMER_INFO'; payload: Partial<ShippingFormData> }
-    | { type: 'SET_SHIPPING_INFO'; payload: Partial<ShippingFormData> }
-    | { type: 'SET_SHIPPING_RATES'; payload: ShippingOption[] }
-    | { type: 'SET_SELECTED_SHIPPING'; payload: string }
-    | { type: 'SET_SELECTED_PAYMENT_METHOD'; payload: string }
-    | { type: 'SET_ORDER_NOTES'; payload: string }
-    | { type: 'SET_ADDRESS_INPUT_STARTED'; payload: boolean }
-    | { type: 'SET_SHIP_TO_DIFFERENT_ADDRESS'; payload: boolean }
-    | { type: 'SET_COUPON_DATA'; payload: { code: string; amount: number } }
-    | { type: 'SET_LOADING'; key: keyof State['loading']; payload: boolean };
-
-const initialState: State = { 
-    customerInfo: {}, 
-    shippingRates: [], 
-    selectedShippingId: '', 
-    selectedPaymentMethod: '', 
-    orderNotes: '', 
-    addressInputStarted: false, 
-    shipToDifferentAddress: false, 
-    shippingInfo: {}, 
-    appliedCouponCode: '',
-    discountAmount: 0,
-    loading: { order: false, shipping: false, coupon: false }, 
-};
+const initialState: State = { customerInfo: {}, shippingRates: [], selectedShippingId: '', selectedPaymentMethod: '', orderNotes: '', addressInputStarted: false, shipToDifferentAddress: false, shippingInfo: {}, appliedCouponCode: '', discountAmount: 0, loading: { order: false, shipping: false, coupon: false }, };
 
 function checkoutReducer(state: State, action: Action): State {
     switch (action.type) {
@@ -99,34 +47,17 @@ function checkoutReducer(state: State, action: Action): State {
 }
 
 interface CheckoutClientProps { 
-    initialPaymentMethods: any[]; 
-    initialShippingRates: ShippingOption[]; 
-    initialCartItems: CartItem[]; 
-    stripePublishableKey: string; 
-    paypalClientId: string; 
-    cartId: string;
+    initialPaymentMethods: any[]; initialShippingRates: ShippingOption[]; initialCartItems: CartItem[]; stripePublishableKey: string; paypalClientId: string; cartId: string;
 }
 
 function CheckoutClientComponent({ 
-    initialPaymentMethods, 
-    initialShippingRates, 
-    initialCartItems, 
-    stripePublishableKey, 
-    paypalClientId,
-    cartId
+    initialPaymentMethods, initialShippingRates, initialCartItems, stripePublishableKey, paypalClientId, cartId
 }: CheckoutClientProps) {
-  
+  const lastFetchedAddress = useRef<string>("");
   const router = useRouter();
-  const [state, dispatch] = useReducer(checkoutReducer, {
-      ...initialState,
-      shippingRates: initialShippingRates
-  });
+  const [state, dispatch] = useReducer(checkoutReducer, { ...initialState, shippingRates: initialShippingRates });
   
-  const { 
-      customerInfo, shippingRates, selectedShippingId, selectedPaymentMethod, 
-      orderNotes, loading, shipToDifferentAddress, shippingInfo, 
-      appliedCouponCode, discountAmount 
-  } = state;
+  const { customerInfo, shippingRates, selectedShippingId, selectedPaymentMethod, orderNotes, loading, shipToDifferentAddress, shippingInfo, appliedCouponCode, discountAmount } = state;
   
   const customerInfoRef = useRef(customerInfo);
   const shippingInfoRef = useRef(shippingInfo);
@@ -134,7 +65,6 @@ function CheckoutClientComponent({
   useEffect(() => { customerInfoRef.current = customerInfo; }, [customerInfo]);
   useEffect(() => { shippingInfoRef.current = shippingInfo; }, [shippingInfo]);
 
-  // Set Defaults
   useEffect(() => {
     if (initialPaymentMethods.length > 0 && !selectedPaymentMethod) {
         dispatch({ type: 'SET_SELECTED_PAYMENT_METHOD', payload: initialPaymentMethods[0].id });
@@ -144,30 +74,24 @@ function CheckoutClientComponent({
     }
   }, [initialPaymentMethods, shippingRates, selectedPaymentMethod, selectedShippingId]);
 
-  // 1. Shipping Rates Logic
   const updateShippingRates = useCallback(async (address: Partial<ShippingFormData>) => {
     if (!address.postcode || !address.city || address.postcode.length < 3) return;
+    const addressKey = `${address.city}-${address.postcode}`;
+    if (lastFetchedAddress.current === addressKey) return;
     dispatch({ type: 'SET_LOADING', key: 'shipping', payload: true });
     try {
         const newRates = await getShippingRates({
             cartId: cartId,
             address: { city: address.city, postcode: address.postcode, state: address.state || "" }
         });
+        lastFetchedAddress.current = addressKey; 
         dispatch({ type: 'SET_SHIPPING_RATES', payload: newRates });
-        if (newRates.length > 0) {
-            dispatch({ type: 'SET_SELECTED_SHIPPING', payload: newRates[0].id });
-        } else {
-            dispatch({ type: 'SET_SELECTED_SHIPPING', payload: '' });
-        }
-    } catch (error) {
-        console.error("Failed to update rates:", error);
-        toast.error("Could not load shipping rates.");
-    } finally {
-        dispatch({ type: 'SET_LOADING', key: 'shipping', payload: false });
-    }
-  }, [cartId]);
+        dispatch({ type: 'SET_SHIPPING_RATES', payload: newRates });
+        if (newRates.length > 0 && !selectedShippingId) dispatch({ type: 'SET_SELECTED_SHIPPING', payload: newRates[0].id });
+    } catch (error) { toast.error("Could not load shipping rates."); } 
+    finally { dispatch({ type: 'SET_LOADING', key: 'shipping', payload: false }); }
+  }, [cartId, selectedShippingId]);
 
-  // Address Handlers
   const handleAddressChange = useCallback((address: Partial<ShippingFormData>) => {
     dispatch({ type: 'SET_CUSTOMER_INFO', payload: address });
     dispatch({ type: 'SET_ADDRESS_INPUT_STARTED', payload: true });
@@ -186,44 +110,27 @@ function CheckoutClientComponent({
     updateShippingRates(targetAddress);
   };
 
-  // 💰 3. Calculate Totals (Discount সহ)
   const calculateTotals = () => {
     const subtotal = initialCartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const selectedRate = shippingRates.find(r => r.id === selectedShippingId);
     const shippingCost = selectedRate ? selectedRate.cost : 0;
-    
-    // ডিসকাউন্ট ক্যালকুলেশন
-    const totalBeforeDiscount = subtotal + shippingCost;
-    const finalTotal = Math.max(0, totalBeforeDiscount - discountAmount);
-    
-    return { 
-        subtotal, 
-        shipping: shippingCost, 
-        discount: discountAmount,
-        total: finalTotal 
-    };
+    const finalTotal = Math.max(0, subtotal + shippingCost - discountAmount);
+    return { subtotal, shipping: shippingCost, discount: discountAmount, total: finalTotal };
   };
   const totals = calculateTotals();
 
-  // 🎉 4. Coupon Handlers (Real Implementation)
   const handleApplyCoupon = async (code: string) => {
       dispatch({ type: 'SET_LOADING', key: 'coupon', payload: true });
       try {
           const res = await validateCoupon(code, cartId);
-          
           if (res.success && res.discountAmount !== undefined) {
              dispatch({ type: 'SET_COUPON_DATA', payload: { code: res.code || code, amount: res.discountAmount } });
              toast.success(res.message || 'Coupon applied successfully!');
-          } else {
-             throw new Error(res.message || 'Invalid coupon code');
-          }
-
+          } else { throw new Error(res.message || 'Invalid coupon code'); }
       } catch (error: any) {
           toast.error(error.message || 'Failed to apply coupon');
-          dispatch({ type: 'SET_COUPON_DATA', payload: { code: '', amount: 0 } }); // Reset on fail
-      } finally {
-          dispatch({ type: 'SET_LOADING', key: 'coupon', payload: false });
-      }
+          dispatch({ type: 'SET_COUPON_DATA', payload: { code: '', amount: 0 } });
+      } finally { dispatch({ type: 'SET_LOADING', key: 'coupon', payload: false }); }
   };
 
   const handleRemoveCoupon = () => {
@@ -231,159 +138,117 @@ function CheckoutClientComponent({
       toast.success('Coupon removed.');
   };
 
-  // 5. Handle Order Placement
   const handlePlaceOrder = async (paymentData?: { transaction_id?: string; paymentMethodId?: string; shippingAddress?: any }) => {
     const currentBilling = customerInfoRef.current;
     
-    if (!currentBilling.firstName || !currentBilling.email) { 
-        toast.error("Please fill in billing details."); 
-        return; 
-    }
-    if (shippingRates.length > 0 && !selectedShippingId) {
-        toast.error("Please select a shipping method.");
-        return;
-    }
+    // Validation
+    if (!currentBilling.firstName || !currentBilling.email) { toast.error("Please fill in billing details."); return; }
+    if (shippingRates.length > 0 && !selectedShippingId) { toast.error("Please select a shipping method."); return; }
 
     dispatch({ type: 'SET_LOADING', key: 'order', payload: true });
-
+    
     try {
         const finalShippingAddress = paymentData?.shippingAddress || (shipToDifferentAddress ? shippingInfoRef.current : currentBilling);
-
         const orderRes = await createOrder({
-            cartId: cartId, 
-            billing: currentBilling, 
-            shipping: finalShippingAddress,
+            cartId: cartId, billing: currentBilling, shipping: finalShippingAddress,
             shippingMethodId: selectedShippingId, 
             paymentMethod: paymentData?.paymentMethodId || selectedPaymentMethod, 
-            customerNote: orderNotes,
-            couponCode: appliedCouponCode || null // ✅ Passing coupon code
+            customerNote: orderNotes, 
+            couponCode: appliedCouponCode || null,
+            paymentIntentId: paymentData?.transaction_id
         });
 
-        if (!orderRes.success || !orderRes.orderId) {
-            throw new Error(orderRes.error || "Failed to create order.");
-        }
-        
-        // Offline Payment Redirect
-        if (paymentData?.transaction_id || initialPaymentMethods.find(m => m.id === (paymentData?.paymentMethodId || selectedPaymentMethod))?.provider === 'offline') {
-             router.push(`/order-success?order_id=${orderRes.orderId}`);
-             return;
-        }
-        
+        if (!orderRes.success || !orderRes.orderId) throw new Error(orderRes.error || "Failed to create order.");
+        router.push(`/order-success?order_id=${orderRes.orderId}`);
         return { orderId: orderRes.orderId, orderKey: orderRes.orderKey };
 
     } catch (error: any) {
         console.error("Order Place Error:", error);
-        toast.error(error.message || "Order placement failed. Please try again.");
-    } finally {
-        dispatch({ type: 'SET_LOADING', key: 'order', payload: false });
+        toast.error(error.message || "Order placement failed.");
+    } finally { 
+        dispatch({ type: 'SET_LOADING', key: 'order', payload: false }); 
     }
   };
 
-  if (initialCartItems.length === 0) return (
-      <div className="p-10 text-center flex flex-col items-center justify-center min-h-[50vh]">
-          <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
-          <button onClick={() => router.push('/shop')} className="px-6 py-2 bg-black text-white rounded">
-              Continue Shopping
-          </button>
-      </div>
-  );
+  const selectedMethodObj = initialPaymentMethods.find(m => m.id === selectedPaymentMethod);
 
   return (
     <div className="grid grid-cols-1 gap-8 w-full max-w-[1400px] mx-auto px-4 py-4 md:gap-10 lg:grid-cols-[1fr_550px] lg:gap-12">
-      
-      {/* LEFT COLUMN: Forms */}
+    
       <div className="flex flex-col gap-8">
+
         <ShippingForm 
             title={shipToDifferentAddress ? "Billing Details" : "Billing & Shipping Details"} 
-            onAddressChange={handleAddressChange} 
-            defaultValues={customerInfo} 
+            onAddressChange={handleAddressChange} defaultValues={customerInfo} 
         />
         
         <div className="mt-[5px] p-4 bg-[#f9f9f9] border border-[#ddd] rounded">
             <label htmlFor="ship-to-different-address" className="flex items-center font-semibold cursor-pointer select-none">
-                <input 
-                    type="checkbox" 
-                    id="ship-to-different-address" 
-                    checked={shipToDifferentAddress} 
-                    onChange={handleToggleShipToDifferent} 
-                    className="mr-3 w-[18px] h-[18px] accent-black" 
-                />
+                <input type="checkbox" id="ship-to-different-address" checked={shipToDifferentAddress} onChange={handleToggleShipToDifferent} className="mr-3 w-[18px] h-[18px] accent-black" />
                 <span>Ship to a different address?</span>
             </label>
         </div>
 
         {shipToDifferentAddress && (
             <div className="mt-2 animate-fadeIn">
-                <ShippingForm 
-                    title="Shipping Details" 
-                    onAddressChange={handleShippingAddressChange} 
-                    defaultValues={shippingInfo} 
-                />
+                <ShippingForm title="Shipping Details" onAddressChange={handleShippingAddressChange} defaultValues={shippingInfo} />
             </div>
         )}
         
-        <OrderNotes 
-            notes={orderNotes} 
-            onNotesChange={(notes) => dispatch({ type: 'SET_ORDER_NOTES', payload: notes })} 
-        />
+        <OrderNotes notes={orderNotes} onNotesChange={(notes) => dispatch({ type: 'SET_ORDER_NOTES', payload: notes })} />
       </div>
 
-      {/* RIGHT COLUMN: Summary & Payment */}
+      {/* RIGHT COLUMN */}
       <div className="flex flex-col gap-8">
         <OrderSummary 
-            cartItems={initialCartItems} 
-            totals={totals} 
-            rates={shippingRates} 
-            selectedRateId={selectedShippingId} 
-            onRateSelect={(id) => dispatch({ type: 'SET_SELECTED_SHIPPING', payload: id })}
-            isLoadingShipping={loading.shipping}
-            // Coupon Props
-            onApplyCoupon={handleApplyCoupon}
-            onRemoveCoupon={handleRemoveCoupon}
-            appliedCouponCode={appliedCouponCode}
-            isApplyingCoupon={loading.coupon}
+            cartItems={initialCartItems} totals={totals} rates={shippingRates} selectedRateId={selectedShippingId} 
+            onRateSelect={(id) => dispatch({ type: 'SET_SELECTED_SHIPPING', payload: id })} isLoadingShipping={loading.shipping}
+            onApplyCoupon={handleApplyCoupon} onRemoveCoupon={handleRemoveCoupon} appliedCouponCode={appliedCouponCode} isApplyingCoupon={loading.coupon}
         />
         
+        {/* Payment Selection Area */}
         <PaymentMethods 
             paymentOptions={initialPaymentMethods} 
             selectedPaymentMethod={selectedPaymentMethod} 
             onPaymentMethodChange={(method) => dispatch({ type: 'SET_SELECTED_PAYMENT_METHOD', payload: method })} 
-            onPlaceOrder={handlePlaceOrder} 
-            isPlacingOrder={loading.order} 
-            total={totals.total} 
-            isShippingSelected={!!selectedShippingId} 
-            customerInfo={customerInfoRef.current} 
-            paypalClientId={paypalClientId} 
             stripePublishableKey={stripePublishableKey}
-            cartId={cartId} 
-            shippingInfo={shipToDifferentAddress ? shippingInfoRef.current : customerInfoRef.current}
+            total={totals.total}
+            cartId={cartId}
             selectedShippingId={selectedShippingId}
-            couponCode={appliedCouponCode || undefined} 
+            shippingInfo={shipToDifferentAddress ? shippingInfo : customerInfo}
+            onPlaceOrder={handlePlaceOrder}
+            couponCode={appliedCouponCode}
+        />
+
+        {/* ✅ UNIFIED SUBMIT BUTTON */}
+        <CheckoutSubmitButton 
+            selectedMethod={selectedMethodObj}
+            onPlaceOrder={handlePlaceOrder}
+            isProcessing={loading.order}
+            total={totals.total}
+            isShippingSelected={!!selectedShippingId}
+            customerInfo={customerInfoRef.current}
+            shippingInfo={shipToDifferentAddress ? shippingInfoRef.current : customerInfoRef.current}
+            cartId={cartId}
+            selectedShippingId={selectedShippingId}
+            couponCode={appliedCouponCode}
+            paypalClientId={paypalClientId}
         />
       </div>
     </div>
   );
 }
 
-// Wrapper to load Stripe Context safely
 export default function CheckoutClient(props: CheckoutClientProps) {
     const [stripePromise] = useState(() => {
-        const hasStripeMethod = props.initialPaymentMethods.some(m => m.provider === 'stripe');
-        if (hasStripeMethod && props.stripePublishableKey) {
-            return loadStripe(props.stripePublishableKey);
-        }
+        if (props.stripePublishableKey) return loadStripe(props.stripePublishableKey);
         return null;
     });
     
-    if (!props.stripePublishableKey && props.initialPaymentMethods.some(m => m.provider === 'stripe')) {
-        return <div className="text-red-500 p-10 text-center border border-red-200 bg-red-50 m-4 rounded">System Error: Stripe configuration missing public key.</div>;
-    }
-
     if (stripePromise) {
         return (
             <Elements stripe={stripePromise} options={{ 
-                mode: 'payment', 
-                currency: 'aud', 
+                mode: 'payment', currency: 'aud', 
                 amount: Math.round(props.initialCartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0) * 100) || 1000,
                 appearance: { theme: 'stripe' }
             }}>

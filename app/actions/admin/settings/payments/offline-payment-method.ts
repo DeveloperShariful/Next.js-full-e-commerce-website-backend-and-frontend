@@ -35,8 +35,6 @@ export async function updateBankTransferSettings(
           description: validated.description,
           instructions: validated.instructions,
           isEnabled: validated.isEnabled ?? false,
-          
-          // ✅ Full Schema Usage: Limits & Surcharges
           minOrderAmount: validated.minOrderAmount ? Number(validated.minOrderAmount) : null,
           maxOrderAmount: validated.maxOrderAmount ? Number(validated.maxOrderAmount) : null,
           
@@ -47,7 +45,6 @@ export async function updateBankTransferSettings(
         },
       })
 
-      // Child Config Update
       await tx.offlinePaymentConfig.upsert({
         where: { paymentMethodId: id },
         create: {

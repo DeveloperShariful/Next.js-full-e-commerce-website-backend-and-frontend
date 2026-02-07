@@ -71,7 +71,7 @@ export default function StripePaymentGateway({
 
       const result = await stripe.confirmPayment({
         elements,
-        clientSecret: res.data.clientSecret, // Override with the order-linked secret
+        clientSecret: res.data.clientSecret, 
         confirmParams: {
           return_url: `${window.location.origin}/order-success?order_id=${orderData.orderId}`,
           payment_method_data: {

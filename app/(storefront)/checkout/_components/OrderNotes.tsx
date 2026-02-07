@@ -12,7 +12,7 @@ export default function OrderNotes({ notes, onNotesChange }: OrderNotesProps) {
       <textarea
         id="order_notes"
         name="orderNotes"
-        className="w-full p-[12px_15px] border border-[#ccc] rounded-[4px] text-base font-inherit leading-1.5 resize-y transition-colors duration-200 focus:outline-none focus:border-[#007bff]"
+        className="w-full p-[12px_15px] border border-[#ccc] rounded-[4px] text-sm md:text-base font-inherit leading-relaxed resize-y transition-colors duration-200 focus:outline-none focus:border-[#007bff] placeholder:text-gray-500"
         value={notes}
         onChange={(e) => onNotesChange(e.target.value)}
         placeholder="Notes about your order, e.g. special notes for delivery."

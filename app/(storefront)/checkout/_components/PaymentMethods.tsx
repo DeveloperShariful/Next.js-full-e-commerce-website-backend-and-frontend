@@ -7,12 +7,10 @@ import Image from 'next/image';
 import { PaymentElement } from '@stripe/react-stripe-js';
 import ExpressCheckouts from './ExpressCheckouts';
 
-// প্রপস ইন্টারফেস আপডেট করা হয়েছে
 interface PaymentMethodsProps {
   paymentOptions: any[];
   selectedPaymentMethod: string;
-  onPaymentMethodChange: (methodId: string) => void;
-  // নতুন প্রপস যা ExpressCheckouts এর জন্য প্রয়োজন
+  onPaymentMethodChange: (methodId: string) => void
   stripePublishableKey: string;
   total: number;
   cartId: string;
@@ -34,8 +32,6 @@ export default function PaymentMethods({
   onPlaceOrder,
   couponCode
 }: PaymentMethodsProps) {
-
-  // গেটওয়ে আইকন দেখানোর ফাংশন (অপশনাল কিন্তু সুন্দর দেখায়)
   const getGatewayIcon = (option: any) => {
     if (option.provider === 'paypal') return <Image src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" width={60} height={20} className="h-5 w-auto" unoptimized />;
     if (option.id === 'stripe_card') return <span className="text-xs font-bold text-gray-400">VISA / MASTER</span>;
@@ -45,8 +41,6 @@ export default function PaymentMethods({
   return (
     <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm">
       <h3 className="text-lg font-semibold mb-4 border-b pb-2">Payment Method</h3>
-
-      {/* 🚀 Express Checkouts (Apple/Google Pay) - সবার উপরে */}
       {stripePublishableKey && total > 0 && (
         <ExpressCheckouts 
           total={total}
@@ -60,7 +54,6 @@ export default function PaymentMethods({
         />
       )}
 
-      {/* পেমেন্ট মেথড লিস্ট */}
       <div className="space-y-4">
         {paymentOptions.map((option) => (
           <div 
@@ -84,14 +77,12 @@ export default function PaymentMethods({
               <div>{getGatewayIcon(option)}</div>
             </div>
             
-            {/* ডিটেইলস এবং স্ট্রাইপ কার্ড ইনপুট */}
             {selectedPaymentMethod === option.id && (
               <div className="mt-4 pl-7 animate-in fade-in slide-in-from-top-2 cursor-default" onClick={(e) => e.stopPropagation()}>
                 {option.description && (
                    <p className="text-sm text-gray-600 mb-4">{option.description}</p>
                 )}
                 
-                {/* Stripe পেমেন্ট ফিল্ড */}
                 {option.provider === 'stripe' && (
                     <div className="mb-2 p-2 bg-white border border-gray-100 rounded">
                         <PaymentElement options={{ layout: 'tabs' }} />

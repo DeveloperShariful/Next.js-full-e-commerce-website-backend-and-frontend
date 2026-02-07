@@ -22,33 +22,27 @@ interface Props {
     selectedShippingId: string;
     couponCode?: string;
     paypalClientId: string;
+    customerNote?: string;
 }
 
 export default function CheckoutSubmitButton({
     selectedMethod, onPlaceOrder, isProcessing, total, isShippingSelected, 
-    customerInfo, shippingInfo, cartId, selectedShippingId, couponCode, paypalClientId
+    customerInfo, shippingInfo, cartId, selectedShippingId, couponCode, paypalClientId, customerNote
 }: Props) {
     
     const stripe = useStripe();
     const elements = useElements();
     const [stripeLoading, setStripeLoading] = useState(false);
     const router = useRouter();
-
-    // 🟢 STRIPE HANDLER
     const handleStripeSubmit = async () => {
         if (!stripe || !elements) return;
         setStripeLoading(true);
 
         try {
-            // 1. Validate Elements
             const { error: submitError } = await elements.submit();
             if (submitError) throw new Error(submitError.message);
-
-            // 2. Create Order
             const orderRes = await onPlaceOrder({ paymentMethodId: selectedMethod.id });
             if (!orderRes?.orderId) throw new Error("Failed to create order");
-
-            // 3. Link Order ID to Intent (Create new intent with metadata)
             const intentRes = await createPaymentIntent({
                 cartId,
                 shippingMethodId: selectedShippingId,
@@ -58,8 +52,6 @@ export default function CheckoutSubmitButton({
             });
 
             if (!intentRes.success || !intentRes.data?.clientSecret) throw new Error("Payment Init Failed");
-
-            // 4. Confirm Payment
             const result = await stripe.confirmPayment({
                 elements,
                 clientSecret: intentRes.data.clientSecret,
@@ -92,7 +84,6 @@ export default function CheckoutSubmitButton({
         }
     };
 
-    // 🟡 PAYPAL RENDER
     if (selectedMethod?.provider === 'paypal') {
         return (
             <PayPalScriptProvider options={{ clientId: paypalClientId, currency: "AUD", intent: "capture" }}>
@@ -100,7 +91,6 @@ export default function CheckoutSubmitButton({
                     total={total}
                     isPlacingOrder={isProcessing}
                     onPlaceOrder={async (data) => {
-                        // Adapter to match expected signature
                         return await onPlaceOrder({ 
                             transaction_id: data.transaction_id, 
                             paymentMethodId: selectedMethod.id 
@@ -113,12 +103,12 @@ export default function CheckoutSubmitButton({
                     selectedShippingId={selectedShippingId}
                     onSuccess={(orderId) => router.push(`/order-success?order_id=${orderId}`)}
                     couponCode={couponCode}
+                    customerNote={customerNote}
                 />
             </PayPalScriptProvider>
         );
     }
 
-    // ⚫ GENERIC BUTTON (Offline & Stripe Trigger)
     return (
         <button 
             onClick={selectedMethod?.provider === 'stripe' ? handleStripeSubmit : () => onPlaceOrder()}

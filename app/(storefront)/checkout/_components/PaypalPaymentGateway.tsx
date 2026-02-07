@@ -1,7 +1,8 @@
-//app/(storefront)/checkout/_components/PaypalPaymentGateway.tsx
+// File: app/(storefront)/checkout/_components/PaypalPaymentGateway.tsx
+
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react'; // useState সরিয়ে দিয়েছি কারণ এটার দরকার নেই
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import toast from 'react-hot-toast';
 import { createPayPalOrder, capturePayPalOrder } from '@/app/actions/storefront/checkout/paypal-payments';
@@ -17,6 +18,7 @@ interface PayPalGatewayProps {
   selectedShippingId: string;
   onSuccess: (orderId: string) => void;
   couponCode?: string;
+  customerNote?: string;
 }
 
 export default function PayPalPaymentGateway({ 
@@ -28,98 +30,119 @@ export default function PayPalPaymentGateway({
     shippingInfo, 
     selectedShippingId, 
     onSuccess, 
-    couponCode
+    couponCode,
+    customerNote
 }: PayPalGatewayProps) {
   
-  const [{ isPending, isResolved, isRejected }] = usePayPalScriptReducer();
-  const [isReady, setIsReady] = useState(false);
-  const dbOrderIdRef = useRef<string | null>(null);
+  const [{ isPending }] = usePayPalScriptReducer();
 
+  // ✅ Refs to hold latest data without causing re-renders
+  // বাটন রেন্ডার হওয়ার পর প্রপস চেঞ্জ হলে বাটন রিফ্রেশ না করে আমরা Ref আপডেট করব
+  const propsRef = useRef({
+      total,
+      shippingInfo,
+      customerInfo,
+      selectedShippingId,
+      couponCode,
+      customerNote,
+      isShippingSelected
+  });
+
+  // যখনই প্রপস চেঞ্জ হবে, Ref আপডেট হবে (কিন্তু রি-রেন্ডার হবে না)
   useEffect(() => {
-    if (isResolved && window.paypal) {
-        setIsReady(true);
-    }
-  }, [isResolved]);
+      propsRef.current = {
+          total,
+          shippingInfo,
+          customerInfo,
+          selectedShippingId,
+          couponCode,
+          customerNote,
+          isShippingSelected
+      };
+  }, [total, shippingInfo, customerInfo, selectedShippingId, couponCode, customerNote, isShippingSelected]);
 
-  if (isPending) return <div className="p-4 text-center text-sm text-gray-500 animate-pulse border rounded">Connecting to PayPal...</div>;
-  if (isRejected) return <div className="p-4 text-center text-sm text-red-500 border border-red-200 rounded">Failed to load PayPal. Check connection.</div>;
-  if (!isReady) return <div className="p-4 text-center text-sm text-gray-500 border rounded">Initializing Payment...</div>;
+  if (isPending) return <div className="h-12 w-full bg-gray-100 animate-pulse rounded"></div>;
 
   return (
       <div className="w-full relative z-0">
         <PayPalButtons
             style={{ layout: "vertical", color: 'gold', shape: 'rect', label: 'paypal', height: 48 }}
-            disabled={isPlacingOrder || !isShippingSelected}
-            forceReRender={[total, selectedShippingId]} 
+            disabled={isPlacingOrder} // isShippingSelected এখানে বাদ দিলাম, validaion ভেতরে করব
+            
+            // ❌ forceReRender একদম বাদ দিয়েছি। এটাই স্লো হওয়ার কারণ ছিল।
             
             createOrder={async (data, actions) => {
-            // 1. Validation
-            if (!isShippingSelected) {
-                toast.error("Select shipping method");
-                throw new Error("Shipping missing");
-            }
-            if (!cartId) {
-                toast.error("Session expired. Refresh page.");
-                throw new Error("Cart ID missing");
-            }
+                // ✅ Ref থেকে লেটেস্ট ডাটা নেওয়া হচ্ছে
+                const currentProps = propsRef.current; 
 
-            try {
-                // 2. Call Server Action
-                const res = await createPayPalOrder({
-                    cartId,
-                    shippingMethodId: selectedShippingId,
-                    shippingAddress: shippingInfo, 
-                    billingAddress: customerInfo,
-                    couponCode: couponCode || undefined
-                });
+                try {
+                    if (!currentProps.isShippingSelected) {
+                        toast.error("Please select a shipping method first.");
+                        throw new Error("Shipping method not selected");
+                    }
 
-                // 3. Handle Failure
-                if (!res.success || !res.data?.orderID) {
-                    const msg = res.error || "Init Failed";
-                    console.error("PayPal Server Error:", msg);
-                    // Throwing error here stops the spinner
-                    throw new Error(msg);
+                    const res = await createPayPalOrder({
+                        cartId,
+                        shippingMethodId: currentProps.selectedShippingId,
+                        shippingAddress: currentProps.shippingInfo, // Latest Address from Ref
+                        couponCode: currentProps.couponCode
+                    });
+
+                    const responseData = res as any; 
+                    const orderID = responseData?.data?.orderID || responseData?.orderID;
+
+                    if (!res.success || !orderID) {
+                        throw new Error(res.error || "Could not init PayPal");
+                    }
+                    
+                    return orderID;
+
+                } catch (err: any) {
+                    console.error("PayPal Init Error:", err);
+                    // টোস্ট শুধু একবার দেখানোর জন্য চেক
+                    if (err.message !== "Shipping method not selected") {
+                         toast.error("Could not connect to PayPal");
+                    }
+                    throw err;
                 }
-
-                // 4. Success
-                dbOrderIdRef.current = res.data.dbOrderId;
-                return res.data.orderID; 
-
-            } catch (err: any) {
-                // Ensure the error message is visible to user
-                const msg = err.message || "Unknown Error";
-                toast.error(msg);
-                throw err; // Rethrow to stop PayPal spinner
-            }
             }}
             
             onApprove={async (data, actions) => {
-            try {
-                if (!dbOrderIdRef.current) throw new Error("Order Ref Lost");
-                toast.loading("Verifying Payment...");
+                const currentProps = propsRef.current;
+                try {
+                    toast.loading("Processing Order...");
 
-                const res = await capturePayPalOrder({
-                    payPalOrderId: data.orderID,
-                    dbOrderId: dbOrderIdRef.current
-                });
+                    const res = await capturePayPalOrder({
+                        payPalOrderId: data.orderID,
+                        cartId,
+                        shippingMethodId: currentProps.selectedShippingId,
+                        shippingAddress: currentProps.shippingInfo, 
+                        billingAddress: currentProps.customerInfo,
+                        couponCode: currentProps.couponCode,
+                        customerNote: currentProps.customerNote
+                    });
+                    
+                    toast.dismiss();
 
-                toast.dismiss();
-                if (res.success && res.data?.orderId) {
-                    toast.success("Payment Successful!");
-                    onSuccess(res.data.orderId);
-                } else {
-                    throw new Error(res.error || "Capture Failed");
+                    const responseData = res as any;
+                    const finalOrderId = responseData?.data?.orderId || responseData?.orderId;
+
+                    if (res.success && finalOrderId) {
+                        toast.success("Order Placed Successfully!");
+                        onSuccess(finalOrderId);
+                    } else {
+                        throw new Error(res.error || "Order creation failed after payment");
+                    }
+
+                } catch (err: any) {
+                    toast.dismiss();
+                    console.error("Capture Error:", err);
+                    toast.error(err.message || "Payment failed");
                 }
-            } catch (err: any) {
-                toast.dismiss();
-                console.error("Capture Error:", err);
-                toast.error(err.message || "Payment Failed");
-            }
             }}
             
             onError={(err) => { 
-                console.error("PayPal SDK Error:", err);
-                // toast.error("Pop-up closed or connection failed."); 
+                console.error("PayPal Error:", err);
             }}
         />
       </div>

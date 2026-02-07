@@ -95,7 +95,7 @@ export async function getAvailablePaymentMethods(): Promise<PaymentOption[]> {
         const config = method.paypalConfig
         const rawSandboxId = config.sandboxClientId ? config.sandboxClientId : ""; 
         const rawLiveId = config.liveClientId ? config.liveClientId : "";
-        const paypalClientId = config.sandbox ? rawSandboxId : rawLiveId;
+        const paypalClientId = config.sandbox ? config.sandboxClientId : config.liveClientId;
 
         options.push({
           id: "paypal",

@@ -10,14 +10,17 @@ import { revalidatePath } from "next/cache"
 import { auditService } from "@/lib/services/audit-service"
 import { auth } from "@clerk/nextjs/server"
 
-// ==========================================
-// 1. BANK TRANSFER UPDATE
-// ==========================================
-export async function updateBankTransferSettings(
-  id: string,
-  values: z.infer<typeof BankTransferSchema>
-) {
-  const { userId } = await auth();
+// Helper to fetch DB User ID
+async function getDbUserId() {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) return null;
+  const user = await db.user.findUnique({ where: { clerkId }, select: { id: true } });
+  return user?.id || null;
+}
+
+// 1. BANK TRANSFER
+export async function updateBankTransferSettings(id: string, values: z.infer<typeof BankTransferSchema>) {
+  const userId = await getDbUserId();
   
   try {
     const validated = BankTransferSchema.parse(values)
@@ -27,7 +30,6 @@ export async function updateBankTransferSettings(
     });
 
     await db.$transaction(async (tx) => {
-      // Parent Config Update
       await tx.paymentMethodConfig.update({
         where: { id },
         data: {
@@ -37,7 +39,6 @@ export async function updateBankTransferSettings(
           isEnabled: validated.isEnabled ?? false,
           minOrderAmount: validated.minOrderAmount ? Number(validated.minOrderAmount) : null,
           maxOrderAmount: validated.maxOrderAmount ? Number(validated.maxOrderAmount) : null,
-          
           surchargeEnabled: validated.surchargeEnabled ?? false,
           surchargeType: validated.surchargeType ?? "fixed",
           surchargeAmount: validated.surchargeAmount ? Number(validated.surchargeAmount) : 0,
@@ -47,18 +48,13 @@ export async function updateBankTransferSettings(
 
       await tx.offlinePaymentConfig.upsert({
         where: { paymentMethodId: id },
-        create: {
-            paymentMethodId: id,
-            bankDetails: validated.bankDetails ?? [],
-        },
-        update: {
-            bankDetails: validated.bankDetails ?? [],
-        }
+        create: { paymentMethodId: id, bankDetails: validated.bankDetails ?? [] },
+        update: { bankDetails: validated.bankDetails ?? [] }
       })
     })
 
     await auditService.log({
-        userId: userId ?? "system",
+        userId: userId,
         action: "UPDATE_BANK_TRANSFER",
         entity: "PaymentMethodConfig",
         entityId: id,
@@ -74,14 +70,9 @@ export async function updateBankTransferSettings(
   }
 }
 
-// ==========================================
-// 2. CHEQUE UPDATE
-// ==========================================
-export async function updateChequeSettings(
-  id: string,
-  values: z.infer<typeof ChequeSchema>
-) {
-  const { userId } = await auth();
+// 2. CHEQUE
+export async function updateChequeSettings(id: string, values: z.infer<typeof ChequeSchema>) {
+  const userId = await getDbUserId(); 
   try {
     const validated = ChequeSchema.parse(values)
     
@@ -93,10 +84,8 @@ export async function updateChequeSettings(
           description: validated.description,
           instructions: validated.instructions,
           isEnabled: validated.isEnabled ?? false,
-          
           minOrderAmount: validated.minOrderAmount ? Number(validated.minOrderAmount) : null,
           maxOrderAmount: validated.maxOrderAmount ? Number(validated.maxOrderAmount) : null,
-          
           surchargeEnabled: validated.surchargeEnabled ?? false,
           surchargeType: validated.surchargeType ?? "fixed",
           surchargeAmount: validated.surchargeAmount ? Number(validated.surchargeAmount) : 0,
@@ -106,18 +95,10 @@ export async function updateChequeSettings(
 
       await tx.offlinePaymentConfig.upsert({
         where: { paymentMethodId: id },
-        create: {
-            paymentMethodId: id,
-            chequePayTo: validated.chequePayTo,
-            addressInfo: validated.addressInfo,
-        },
-        update: {
-            chequePayTo: validated.chequePayTo,
-            addressInfo: validated.addressInfo,
-        }
+        create: { paymentMethodId: id, chequePayTo: validated.chequePayTo, addressInfo: validated.addressInfo },
+        update: { chequePayTo: validated.chequePayTo, addressInfo: validated.addressInfo }
       })
     })
-
     revalidatePath("/admin/settings/payments")
     return { success: true, message: "Cheque settings updated." }
   } catch (error) {
@@ -125,14 +106,8 @@ export async function updateChequeSettings(
   }
 }
 
-// ==========================================
-// 3. COD UPDATE
-// ==========================================
-export async function updateCodSettings(
-  id: string,
-  values: z.infer<typeof CodSchema>
-) {
-  const { userId } = await auth();
+// 3. COD
+export async function updateCodSettings(id: string, values: z.infer<typeof CodSchema>) {
   try {
     const validated = CodSchema.parse(values)
     
@@ -144,10 +119,8 @@ export async function updateCodSettings(
           description: validated.description,
           instructions: validated.instructions,
           isEnabled: validated.isEnabled ?? false,
-          
           minOrderAmount: validated.minOrderAmount ? Number(validated.minOrderAmount) : null,
           maxOrderAmount: validated.maxOrderAmount ? Number(validated.maxOrderAmount) : null,
-          
           surchargeEnabled: validated.surchargeEnabled ?? false,
           surchargeType: validated.surchargeType ?? "fixed",
           surchargeAmount: validated.surchargeAmount ? Number(validated.surchargeAmount) : 0,
@@ -157,13 +130,8 @@ export async function updateCodSettings(
 
       await tx.offlinePaymentConfig.upsert({
         where: { paymentMethodId: id },
-        create: {
-            paymentMethodId: id,
-            enableForShippingMethods: validated.enableForShippingMethods ?? [],
-        },
-        update: {
-            enableForShippingMethods: validated.enableForShippingMethods ?? [],
-        }
+        create: { paymentMethodId: id, enableForShippingMethods: validated.enableForShippingMethods ?? [] },
+        update: { enableForShippingMethods: validated.enableForShippingMethods ?? [] }
       })
     })
 

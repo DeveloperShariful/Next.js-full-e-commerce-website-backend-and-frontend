@@ -1,5 +1,7 @@
 // app/layout.tsx
 
+// app/layout.tsx
+
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -29,24 +31,34 @@ export const metadata: Metadata = {
   description: "Admin panel for GoBike e-commerce",
 };
 
+// ✅ Helper to fetch data safely without crashing the app on DB timeout
+async function fetchSafe(query: Promise<any>) {
+  try {
+    return await query;
+  } catch (error) {
+    console.error("⚠️ Layout DB Fetch Error:", error);
+    return null; // Return null on error so the page still loads
+  }
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   
-  // 1. Fetch ALL Required Settings concurrently
+  // 1. Fetch ALL Required Settings concurrently with SAFE handling
+  // Promise.allSettled is better here, but manual try-catch wrapper works too.
   const [storeSettings, seoConfig, marketingConfig] = await Promise.all([
-    db.storeSettings.findUnique({ where: { id: "settings" }, include: { logoMedia: true, faviconMedia: true } }), // 🔥 Media include করা ভালো
-    db.seoGlobalConfig.findUnique({ where: { id: "global_seo" }, include: { ogMedia: true } }),
-    db.marketingIntegration.findUnique({ where: { id: "marketing_config" } })
+    fetchSafe(db.storeSettings.findUnique({ where: { id: "settings" }, include: { logoMedia: true, faviconMedia: true } })),
+    fetchSafe(db.seoGlobalConfig.findUnique({ where: { id: "global_seo" }, include: { ogMedia: true } })),
+    fetchSafe(db.marketingIntegration.findUnique({ where: { id: "marketing_config" } }))
   ]);
 
   // 2. Prepare the settings object explicitly casting JSON fields
   const providerSettings = {
     storeSettings: storeSettings ? {
       ...storeSettings,
-      // 🔥 FIX: JSON ফিল্ডগুলোকে জোর করে টাইপ বলে দেওয়া হচ্ছে
       storeAddress: storeSettings.storeAddress as unknown as StoreAddress,
       socialLinks: storeSettings.socialLinks as unknown as SocialLinks,
       generalConfig: storeSettings.generalConfig as any,
@@ -55,14 +67,12 @@ export default async function RootLayout({
 
     seoConfig: seoConfig ? {
       ...seoConfig,
-      // 🔥 FIX: SEO JSON fields casting
       organizationData: seoConfig.organizationData as any,
       manifestJson: seoConfig.manifestJson as any,
     } : null,
 
     marketingConfig: marketingConfig ? {
       ...marketingConfig,
-      // 🔥 FIX: Marketing JSON fields casting
       fbDataProcessingOptions: marketingConfig.fbDataProcessingOptions as any,
       klaviyoListIds: marketingConfig.klaviyoListIds as any,
       verificationStatus: marketingConfig.verificationStatus as any,
@@ -89,7 +99,6 @@ export default async function RootLayout({
           />
           <Toaster position="top-center" />
           
-          {/* 3. Pass the structured object */}
           <GlobalStoreProvider settings={providerSettings}>
             <AffiliateTrackerProvider />
             {children}

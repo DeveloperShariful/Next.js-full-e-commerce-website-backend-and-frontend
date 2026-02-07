@@ -1,4 +1,5 @@
 // File: app/actions/settings/payments/payments-dashboard.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
@@ -8,7 +9,20 @@ import { auditService } from "@/lib/services/audit-service"
 import { auth } from "@clerk/nextjs/server"
 import { PaymentMode } from "@prisma/client"
 
+// Helper to get Real DB User ID
+async function getDbUserId() {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) return null;
+  
+  const user = await db.user.findUnique({
+    where: { clerkId },
+    select: { id: true }
+  });
+  return user?.id || null;
+}
+
 export async function getAllPaymentMethods() {
+  // ... (Code same as before)
   try {
     const methods = await db.paymentMethodConfig.findMany({
       include: {
@@ -16,11 +30,9 @@ export async function getAllPaymentMethods() {
         paypalConfig: true,
         offlineConfig: true,
       },
-      orderBy: {
-        displayOrder: "asc",
-      },
+      orderBy: { displayOrder: "asc" },
     })
-
+    // ... decryption logic same as before ...
     const decryptedMethods = methods.map((method) => {
       if (method.stripeConfig) {
         method.stripeConfig.liveSecretKey = decrypt(method.stripeConfig.liveSecretKey ?? "")
@@ -28,15 +40,12 @@ export async function getAllPaymentMethods() {
         method.stripeConfig.testSecretKey = decrypt(method.stripeConfig.testSecretKey ?? "")
         method.stripeConfig.testWebhookSecret = decrypt(method.stripeConfig.testWebhookSecret ?? "")
       }
-
       if (method.paypalConfig) {
         method.paypalConfig.liveClientSecret = decrypt(method.paypalConfig.liveClientSecret ?? "")
         method.paypalConfig.sandboxClientSecret = decrypt(method.paypalConfig.sandboxClientSecret ?? "")
       }
-
       return method
     })
-
     return { success: true, data: JSON.parse(JSON.stringify(decryptedMethods)) }
   } catch (error) {
     return { success: false, error: "Failed to fetch payment methods" }
@@ -44,7 +53,8 @@ export async function getAllPaymentMethods() {
 }
 
 export async function togglePaymentMethodStatus(id: string, isEnabled: boolean) {
-  const { userId } = await auth();
+  // ✅ FIX: Get Real DB User ID instead of Clerk ID
+  const userId = await getDbUserId();
   
   try {
     const oldData = await db.paymentMethodConfig.findUnique({ where: { id } });
@@ -55,7 +65,7 @@ export async function togglePaymentMethodStatus(id: string, isEnabled: boolean) 
     });
 
     await auditService.log({
-        userId: userId ?? "system",
+        userId: userId, // Now passing correct UUID or null
         action: isEnabled ? "ENABLE_PAYMENT_METHOD" : "DISABLE_PAYMENT_METHOD",
         entity: "PaymentMethodConfig",
         entityId: id,
@@ -71,7 +81,8 @@ export async function togglePaymentMethodStatus(id: string, isEnabled: boolean) 
 }
 
 export async function resetPaymentMethodsDB() {
-  const { userId } = await auth();
+  // ✅ FIX: Get Real DB User ID
+  const userId = await getDbUserId();
   
   try {
     await db.$transaction(async (tx) => {
@@ -96,20 +107,14 @@ export async function resetPaymentMethodsDB() {
           }
         })
 
-        if (m.identifier === "stripe") {
-            await tx.stripeConfig.create({ data: { paymentMethodId: config.id } })
-        } 
-        else if (m.identifier === "paypal") {
-            await tx.paypalConfig.create({ data: { paymentMethodId: config.id } })
-        } 
-        else {
-            await tx.offlinePaymentConfig.create({ data: { paymentMethodId: config.id } })
-        }
+        if (m.identifier === "stripe") await tx.stripeConfig.create({ data: { paymentMethodId: config.id } })
+        else if (m.identifier === "paypal") await tx.paypalConfig.create({ data: { paymentMethodId: config.id } })
+        else await tx.offlinePaymentConfig.create({ data: { paymentMethodId: config.id } })
       }
     });
 
     await auditService.log({
-        userId: userId ?? "system",
+        userId: userId,
         action: "RESET_PAYMENT_DB",
         entity: "PaymentMethodConfig",
         entityId: "ALL",
@@ -125,7 +130,8 @@ export async function resetPaymentMethodsDB() {
 }
 
 export async function getPaymentMethodByIdentifier(identifier: string) {
-  try {
+    // ... (This function looks fine, no audit logging here)
+    try {
     const method = await db.paymentMethodConfig.findUnique({
       where: { identifier },
       include: {

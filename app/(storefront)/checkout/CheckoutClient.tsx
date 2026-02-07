@@ -4,14 +4,15 @@
 
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { useEffect, useReducer, useRef, useState, useCallback } from 'react';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
+import { useEffect, useReducer, useRef, useState, useCallback, useMemo } from 'react'; 
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import OrderNotes from './_components/OrderNotes';
 import ShippingForm from './_components/ShippingForm';
 import OrderSummary from './_components/OrderSummary';
 import PaymentMethods from './_components/PaymentMethods';
-import CheckoutSubmitButton from './_components/CheckoutSubmitButton'; // ✅ New Component
+import CheckoutSubmitButton from './_components/CheckoutSubmitButton'; 
 import { createOrder } from '@/app/actions/storefront/checkout/create-order';
 import { getShippingRates, ShippingOption } from '@/app/actions/storefront/checkout/get-shipping-rates';
 import { validateCoupon } from '@/app/actions/storefront/checkout/validate-coupon';
@@ -86,7 +87,6 @@ function CheckoutClientComponent({
         });
         lastFetchedAddress.current = addressKey; 
         dispatch({ type: 'SET_SHIPPING_RATES', payload: newRates });
-        dispatch({ type: 'SET_SHIPPING_RATES', payload: newRates });
         if (newRates.length > 0 && !selectedShippingId) dispatch({ type: 'SET_SELECTED_SHIPPING', payload: newRates[0].id });
     } catch (error) { toast.error("Could not load shipping rates."); } 
     finally { dispatch({ type: 'SET_LOADING', key: 'shipping', payload: false }); }
@@ -141,7 +141,6 @@ function CheckoutClientComponent({
   const handlePlaceOrder = async (paymentData?: { transaction_id?: string; paymentMethodId?: string; shippingAddress?: any }) => {
     const currentBilling = customerInfoRef.current;
     
-    // Validation
     if (!currentBilling.firstName || !currentBilling.email) { toast.error("Please fill in billing details."); return; }
     if (shippingRates.length > 0 && !selectedShippingId) { toast.error("Please select a shipping method."); return; }
 
@@ -171,12 +170,11 @@ function CheckoutClientComponent({
   };
 
   const selectedMethodObj = initialPaymentMethods.find(m => m.id === selectedPaymentMethod);
+  const finalShippingInfo = shipToDifferentAddress ? shippingInfo : customerInfo;
 
   return (
     <div className="grid grid-cols-1 gap-8 w-full max-w-[1400px] mx-auto px-4 py-4 md:gap-10 lg:grid-cols-[1fr_550px] lg:gap-12">
-    
       <div className="flex flex-col gap-8">
-
         <ShippingForm 
             title={shipToDifferentAddress ? "Billing Details" : "Billing & Shipping Details"} 
             onAddressChange={handleAddressChange} defaultValues={customerInfo} 
@@ -198,7 +196,6 @@ function CheckoutClientComponent({
         <OrderNotes notes={orderNotes} onNotesChange={(notes) => dispatch({ type: 'SET_ORDER_NOTES', payload: notes })} />
       </div>
 
-      {/* RIGHT COLUMN */}
       <div className="flex flex-col gap-8">
         <OrderSummary 
             cartItems={initialCartItems} totals={totals} rates={shippingRates} selectedRateId={selectedShippingId} 
@@ -206,7 +203,6 @@ function CheckoutClientComponent({
             onApplyCoupon={handleApplyCoupon} onRemoveCoupon={handleRemoveCoupon} appliedCouponCode={appliedCouponCode} isApplyingCoupon={loading.coupon}
         />
         
-        {/* Payment Selection Area */}
         <PaymentMethods 
             paymentOptions={initialPaymentMethods} 
             selectedPaymentMethod={selectedPaymentMethod} 
@@ -215,46 +211,70 @@ function CheckoutClientComponent({
             total={totals.total}
             cartId={cartId}
             selectedShippingId={selectedShippingId}
-            shippingInfo={shipToDifferentAddress ? shippingInfo : customerInfo}
+            shippingInfo={finalShippingInfo}
             onPlaceOrder={handlePlaceOrder}
             couponCode={appliedCouponCode}
         />
 
-        {/* ✅ UNIFIED SUBMIT BUTTON */}
         <CheckoutSubmitButton 
             selectedMethod={selectedMethodObj}
             onPlaceOrder={handlePlaceOrder}
             isProcessing={loading.order}
             total={totals.total}
             isShippingSelected={!!selectedShippingId}
-            customerInfo={customerInfoRef.current}
-            shippingInfo={shipToDifferentAddress ? shippingInfoRef.current : customerInfoRef.current}
+            customerInfo={customerInfo} 
+            shippingInfo={finalShippingInfo}
             cartId={cartId}
             selectedShippingId={selectedShippingId}
             couponCode={appliedCouponCode}
             paypalClientId={paypalClientId}
+            customerNote={orderNotes} 
         />
       </div>
     </div>
   );
 }
 
+// ✅ MAIN FIX IS HERE
 export default function CheckoutClient(props: CheckoutClientProps) {
     const [stripePromise] = useState(() => {
         if (props.stripePublishableKey) return loadStripe(props.stripePublishableKey);
         return null;
     });
+
+    // 🛑 PROBLEM: This was recreating the object on every render
+    // const payPalOptions = { ... } 
+
+    // ✅ FIX: useMemo ব্যবহার করে অবজেক্ট স্থির রাখা হয়েছে
+    const payPalOptions = useMemo(() => ({
+        clientId: props.paypalClientId,
+        currency: "AUD",
+        intent: "capture",
+        // 'components' বাদ দেওয়া হলো বা ডিফল্ট রাখা হলো যাতে সব লোড হয়।
+        // যদি শুধু বাটন দরকার হয়: components: 'buttons' দিতে পারেন।
+    }), [props.paypalClientId]);
     
-    if (stripePromise) {
-        return (
-            <Elements stripe={stripePromise} options={{ 
-                mode: 'payment', currency: 'aud', 
-                amount: Math.round(props.initialCartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0) * 100) || 1000,
-                appearance: { theme: 'stripe' }
-            }}>
-                <CheckoutClientComponent {...props} />
-            </Elements>
-        );
+    // Stripe Wrapper
+    const stripeWrapper = stripePromise ? (
+        <Elements stripe={stripePromise} options={{ 
+            mode: 'payment', currency: 'aud', 
+            amount: Math.round(props.initialCartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0) * 100) || 1000,
+            appearance: { theme: 'stripe' }
+        }}>
+            <CheckoutClientComponent {...props} />
+        </Elements>
+    ) : (
+        <CheckoutClientComponent {...props} />
+    );
+
+    // যদি PayPal Client ID না থাকে, তাহলে Provider রেন্ডার করবেন না (সেফটি চেক)
+    if (!props.paypalClientId) {
+        return stripeWrapper;
     }
-    return <CheckoutClientComponent {...props} />;
+
+    return (
+        <PayPalScriptProvider options={payPalOptions}>
+            {stripeWrapper}
+        </PayPalScriptProvider>
+    );
 }

@@ -52,7 +52,7 @@ export default function OrderSummary({
       <div className="flex flex-col gap-4 mb-5">
         {cartItems.map((item, idx) => (
           <div key={idx} className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
-             <div className="relative w-16 h-16 bg-white rounded border border-gray-200 flex items-center justify-center overflow-hidden">
+             <div className="relative w-16 h-16 bg-white rounded border border-gray-200 flex items-center justify-center">
               {item.image ? (
                 <Image src={item.image} alt={item.name} width={64} height={64} className="object-cover" />
               ) : (

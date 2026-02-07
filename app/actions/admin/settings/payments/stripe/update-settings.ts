@@ -11,31 +11,23 @@ import { encrypt } from "../crypto"
 import { auditService } from "@/lib/services/audit-service"
 import { auth } from "@clerk/nextjs/server"
 
+async function getDbUserId() {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) return null;
+  const user = await db.user.findUnique({
+    where: { clerkId }, 
+    select: { id: true }
+  });
+  
+  return user?.id || null;
+}
+
 export async function updateStripeSettings(
   paymentMethodId: string,
   values: z.infer<typeof StripeSettingsSchema>
 ) {
-  const { userId } = await auth();
+  const userId = await getDbUserId();
   
-  let validUserId: string | undefined = undefined;
-  
-  if (userId) {
-    try {
-      const localUser = await db.user.findUnique({ 
-        where: { id: userId },
-        select: { id: true } 
-      });
-      
-      if (localUser) {
-        validUserId = localUser.id;
-      } else {
-        console.warn(`[Audit Log Warning] User ${userId} not found in local DB. Logging as System/Anonymous.`);
-      }
-    } catch (err) {
-      console.error("Error verifying user for audit log:", err);
-    }
-  }
-
   try {
     const validated = StripeSettingsSchema.parse(values)    
     const oldConfig = await db.stripeConfig.findUnique({
@@ -55,7 +47,7 @@ export async function updateStripeSettings(
       if (isKeyChanged) {
           try {
             const stripe = new Stripe(secretKeyToCheck!, { apiVersion: "2025-01-27.acacia" as any });
-            await stripe.balance.retrieve(); // Test connection
+            await stripe.balance.retrieve(); 
           } catch (error: any) {
             return { success: false, error: `Stripe Connection Failed: ${error.message}` };
           }
@@ -78,7 +70,7 @@ export async function updateStripeSettings(
           minOrderAmount: validated.minOrderAmount ? Number(validated.minOrderAmount) : null,
           maxOrderAmount: validated.maxOrderAmount ? Number(validated.maxOrderAmount) : null,         
           surchargeEnabled: validated.surchargeEnabled ?? false,
-          surchargeType: validated.surchargeType ?? "fixed", // 'fixed' or 'percentage'
+          surchargeType: validated.surchargeType ?? "fixed",
           surchargeAmount: validated.surchargeAmount ? Number(validated.surchargeAmount) : 0,
           taxableSurcharge: validated.taxableSurcharge ?? false
         }
@@ -138,8 +130,9 @@ export async function updateStripeSettings(
           debugLog: validated.debugLog ?? false,
         }
       });
+
       await auditService.log({
-          userId: validUserId, 
+          userId: userId, 
           action: "UPDATE_STRIPE_SETTINGS",
           entity: "StripeConfig",
           entityId: newConfig.id,

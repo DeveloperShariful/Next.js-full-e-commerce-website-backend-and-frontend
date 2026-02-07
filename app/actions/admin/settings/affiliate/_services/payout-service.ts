@@ -6,8 +6,8 @@ import { db } from "@/lib/prisma";
 import { PayoutQueueItem } from "../types";
 import { PayoutStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { auditService } from "@/lib/services/audit-service";
-import { DecimalMath } from "@/lib/utils/decimal-math";
+import { auditService } from "@/lib/audit-service";
+import { DecimalMath } from "@/lib/decimal-math";
 import { protectAction } from "../permission-service";
 
 // =========================================

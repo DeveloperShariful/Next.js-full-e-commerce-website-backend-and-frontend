@@ -8,13 +8,13 @@ interface Props {
 
 export default function ProductBreadcrumb({ productName }: Props) {
   return (
-    <div className="bg-gray-100 py-4 mb-8">
-      <div className="container mx-auto px-6 text-sm text-gray-500">
-        <Link href="/" className="hover:text-blue-600">Home</Link>
-        <span className="mx-2">/</span>
-        <Link href="/shop" className="hover:text-blue-600">Shop</Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-800 font-medium">{productName}</span>
+    <div className="border-b border-gray-100 bg-white py-3">
+      <div className="container mx-auto px-6 text-xs md:text-sm text-gray-500 font-medium flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
+        <Link href="/" className="hover:text-slate-900 transition-colors">Home</Link>
+        <span className="text-gray-300">/</span>
+        <Link href="/shop" className="hover:text-slate-900 transition-colors">Shop</Link>
+        <span className="text-gray-300">/</span>
+        <span className="text-slate-900 truncate">{productName}</span>
       </div>
     </div>
   );

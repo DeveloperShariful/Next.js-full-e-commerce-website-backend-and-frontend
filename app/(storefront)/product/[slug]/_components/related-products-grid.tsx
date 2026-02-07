@@ -18,7 +18,6 @@ export default function RelatedProductsGrid({ products }: Props) {
         {products.map((related) => {
           if (!related) return null;
           return (
-            // @ts-ignore: Assuming ProductCard handles the types correctly
             <ProductCard key={related.id} data={related} />
           );
         })}

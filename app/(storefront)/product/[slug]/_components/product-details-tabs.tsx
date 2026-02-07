@@ -24,7 +24,6 @@ export default function ProductDetailsTabs({
   const [activeTab, setActiveTab] = useState<"description" | "reviews">("description");
 
   return (
-    // overflow-hidden যোগ করা হয়েছে যাতে কোনো চাইল্ড এলিমেন্ট বাইরে না যায়
     <div className="mt-12 lg:mt-20 border-t border-slate-100 pt-8 lg:pt-10 overflow-hidden">
       {/* Tabs Header */}
       <div className="flex gap-6 lg:gap-8 mb-6 border-b border-slate-200 overflow-x-auto scrollbar-hide">

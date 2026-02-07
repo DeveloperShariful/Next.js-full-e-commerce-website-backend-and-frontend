@@ -4,10 +4,10 @@
 
 import { useState } from "react";
 import { toast } from "react-hot-toast";
-import StarRating from "./star-rating"; // Make sure this path is correct
+import StarRating from "./star-rating"; 
 import { createReview } from "@/app/actions/storefront/product/review-actions";
 import { useUser } from "@clerk/nextjs"; 
-import ImageUpload from "@/components/media/image-upload"; // Use your existing ImageUpload component
+import ImageUpload from "@/components/media/image-upload"; 
 
 interface Props {
   productId: string;

@@ -1,4 +1,4 @@
-// File: lib/services/audit-service.ts
+// File: lib/audit-service.ts
 
 import { db } from "@/lib/prisma";
 import { headers } from "next/headers";

@@ -5,8 +5,8 @@
 import { db } from "@/lib/prisma";
 import { Prisma, FraudRuleType, FraudAction } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { auditService } from "@/lib/services/audit-service";
-import { getCachedFraudRules } from "@/lib/services/settings-cache";
+import { auditService } from "@/lib/audit-service";
+import { getCachedFraudRules } from "@/lib/settings-cache";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service";

@@ -7,7 +7,7 @@ import { db } from "@/lib/prisma"
 import { BankTransferSchema, ChequeSchema, CodSchema } from "@/app/(admin)/admin/settings/payments/schemas"
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
-import { auditService } from "@/lib/services/audit-service"
+import { auditService } from "@/lib/audit-service"
 import { auth } from "@clerk/nextjs/server"
 
 // Helper to fetch DB User ID

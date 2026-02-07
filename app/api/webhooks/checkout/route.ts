@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-import { auditService } from "@/lib/services/audit-service";
+import { auditService } from "@/lib/audit-service";
 
 export async function POST(req: Request) {
   try {

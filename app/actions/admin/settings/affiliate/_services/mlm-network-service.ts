@@ -4,13 +4,13 @@
 
 import { db } from "@/lib/prisma";
 import { Prisma, MLMBasis } from "@prisma/client";
-import { getCachedMLMConfig } from "@/lib/services/settings-cache";
-import { DecimalMath } from "@/lib/utils/decimal-math";
+import { getCachedMLMConfig } from "@/lib/settings-cache";
+import { DecimalMath } from "@/lib/decimal-math";
 import { ActionResponse, NetworkNode } from "../types";
 import { z } from "zod";
 import { revalidatePath, unstable_cache } from "next/cache";
 import { protectAction } from "../permission-service";
-import { auditService } from "@/lib/services/audit-service";
+import { auditService } from "@/lib/audit-service";
 
 const mlmSchema = z.object({
   isEnabled: z.boolean(),

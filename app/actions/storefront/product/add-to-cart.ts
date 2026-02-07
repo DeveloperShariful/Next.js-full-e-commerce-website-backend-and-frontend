@@ -20,8 +20,6 @@ export async function addToCart({ productId, quantity, variantId }: AddToCartPar
     let cart = null;
 
     console.log("🍪 Checking Cookie Cart ID:", cartId || "None");
-
-    // ১. যদি কুকি থাকে, তবে চেক করি ডাটাবেসে সেই কার্ট আসলেই আছে কি না
     if (cartId) {
       cart = await db.cart.findUnique({
         where: { id: cartId }
@@ -32,17 +30,15 @@ export async function addToCart({ productId, quantity, variantId }: AddToCartPar
       }
     }
 
-    // ২. যদি কার্ট আইডি না থাকে অথবা ডাটাবেসে কার্ট না পাওয়া যায় -> নতুন বানাও
     if (!cartId || !cart) {
       console.log("⚙️ Creating new cart...");
       const newCart = await db.cart.create({
         data: {}, 
       });
       cartId = newCart.id;
-      
-      // কুকি সেট করা / আপডেট করা
+
       cookieStore.set("cartId", cartId, {
-        maxAge: 60 * 60 * 24 * 30, // 30 Days
+        maxAge: 60 * 60 * 24 * 30, 
         path: "/",
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -51,7 +47,6 @@ export async function addToCart({ productId, quantity, variantId }: AddToCartPar
       console.log("✅ New Cart Created & Cookie Set:", cartId);
     }
 
-    // ৩. প্রোডাক্ট ভ্যালিডেশন
     const product = await db.product.findUnique({ 
         where: { id: productId },
         include: { variants: true } 
@@ -62,7 +57,7 @@ export async function addToCart({ productId, quantity, variantId }: AddToCartPar
         return { success: false, message: "Product not found" };
     }
 
-    // ভেরিয়েন্ট ভ্যালিডেশন
+
     if (variantId) {
         const variantExists = product.variants.find(v => v.id === variantId);
         if (!variantExists) {
@@ -71,12 +66,9 @@ export async function addToCart({ productId, quantity, variantId }: AddToCartPar
         }
     }
 
-    // ৪. কার্টে আইটেম চেক বা অ্যাড করা
     console.log("🔍 Processing Cart Item...");
-    
-    // FIX: variantId undefined হলে null পাঠানো, নাহলে Prisma এরর দিতে পারে
+  
     const safeVariantId = variantId || null;
-
     const existingItem = await db.cartItem.findFirst({
       where: {
         cartId: cartId,
@@ -95,7 +87,7 @@ export async function addToCart({ productId, quantity, variantId }: AddToCartPar
       console.log("➕ Creating new cart item...");
       await db.cartItem.create({
         data: {
-          cartId: cartId, // এখন আমরা নিশ্চিত যে এই cartId ভ্যালিড
+          cartId: cartId, 
           productId: productId,
           variantId: safeVariantId,
           quantity: quantity,
@@ -103,7 +95,6 @@ export async function addToCart({ productId, quantity, variantId }: AddToCartPar
       });
     }
 
-    // ৫. পেজ রিফ্রেশ
     console.log("🔄 Revalidating Layout...");
     revalidatePath("/", "layout"); 
 

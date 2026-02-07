@@ -1,4 +1,4 @@
-//lib/utils/decimal-math.ts
+//lib/decimal-math.ts
 
 import { Prisma } from "@prisma/client";
 
@@ -77,4 +77,9 @@ export class DecimalMath {
     if (excludeShipping) finalAmount = finalAmount.sub(this.toDecimal(shipping));
     return this.max(finalAmount, 0);
   }
+  static toPaymentUnit(value: number | string | Prisma.Decimal): number {
+    const decimalVal = this.toDecimal(value);
+    return decimalVal.mul(100).round().toNumber();
+  }
+
 }

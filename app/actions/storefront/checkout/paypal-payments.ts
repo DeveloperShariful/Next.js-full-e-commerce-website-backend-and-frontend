@@ -4,87 +4,32 @@
 
 import { db } from "@/lib/prisma";
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
-import { secureAction } from "@/lib/security/server-action-wrapper";
+import { secureAction } from "@/lib/server-action-wrapper";
 import { createOrder } from "./create-order"; 
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { clearCart } from "../cart/clear-cart";
-import { calculateShippingServerSide } from "./get-shipping-rates";
-import { validateCoupon } from "./validate-coupon";
+import { calculateCartTotals } from "./checkout-utils"; 
 import { z } from "zod";
 import { revalidatePath } from "next/cache"; 
 
-// ✅ আপডেট ১: অ্যাড্রেস রিসিভ করা হচ্ছে
-async function calculateCartTotalForPayPal(
-    cartId: string, 
-    shippingMethodId: string, 
-    shippingAddress: any, 
-    couponCode?: string
-) {
-    const cart = await db.cart.findUnique({
-        where: { id: cartId },
-        include: { items: { include: { product: true, variant: true } } }
-    });
-
-    if (!cart || cart.items.length === 0) throw new Error("Cart is empty");
-
-    let subtotal = 0;
-    for (const item of cart.items) {
-        const price = Number(item.variant ? (item.variant.salePrice || item.variant.price) : (item.product.salePrice || item.product.price));
-        subtotal += price * item.quantity;
-    }
-
-    // ✅ আপডেট ২: সঠিক অ্যাড্রেস দিয়ে শিপিং ক্যালকুলেশন
-    let shippingCost = 0;
-    if (shippingMethodId) {
-        // এখানে shippingAddress পাস করা হলো, আগে {} ফাঁকা অবজেক্ট ছিল
-        const cost = await calculateShippingServerSide(cartId, shippingAddress, shippingMethodId); 
-        if (cost !== null) shippingCost = cost;
-    }
-
-    let discountAmount = 0;
-    if (couponCode) {
-        const couponRes = await validateCoupon(couponCode, cartId);
-        if (couponRes.success && couponRes.discountAmount) {
-            discountAmount = couponRes.discountAmount;
-        }
-    }
-
-    // Surcharge Calculation
-    let surcharge = 0;
-    const paypalConf = await db.paypalConfig.findFirst({ include: { paymentMethod: true } });
-    const surchargeBase = Math.max(0, subtotal + shippingCost - discountAmount);
-
-    if (paypalConf?.paymentMethod.surchargeEnabled) {
-        surcharge = paypalConf.paymentMethod.surchargeType === 'percentage'
-            ? (surchargeBase * Number(paypalConf.paymentMethod.surchargeAmount)) / 100
-            : Number(paypalConf.paymentMethod.surchargeAmount);
-    }
-
-    const grandTotal = Math.max(0, subtotal + shippingCost + surcharge - discountAmount);
-    
-    console.log(`💰 PayPal Calc: Sub: ${subtotal} | Ship: ${shippingCost} | Disc: ${discountAmount} | Total: ${grandTotal}`);
-    
-    return grandTotal.toFixed(2);
-}
-
-// ✅ আপডেট ৩: স্কিমাতে shippingAddress অ্যাড করা হলো
 const CreatePayPalSchema = z.object({
     cartId: z.string(),
     shippingMethodId: z.string(),
-    shippingAddress: z.any(), // New
+    shippingAddress: z.any(), 
     couponCode: z.string().optional()
 });
 
 export async function createPayPalOrder(params: z.infer<typeof CreatePayPalSchema>) {
     return secureAction(params, { actionName: "CREATE_PAYPAL_ORDER", schema: CreatePayPalSchema, role: "PUBLIC" }, async (input) => {
-        
-        // টোটাল ক্যালকুলেশনের সময় অ্যাড্রেস পাঠানো হচ্ছে
-        const grandTotal = await calculateCartTotalForPayPal(
+        const calculation = await calculateCartTotals(
             input.cartId, 
             input.shippingMethodId, 
             input.shippingAddress, 
-            input.couponCode
+            input.couponCode,
+            "paypal"
         );
+        
+        const grandTotal = calculation.total; 
         
         console.log(`🚀 Init PayPal: Cart ${input.cartId} | Total: ${grandTotal}`);
 
@@ -97,8 +42,7 @@ export async function createPayPalOrder(params: z.infer<typeof CreatePayPalSchem
 
         const isSandbox = config.sandbox;
         const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
-        const secret = decrypt(isSandbox ? config.sandboxClientSecret! : config.liveClientSecret!);
-        
+        const secret = decrypt(isSandbox ? config.sandboxClientSecret! : config.liveClientSecret!);       
         const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
         const tokenRes = await fetch(isSandbox ? "https://api-m.sandbox.paypal.com/v1/oauth2/token" : "https://api-m.paypal.com/v1/oauth2/token", {
             method: "POST",
@@ -107,14 +51,16 @@ export async function createPayPalOrder(params: z.infer<typeof CreatePayPalSchem
         });
         const tokenData = await tokenRes.json();
         if (!tokenData.access_token) throw new Error("PayPal Auth Failed");
-
         const orderRes = await fetch(isSandbox ? "https://api-m.sandbox.paypal.com/v2/checkout/orders" : "https://api-m.paypal.com/v2/checkout/orders", {
             method: "POST",
             headers: { Authorization: `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
             body: JSON.stringify({
                 intent: config.intent || "CAPTURE",
                 purchase_units: [{
-                    amount: { currency_code: "AUD", value: grandTotal }
+                    amount: { 
+                        currency_code: "AUD", 
+                        value: grandTotal 
+                    }
                 }]
             })
         });
@@ -133,7 +79,6 @@ export async function createPayPalOrder(params: z.infer<typeof CreatePayPalSchem
     });
 }
 
-// ... Capture Function (নিচে যা আছে তাই থাকবে, কোনো পরিবর্তন নেই) ...
 const CapturePayPalSchema = z.object({
     payPalOrderId: z.string(),
     cartId: z.string(),
@@ -149,18 +94,14 @@ export async function capturePayPalOrder(params: z.infer<typeof CapturePayPalSch
         
         const config = await db.paypalConfig.findFirst({ where: { paymentMethod: { isEnabled: true } } });
         if(!config) throw new Error("Config missing");
-
         const isSandbox = config.sandbox;
         const clientId = isSandbox ? config.sandboxClientId : config.liveClientId;
-        const secret = decrypt(isSandbox ? config.sandboxClientSecret! : config.liveClientSecret!);
-        
+        const secret = decrypt(isSandbox ? config.sandboxClientSecret! : config.liveClientSecret!);      
         const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
         const tokenRes = await fetch(isSandbox ? "https://api-m.sandbox.paypal.com/v1/oauth2/token" : "https://api-m.paypal.com/v1/oauth2/token", {
             method: "POST", body: "grant_type=client_credentials", headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" }
         });
         const tokenData = await tokenRes.json();
-
-        // 1. Capture Payment
         const captureRes = await fetch(isSandbox ? `https://api-m.sandbox.paypal.com/v2/checkout/orders/${input.payPalOrderId}/capture` : `https://api-m.paypal.com/v2/checkout/orders/${input.payPalOrderId}/capture`, {
             method: "POST",
             headers: { Authorization: `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" }
@@ -170,8 +111,6 @@ export async function capturePayPalOrder(params: z.infer<typeof CapturePayPalSch
 
         if (captureData.status === "COMPLETED" || captureData.status === "APPROVED") {
             const captureId = captureData.purchase_units[0].payments.captures[0].id;
-
-            // 2. Create Order in DB
             const orderRes = await createOrder({
                 cartId: input.cartId,
                 billing: input.billingAddress,
@@ -185,6 +124,7 @@ export async function capturePayPalOrder(params: z.infer<typeof CapturePayPalSch
             });
 
             if (!orderRes.success || !orderRes.orderId) {
+                console.error("CRITICAL: PayPal Captured but Order Creation Failed", captureId);
                 throw new Error("Payment captured but Order Creation Failed: " + orderRes.error);
             }
 
@@ -220,6 +160,6 @@ export async function capturePayPalOrder(params: z.infer<typeof CapturePayPalSch
             };
         }
 
-        throw new Error("PayPal Capture Failed");
+        throw new Error("PayPal Capture Failed: " + (captureData.details?.[0]?.description || "Unknown error"));
     });
 }

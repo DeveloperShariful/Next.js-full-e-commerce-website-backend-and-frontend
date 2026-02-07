@@ -1,4 +1,4 @@
-//File: lib/security/hmac-service.ts
+//File: lib/hmac-service.ts
 
 import crypto from "crypto";
 const SECRET_KEY = process.env.AFFILIATE_WEBHOOK_SECRET || "fallback-secret-change-me-in-prod";

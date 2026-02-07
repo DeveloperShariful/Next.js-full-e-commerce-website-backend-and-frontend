@@ -1,3 +1,5 @@
+// File: app/product/[slug]/_components/reviews/review-list.tsx
+
 import StarRating from "./star-rating";
 
 interface Props {

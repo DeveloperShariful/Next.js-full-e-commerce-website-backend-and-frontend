@@ -8,7 +8,7 @@ import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import Stripe from "stripe"
 import { encrypt } from "../crypto" 
-import { auditService } from "@/lib/services/audit-service"
+import { auditService } from "@/lib/audit-service"
 import { auth } from "@clerk/nextjs/server"
 
 async function getDbUserId() {

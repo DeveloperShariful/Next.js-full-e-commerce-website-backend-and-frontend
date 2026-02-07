@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma"
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
 import { revalidatePath } from "next/cache"
-import { auditService } from "@/lib/services/audit-service"
+import { auditService } from "@/lib/audit-service"
 import { auth } from "@clerk/nextjs/server"
 import { PaymentMode } from "@prisma/client"
 

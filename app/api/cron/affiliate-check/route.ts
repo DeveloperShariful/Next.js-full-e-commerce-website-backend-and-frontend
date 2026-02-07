@@ -1,7 +1,7 @@
 // File: app/api/cron/affiliate-check/route.ts
 
 import { NextResponse } from "next/server";
-import { auditService } from "@/lib/services/audit-service";
+import { auditService } from "@/lib/audit-service";
 import { processDailyJobs } from "@/app/actions/admin/settings/affiliate/cron-service";
 
 export const dynamic = 'force-dynamic'; 

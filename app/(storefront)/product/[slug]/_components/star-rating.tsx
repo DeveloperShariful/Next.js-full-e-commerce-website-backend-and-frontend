@@ -1,3 +1,5 @@
+// File: app/product/[slug]/_components/reviews/star-rating.tsx
+
 import { Star } from "lucide-react";
 
 interface Props {

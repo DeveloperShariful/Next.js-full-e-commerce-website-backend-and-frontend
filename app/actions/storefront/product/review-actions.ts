@@ -8,20 +8,14 @@ import { revalidatePath } from "next/cache";
 
 export async function createReview(productId: string, data: any) {
   const user = await currentUser();
-  
-  // 1. Validation
   if (!user) {
     return { success: false, message: "You must be logged in to leave a review." };
   }
 
   try {
-    // 🚀 FIX: Ensure User Exists in Database (Sync Clerk User to DB)
-    // ইউজারের ইমেইল বের করা
     const email = user.emailAddresses[0]?.emailAddress;
-
-    // ডাটাবেসে ইউজার আছে কি না চেক করা, না থাকলে তৈরি করা
     await db.user.upsert({
-        where: { clerkId: user.id }, // Clerk ID দিয়ে চেক
+        where: { clerkId: user.id }, 
         update: {
             name: `${user.firstName} ${user.lastName}`,
             email: email,
@@ -32,11 +26,10 @@ export async function createReview(productId: string, data: any) {
             email: email,
             name: `${user.firstName} ${user.lastName}`,
             image: user.imageUrl,
-            role: "CUSTOMER" // ডিফল্ট রোল
+            role: "CUSTOMER" 
         }
     });
 
-    // এখন যেহেতু ইউজার কনফার্ম আছে, আসল ইউজার রেকর্ডটি আনছি (রিভিউতে লিঙ্কিংয়ের জন্য)
     const dbUser = await db.user.findUnique({
         where: { clerkId: user.id }
     });
@@ -44,9 +37,6 @@ export async function createReview(productId: string, data: any) {
     if (!dbUser) {
         return { success: false, message: "User synchronization failed." };
     }
-
-    // 2. Check if user already reviewed this product
-    // এখন dbUser.id ব্যবহার করব, Clerk ID নয় (যদি স্কিমাতে রিলেশন dbUser.id দিয়ে থাকে)
     const existingReview = await db.review.findFirst({
       where: { 
         userId: dbUser.id, 
@@ -58,10 +48,9 @@ export async function createReview(productId: string, data: any) {
       return { success: false, message: "You have already reviewed this product." };
     }
 
-    // 3. Create Review
     await db.review.create({
       data: {
-        userId: dbUser.id, // 🚀 Use synced DB User ID
+        userId: dbUser.id, 
         productId,
         rating: Number(data.rating),
         title: data.title,
@@ -80,8 +69,6 @@ export async function createReview(productId: string, data: any) {
   }
 }
 
-// ... Rest of the file (getProductReviews, getReviewStats) remains same
-// ... নিচের অংশগুলো অপরিবর্তিত থাকবে
 export async function getProductReviews(productId: string) {
   try {
     const reviews = await db.review.findMany({

@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma"
 import { PaypalSettingsSchema } from "@/app/(admin)/admin/settings/payments/schemas"
-import { secureAction } from "@/lib/security/server-action-wrapper"
+import { secureAction } from "@/lib/server-action-wrapper"
 import { encrypt } from "../crypto"
 import { z } from "zod"
 

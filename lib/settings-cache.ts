@@ -1,4 +1,4 @@
-// File: lib/services/settings-cache.ts
+// File: lib/settings-cache.ts
 
 import { db } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";

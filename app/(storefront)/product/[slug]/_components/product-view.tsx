@@ -2,12 +2,16 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import Image from "next/image";
 import { addToCart } from "@/app/actions/storefront/product/add-to-cart"; 
-import { ShoppingCart, Heart, Minus, Plus, CheckCircle2, PackageX, AlertCircle, Loader2 } from "lucide-react";
+import { 
+  ShoppingCart, Heart, Minus, Plus, CheckCircle2, 
+  PackageX, AlertCircle, Loader2, CalendarClock, Download, RefreshCw 
+} from "lucide-react";
 import { toast } from "sonner"; 
 import { useGlobalStore } from "@/app/providers/global-store-provider"; 
+import { format } from "date-fns";
 
 interface ProductViewProps {
   product: {
@@ -28,7 +32,12 @@ interface ProductViewProps {
     trackQuantity: boolean;
     backorderStatus: "DO_NOT_ALLOW" | "ALLOW" | "ALLOW_BUT_NOTIFY";
     
-    // Variants
+    // Schema Updates
+    isPreOrder: boolean;
+    preOrderReleaseDate: string | Date | null;
+    isDownloadable: boolean;
+
+    // Variants & Plans
     variants: { 
       id: string; 
       name: string; 
@@ -36,6 +45,13 @@ interface ProductViewProps {
       salePrice: number | null;
       stock: number; 
       trackQuantity: boolean; 
+    }[];
+    subscriptionPlans: {
+      id: string;
+      name: string;
+      price: number;
+      interval: string;
+      intervalCount: number;
     }[];
   }
 }
@@ -50,42 +66,87 @@ export default function ProductView({ product }: ProductViewProps) {
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false); 
 
-  const currentVariant = product.variants.find(v => v.id === selectedVariantId);
+  // New States for Schema Support
+  const [purchaseType, setPurchaseType] = useState<"onetime" | "subscription">("onetime");
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(
+    product.subscriptionPlans.length > 0 ? product.subscriptionPlans[0].id : null
+  );
 
-  // Stock Logic
+  const currentVariant = product.variants.find(v => v.id === selectedVariantId);
+  const currentPlan = product.subscriptionPlans.find(p => p.id === selectedPlanId);
+
+  // Stock & Status Logic (Updated for Pre-order & Digital)
   const getStockStatus = () => {
+    // 1. Pre-order Logic
+    if (product.isPreOrder) {
+        const dateStr = product.preOrderReleaseDate 
+            ? format(new Date(product.preOrderReleaseDate), "MMM d") 
+            : "Soon";
+        return { 
+            available: true, 
+            label: `Pre-Order (Ships ${dateStr})`, 
+            color: "text-purple-600", 
+            icon: CalendarClock,
+            btnText: "Pre-Order Now"
+        };
+    }
+
+    // 2. Digital Product Logic
+    if (product.isDownloadable) {
+        return { 
+            available: true, 
+            label: "Instant Download", 
+            color: "text-blue-600", 
+            icon: Download,
+            btnText: "Download Now"
+        };
+    }
+
     const stockLevel = currentVariant ? currentVariant.stock : product.stock;
     const shouldTrack = currentVariant ? currentVariant.trackQuantity : product.trackQuantity;
     
-    if (!shouldTrack) return { available: true, label: "In Stock", color: "text-green-600", icon: CheckCircle2 };
+    if (!shouldTrack) return { available: true, label: "In Stock", color: "text-green-600", icon: CheckCircle2, btnText: "Add to Cart" };
 
     const backorder = product.backorderStatus;
 
     if (stockLevel > 0) {
-      if (stockLevel < 5) return { available: true, label: `Only ${stockLevel} left!`, color: "text-orange-600", icon: AlertCircle };
-      return { available: true, label: "In Stock", color: "text-green-600", icon: CheckCircle2 };
+      if (stockLevel < 5) return { available: true, label: `Only ${stockLevel} left!`, color: "text-orange-600", icon: AlertCircle, btnText: "Add to Cart" };
+      return { available: true, label: "In Stock", color: "text-green-600", icon: CheckCircle2, btnText: "Add to Cart" };
     } else {
       if (backorder === "ALLOW" || backorder === "ALLOW_BUT_NOTIFY") {
-        return { available: true, label: "Available on Backorder", color: "text-blue-600", icon: AlertCircle };
+        return { available: true, label: "Available on Backorder", color: "text-blue-600", icon: AlertCircle, btnText: "Backorder" };
       }
-      return { available: false, label: "Out of Stock", color: "text-red-600", icon: PackageX };
+      return { available: false, label: "Out of Stock", color: "text-red-600", icon: PackageX, btnText: "Out of Stock" };
     }
   };
 
-  const { available, label, color, icon: StockIcon } = getStockStatus();
+  const { available, label, color, icon: StockIcon, btnText } = getStockStatus();
 
-  // Price Logic
-  const displayPrice = currentVariant 
-    ? (currentVariant.salePrice || currentVariant.price || product.price) 
-    : (product.salePrice || product.price);
+  // Price Logic (Updated for Subscription)
+  const getDisplayPrice = () => {
+    if (purchaseType === "subscription" && currentPlan) {
+        return Number(currentPlan.price);
+    }
+    if (currentVariant) {
+        return Number(currentVariant.salePrice || currentVariant.price);
+    }
+    return Number(product.salePrice || product.price);
+  };
 
-  const originalPrice = currentVariant
-    ? (currentVariant.salePrice ? currentVariant.price : null) 
-    : (product.salePrice ? product.price : null); 
+  const getOriginalPrice = () => {
+    if (purchaseType === "subscription") return null;
+    if (currentVariant) {
+        return currentVariant.salePrice ? Number(currentVariant.price) : null;
+    }
+    return product.salePrice ? Number(product.price) : null;
+  };
+
+  const displayPrice = getDisplayPrice();
+  const originalPrice = getOriginalPrice();
 
   // 🛒 Add to Cart Handler
   const onAddToCart = () => {
-    if (product.variants.length > 0 && !selectedVariantId) {
+    if (product.variants.length > 0 && purchaseType === 'onetime' && !selectedVariantId) {
       toast.error("Please select an option first!");
       return;
     }
@@ -100,7 +161,8 @@ export default function ProductView({ product }: ProductViewProps) {
         const res = await addToCart({
             productId: product.id,
             quantity: quantity,
-            variantId: selectedVariantId || undefined
+            variantId: purchaseType === 'onetime' ? (selectedVariantId || undefined) : undefined,
+            // Logic to handle subscription plan would go here if backend supports it
         });
 
         if (res.success) {
@@ -165,8 +227,9 @@ export default function ProductView({ product }: ProductViewProps) {
            {product.name}
          </h1>
 
+         {/* ✅ FIX: Added break-words and max-w-full to prevent layout breakage */}
          {product.shortDescription && (
-           <div className="text-slate-500 text-base leading-relaxed mb-6 border-b border-gray-100 pb-6"
+           <div className="text-slate-500 text-base leading-relaxed mb-6 border-b border-gray-100 pb-6 max-w-full break-words overflow-hidden"
                 dangerouslySetInnerHTML={{ __html: product.shortDescription }} 
            />
          )}
@@ -179,6 +242,11 @@ export default function ProductView({ product }: ProductViewProps) {
                    {formatPrice(originalPrice)}
                  </span>
                )}
+               {purchaseType === 'subscription' && currentPlan && (
+                 <span className="text-sm font-medium text-slate-500">
+                   / {currentPlan.interval}
+                 </span>
+               )}
             </div>
 
             <div className={`flex items-center gap-1.5 text-sm font-bold ${color} bg-gray-50 px-3 py-1.5 rounded-lg border border-slate-100`}>
@@ -187,8 +255,39 @@ export default function ProductView({ product }: ProductViewProps) {
             </div>
          </div>
 
+         {/* ✅ SUBSCRIPTION SELECTOR (Minimal Design) */}
+         {product.subscriptionPlans.length > 0 && (
+             <div className="mb-6 space-y-3">
+                 <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${purchaseType === 'onetime' ? 'border-slate-900 bg-slate-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                     <input type="radio" name="ptype" checked={purchaseType === 'onetime'} onChange={() => setPurchaseType('onetime')} className="accent-slate-900 w-4 h-4"/>
+                     <span className="font-medium text-slate-700">One-time purchase</span>
+                 </label>
+
+                 <div className={`p-3 rounded-xl border transition-all ${purchaseType === 'subscription' ? 'border-slate-900 bg-slate-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input type="radio" name="ptype" checked={purchaseType === 'subscription'} onChange={() => setPurchaseType('subscription')} className="accent-slate-900 w-4 h-4"/>
+                        <span className="font-medium text-slate-700 flex items-center gap-2">Subscribe & Save <RefreshCw size={14}/></span>
+                    </label>
+                    
+                    {purchaseType === 'subscription' && (
+                        <select 
+                          value={selectedPlanId || ""} 
+                          onChange={(e) => setSelectedPlanId(e.target.value)}
+                          className="mt-3 w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-slate-900 outline-none bg-white"
+                        >
+                            {product.subscriptionPlans.map(plan => (
+                                <option key={plan.id} value={plan.id}>
+                                    {plan.name} ({formatPrice(Number(plan.price))} / {plan.interval})
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                 </div>
+             </div>
+         )}
+
          {/* Variants Selector */}
-         {product.variants.length > 0 && (
+         {product.variants.length > 0 && purchaseType === 'onetime' && (
             <div className="space-y-4 mb-8">
                <label className="text-sm font-bold text-slate-900 uppercase tracking-wide flex justify-between">
                  Select Option 
@@ -196,26 +295,26 @@ export default function ProductView({ product }: ProductViewProps) {
                </label>
                <div className="flex flex-wrap gap-3">
                   {product.variants.map((v) => {
-                     const isVariantOOS = v.trackQuantity && v.stock <= 0 && product.backorderStatus === 'DO_NOT_ALLOW';
-                     
-                     return (
-                       <button
-                         key={v.id}
-                         onClick={() => setSelectedVariantId(v.id)}
-                         disabled={isVariantOOS}
-                         className={`
-                           relative px-4 py-2.5 rounded-lg border text-sm font-semibold transition-all
-                           ${selectedVariantId === v.id 
-                             ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600" 
-                             : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                           }
-                           ${isVariantOOS ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 decoration-slice" : ""}
-                         `}
-                       >
-                         {v.name} 
-                         {isVariantOOS && <span className="text-xs ml-1 text-red-400">(OOS)</span>}
-                       </button>
-                     );
+                      const isVariantOOS = v.trackQuantity && v.stock <= 0 && product.backorderStatus === 'DO_NOT_ALLOW';
+                      
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => setSelectedVariantId(v.id)}
+                          disabled={isVariantOOS}
+                          className={`
+                            relative px-4 py-2.5 rounded-lg border text-sm font-semibold transition-all
+                            ${selectedVariantId === v.id 
+                              ? "border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600" 
+                              : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                            }
+                            ${isVariantOOS ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 decoration-slice" : ""}
+                          `}
+                        >
+                          {v.name} 
+                          {isVariantOOS && <span className="text-xs ml-1 text-red-400">(OOS)</span>}
+                        </button>
+                      );
                   })}
                </div>
             </div>
@@ -259,7 +358,7 @@ export default function ProductView({ product }: ProductViewProps) {
                    {isPending ? (
                      <Loader2 className="animate-spin h-5 w-5" />
                    ) : available ? (
-                     <> <ShoppingCart size={20}/> Add to Cart </>
+                     <> <ShoppingCart size={20}/> {btnText} </>
                    ) : (
                      "Out of Stock"
                    )}

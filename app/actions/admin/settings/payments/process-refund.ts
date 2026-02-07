@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
-import { secureAction } from "@/lib/security/server-action-wrapper"
+import { secureAction } from "@/lib/server-action-wrapper"
 import Stripe from "stripe"
 import { z } from "zod"
 

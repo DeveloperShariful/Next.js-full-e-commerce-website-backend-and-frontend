@@ -1,9 +1,7 @@
 // File: lib/server-action-wrapper.ts
 
-// File: lib/server-action-wrapper.ts
-
-import { security } from "@/lib/security/security";
-import { auditService } from "@/lib/services/audit-service";
+import { security } from "@/lib/security";
+import { auditService } from "@/lib/audit-service";
 import { ZodSchema } from "zod";
 
 type ActionOptions<T> = {
@@ -44,23 +42,19 @@ export async function secureAction<Input, Output>(
       safeInput = parsed.data;
     }
     
-    // Execute main logic
     const result = await handler(safeInput, user);
 
     if (!result.success) {
       throw new Error(result.error || "Action failed");
     }
 
-    // ✅ Fix: Non-blocking Audit Logging (Run in background)
-    // We don't await this, or we catch errors so it doesn't fail the request
     if (auditEntity) {
       const entityId = idExtractor 
         ? idExtractor(result.data || safeInput) 
         : (safeInput as any)?.id || (result.data as any)?.id || "UNKNOWN";
 
-      // Fire and forget (with catch to prevent unhandled promise rejection logging)
       const auditPromise = auditService.log({
-          userId: user?.id || "system", // Ensure "system" fallback if no user
+          userId: user?.id || "system", 
           action: actionName,
           entity: auditEntity,
           entityId: entityId,
@@ -68,17 +62,12 @@ export async function secureAction<Input, Output>(
           newData: result.data 
       }).catch(err => console.error("⚠️ Audit Log Failed (Background):", err.message));
       
-      // In Serverless/Vercel, you might need to await it to ensure execution, 
-      // but wrap in try-catch to not block the response.
-      // await auditPromise; 
     }
 
     return { success: true, data: result.data, message: result.data?.message };
 
   } catch (error: any) {
     console.error(`[ACTION_FAIL] ${actionName}:`, error.message);
-    
-    // Non-blocking system log
     auditService.systemLog("ERROR", actionName, error.message, { input }).catch(() => {});
 
     return { 

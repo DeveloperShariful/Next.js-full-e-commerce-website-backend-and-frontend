@@ -235,26 +235,20 @@ function CheckoutClientComponent({
   );
 }
 
-// ✅ MAIN FIX IS HERE
 export default function CheckoutClient(props: CheckoutClientProps) {
     const [stripePromise] = useState(() => {
         if (props.stripePublishableKey) return loadStripe(props.stripePublishableKey);
         return null;
     });
 
-    // 🛑 PROBLEM: This was recreating the object on every render
-    // const payPalOptions = { ... } 
-
-    // ✅ FIX: useMemo ব্যবহার করে অবজেক্ট স্থির রাখা হয়েছে
     const payPalOptions = useMemo(() => ({
         clientId: props.paypalClientId,
         currency: "AUD",
         intent: "capture",
-        // 'components' বাদ দেওয়া হলো বা ডিফল্ট রাখা হলো যাতে সব লোড হয়।
-        // যদি শুধু বাটন দরকার হয়: components: 'buttons' দিতে পারেন।
+        "enable-funding": "venmo,paylater",
+        
     }), [props.paypalClientId]);
     
-    // Stripe Wrapper
     const stripeWrapper = stripePromise ? (
         <Elements stripe={stripePromise} options={{ 
             mode: 'payment', currency: 'aud', 
@@ -267,7 +261,6 @@ export default function CheckoutClient(props: CheckoutClientProps) {
         <CheckoutClientComponent {...props} />
     );
 
-    // যদি PayPal Client ID না থাকে, তাহলে Provider রেন্ডার করবেন না (সেফটি চেক)
     if (!props.paypalClientId) {
         return stripeWrapper;
     }

@@ -4,7 +4,7 @@
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { decrypt } from "../crypto"
-import { auditService } from "@/lib/services/audit-service"
+import { auditService } from "@/lib/audit-service"
 import { auth } from "@clerk/nextjs/server"
 
 export async function refreshPaypalWebhook(paymentMethodId: string) {

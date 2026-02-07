@@ -1,5 +1,7 @@
 // File: app/(storefront)/product/[slug]/_components/product-card.tsx
 
+// File: app/(storefront)/product/[slug]/_components/product-card.tsx
+
 "use client";
 
 import { useTransition, MouseEventHandler } from "react";
@@ -20,6 +22,8 @@ interface ProductCardProps {
     featuredImage: string | null;
     images: { url: string }[];
     category: { name: string } | null;
+    rating?: number;      // ✅ Real Rating
+    reviewCount?: number; // ✅ Real Review Count
   };
 }
 
@@ -32,6 +36,10 @@ export default function ProductCard({ data }: ProductCardProps) {
   const discount = salePrice 
     ? Math.round(((price - salePrice) / price) * 100)
     : 0;
+
+  // ✅ Image Logic for Hover Effect
+  const mainImage = data.featuredImage || data.images?.[0]?.url;
+  const hoverImage = data.images?.[1]?.url; // গ্যালারির দ্বিতীয় ইমেজ
 
   const onAddToCart: MouseEventHandler<HTMLButtonElement> = (event) => {
     event.preventDefault(); 
@@ -51,25 +59,37 @@ export default function ProductCard({ data }: ProductCardProps) {
     });
   };
 
-  // ✅ FIX: Outer wrapper is now a DIV, not a LINK
   return (
-    <div className="group bg-white border border-slate-100 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 relative flex flex-col h-full">
+    <div className="group flex flex-col h-full bg-white border border-slate-100 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300">
       
-      {/* Image Link Wrapper */}
-      <div className="block relative aspect-[4/5] bg-gray-50 overflow-hidden cursor-pointer">
-        <Link href={`/product/${data.slug}`} className="absolute inset-0">
-            {data.featuredImage || data.images?.[0]?.url ? (
-            <Image 
-                src={data.featuredImage || data.images[0].url} 
-                alt={data.name}
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover group-hover:scale-110 transition-transform duration-500"
-            />
+      {/* ✅ Image Wrapper: Aspect Square & Hover Effect */}
+      <div className="relative aspect-square bg-gray-50 overflow-hidden">
+        <Link href={`/product/${data.slug}`} className="block w-full h-full">
+            {mainImage ? (
+                <>
+                    {/* Main Image */}
+                    <Image 
+                        src={mainImage} 
+                        alt={data.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className={`object-cover transition-all duration-500 ${hoverImage ? "group-hover:opacity-0" : "group-hover:scale-105"}`}
+                    />
+                    {/* Hover Image (Show only if available) */}
+                    {hoverImage && (
+                        <Image 
+                            src={hoverImage} 
+                            alt={data.name}
+                            fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            className="object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-105"
+                        />
+                    )}
+                </>
             ) : (
-            <div className="flex items-center justify-center h-full text-gray-300 bg-gray-100">
-                No Image
-            </div>
+                <div className="flex items-center justify-center h-full text-gray-300 bg-gray-100">
+                   No Image
+                </div>
             )}
         </Link>
 
@@ -82,29 +102,14 @@ export default function ProductCard({ data }: ProductCardProps) {
             )}
         </div>
 
-        {/* Overlay Actions */}
-        <div className="absolute inset-x-4 bottom-4 translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-20 flex gap-2">
-           <button 
-             onClick={onAddToCart}
-             disabled={isPending}
-             className="flex-1 bg-slate-900 text-white py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-black shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
-           >
-             {isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-             ) : (
-                <>
-                  <ShoppingCart size={16} /> Add
-                </>
-             )}
-           </button>
-           
-           {/* Eye Icon Link (Now safe because parent is DIV) */}
-           <Link 
-             href={`/product/${data.slug}`} 
-             className="p-2.5 bg-white text-slate-900 rounded-lg hover:bg-slate-50 shadow-lg border border-slate-200 flex items-center justify-center"
-           >
-             <Eye size={16} />
-           </Link>
+        {/* Quick View Icon (Only Visible on Hover) */}
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
+            <Link 
+              href={`/product/${data.slug}`} 
+              className="h-8 w-8 bg-white text-slate-900 rounded-full hover:bg-slate-900 hover:text-white shadow-md flex items-center justify-center transition-colors"
+            >
+              <Eye size={16} />
+            </Link>
         </div>
       </div>
 
@@ -120,7 +125,8 @@ export default function ProductCard({ data }: ProductCardProps) {
           </h3>
         </Link>
         
-        <div className="mt-auto flex items-end justify-between">
+        {/* Price & Real Rating Row */}
+        <div className="flex items-end justify-between mb-4">
           <div className="flex flex-col">
             {salePrice ? (
               <>
@@ -138,11 +144,28 @@ export default function ProductCard({ data }: ProductCardProps) {
             )}
           </div>
           
-          <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold bg-yellow-50 px-1.5 py-0.5 rounded">
-             <Star size={12} fill="currentColor" />
-             <span className="text-slate-700">4.5</span>
+          {/* ✅ Real Rating from Database */}
+          <div className="flex items-center gap-1 text-slate-700 text-xs font-bold bg-gray-50 px-2 py-1 rounded border border-gray-100">
+             <Star size={12} className="text-yellow-400 fill-yellow-400" />
+             <span>{data.rating ? Number(data.rating).toFixed(1) : "0.0"}</span>
+             <span className="text-slate-400 font-normal ml-0.5">({data.reviewCount || 0})</span>
           </div>
         </div>
+
+        {/* ✅ Add to Cart Button (Always Visible) */}
+        <button 
+            onClick={onAddToCart}
+            disabled={isPending}
+            className="mt-auto w-full bg-slate-900 text-white py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-black shadow-md transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+        >
+            {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+                <>
+                  <ShoppingCart size={16} /> Add to Cart
+                </>
+            )}
+        </button>
       </div>
     </div>
   );

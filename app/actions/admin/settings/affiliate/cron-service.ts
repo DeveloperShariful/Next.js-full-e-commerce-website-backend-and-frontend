@@ -3,8 +3,8 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { auditService } from "@/lib/services/audit-service";
-import { DecimalMath } from "@/lib/utils/decimal-math";
+import { auditService } from "@/lib/audit-service";
+import { DecimalMath } from "@/lib/decimal-math";
 import { updateRiskScore } from "./_services/fraud-service";
 
 const BATCH_SIZE = Number(process.env.AFFILIATE_CRON_BATCH_SIZE) || 100;

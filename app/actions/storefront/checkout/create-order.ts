@@ -1,52 +1,41 @@
 //app/actions/storefront/checkout/create-order.ts
-// app/actions/storefront/checkout/create-order.ts
-
 "use server";
 
 import { db } from "@/lib/prisma";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { clearCart } from "../cart/clear-cart";
-import { calculateShippingServerSide } from "./get-shipping-rates";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { cookies } from "next/headers";
-import { validateCoupon } from "./validate-coupon";
+import { calculateCartTotals } from "./checkout-utils";
+import { z } from "zod";
 
-interface OrderInput {
-  cartId: string;
-  billing: any;
-  shipping: any;
-  shippingMethodId: string;
-  paymentMethod: string;
-  paymentIntentId?: string;
-  customerNote?: string;
-  couponCode?: string | null;
-  retainCart?: boolean; // ✅ NEW OPTION: To prevent clearing cart prematurely
-}
+const CreateOrderSchema = z.object({
+  cartId: z.string().uuid(),
+  billing: z.any(),
+  shipping: z.any(),
+  shippingMethodId: z.string(),
+  paymentMethod: z.string(),
+  paymentIntentId: z.string().optional(),
+  customerNote: z.string().optional(),
+  couponCode: z.string().optional().nullable(),
+  retainCart: z.boolean().optional(),
+});
 
-interface OrderItemData {
-  productId: string;
-  variantId: string | null;
-  productName: string;
-  variantName: string | undefined;
-  price: number;
-  quantity: number;
-  total: number;
-  image: string | null;
-}
-
-export async function createOrder(data: OrderInput) {
+export async function createOrder(input: z.infer<typeof CreateOrderSchema>) {
   try {
-    // 1. Fetch Cart
-    const cart = await db.cart.findUnique({
-      where: { id: data.cartId },
-      include: { items: { include: { product: true, variant: true } } }
-    });
+    const data = CreateOrderSchema.parse(input);
+    const calculation = await calculateCartTotals(
+      data.cartId,
+      data.shippingMethodId,
+      data.shipping,
+      data.couponCode || undefined,
+      data.paymentMethod
+    );
 
+    const { cart } = calculation;
     if (!cart || cart.items.length === 0) {
-      return { success: false, error: "Cart is empty" };
+      throw new Error("Cart is empty or invalid.");
     }
-
-    // 2. Affiliate Tracking
     const cookieStore = await cookies();
     const affiliateSlug = cookieStore.get("affiliate_token")?.value;
     let affiliateId: string | null = null;
@@ -56,144 +45,82 @@ export async function createOrder(data: OrderInput) {
         where: { slug: affiliateSlug, status: "ACTIVE" },
         select: { id: true }
       });
-      if (affiliate) {
-        affiliateId = affiliate.id;
-      }
+      affiliateId = affiliate?.id || null;
     }
-
-    // 3. Calculate Totals & Validate Stock
-    let subtotal = 0;
-    const orderItemsData: OrderItemData[] = [];
-
-    for (const item of cart.items) {
-      // Use salePrice if available, otherwise price
-      const price = Number(
-        item.variant 
-          ? (item.variant.salePrice ?? item.variant.price) 
-          : (item.product.salePrice ?? item.product.price)
-      );
-      
-      const currentStock = item.variant ? item.variant.stock : item.product.stock;
-      const trackQuantity = item.variant ? item.variant.trackQuantity : item.product.trackQuantity;
-      
-      if (trackQuantity && currentStock < item.quantity) {
-        return { success: false, error: `Product "${item.product.name}" is out of stock.` };
-      }
-
-      subtotal += price * item.quantity;
-
-      orderItemsData.push({
-        productId: item.productId,
-        variantId: item.variantId,
-        productName: item.product.name,
-        variantName: item.variant?.name,
-        price: price,
-        quantity: item.quantity,
-        total: price * item.quantity,
-        image: item.variant?.image || item.product.featuredImage
-      });
-    }
-
-    // 4. Shipping
-    let shippingCost = 0;
-    if (data.shippingMethodId) {
-      const validCost = await calculateShippingServerSide(
-        data.cartId, 
-        data.shipping, 
-        data.shippingMethodId
-      );
-      if (validCost === null) return { success: false, error: "Invalid shipping method." };
-      shippingCost = validCost;
-    }
-
-    // 5. Discount
-    let discountAmount = 0;
-    let discountId = null;
-    if (data.couponCode) {
-        const couponRes = await validateCoupon(data.couponCode, data.cartId);
-        if (couponRes.success && couponRes.discountAmount) {
-            discountAmount = couponRes.discountAmount;
-            const discount = await db.discount.findUnique({ where: { code: data.couponCode } });
-            if (discount) discountId = discount.id;
-        }
-    }
-
-    // 6. Surcharge Calculation
-    let surcharge = 0;
-    let paymentGatewayName = "OFFLINE";
-
-    // Helper to calculate percentage or fixed amount
-    const calculateSurchargeValue = (amount: number, type: string, baseAmount: number) => {
-        return type === 'percentage' 
-            ? (baseAmount * amount) / 100 
-            : amount;
-    };
-
-    // Calculate base amount for surcharge (usually Subtotal + Shipping - Discount)
-    const surchargeBase = Math.max(0, subtotal + shippingCost - discountAmount);
-
-    if (data.paymentMethod === 'stripe_card' || data.paymentMethod.startsWith('stripe_')) {
-        paymentGatewayName = "STRIPE";
-        const stripeConf = await db.stripeConfig.findFirst({ include: { paymentMethod: true } });
-        
-        if (stripeConf?.paymentMethod?.surchargeEnabled) {
-             surcharge = calculateSurchargeValue(
-                 Number(stripeConf.paymentMethod.surchargeAmount),
-                 stripeConf.paymentMethod.surchargeType,
-                 surchargeBase
-             );
-        }
-    } 
-    else if (data.paymentMethod === 'paypal') {
-        paymentGatewayName = "PAYPAL";
-        const paypalConf = await db.paypalConfig.findFirst({ include: { paymentMethod: true } });
-        
-        if (paypalConf?.paymentMethod?.surchargeEnabled) {
-             surcharge = calculateSurchargeValue(
-                 Number(paypalConf.paymentMethod.surchargeAmount),
-                 paypalConf.paymentMethod.surchargeType,
-                 surchargeBase
-             );
-        }
-    }
-    else {
-        // Offline / Manual Methods
-        const offlineConf = await db.paymentMethodConfig.findFirst({ where: { identifier: data.paymentMethod } });
-        if (offlineConf?.surchargeEnabled) {
-             surcharge = calculateSurchargeValue(
-                 Number(offlineConf.surchargeAmount),
-                 offlineConf.surchargeType,
-                 surchargeBase
-             );
-        }
-    }
-
-    // Ensure grand total is never negative
-    const grandTotal = Math.max(0, subtotal + shippingCost + surcharge - discountAmount);
-
-    // 7. Transaction (Create Order & Update Stock)
     const newOrder = await db.$transaction(async (tx) => {
+      for (const item of cart.items) {
+        if (item.variantId) {
+          const variant = await tx.productVariant.findUnique({
+            where: { id: item.variantId }
+          });
+
+          if (!variant) throw new Error(`Product variant not found: ${item.product.name}`);
+          
+          if (variant.trackQuantity) {
+            if (variant.stock < item.quantity) {
+              throw new Error(`Insufficient stock for ${item.product.name} (${variant.name})`);
+            }
+            await tx.productVariant.update({
+              where: { id: item.variantId },
+              data: { stock: { decrement: item.quantity } }
+            });
+          }
+        } else {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId }
+          });
+
+          if (!product) throw new Error(`Product not found: ${item.product.name}`);
+
+          if (product.trackQuantity) {
+            if (product.stock < item.quantity) {
+              throw new Error(`Insufficient stock for ${item.product.name}`);
+            }
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { decrement: item.quantity } }
+            });
+          }
+        }
+      }
+      let discountId: string | null = null;
+      if (data.couponCode) {
+        const discount = await tx.discount.findUnique({
+            where: { code: data.couponCode }
+        });
+        
+        if (discount) {
+            if (discount.usageLimit && discount.usedCount >= discount.usageLimit) {
+                throw new Error("Coupon usage limit reached during checkout.");
+            }
+            discountId = discount.id;
+            await tx.discount.update({
+                where: { id: discount.id },
+                data: { usedCount: { increment: 1 } }
+            });
+        }
+      }
       const count = await tx.order.count();
       const orderNumber = `ORD-${1000 + count + 1}`;
-      
-      const order = await tx.order.create({
+      let gatewayName = "OFFLINE";
+      const pmUpper = data.paymentMethod.toUpperCase();
+      if (pmUpper.includes("STRIPE")) gatewayName = "STRIPE";
+      else if (pmUpper.includes("PAYPAL")) gatewayName = "PAYPAL";
+      return await tx.order.create({
         data: {
           orderNumber,
-          status: OrderStatus.PENDING, 
+          status: OrderStatus.PENDING,
           paymentStatus: PaymentStatus.UNPAID,
-          paymentGateway: paymentGatewayName,
+          paymentGateway: gatewayName,
           paymentMethod: data.paymentMethod,
           paymentId: data.paymentIntentId || null,
-          
-          subtotal: subtotal, 
-          shippingTotal: shippingCost,
-          discountTotal: discountAmount,
-          surcharge: surcharge,
-          total: grandTotal,
-          
-          couponCode: data.couponCode || null, 
+          subtotal: calculation.subtotal,
+          shippingTotal: calculation.shippingCost,
+          discountTotal: calculation.discount,
+          surcharge: calculation.surcharge,
+          total: calculation.total,
+          couponCode: data.couponCode || null,
           discountId: discountId,
-          
           guestEmail: data.billing.email,
           shippingAddress: data.shipping,
           billingAddress: data.billing,
@@ -203,84 +130,70 @@ export async function createOrder(data: OrderInput) {
           affiliateId: affiliateId,
 
           items: {
-            create: orderItemsData
+            create: cart.items.map(item => {
+              const price = item.variant 
+                ? (item.variant.salePrice ?? item.variant.price)
+                : (item.product.salePrice ?? item.product.price);
+
+              return {
+                productId: item.productId,
+                variantId: item.variantId,
+                productName: item.product.name,
+                variantName: item.variant?.name,
+                sku: item.variant?.sku || item.product.sku,
+                price: price, 
+                quantity: item.quantity,
+                total: Number(price) * item.quantity, 
+                image: item.variant?.image || item.product.featuredImage
+              };
+            })
           }
         }
       });
-      
-      // Deduct Stock
-      for (const item of cart.items) {
-           if (item.variantId && item.variant?.trackQuantity) {
-             await tx.productVariant.update({ 
-               where: { id: item.variantId }, 
-               data: { stock: { decrement: item.quantity } } 
-             });
-           } else if (item.product.trackQuantity) {
-             await tx.product.update({ 
-               where: { id: item.productId }, 
-               data: { stock: { decrement: item.quantity } } 
-             });
-           }
-      }
-      
-      // Increment Coupon Usage
-      if (data.couponCode && discountAmount > 0) {
-          await tx.discount.update({
-              where: { code: data.couponCode },
-              data: { usedCount: { increment: 1 } }
-          });
-      }
-
-      return order;
+    }, {
+      maxWait: 5000, 
+      timeout: 10000 
     });
-
-    // 8. Notifications (Async - don't block if fails)
-    if (!data.retainCart) { 
-        sendNotification({
-            trigger: "ORDER_PENDING",
-            recipient: data.billing.email,
-            orderId: newOrder.id,
-            data: {
-                order_number: newOrder.orderNumber,
-                customer_name: `${data.billing.firstName} ${data.billing.lastName}`,
-                total_amount: grandTotal.toFixed(2),
-            }
-        }).catch(err => console.error("Email Error:", err));
-    }
-
-    // 9. Clear Cart
-    if (!data.retainCart) { 
-        await clearCart(); 
-    }
-
-    // 10. Affiliate Trigger (Safe Fetch)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const apiKey = process.env.INTERNAL_API_KEY;
     
-    if (affiliateId && apiKey) {
-        fetch(`${appUrl}/api/affiliate/process-order`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-api-key": apiKey
-            },
-            body: JSON.stringify({ orderId: newOrder.id })
-        }).catch(err => console.error("Affiliate Trigger Failed:", err));
+    if (!data.retainCart) {
+      await clearCart();
     }
 
-    // ✅ SUCCESS RETURN
-    return { 
-      success: true, 
-      id: newOrder.id, // Important: match this key with frontend expectation
-      orderId: newOrder.id, 
+    sendNotification({
+      trigger: "ORDER_PENDING",
+      recipient: data.billing.email,
+      orderId: newOrder.id,
+      data: {
+        order_number: newOrder.orderNumber,
+        customer_name: `${data.billing.firstName} ${data.billing.lastName}`,
+        total_amount: calculation.total, 
+      }
+    }).catch(err => console.error("Order Email Failed:", err.message));
+    if (affiliateId) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const apiKey = process.env.INTERNAL_API_KEY || "";
+      
+      fetch(`${appUrl}/api/affiliate/process-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+        body: JSON.stringify({ orderId: newOrder.id })
+      }).catch(err => console.error("Affiliate Trigger Failed:", err.message));
+    }
+
+    return {
+      success: true,
+      id: newOrder.id,
+      orderId: newOrder.id,
       orderNumber: newOrder.orderNumber,
-      orderKey: "key_" + newOrder.id, 
-      grandTotal: grandTotal 
+      orderKey: "key_" + newOrder.id,
+      grandTotal: calculation.total
     };
 
   } catch (error: any) {
     console.error("Create Order Error:", error);
-    // Return a clean error message
-    return { success: false, error: error.message || "Failed to create order" };
+    return { 
+      success: false, 
+      error: error.message || "Failed to create order. Please try again." 
+    };
   }
 }

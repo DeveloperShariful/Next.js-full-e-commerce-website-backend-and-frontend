@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma";
 // ✅ ১. সঠিক Enum টি ইমপোর্ট করুন
 import { Prisma, AffiliateDocumentStatus } from "@prisma/client"; 
-import { auditService } from "@/lib/services/audit-service";
+import { auditService } from "@/lib/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse } from "../types";
 import { protectAction } from "../permission-service";

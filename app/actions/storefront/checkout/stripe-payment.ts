@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma"
 import Stripe from "stripe"
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
-import { secureAction } from "@/lib/security/server-action-wrapper"
+import { secureAction } from "@/lib/server-action-wrapper"
 import { calculateCartTotals } from "./checkout-utils"
 import { z } from "zod"
 
@@ -38,31 +38,23 @@ export async function createPaymentIntent(params: z.infer<typeof CreateIntentSch
     async (input) => {
         const instance = await getStripeInstance();
         if (!instance) throw new Error("Stripe Unavailable");
-        const { stripe, config } = instance;
-
-        // ✅ সার্ভার সাইডে শিপিং এবং ডিসকাউন্ট সহ আসল টোটাল ক্যালকুলেট করা
-        const { total } = await calculateCartTotals(
+        const { stripe } = instance;
+        const { totalsInCents } = await calculateCartTotals(
             input.cartId, 
             input.shippingMethodId, 
             input.shippingAddress, 
-            input.couponCode
+            input.couponCode,
+            "stripe" 
         );
         
-        let finalAmount = total;
+        const finalAmountCents = totalsInCents.total;
 
-        // ✅ Stripe এর জন্য পেমেন্ট সারচার্জ যোগ করা (যদি এনাবল থাকে)
-        if (config.paymentMethod.surchargeEnabled) {
-             const surcharge = config.paymentMethod.surchargeType === 'percentage'
-                ? (total * Number(config.paymentMethod.surchargeAmount)) / 100
-                : Number(config.paymentMethod.surchargeAmount);
-             finalAmount += surcharge;
+        if (finalAmountCents < 50) {
+            throw new Error("Total amount must be at least $0.50");
         }
 
-        // Stripe এর মিনিমাম চার্জ ৫০ সেন্ট (AUD 0.50)
-        if (finalAmount <= 0.50) throw new Error("Total must be at least $0.50");
-
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(finalAmount * 100), // সেন্টে কনভার্ট করা
+            amount: finalAmountCents, 
             currency: "aud",
             automatic_payment_methods: { enabled: true },
             metadata: {
@@ -99,26 +91,22 @@ export async function updatePaymentIntent(params: z.infer<typeof UpdateIntentSch
     async (input) => {
         const instance = await getStripeInstance();
         if (!instance) throw new Error("Stripe Unavailable");
-        const { stripe, config } = instance;
+        const { stripe } = instance;
 
-        // ✅ আপডেট হওয়ার সময় নতুন করে টোটাল ক্যালকুলেট করা
-        const { total } = await calculateCartTotals(
+        const { totalsInCents } = await calculateCartTotals(
             input.cartId, 
             input.shippingMethodId, 
             input.shippingAddress, 
-            input.couponCode
+            input.couponCode,
+            "stripe"
         );
 
-        let finalAmount = total;
-        if (config.paymentMethod.surchargeEnabled) {
-             const surcharge = config.paymentMethod.surchargeType === 'percentage'
-                ? (total * Number(config.paymentMethod.surchargeAmount)) / 100
-                : Number(config.paymentMethod.surchargeAmount);
-             finalAmount += surcharge;
+        if (totalsInCents.total < 50) {
+            throw new Error("Total amount must be at least $0.50");
         }
 
         await stripe.paymentIntents.update(input.paymentIntentId, {
-            amount: Math.round(finalAmount * 100),
+            amount: totalsInCents.total,
             metadata: {
                 cartId: input.cartId,
                 shippingMethodId: input.shippingMethodId || "",

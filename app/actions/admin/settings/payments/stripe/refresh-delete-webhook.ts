@@ -5,7 +5,7 @@ import { db } from "@/lib/prisma"
 import Stripe from "stripe"
 import { revalidatePath } from "next/cache"
 import { encrypt, decrypt } from "../crypto"
-import { auditService } from "@/lib/services/audit-service"
+import { auditService } from "@/lib/audit-service"
 import { auth } from "@clerk/nextjs/server"
 
 export async function refreshStripeWebhooks(paymentMethodId: string) {

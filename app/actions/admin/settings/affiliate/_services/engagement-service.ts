@@ -5,11 +5,11 @@
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath, unstable_cache } from "next/cache";
-import { DecimalMath } from "@/lib/utils/decimal-math";
+import { DecimalMath } from "@/lib/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service"; 
-import { auditService } from "@/lib/services/audit-service";
+import { auditService } from "@/lib/audit-service";
 
 // =========================================
 // SECTION 1: CONTESTS (Competitions)

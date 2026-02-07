@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto";
-import { auditService } from "@/lib/services/audit-service"; 
+import { auditService } from "@/lib/audit-service"; 
 
 async function getPayPalAccessToken(clientId: string, clientSecret: string, isSandbox: boolean) {
   const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";

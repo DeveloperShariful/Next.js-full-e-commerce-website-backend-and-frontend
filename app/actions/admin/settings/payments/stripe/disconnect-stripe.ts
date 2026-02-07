@@ -3,7 +3,7 @@
 "use server"
 
 import { db } from "@/lib/prisma"
-import { secureAction } from "@/lib/security/server-action-wrapper"
+import { secureAction } from "@/lib/server-action-wrapper"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 

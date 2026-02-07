@@ -5,8 +5,8 @@
 import { db } from "@/lib/prisma";
 import { Prisma, CommissionType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { auditService } from "@/lib/services/audit-service";
-import { DecimalMath } from "@/lib/utils/decimal-math";
+import { auditService } from "@/lib/audit-service";
+import { DecimalMath } from "@/lib/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service";

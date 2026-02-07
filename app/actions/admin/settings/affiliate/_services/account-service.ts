@@ -4,8 +4,8 @@
 
 import { db } from "@/lib/prisma";
 import { AffiliateStatus, Prisma, AffiliateAccount } from "@prisma/client";
-import { DecimalMath } from "@/lib/utils/decimal-math";
-import { auditService } from "@/lib/services/audit-service";
+import { DecimalMath } from "@/lib/decimal-math";
+import { auditService } from "@/lib/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, AffiliateUserTableItem } from "../types";
 import { protectAction } from "../permission-service";

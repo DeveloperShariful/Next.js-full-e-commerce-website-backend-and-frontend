@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { protectAction } from "../permission-service"; 
-import { DecimalMath } from "@/lib/utils/decimal-math";
+import { DecimalMath } from "@/lib/decimal-math";
 import { unstable_cache } from "next/cache";
 import { 
   subMonths, 

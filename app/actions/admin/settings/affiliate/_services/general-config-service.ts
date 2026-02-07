@@ -5,11 +5,11 @@
 import { db } from "@/lib/prisma";
 import { AffiliateGeneralSettings, AffiliateConfigDTO, ActionResponse } from "../types";
 import { revalidatePath } from "next/cache";
-import { auditService } from "@/lib/services/audit-service";
+import { auditService } from "@/lib/audit-service";
 import { affiliateGeneralSchema } from "../schemas";
 import { getChanges } from "../get-changes";
 import { protectAction } from "../permission-service";
-import { DecimalMath } from "@/lib/utils/decimal-math";
+import { DecimalMath } from "@/lib/decimal-math";
 
 // =========================================
 // READ OPERATIONS

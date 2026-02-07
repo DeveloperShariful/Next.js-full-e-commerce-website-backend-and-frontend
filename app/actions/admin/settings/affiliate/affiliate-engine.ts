@@ -4,11 +4,11 @@
 
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { DecimalMath } from "@/lib/utils/decimal-math";
-import { getCachedAffiliateSettings, getCachedGlobalRules } from "@/lib/services/settings-cache";
+import { DecimalMath } from "@/lib/decimal-math";
+import { getCachedAffiliateSettings, getCachedGlobalRules } from "@/lib/settings-cache";
 import { distributeMLMCommission } from "./_services/mlm-network-service";
 import { detectSelfReferral, checkVelocity } from "./_services/fraud-service";
-import { auditService } from "@/lib/services/audit-service";
+import { auditService } from "@/lib/audit-service";
 
 export async function processOrder(orderId: string) {
   const order = await db.order.findUnique({

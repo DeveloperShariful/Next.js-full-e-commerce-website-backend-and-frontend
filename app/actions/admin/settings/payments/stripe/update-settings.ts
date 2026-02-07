@@ -17,8 +17,27 @@ export async function updateStripeSettings(
 ) {
   const { userId } = await auth();
   
+  let validUserId: string | undefined = undefined;
+  
+  if (userId) {
+    try {
+      const localUser = await db.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true } 
+      });
+      
+      if (localUser) {
+        validUserId = localUser.id;
+      } else {
+        console.warn(`[Audit Log Warning] User ${userId} not found in local DB. Logging as System/Anonymous.`);
+      }
+    } catch (err) {
+      console.error("Error verifying user for audit log:", err);
+    }
+  }
+
   try {
-    const validated = StripeSettingsSchema.parse(values)   
+    const validated = StripeSettingsSchema.parse(values)    
     const oldConfig = await db.stripeConfig.findUnique({
         where: { paymentMethodId },
         include: { paymentMethod: true }
@@ -119,10 +138,8 @@ export async function updateStripeSettings(
           debugLog: validated.debugLog ?? false,
         }
       });
-
-      // 6. Audit Logging
       await auditService.log({
-          userId: userId ?? "system",
+          userId: validUserId, 
           action: "UPDATE_STRIPE_SETTINGS",
           entity: "StripeConfig",
           entityId: newConfig.id,

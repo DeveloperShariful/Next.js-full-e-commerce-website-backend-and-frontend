@@ -2,7 +2,7 @@
 
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth"; // <--- NextAuth Session
 import { db } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import AdminSidebar from "@/app/(admin)/Header-Sideber/sidebar";
@@ -76,11 +76,11 @@ async function getGlobalData() {
 }
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) redirect("/sign-in");
+  const session = await auth(); // <--- NextAuth Auth Check
+  if (!session?.user?.email) redirect("/sign-in");
 
   const dbUser = await db.user.findUnique({
-    where: { email: clerkUser.emailAddresses[0].emailAddress }
+    where: { email: session.user.email }
   });
 
   if (!dbUser || dbUser.role === Role.CUSTOMER) redirect("/");
@@ -89,16 +89,16 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     name: dbUser.name,
     email: dbUser.email,
     role: dbUser.role,
-    image: clerkUser.imageUrl,
+    image: session.user.image, 
   };
 
   const rawData = await getGlobalData();
   const cleanData = serializePrismaData(rawData);
   return (
     <GlobalStoreProvider 
-      settings={cleanData.settings} 
-      paymentMethods={cleanData.paymentMethods}
-      pickupLocations={cleanData.pickupLocations}
+      settings={cleanData.settings as any} 
+      paymentMethods={cleanData.paymentMethods as any}
+      pickupLocations={cleanData.pickupLocations as any}
     >
       <div className="flex h-screen bg-slate-50/50 font-sans text-slate-800 overflow-hidden">
         <AdminSidebar user={adminUser} />

@@ -1,14 +1,22 @@
 // File: app/actions/settings/payments/paypal/refresh-delete-webhook.ts
+
 "use server"
 
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { decrypt } from "../crypto"
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/auth"
+
+async function getDbUserId() {
+  const session = await auth();
+  if (!session?.user?.email) return null;
+  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
+  return user?.id || null;
+}
 
 export async function refreshPaypalWebhook(paymentMethodId: string) {
-  const { userId } = await auth();
+  const userId = await getDbUserId();
   try {
     const config = await db.paypalConfig.findUnique({ where: { paymentMethodId } })
     if (!config) return { success: false, error: "Configuration not found" }
@@ -91,7 +99,7 @@ export async function refreshPaypalWebhook(paymentMethodId: string) {
 }
 
 export async function deletePaypalWebhook(paymentMethodId: string) {
-  const { userId } = await auth();
+  const userId = await getDbUserId();
   try {
     const config = await db.paypalConfig.findUnique({ where: { paymentMethodId } })
     if (!config || !config.webhookId) return { success: true }

@@ -6,7 +6,7 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/admin/product/product-utils"; 
-import { currentUser } from "@clerk/nextjs/server"; 
+import { auth } from "@/auth";
 
 import { parseProductFormData } from "./product-data-parser";
 import { 
@@ -84,23 +84,23 @@ export async function updateProduct(formData: FormData): Promise<ProductFormStat
 }
 
 async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promise<ProductFormState> {
-    const user = await currentUser();
-    if (!user) return { success: false, message: "Unauthorized access" };
+ 
+    const session = await auth();
+    if (!session || !session.user) return { success: false, message: "Unauthorized access" };
 
-    let dbUser = await db.user.findUnique({ where: { clerkId: user.id } });
+    const email = session.user.email;
+    if (!email) return { success: false, message: "User email not found" };
+
+    let dbUser = await db.user.findUnique({ where: { email: email } });
 
     if (!dbUser) {
-        const email = user.emailAddresses[0]?.emailAddress;
-        if (!email) return { success: false, message: "User email not found" };
-
         try {
             dbUser = await db.user.create({
                 data: {
-                    clerkId: user.id,
                     email: email,
-                    name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || "Admin User",
+                    name: session.user.name || "Admin User",
                     role: "ADMIN",
-                    image: user.imageUrl
+                    image: session.user.image
                 }
             });
         } catch (error) {

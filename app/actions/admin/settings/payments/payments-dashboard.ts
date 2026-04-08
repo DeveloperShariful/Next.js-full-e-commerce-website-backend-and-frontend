@@ -6,16 +6,16 @@ import { db } from "@/lib/prisma"
 import { decrypt } from "@/app/actions/admin/settings/payments/crypto"
 import { revalidatePath } from "next/cache"
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/auth"
 import { PaymentMode } from "@prisma/client"
 
 // Helper to get Real DB User ID
 async function getDbUserId() {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) return null;
+  const session = await auth();
+  if (!session?.user?.email) return null;
   
   const user = await db.user.findUnique({
-    where: { clerkId },
+    where: { email: session.user.email },
     select: { id: true }
   });
   return user?.id || null;
@@ -53,7 +53,7 @@ export async function getAllPaymentMethods() {
 }
 
 export async function togglePaymentMethodStatus(id: string, isEnabled: boolean) {
-  // ✅ FIX: Get Real DB User ID instead of Clerk ID
+
   const userId = await getDbUserId();
   
   try {
@@ -130,7 +130,6 @@ export async function resetPaymentMethodsDB() {
 }
 
 export async function getPaymentMethodByIdentifier(identifier: string) {
-    // ... (This function looks fine, no audit logging here)
     try {
     const method = await db.paymentMethodConfig.findUnique({
       where: { identifier },

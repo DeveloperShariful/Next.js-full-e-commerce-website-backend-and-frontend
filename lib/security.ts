@@ -1,16 +1,16 @@
-// File: lib/security.ts
+// lib/security.ts
 
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 import { db } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { Role } from "@prisma/client";
 
 export const security = {
   async getCurrentUser() {
-    const { userId: clerkId } = await auth();
-    if (!clerkId) return null;
+    const session = await auth();
+    if (!session?.user?.email) return null;
     return await db.user.findUnique({
-      where: { clerkId },
+      where: { email: session.user.email },
       select: { id: true, role: true, email: true, isActive: true }
     });
   },

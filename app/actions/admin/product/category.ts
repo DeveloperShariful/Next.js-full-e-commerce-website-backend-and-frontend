@@ -5,7 +5,7 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { currentUser } from "@clerk/nextjs/server"; // 🔥 NEW: Auth check for logging
+import { auth } from "@/auth"; 
 
 // --- Types ---
 export type CategoryNode = {
@@ -38,9 +38,9 @@ const categorySchema = z.object({
 
 // --- Helper: Get DB User ID ---
 async function getDbUserId() {
-    const user = await currentUser();
-    if (!user) return null;
-    const dbUser = await db.user.findUnique({ where: { clerkId: user.id } });
+    const session = await auth();
+    if (!session?.user?.email) return null;
+    const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
     return dbUser?.id;
 }
 

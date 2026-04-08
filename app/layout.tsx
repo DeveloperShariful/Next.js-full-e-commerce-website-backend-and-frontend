@@ -1,12 +1,10 @@
 // app/layout.tsx
 
-// app/layout.tsx
-
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider } from '@clerk/nextjs';
+import { SessionProvider } from "next-auth/react"; 
 import NextTopLoader from 'nextjs-toploader';
 import { db } from "@/lib/prisma";
 import { 
@@ -80,7 +78,7 @@ export default async function RootLayout({
   };
 
   return (
-    <ClerkProvider>
+    <SessionProvider>
       <html lang="en">
         <body
           suppressHydrationWarning={true}
@@ -99,13 +97,13 @@ export default async function RootLayout({
           />
           <Toaster position="top-center" />
           
-          <GlobalStoreProvider settings={providerSettings}>
+          <GlobalStoreProvider settings={providerSettings as any}>
             <AffiliateTrackerProvider />
             {children}
           </GlobalStoreProvider>
           
         </body>
       </html>
-    </ClerkProvider>
+    </SessionProvider>
   );
 }

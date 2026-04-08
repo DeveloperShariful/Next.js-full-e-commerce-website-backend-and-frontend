@@ -1,29 +1,26 @@
 // app/actions/storefront/header-footer/header-client.tsx
-
-// app/actions/storefront/header-footer/header-client.tsx
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
-import { Search, Menu, X, LayoutDashboard, User, Network } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import { Search, Menu, X, LayoutDashboard, User, Network, LogOut, Loader2 } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { Cart_Icon } from "./Cart_Icon"; 
 import { cn } from "@/lib/utils";
 
-// ✅ 1. মেনু আইটেমের টাইপ ডিফাইন করা হলো
+// ✅ 1. মেনু আইটেমের টাইপ ডিফাইন
 type MenuItem = {
   id: string;
   label: string;
   url: string;
-  target?: string; // যেমন: "_blank"
-  children?: MenuItem[]; // সাব-মেনুর জন্য
+  target?: string;
+  children?: MenuItem[];
 };
 
-// ✅ 2. মেনু আইটেমের ডাটা এখানেই হার্ডকোড করা হলো
+// ✅ 2. মেনু আইটেমের ডাটা
 const mainMenuItems: MenuItem[] = [
   { id: "1", label: "Home", url: "/" },
   { id: "2", label: "Shop", url: "/shop" },
@@ -50,11 +47,20 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
   const { storeName, logo, primaryColor } = useGlobalStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { user } = useUser();
+  
+  // Hydration ফিক্স করার জন্য State
+  const [mounted, setMounted] = useState(false);
+  
+  const { data: session, status } = useSession();
   const pathname = usePathname();
 
-  // Admin Role চেক করা
-  const isAdmin = user?.publicMetadata?.role === "admin" || pathname.startsWith("/admin");
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isLoggedIn = status === "authenticated";
+  const isLoading = status === "loading";
+  const isAdmin = session?.user?.role === "SUPER_ADMIN" || session?.user?.role === "ADMIN" || pathname.startsWith("/admin");
 
   return (
     <>
@@ -63,7 +69,6 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
           
           {/* -------------------- 1. LEFT: LOGO -------------------- */}
           <div className="flex items-center gap-4">
-            {/* Mobile Hamburger */}
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-md"
@@ -71,7 +76,6 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
               <Menu size={24} />
             </button>
 
-            {/* Dynamic Logo */}
             <Link href="/" className="flex items-center gap-2 group">
               {logo?.url ? (
                 <div className="relative w-8 h-8 sm:w-auto">
@@ -97,7 +101,7 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
             </Link>
           </div>
 
-          {/* -------------------- 2. CENTER: NAVIGATION (Desktop) -------------------- */}
+          {/* -------------------- 2. CENTER: NAVIGATION -------------------- */}
           <nav className="hidden lg:flex items-center gap-1">
             {mainMenuItems.length > 0 ? (
               mainMenuItems.map((item) => (
@@ -111,13 +115,11 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
                     )}
                   >
                     {item.label}
-                    {/* Dropdown Icon if children exist */}
                     {item.children && item.children.length > 0 && (
                       <span className="opacity-50 text-[10px]">▼</span>
                     )}
                   </Link>
                   
-                  {/* Dropdown Menu */}
                   {item.children && item.children.length > 0 && (
                      <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-slate-100 shadow-lg rounded-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform translate-y-2 group-hover:translate-y-0 z-50">
                        {item.children.map((subItem) => (
@@ -135,7 +137,6 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
                 </div>
               ))
             ) : (
-              // Fallback Menu
               <>
                 <Link href="/" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-black hover:bg-slate-50 rounded-full">Home</Link>
                 <Link href="/shop" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-black hover:bg-slate-50 rounded-full">Shop</Link>
@@ -146,7 +147,6 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
           {/* -------------------- 3. RIGHT: ACTIONS -------------------- */}
           <div className="flex items-center gap-2 sm:gap-4">
             
-            {/* Search Toggle */}
             <button 
               onClick={() => setIsSearchOpen(!isSearchOpen)}
               className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
@@ -154,77 +154,83 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
               {isSearchOpen ? <X size={20} /> : <Search size={20} />}
             </button>
 
-            {/* Cart Icon */}
             <Cart_Icon initialCount={cartCount} />
 
             <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
 
             {/* Auth Buttons */}
             <div className="flex items-center gap-2">
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <button className="text-sm font-semibold px-4 py-2 border border-slate-200 rounded-full hover:border-slate-400 transition text-slate-700 hidden sm:block">
-                    Login
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="text-sm font-bold px-4 py-2 bg-black text-white rounded-full hover:bg-slate-800 transition shadow-sm hidden sm:block">
-                    Register
-                  </button>
-                </SignUpButton>
-                {/* Mobile only icon for login */}
-                <SignInButton mode="modal">
-                    <button className="sm:hidden p-2 text-slate-600"><User size={20} /></button>
-                </SignInButton>
-              </SignedOut>
+              
+              {/* Hydration ও Loading স্টেট চেক */}
+              {!mounted || isLoading ? (
+                <div className="w-8 h-8 rounded-full bg-slate-100 animate-pulse hidden sm:block" />
+              ) : (
+                <>
+                  {/* --- SIGNED OUT VIEW --- */}
+                  {!isLoggedIn && (
+                    <>
+                      <Link href="/sign-in" className="text-sm font-semibold px-4 py-2 border border-slate-200 rounded-full hover:border-slate-400 transition text-slate-700 hidden sm:block">
+                        Login
+                      </Link>
+                      <Link href="/sign-up" className="text-sm font-bold px-4 py-2 bg-black text-white rounded-full hover:bg-slate-800 transition shadow-sm hidden sm:block">
+                        Register
+                      </Link>
+                      <Link href="/sign-in" className="sm:hidden p-2 text-slate-600">
+                        <User size={20} />
+                      </Link>
+                    </>
+                  )}
 
-              <SignedIn>
-                {/* --- ROLE BASED DASHBOARD BUTTONS --- */}
-                
-                {/* 1. ADMIN BUTTON */}
-                {isAdmin && (
-                  <Link 
-                    href="/admin" 
-                    className="hidden md:flex items-center gap-2 text-xs font-bold text-white bg-slate-900 px-3 py-1.5 rounded-full hover:bg-slate-700 transition"
-                  >
-                    <LayoutDashboard size={14} />
-                    Admin
-                  </Link>
-                )}
+                  {/* --- SIGNED IN VIEW --- */}
+                  {isLoggedIn && (
+                    <>
+                      {isAdmin && (
+                        <Link 
+                          href="/admin" 
+                          className="hidden md:flex items-center gap-2 text-xs font-bold text-white bg-slate-900 px-3 py-1.5 rounded-full hover:bg-slate-700 transition"
+                        >
+                          <LayoutDashboard size={14} />
+                          Admin
+                        </Link>
+                      )}
 
-                {/* 2. AFFILIATE BUTTON (Show if Affiliate AND Not Admin) */}
-                {isAffiliate && !isAdmin && (
-                  <Link 
-                    href="/affiliates" 
-                    className="hidden md:flex items-center gap-2 text-xs font-bold text-white bg-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-700 transition shadow-sm shadow-indigo-200"
-                  >
-                    <Network size={14} />
-                    Partner Portal
-                  </Link>
-                )}
+                      {isAffiliate && !isAdmin && (
+                        <Link 
+                          href="/affiliates" 
+                          className="hidden md:flex items-center gap-2 text-xs font-bold text-white bg-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-700 transition shadow-sm shadow-indigo-200"
+                        >
+                          <Network size={14} />
+                          Partner Portal
+                        </Link>
+                      )}
 
-                {/* 3. REGULAR USER BUTTON (If neither) */}
-                {!isAdmin && !isAffiliate && (
-                  <Link 
-                    href="/affiliates/register" 
-                    className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200 transition"
-                  >
-                    <User size={14} />
-                    Join Affiliate
-                  </Link>
-                )}
-                
-                <div className="ml-1">
-                  <UserButton 
-                    afterSignOutUrl="/"
-                    appearance={{
-                      elements: {
-                        avatarBox: "w-9 h-9 border-2 border-slate-100 hover:border-slate-300 transition",
-                      }
-                    }}
-                  />
-                </div>
-              </SignedIn>
+                      {!isAdmin && !isAffiliate && (
+                        <Link 
+                          href="/affiliates/register" 
+                          className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200 transition"
+                        >
+                          <User size={14} />
+                          Join Affiliate
+                        </Link>
+                      )}
+                      
+                      <div className="ml-2 flex items-center gap-3 border-l pl-3">
+ 
+                        <Link href="/profile" className="w-9 h-9 border-2 border-slate-100 rounded-full flex items-center justify-center bg-slate-100 overflow-hidden cursor-pointer hover:border-slate-300 transition" title="Go to Profile">
+                          {session?.user?.image ? (
+                           <Image src={session.user.image} alt="Avatar" width={36} height={36} className="object-cover" />
+                              ) : (
+                                <User size={18} className="text-slate-600" />
+                             )}
+                        </Link>
+                         <button onClick={() => signOut({ callbackUrl: "/" })} className="hidden sm:block text-slate-500 hover:text-red-500 transition" title="Logout">
+                          <LogOut size={18} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -254,13 +260,11 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
       {/* -------------------- 5. MOBILE MENU -------------------- */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Backdrop */}
           <div 
             className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in"
             onClick={() => setIsMobileMenuOpen(false)}
           />
           
-          {/* Drawer */}
           <div className="fixed inset-y-0 left-0 w-3/4 max-w-xs bg-white shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
               <span className="font-bold text-lg truncate">{storeName}</span>
@@ -304,31 +308,43 @@ export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientPro
             </div>
 
             <div className="p-4 border-t bg-slate-50 space-y-3">
-              <SignedIn>
-                {/* Mobile Role Links */}
-                {isAdmin && (
-                    <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-slate-900 text-white rounded-lg shadow-sm">
-                      <LayoutDashboard size={18} /> <span className="font-medium text-sm">Admin Dashboard</span>
+              {mounted && !isLoading && (
+                isLoggedIn ? (
+                  <>
+                    {isAdmin && (
+                        <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-slate-900 text-white rounded-lg shadow-sm">
+                          <LayoutDashboard size={18} /> <span className="font-medium text-sm">Admin Dashboard</span>
+                        </Link>
+                    )}
+                    {isAffiliate && !isAdmin && (
+                        <Link href="/affiliates" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-indigo-600 text-white rounded-lg shadow-sm">
+                          <Network size={18} /> <span className="font-medium text-sm">Partner Portal</span>
+                        </Link>
+                    )}
+                    {!isAdmin && !isAffiliate && (
+                        <Link href="/affiliates/register" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-white border rounded-lg shadow-sm hover:bg-gray-50">
+                          <User size={18} /> <span className="font-medium text-sm">Join Affiliate</span>
+                        </Link>
+                    )}
+  
+                    <button 
+                      onClick={() => signOut({ callbackUrl: "/" })} 
+                      className="flex w-full items-center justify-center gap-2 px-4 py-3 mt-2 bg-red-50 text-red-600 rounded-lg shadow-sm hover:bg-red-100"
+                    >
+                      <LogOut size={18} /> <span className="font-medium text-sm">Log Out</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/sign-in" onClick={() => setIsMobileMenuOpen(false)}>
+                      <button className="w-full py-2.5 text-sm font-semibold border bg-white rounded-lg mb-2">Login</button>
                     </Link>
-                )}
-                {isAffiliate && (
-                    <Link href="/affiliates" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-indigo-600 text-white rounded-lg shadow-sm">
-                      <Network size={18} /> <span className="font-medium text-sm">Partner Portal</span>
+                    <Link href="/sign-up" onClick={() => setIsMobileMenuOpen(false)}>
+                      <button className="w-full py-2.5 text-sm font-bold bg-black text-white rounded-lg">Register</button>
                     </Link>
-                )}
-                <Link href="/affiliates/register" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-white border rounded-lg shadow-sm hover:bg-gray-50">
-                  <User size={18} /> <span className="font-medium text-sm">Join Affiliate</span>
-                </Link>
-              </SignedIn>
-
-              <SignedOut>
-                  <SignInButton mode="modal">
-                    <button className="w-full py-2.5 text-sm font-semibold border bg-white rounded-lg mb-2">Login</button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button className="w-full py-2.5 text-sm font-bold bg-black text-white rounded-lg">Register</button>
-                  </SignUpButton>
-              </SignedOut>
+                  </>
+                )
+              )}
             </div>
           </div>
         </div>

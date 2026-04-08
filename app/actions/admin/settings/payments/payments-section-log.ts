@@ -3,11 +3,11 @@
 "use server"
 
 import { db } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/auth"
 
 export async function getPaymentAuditLogs() {
   try {
-    const { userId } = await auth(); 
+    const session = await auth(); 
     const logs = await db.auditLog.findMany({
       where: {
         tableName: {
@@ -31,4 +31,3 @@ export async function getPaymentAuditLogs() {
     return { success: false, error: "Failed to fetch logs", data: [] }
   }
 }
-

@@ -1,42 +1,27 @@
-// File: app/actions/storefront/product/review-actions.ts
+// app/actions/storefront/product/review-actions.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 
 export async function createReview(productId: string, data: any) {
-  const user = await currentUser();
-  if (!user) {
+  const session = await auth();
+  if (!session?.user?.email) {
     return { success: false, message: "You must be logged in to leave a review." };
   }
 
   try {
-    const email = user.emailAddresses[0]?.emailAddress;
-    await db.user.upsert({
-        where: { clerkId: user.id }, 
-        update: {
-            name: `${user.firstName} ${user.lastName}`,
-            email: email,
-            image: user.imageUrl,
-        },
-        create: {
-            clerkId: user.id,
-            email: email,
-            name: `${user.firstName} ${user.lastName}`,
-            image: user.imageUrl,
-            role: "CUSTOMER" 
-        }
-    });
-
+    const email = session.user.email;
     const dbUser = await db.user.findUnique({
-        where: { clerkId: user.id }
+        where: { email: email }
     });
 
     if (!dbUser) {
         return { success: false, message: "User synchronization failed." };
     }
+
     const existingReview = await db.review.findFirst({
       where: { 
         userId: dbUser.id, 

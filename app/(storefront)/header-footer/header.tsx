@@ -2,9 +2,8 @@
 
 import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth"; 
 import HeaderClient from "./header-client";
-import { syncUser } from "@/lib/auth-sync";
 
 async function getCartCount() {
   try {
@@ -13,36 +12,31 @@ async function getCartCount() {
     if (!cartId) return 0;
     return await db.cartItem.count({ where: { cartId } });
   } catch (error) {
+    console.error("Error fetching cart count:", error);
     return 0;
   }
 }
 
 async function getAffiliateStatus() {
   try {
-    const { userId: clerkId } = await auth();
-    if (!clerkId) return false;
+    const session = await auth(); 
+    const userId = session?.user?.id;
 
-    const dbUser = await db.user.findUnique({
-      where: { clerkId: clerkId },
-      select: { id: true }
-    });
-
-    if (!dbUser) return false;
-
+    if (!userId) return false;
     const account = await db.affiliateAccount.findUnique({
-      where: { userId: dbUser.id },
+      where: { userId: userId },
       select: { status: true }
     });
 
     return account?.status === "ACTIVE";
   } catch (error) {
+    console.error("Error fetching affiliate status:", error);
     return false;
   }
 }
 
 const Header = async () => {
-  await syncUser();
-
+  
   const [cartCount, isAffiliate] = await Promise.all([
     getCartCount(),
     getAffiliateStatus()

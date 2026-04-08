@@ -5,14 +5,14 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ProductStatus } from "@prisma/client";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth"; 
 
 export async function duplicateProduct(id: string) {
   try {
-    const user = await currentUser();
-    if (!user) return { success: false, message: "Unauthorized" };
+    const session = await auth();
+    if (!session || !session.user || !session.user.email) return { success: false, message: "Unauthorized" };
     
-    const dbUser = await db.user.findUnique({ where: { clerkId: user.id } });
+    const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
 
     const original = await db.product.findUnique({
       where: { id },

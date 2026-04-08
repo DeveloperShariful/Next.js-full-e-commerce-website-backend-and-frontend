@@ -1,4 +1,4 @@
-//app/actions/admin/order/import-export.ts
+// app/actions/admin/order/import-export.ts
 
 "use server";
 
@@ -6,7 +6,7 @@ import { db } from "@/lib/prisma";
 import Papa from "papaparse";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 const safeFloat = (val: any) => {
     if (!val) return 0;
@@ -112,8 +112,8 @@ export async function importOrdersCSV(csvString: string) {
     try {
         const { data } = Papa.parse(csvString, { header: true, skipEmptyLines: true });
         
-        const user = await currentUser();
-        const dbUser = user ? await db.user.findUnique({ where: { clerkId: user.id } }) : null;
+        const session = await auth();
+        const dbUser = session?.user?.email ? await db.user.findUnique({ where: { email: session.user.email } }) : null;
         const userId = dbUser?.id;
 
         let successCount = 0;

@@ -1,14 +1,15 @@
 // File: app/actions/storefront/cart/merge-cart.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 
 export async function mergeCart() {
   try {
-    const user = await currentUser();
-    if (!user) return { merged: false }; // রিটার্ন টাইপ অবজেক্ট করা ভালো
+    const session = await auth();
+    if (!session?.user?.email) return { merged: false }; // রিটার্ন টাইপ অবজেক্ট করা ভালো
 
     const cookieStore = await cookies();
     const guestCartId = cookieStore.get("cartId")?.value;
@@ -16,7 +17,7 @@ export async function mergeCart() {
     if (!guestCartId) return { merged: false };
 
     const dbUser = await db.user.findUnique({
-      where: { clerkId: user.id }
+      where: { email: session.user.email }
     });
 
     if (!dbUser) return { merged: false };

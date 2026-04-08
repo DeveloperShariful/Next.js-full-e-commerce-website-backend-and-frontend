@@ -5,12 +5,12 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ProductStatus } from "@prisma/client";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth"; 
 
 async function getDbUserId() {
-    const user = await currentUser();
-    if (!user) return null;
-    const dbUser = await db.user.findUnique({ where: { clerkId: user.id } });
+    const session = await auth();
+    if (!session?.user?.email) return null;
+    const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
     return dbUser?.id;
 }
 

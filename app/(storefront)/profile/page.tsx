@@ -1,6 +1,6 @@
-// app/(routes)/profile/page.tsx
+// app/(storefront)/profile/page.tsx
 
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth"; 
 import { db } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { User, Mail, Phone, MapPin, Calendar, Edit2 } from "lucide-react";
@@ -8,13 +8,13 @@ import Image from "next/image";
 import Link from "next/link";
 
 export default async function CustomerProfilePage() {
-  // 1. Get Clerk User
-  const clerkUser = await currentUser();
-  if (!clerkUser) redirect("/sign-in");
+  // 1. Get NextAuth Session
+  const session = await auth();
+  if (!session || !session.user || !session.user.email) redirect("/sign-in");
 
   // 2. Get DB User (using email)
   const user = await db.user.findUnique({
-    where: { email: clerkUser.emailAddresses[0].emailAddress },
+    where: { email: session.user.email },
     include: { addresses: { where: { isDefault: true }, take: 1 } } 
   });
 
@@ -28,8 +28,8 @@ export default async function CustomerProfilePage() {
     <div className="container mx-auto px-4 py-12 max-w-5xl">
        <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
-          {/* Clerk Profile Edit Modal Trigger */}
-          {/* In Clerk, users edit profile via UserButton, so we can guide them there or link to account portal */}
+          {/* Profile Edit Modal Trigger */}
+          {/* Users edit profile via UserButton, so we can guide them there or link to account portal */}
        </div>
        
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -37,8 +37,8 @@ export default async function CustomerProfilePage() {
           {/* Left: Profile Card */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm text-center h-fit">
              <div className="w-28 h-28 bg-slate-100 rounded-full mx-auto flex items-center justify-center text-4xl font-bold text-slate-400 mb-4 border-4 border-white shadow-md overflow-hidden relative">
-                {clerkUser.imageUrl ? (
-                   <Image src={clerkUser.imageUrl} alt="Profile" fill className="object-cover" />
+                {session.user.image || user.image ? (
+                   <Image src={session.user.image || user.image || ""} alt="Profile" fill className="object-cover" />
                 ) : (
                    user.name?.charAt(0).toUpperCase()
                 )}

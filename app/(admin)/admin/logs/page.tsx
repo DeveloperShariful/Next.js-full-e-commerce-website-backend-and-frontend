@@ -10,7 +10,7 @@ import {
   Trash2, User, Eye, X, ShieldAlert 
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+// Image ইম্পোর্ট সরিয়ে ফেলা হলো
 
 export default function ActivityLogsPage() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -123,8 +123,9 @@ export default function ActivityLogsPage() {
                     <td className="p-4">
                        <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 overflow-hidden">
+                             {/* 🚀 FIX: HTML img ট্যাগ ব্যবহার করা হলো */}
                              {log.user?.image ? (
-                                <Image src={log.user.image} alt="" width={32} height={32} className="object-cover"/>
+                                <img src={log.user.image} alt="" className="w-full h-full object-cover"/>
                              ) : <User size={16}/>}
                           </div>
                           <div>

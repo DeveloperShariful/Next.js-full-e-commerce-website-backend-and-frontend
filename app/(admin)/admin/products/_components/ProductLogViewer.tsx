@@ -1,13 +1,11 @@
 // File: app/admin/products/_components/ProductLogViewer.tsx
 
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { History, X, RefreshCw, User, Loader2, Trash2, Filter, Package, ArrowRight } from "lucide-react";
 import { getProductActivityLogs } from "@/app/actions/admin/product/get-logs"; 
 import { deleteActivityLogs } from "@/app/actions/admin/product/delete-log"; 
-import Image from "next/image";
 import { toast } from "react-hot-toast";
 
 export default function ProductLogViewer() {
@@ -235,8 +233,9 @@ export default function ProductLogViewer() {
                             <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
                                     <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                                        {/* 🚀 FIX: HTML img tag used instead of Next Image to prevent external domain crashes */}
                                         {log.user?.image ? (
-                                        <Image src={log.user.image} alt="" width={24} height={24} className="object-cover" />
+                                        <img src={log.user.image} alt="" className="w-full h-full object-cover" />
                                         ) : (
                                         <User size={14} className="text-gray-400" />
                                         )}

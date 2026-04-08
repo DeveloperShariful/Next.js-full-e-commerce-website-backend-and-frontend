@@ -9,13 +9,13 @@ import { revalidatePath } from "next/cache"
 import Stripe from "stripe"
 import { encrypt } from "../crypto" 
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/auth"
 
 async function getDbUserId() {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) return null;
+  const session = await auth();
+  if (!session?.user?.email) return null;
   const user = await db.user.findUnique({
-    where: { clerkId }, 
+    where: { email: session.user.email }, 
     select: { id: true }
   });
   

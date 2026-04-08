@@ -1,41 +1,31 @@
 //lib/auth-sync.ts
 
-import { auth, currentUser } from "@clerk/nextjs/server";
+// lib/auth-sync.ts
+
+import { auth } from "@/auth"; // NextAuth এর auth ফাংশন
 import { db } from "@/lib/prisma";
 
 export async function syncUser() {
   try {
-    const { userId: clerkId } = await auth();
+    const session = await auth();
 
-    if (!clerkId) return null;
+    // সেশনে ইউজার না থাকলে null রিটার্ন করবে
+    if (!session?.user?.email) return null;
 
+    // NextAuth সরাসরি আমাদের ডাটাবেজ ব্যবহার করে, তাই নতুন করে Sync করার কিছু নেই।
+    // আমরা শুধু বর্তমান ইউজারের লেটেস্ট ডাটাবেজ রেকর্ডটি ফেচ করে রিটার্ন করব।
     const existingUser = await db.user.findUnique({
-      where: { clerkId },
+      where: { email: session.user.email },
     });
 
-    if (existingUser) return existingUser;
+    if (existingUser) {
+      return existingUser;
+    }
 
-    const clerkUser = await currentUser();
-    
-    if (!clerkUser) return null;
-
-    const email = clerkUser.emailAddresses[0]?.emailAddress;
-    const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "New User";
-
-    const newUser = await db.user.create({
-      data: {
-        clerkId,
-        email,
-        name,
-
-      },
-    });
-
-    console.log("✅ Global Sync: New User Created:", email);
-    return newUser;
+    return null;
 
   } catch (error) {
-    console.error("⚠️ User Sync Failed:", error);
+    console.error("⚠️ User Fetch Failed:", error);
     return null;
   }
 }

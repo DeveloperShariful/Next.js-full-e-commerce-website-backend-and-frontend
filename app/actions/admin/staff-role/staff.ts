@@ -6,7 +6,6 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Role } from "@prisma/client";
 import { z } from "zod";
-// ✅ Use global syncUser instead of manual implementation
 import { syncUser } from "@/lib/auth-sync";
 
 // --- ZOD SCHEMA ---
@@ -81,7 +80,6 @@ export async function createStaff(prevState: any, formData: FormData): Promise<A
     const existingUser = await db.user.findUnique({ where: { email } });
     if (existingUser) return { success: false, error: "User already exists with this email!" };
 
-    // ✅ Note: Created without clerkId. Will be linked when they sign up via email.
     await db.user.create({
       data: {
         name,

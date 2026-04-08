@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth"; 
 
 // --- SCHEMAS ---
 const SupplierSchema = z.object({
@@ -72,11 +72,21 @@ export async function getInventory(query: string = "") {
 
 export async function adjustStock(id: string, adjustment: number, reason: string) {
   try {
-    // [FIXED] Clerk Authentication
-    const { userId } = await auth();
+    // 🚀 [FIXED] NextAuth Authentication
+    const session = await auth();
 
-    if (!userId) {
+    if (!session || !session.user || !session.user.email) {
       return { success: false, message: "Unauthorized: User not found" };
+    }
+
+    // 🚀 Get Actual DB User ID
+    const dbUser = await db.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true }
+    });
+
+    if (!dbUser) {
+       return { success: false, message: "Unauthorized: DB User not found" };
     }
 
     const level = await db.inventoryLevel.findUnique({ where: { id } });
@@ -95,7 +105,7 @@ export async function adjustStock(id: string, adjustment: number, reason: string
           action: `Stock Adjusted (${adjustment > 0 ? '+' : ''}${adjustment})`,
           entityId: id,
           details: { reason, old: level.quantity, new: newQty },
-          userId: userId 
+          userId: dbUser.id 
         }
       })
     ]);

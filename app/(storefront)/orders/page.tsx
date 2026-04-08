@@ -1,6 +1,6 @@
 // app/(routes)/orders/page.tsx
 
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@/auth"; 
 import { db } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -8,12 +8,13 @@ import { Package, Clock, CheckCircle2, XCircle, ChevronRight, ShoppingBag } from
 import { OrderStatus } from "@prisma/client";
 
 export default async function CustomerOrdersPage() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) redirect("/sign-in");
+  const session = await auth(); 
+  
+  if (!session || !session.user || !session.user.email) redirect("/sign-in");
 
   // Get DB User ID first
   const user = await db.user.findUnique({
-    where: { email: clerkUser.emailAddresses[0].emailAddress },
+    where: { email: session.user.email },
     select: { id: true }
   });
 

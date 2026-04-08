@@ -1,6 +1,5 @@
 // File: app/actions/settings/payments/offline-payment-method.ts
 
-
 "use server"
 
 import { db } from "@/lib/prisma"
@@ -8,13 +7,13 @@ import { BankTransferSchema, ChequeSchema, CodSchema } from "@/app/(admin)/admin
 import { z } from "zod"
 import { revalidatePath } from "next/cache"
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@/auth"
 
 // Helper to fetch DB User ID
 async function getDbUserId() {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) return null;
-  const user = await db.user.findUnique({ where: { clerkId }, select: { id: true } });
+  const session = await auth();
+  if (!session?.user?.email) return null;
+  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
   return user?.id || null;
 }
 

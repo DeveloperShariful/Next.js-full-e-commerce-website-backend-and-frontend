@@ -15,7 +15,7 @@ async function getGlobalData() {
     db.storeSettings.findUnique({ where: { id: "settings" }, include: { logoMedia: true, faviconMedia: true } }),
     db.seoGlobalConfig.findUnique({ where: { id: "global_seo" }, include: { ogMedia: true } }),
     db.marketingIntegration.findUnique({ where: { id: "marketing_config" } }),
-    db.paymentMethodConfig.findMany({ where: { isEnabled: true } }), 
+    db.paymentProvider.findMany({ where: { isEnabled: true } }),
     db.location.findMany({ where: { isActive: true } }) 
   ]);
 

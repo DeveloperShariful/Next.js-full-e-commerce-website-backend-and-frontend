@@ -23,7 +23,6 @@ export default function PaymentSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // পেজ লোড হওয়ার সময় ডাটাবেজ থেকে ডাটা নিয়ে আসবে
   useEffect(() => {
     fetchProviders();
   },[]);
@@ -38,14 +37,12 @@ export default function PaymentSettingsPage() {
     setLoading(false);
   };
 
-  // ইনপুট চেঞ্জ হ্যান্ডলার
   const handleInputChange = (id: string, field: keyof PaymentProvider, value: any) => {
     setProviders((prev) =>
       prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
     );
   };
 
-  // ডাটা সেভ করার ফাংশন
   const handleSave = async (provider: PaymentProvider) => {
     setSavingId(provider.id);
     const res = await updatePaymentProvider(provider.id, provider);
@@ -58,7 +55,6 @@ export default function PaymentSettingsPage() {
     setSavingId(null);
   };
 
-  // গেটওয়ে অনুযায়ী আইকন দেখানোর জন্য
   const getIcon = (providerId: string) => {
     switch (providerId) {
       case "stripe": return <CreditCard className="w-6 h-6 text-indigo-500" />;

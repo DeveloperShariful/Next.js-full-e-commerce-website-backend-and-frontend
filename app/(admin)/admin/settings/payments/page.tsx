@@ -1,3 +1,5 @@
+// app/admin/settings/payments/page.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";

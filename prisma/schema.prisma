@@ -8,13 +8,13 @@
 
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures =["postgresqlExtensions", "fullTextSearchPostgres", "tracing", "relationJoins"]
+  previewFeatures = ["postgresqlExtensions", "fullTextSearchPostgres", "tracing", "relationJoins"]
   engineType      = "library"
 }
 
 datasource db {
   provider   = "postgresql"
-  extensions =[pg_trgm, unaccent, pgvector(map: "vector", schema: "public")]
+  extensions = [pg_trgm, unaccent, pgvector(map: "vector", schema: "public")]
 }
 
 // ==========================================
@@ -143,6 +143,47 @@ enum ShippingMethodType {
 enum PaymentMode {
   TEST
   LIVE
+}
+
+enum PaymentIntent {
+  CAPTURE
+  AUTHORIZE
+}
+
+enum PayPalButtonColor {
+  GOLD
+  BLUE
+  SILVER
+  WHITE
+  BLACK
+}
+
+enum PayPalButtonShape {
+  PILL
+  RECT
+}
+
+enum PayPalButtonLayout {
+  VERTICAL
+  HORIZONTAL
+}
+
+enum PayPalButtonLabel {
+  PAYPAL
+  CHECKOUT
+  BUYNOW
+  PAY
+}
+
+enum PayPalLandingPage {
+  LOGIN
+  BILLING
+  NO_PREFERENCE
+}
+
+enum PaymentHandlerType {
+  ONLINE
+  OFFLINE
 }
 
 enum DisputeStatus {
@@ -334,7 +375,7 @@ model User {
 
   affiliateAccount      AffiliateAccount?
   referredByAffiliateId String?
-  referredByAffiliate   AffiliateAccount? @relation("CustomerReferral", fields: [referredByAffiliateId], references:[id], onDelete: SetNull)
+  referredByAffiliate   AffiliateAccount? @relation("CustomerReferral", fields: [referredByAffiliateId], references: [id], onDelete: SetNull)
 
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -360,12 +401,13 @@ model Account {
   id_token           String?  @db.Text
   session_state      String?
 
-  user User @relation(fields:[userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
 }
 
+// ডাটাবেজ সেশন মেইনটেইন করার জন্য (যদি JWT ব্যবহার না করে ডাটাবেজ সেশন ব্যবহার করেন)
 model Session {
   id           String   @id @default(uuid())
   sessionToken String   @unique
@@ -376,6 +418,7 @@ model Session {
   @@index([userId])
 }
 
+// Magic Link বা Password Reset টোকেনের জন্য
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -411,7 +454,7 @@ model UserPaymentMethod {
 model Address {
   id                    String      @id @default(uuid())
   userId                String
-  user                  User        @relation(fields:[userId], references: [id], onDelete: Cascade)
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   title                 String?
   type                  AddressType @default(SHIPPING)
   firstName             String
@@ -595,12 +638,12 @@ model Product {
   categoryId               String?
   category                 Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   brandId                  String?
-  brand                    Brand?                 @relation(fields: [brandId], references:[id], onDelete: SetNull)
+  brand                    Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
   tags                     Tag[]
   collections              Collection[]
   featuredImage            String?
   featuredMediaId          String?
-  featuredMedia            Media?                 @relation(fields:[featuredMediaId], references: [id])
+  featuredMedia            Media?                 @relation(fields: [featuredMediaId], references: [id])
   images                   ProductImage[]
   videoUrl                 String?
   videoThumbnail           String?
@@ -788,7 +831,7 @@ model BundleItem {
   parentProductId String
   parentProduct   Product @relation("BundleParent", fields: [parentProductId], references: [id], onDelete: Cascade)
   childProductId  String
-  childProduct    Product @relation("BundleChild", fields: [childProductId], references:[id], onDelete: Cascade)
+  childProduct    Product @relation("BundleChild", fields: [childProductId], references: [id], onDelete: Cascade)
   quantity        Int     @default(1)
 
   @@index([parentProductId])
@@ -976,7 +1019,7 @@ model Order {
   orderNumber            String             @unique
   orderDate              DateTime           @default(now())
   userId                 String?
-  user                   User?              @relation(fields: [userId], references:[id], onDelete: SetNull)
+  user                   User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
   guestEmail             String?
   status                 OrderStatus        @default(PENDING)
   paymentStatus          PaymentStatus      @default(UNPAID)
@@ -1020,7 +1063,7 @@ model Order {
   shippingTrackingUrl    String?
   shippingProvider       String?
   pickupLocationId       String?
-  pickupLocation         PickupLocation?    @relation(fields: [pickupLocationId], references:[id])
+  pickupLocation         PickupLocation?    @relation(fields: [pickupLocationId], references: [id])
   transdirectBookingId   Int?
   transdirectOrderStatus String?
   transdirectQuoteId     String?
@@ -1066,7 +1109,7 @@ model Order {
   orderNotes             OrderNote[]
   
   subscriptionId         String?
-  subscription           Subscription?      @relation(fields:[subscriptionId], references: [id], onDelete: SetNull)
+  subscription           Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   
   deletedAt              DateTime?
   version                Int                @default(1)
@@ -1224,7 +1267,7 @@ model PaymentSession {
 model Shipment {
   id                 String   @id @default(uuid())
   orderId            String
-  order              Order    @relation(fields: [orderId], references:[id], onDelete: Cascade)
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   trackingNumber     String?
   trackingUrl        String?
   courier            String?
@@ -1252,7 +1295,7 @@ model Shipment {
 model ReturnRequest {
   id        String       @id @default(uuid())
   orderId   String
-  order     Order        @relation(fields:[orderId], references: [id], onDelete: Cascade)
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   status    ReturnStatus @default(REQUESTED)
   reason    String
   adminNote String?
@@ -1270,7 +1313,7 @@ model ReturnRequest {
 model Refund {
   id              String   @id @default(uuid())
   orderId         String
-  order           Order    @relation(fields: [orderId], references:[id], onDelete: Cascade)
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   amount          Decimal  @db.Decimal(12, 2)
   reason          String?
   status          String   @default("pending")
@@ -1303,7 +1346,7 @@ model OrderNote {
 model Cart {
   id             String          @id @default(uuid())
   userId         String?         @unique
-  user           User?           @relation(fields:[userId], references: [id], onDelete: Cascade)
+  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionId      String?
   items          CartItem[]
   paymentSession PaymentSession?
@@ -1319,7 +1362,7 @@ model Cart {
 model CartItem {
   id        String          @id @default(uuid())
   cartId    String
-  cart      Cart            @relation(fields:[cartId], references: [id], onDelete: Cascade)
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String
   product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variantId String?
@@ -1565,7 +1608,7 @@ model StoreSettings {
   logoMediaId    String?
   logoMedia      Media?              @relation("StoreLogo", fields: [logoMediaId], references: [id])
   faviconMediaId String?
-  faviconMedia   Media?              @relation("StoreFavicon", fields: [faviconMediaId], references:[id])
+  faviconMedia   Media?              @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
   socialLinks    Json?
   smtpConfig     Json?
   maintenance    Boolean             @default(false)
@@ -1617,7 +1660,7 @@ model ShippingRate {
   taxStatus               String             @default("taxable")
   freeShippingRequirement String?
   carrierServiceId        String?
-  carrierService          CarrierService?    @relation(fields: [carrierServiceId], references:[id], onDelete: SetNull)
+  carrierService          CarrierService?    @relation(fields: [carrierServiceId], references: [id], onDelete: SetNull)
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
 
@@ -1812,7 +1855,7 @@ model ActivityLog {
 model Notification {
   id        String   @id @default(uuid())
   userId    String?
-  user      User?    @relation(fields: [userId], references:[id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String
   isRead    Boolean  @default(false)
@@ -1970,34 +2013,127 @@ model SystemLog {
 }
 
 // ==========================================
-// 15. PAYMENT CONFIGURATION (SMART & SIMPLE)
+// 15. PAYMENT CONFIGURATION
 // ==========================================
 
-model PaymentProvider {
-  id                String      @id @default(uuid())
-  providerId        String      @unique // e.g., "stripe", "paypal", "sslcommerz", "cod"
-  name              String      // e.g., "Stripe", "PayPal", "Cash on Delivery"
-  
-  // Admin Panel Control
-  isEnabled         Boolean     @default(false)
-  mode              PaymentMode @default(TEST) // TEST or LIVE
-  
-  // Primary Core Keys
-  publicKey         String?     @db.Text // Publishable Key (Stripe) / Client ID (PayPal)
-  secretKey         String?     @db.Text // Secret Key
-  webhookSecret     String?     @db.Text // Webhook Secret/ID
-  
-  // Future Proofing: Extra keys or settings
-  additionalDetails Json?       // e.g., { "merchantEmail": "...", "colorTheme": "dark" }
-  
-  // Instructions for manual methods
-  instructions      String?     @db.Text
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+model PaymentMethodConfig {
+  id                   String                @id @default(uuid())
+  identifier           String                @unique
+  name                 String
+  isEnabled            Boolean               @default(false)
+  mode                 PaymentMode           @default(TEST)
+  displayOrder         Int                   @default(0)
+  description          String?
+  instructions         String?
+  icon                 String?
+  minOrderAmount       Decimal?              @db.Decimal(12, 2)
+  maxOrderAmount       Decimal?              @db.Decimal(12, 2)
+  surchargeEnabled     Boolean               @default(false)
+  surchargeType        String                @default("fixed")
+  surchargeAmount      Decimal               @default(0) @db.Decimal(12, 2)
+  taxableSurcharge     Boolean               @default(false)
+  needsSetup           Boolean               @default(true)
+  stripeConfig         StripeConfig?
+  paypalConfig         PaypalConfig?
+  offlineConfig        OfflinePaymentConfig?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
-  @@index([isEnabled])
-  @@index([providerId])
+  @@index([isEnabled, displayOrder(sort: Asc)])
+  @@index([identifier])
+}
+
+model StripeConfig {
+  id                        String              @id @default(uuid())
+  paymentMethodId           String              @unique
+  paymentMethod             PaymentMethodConfig @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+  enableStripe              Boolean             @default(true)
+  testMode                  Boolean             @default(false)
+  title                     String              @default("Credit Card / Debit Card")
+  description               String              @default("Pay securely with your credit card via Stripe.")
+  isConnected               Boolean             @default(false)
+  accountId                 String?
+  oauthAccessToken          String?             @db.Text
+  oauthRefreshToken         String?             @db.Text
+  oauthTokenType            String?
+  livePublishableKey        String?             @db.Text
+  liveSecretKey             String?             @db.Text
+  liveWebhookSecret         String?             @db.Text
+  testPublishableKey        String?             @db.Text
+  testSecretKey             String?             @db.Text
+  testWebhookSecret         String?             @db.Text
+  paymentAction             PaymentIntent       @default(CAPTURE)
+  statementDescriptor       String?
+  shortStatementDescriptor  String?
+  addOrderNumberToStatement Boolean             @default(false)
+  savedCards                Boolean             @default(true)
+  inlineCreditCardForm      Boolean             @default(true)
+  applePayEnabled           Boolean             @default(true)
+  googlePayEnabled          Boolean             @default(true)
+  klarnaEnabled             Boolean             @default(true)
+  afterpayEnabled           Boolean             @default(true)
+  zipEnabled                Boolean             @default(true)
+  paymentRequestButtons     Boolean             @default(true)
+  buttonTheme               String              @default("dark")
+  debugLog                  Boolean             @default(true)
+  updatedAt                 DateTime            @updatedAt
+}
+
+model PaypalConfig {
+  id                       String              @id @default(uuid())
+  paymentMethodId          String              @unique
+  paymentMethod            PaymentMethodConfig @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+  enablePaypal             Boolean             @default(true)
+  sandbox                  Boolean             @default(false)
+  isOnboarded              Boolean             @default(false)
+  merchantId               String?
+  accessToken              String?             @db.Text
+  refreshToken             String?             @db.Text
+  tokenExpiry              DateTime?
+  tokenType                String?
+  partnerReferralId        String?
+  liveEmail                String?
+  liveClientId             String?             @db.Text
+  liveClientSecret         String?             @db.Text
+  sandboxEmail             String?
+  sandboxClientId          String?             @db.Text
+  sandboxClientSecret      String?             @db.Text
+  title                    String              @default("PayPal")
+  description              String              @default("Pay via PayPal; you can pay with your credit card if you don't have a PayPal account.")
+  intent                   PaymentIntent       @default(CAPTURE)
+  instantPayments          Boolean             @default(false)
+  brandName                String?
+  landingPage              PayPalLandingPage   @default(LOGIN)
+  disableFunding           String[]
+  advancedCardEnabled      Boolean             @default(false)
+  advancedCardTitle        String              @default("Debit & Credit Cards")
+  vaultingEnabled          Boolean             @default(false)
+  smartButtonLocations     String[]
+  requireFinalConfirmation Boolean             @default(true)
+  buttonLabel              PayPalButtonLabel   @default(PAYPAL)
+  buttonLayout             PayPalButtonLayout  @default(VERTICAL)
+  buttonColor              PayPalButtonColor   @default(GOLD)
+  buttonShape              PayPalButtonShape   @default(RECT)
+  payLaterEnabled          Boolean             @default(true)
+  payLaterLocations        String[]
+  payLaterMessaging        Boolean             @default(true)
+  payLaterMessageTheme     String              @default("light")
+  subtotalMismatchBehavior String              @default("add_line_item")
+  invoicePrefix            String?             @default("wc-")
+  debugLog                 Boolean             @default(false)
+  webhookId                String?             @unique
+  webhookUrl               String?             @db.Text
+  updatedAt                DateTime            @updatedAt
+}
+
+model OfflinePaymentConfig {
+  id                       String              @id @default(uuid())
+  paymentMethodId          String              @unique
+  paymentMethod            PaymentMethodConfig @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+  bankDetails              Json?
+  chequePayTo              String?
+  addressInfo              String?
+  enableForShippingMethods String[]
 }
 
 // ==========================================
@@ -2044,7 +2180,7 @@ model OutboxEvent {
 model AffiliateAccount {
   id              String           @id @default(uuid())
   userId          String           @unique
-  user            User             @relation(fields: [userId], references:[id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   slug            String           @unique
   customSlug      String?          @unique 
   status          AffiliateStatus  @default(PENDING)
@@ -2273,7 +2409,7 @@ model AffiliatePayout {
 model AffiliateDomain {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields:[affiliateId], references: [id], onDelete: SetNull)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   
   domain          String           @unique 
   isVerified      Boolean          @default(false)
@@ -2310,7 +2446,7 @@ model AffiliateCreativeUsage {
   creativeId  String
   creative    AffiliateCreative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
   affiliateId String
-  affiliate   AffiliateAccount  @relation(fields:[affiliateId], references: [id], onDelete: Cascade)
+  affiliate   AffiliateAccount  @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   copiedAt    DateTime          @default(now())
   
   @@index([creativeId])
@@ -2375,11 +2511,11 @@ model AffiliateCommissionRule {
 model AffiliateLink {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields:[affiliateId], references: [id], onDelete: SetNull)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   slug            String           @unique
   destinationUrl  String           
   campaignId      String?
-  campaign        AffiliateCampaign? @relation(fields:[campaignId], references: [id], onDelete: SetNull)
+  campaign        AffiliateCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   clickCount      Int              @default(0)
   isActive        Boolean          @default(true)
   createdAt       DateTime         @default(now())
@@ -2393,7 +2529,7 @@ model AffiliateCampaign {
   id              String           @id @default(uuid())
   name            String           
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields:[affiliateId], references: [id], onDelete: SetNull)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   clicks          Int              @default(0)
   conversions     Int              @default(0)
   revenue         Decimal          @default(0.00) @db.Decimal(12, 2)
@@ -2407,7 +2543,7 @@ model AffiliateCampaign {
 model AffiliateLedger {
   id              String           @id @default(uuid())
   affiliateId     String
-  affiliate       AffiliateAccount @relation(fields:[affiliateId], references: [id], onDelete: SetNull)
+  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
   type            LedgerType       
   amount          Decimal          @db.Decimal(12, 2)
   balanceBefore   Decimal          @db.Decimal(12, 2)
@@ -2484,7 +2620,7 @@ model AffiliateProductRate {
   productId      String
   product        Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   affiliateId    String?
-  affiliate      AffiliateAccount? @relation(fields: [affiliateId], references:[id], onDelete: Cascade)
+  affiliate      AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
   groupId        String?
   group          AffiliateGroup?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   rate           Decimal          @db.Decimal(12, 4)
@@ -2540,7 +2676,7 @@ model SubscriptionPlan {
 model Subscription {
   id               String               @id @default(uuid())
   userId           String
-  user             User                 @relation(fields:[userId], references: [id], onDelete: Cascade)
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   planId           String
   plan             SubscriptionPlan     @relation(fields: [planId], references: [id])
   status           SubscriptionStatus   @default(ACTIVE)
@@ -2564,7 +2700,7 @@ model Subscription {
 model SubscriptionInvoice {
   id             String        @id @default(uuid())
   subscriptionId String
-  subscription   Subscription  @relation(fields:[subscriptionId], references: [id], onDelete: Cascade)
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   amount         Decimal       @db.Decimal(12, 2)
   currency       String
   status         String        @default("pending") 
@@ -2592,7 +2728,7 @@ model InventoryReservation {
   locationId  String
   location    Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
   cartId      String?
-  cart        Cart?           @relation(fields:[cartId], references: [id], onDelete: Cascade)
+  cart        Cart?           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   quantity    Int
   expiresAt   DateTime
   createdAt   DateTime        @default(now())

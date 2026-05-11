@@ -14,7 +14,8 @@ const PERMISSIONS: Record<Role, AffiliatePermission[]> = {
   EDITOR:      ["VIEW_ANALYTICS", "MANAGE_PARTNERS"],
   SUPPORT:     ["VIEW_ANALYTICS"],
   CUSTOMER:    [],
-  AFFILIATE:   []
+  AFFILIATE:   [],
+  SUBSCRIBER:  [],
 };
 
 export async function protectAction(required: AffiliatePermission) {

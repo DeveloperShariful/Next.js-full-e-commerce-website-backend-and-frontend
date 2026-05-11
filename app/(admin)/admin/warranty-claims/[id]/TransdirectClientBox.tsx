@@ -1,4 +1,4 @@
-//app/(backend)/admin/warranty-claims/[id]/TransdirectClientBox.tsx
+//app/(admin)/admin/warranty-claims/[id]/TransdirectClientBox.tsx
 
 'use client';
 

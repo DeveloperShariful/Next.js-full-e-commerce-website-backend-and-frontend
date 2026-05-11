@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Users, 
   TicketPercent, BarChart3, Settings, 
   FileText, ShieldCheck, MessageSquare, ScrollText, 
-  Undo2, Megaphone, Truck,
+  Undo2, Megaphone, Truck, MedalIcon
 } from "lucide-react";
 import { Role } from "@prisma/client";
 
@@ -51,10 +51,11 @@ export const sidebarConfig: SidebarGroup[] = [
            { name: "Tags", href: "/admin/tags" },
            { name: "Reviews", href: "/admin/reviews" },
            { name: "Inventory", href: "/admin/inventory" },
-           { name: "Media", href: "/admin/media" },
+           
         ]
       },
       { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
+      { name: "Media", href: "/admin/media" ,icon: MedalIcon },
       
     ]
   },
@@ -78,8 +79,7 @@ export const sidebarConfig: SidebarGroup[] = [
   {
     title: "System",
     items: [
-      { name: "Staff & Roles", href: "/admin/staff", icon: ShieldCheck, roles: [Role.SUPER_ADMIN] },
-      { name: "Customers", href: "/admin/customers", icon: Users },
+      { name: "Users", href: "/admin/users", icon: ShieldCheck, roles: [Role.SUPER_ADMIN] },
       { name: "Activity Logs", href: "/admin/logs", icon: ScrollText, roles: [Role.SUPER_ADMIN] },
       { name: "Settings", href: "/admin/settings", icon: Settings, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ]

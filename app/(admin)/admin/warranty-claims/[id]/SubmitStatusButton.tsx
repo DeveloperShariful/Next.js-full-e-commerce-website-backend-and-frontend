@@ -1,4 +1,4 @@
-//app/(backend)/admin/warranty-claims/[id]/SubmitStatusButton.tsx
+//app/(admin)/admin/warranty-claims/[id]/SubmitStatusButton.tsx
 
 'use client';
 

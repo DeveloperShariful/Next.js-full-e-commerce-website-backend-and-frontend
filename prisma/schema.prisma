@@ -29,6 +29,7 @@ enum Role {
   SUPPORT
   CUSTOMER
   AFFILIATE
+  SUBSCRIBER
 }
 
 enum ProductType {

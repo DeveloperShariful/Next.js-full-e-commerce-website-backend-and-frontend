@@ -1,4 +1,4 @@
-//app/(backend)/admin/warranty-claims/page.tsx
+//app/(admin)/admin/warranty-claims/page.tsx
 
 import Link from 'next/link';
 import { db } from '@/lib/prisma';

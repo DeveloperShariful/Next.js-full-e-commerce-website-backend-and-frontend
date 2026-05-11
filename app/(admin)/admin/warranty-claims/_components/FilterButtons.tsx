@@ -1,4 +1,4 @@
-//app/(backend)/admin/warranty-claims/_components/FilterButtons.tsx
+//app/(admin)/admin/warranty-claims/_components/FilterButtons.tsx
 
 'use client';
 

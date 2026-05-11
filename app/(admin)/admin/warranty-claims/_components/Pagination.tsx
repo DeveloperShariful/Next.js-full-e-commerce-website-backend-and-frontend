@@ -1,4 +1,4 @@
-//app/(backend)/admin/warranty-claims/_components/Pagination.tsx
+//app/(admin)/admin/warranty-claims/_components/Pagination.tsx
 
 'use client';
 

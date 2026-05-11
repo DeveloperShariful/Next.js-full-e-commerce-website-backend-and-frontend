@@ -1,6 +1,4 @@
-//app/(backend)/admin/warranty-claims/_components/WarrantyTableClient.tsx
-
-// app/(backend)/admin/warranty-claims/_components/WarrantyTableClient.tsx
+//app/(admin)/admin/warranty-claims/_components/WarrantyTableClient.tsx
 
 'use client';
 

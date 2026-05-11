@@ -4,9 +4,10 @@ import {
   LayoutDashboard, ShoppingCart, Package, Users, 
   TicketPercent, BarChart3, Settings, 
   FileText, ShieldCheck, MessageSquare, ScrollText, 
-  Undo2, Megaphone, Truck
+  Undo2, Megaphone, Truck,
 } from "lucide-react";
 import { Role } from "@prisma/client";
+
 
 export interface SidebarItem {
   name: string;
@@ -64,6 +65,7 @@ export const sidebarConfig: SidebarGroup[] = [
       { name: "Shipments", href: "/admin/shipments", icon: Truck },
       { name: "Refunds", href: "/admin/refunds", icon: Undo2 },
       { name: "Support Ticket", href: "/admin/support", icon: MessageSquare },
+      { name: "Warranty-Cliem", href: "/admin/warranty-claims", icon: Megaphone },
     ]
   },
   {

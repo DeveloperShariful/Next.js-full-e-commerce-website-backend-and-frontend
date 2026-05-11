@@ -1,15 +1,18 @@
 //app/(backend)/admin/warranty-claims/_components/WarrantyTableClient.tsx
 
+// app/(backend)/admin/warranty-claims/_components/WarrantyTableClient.tsx
+
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { updateClaimStatus, bulkUpdateClaimStatus, deleteClaimPermanently, bulkDeleteClaimsPermanently } from '../../../action/warranty/claim-action';
+import { updateClaimStatus, bulkUpdateClaimStatus, deleteClaimPermanently, bulkDeleteClaimsPermanently } from '@/app/actions/admin/warranty/claim-action';
 import Pagination from './Pagination'; 
+import { ClaimStatus } from '@prisma/client'; // 🛑 NEW: Import types
 
 export default function WarrantyTableClient({ claims, currentFilter, totalItems, itemsPerPage }: { claims: any[], currentFilter: string, totalItems: number, itemsPerPage: number }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState('');
+  const [bulkAction, setBulkAction] = useState<ClaimStatus | "">(""); // 🛑 FIXED: Strong Typing
   const [isApplying, setIsApplying] = useState(false);
 
   const isTrashView = currentFilter === 'TRASHED';
@@ -30,22 +33,25 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
 
     setIsApplying(true);
 
-    if (bulkAction === 'DELETE_PERMANENTLY') {
+    if (bulkAction === 'DELETE_PERMANENTLY' as any) {
       if (confirm('Are you sure you want to permanently delete these claims? This cannot be undone.')) {
         await bulkDeleteClaimsPermanently(selectedIds);
       }
     } else {
-      await bulkUpdateClaimStatus(selectedIds, bulkAction);
+      // 🛑 FIXED: Passing strongly typed status
+      await bulkUpdateClaimStatus(selectedIds, bulkAction as ClaimStatus);
     }
 
-    setSelectedIds([]); setBulkAction(''); setIsApplying(false);
+    setSelectedIds([]); 
+    setBulkAction(''); 
+    setIsApplying(false);
   };
 
   return (
     <>
       <div className="flex justify-between items-center bg-white p-2 border-y sm:border sm:border-[#c3c4c7] sm:border-b-0 mt-2 -mx-4 sm:mx-0">
         <div className="flex items-center gap-2 px-2 sm:px-0">
-          <select value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} className="border border-[#8c8f94] rounded text-[13px] px-2 py-1 outline-none focus:border-[#2271b1]">
+          <select value={bulkAction} onChange={(e) => setBulkAction(e.target.value as any)} className="border border-[#8c8f94] rounded text-[13px] px-2 py-1 outline-none focus:border-[#2271b1]">
             <option value="">Bulk actions</option>
             {isTrashView ? (
               <>
@@ -65,7 +71,6 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
           </button>
         </div>
 
-        {/* <-- এখানে Total Items ফিরিয়ে আনা হয়েছে এবং পেজিনেশন অ্যাড করা হয়েছে --> */}
         <div className="flex items-center gap-4 pr-2 sm:pr-0">
           <div className="hidden sm:block">
             <Pagination totalItems={totalItems} itemsPerPage={itemsPerPage} />
@@ -82,7 +87,6 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
               </th>
               <th className="p-3 sm:p-2 font-semibold whitespace-nowrap">Customer Name</th>
               <th className="p-3 sm:p-2 font-semibold whitespace-nowrap">Order Number</th>
-              {/* <-- Email কলাম ফিরিয়ে আনা হয়েছে --> */}
               <th className="p-3 sm:p-2 font-semibold whitespace-nowrap">Email</th>
               <th className="p-3 sm:p-2 font-semibold whitespace-nowrap">Status</th>
               <th className="p-3 sm:p-2 font-semibold whitespace-nowrap pr-4 sm:pr-2">Date Submitted</th>
@@ -124,7 +128,6 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
                   
                   <td className="p-3 sm:p-2 align-top font-mono text-[#50575e] whitespace-nowrap">#{claim.orderNumber}</td>
                   
-                  {/* <-- Email কলামের ডেটা ফিরিয়ে আনা হয়েছে --> */}
                   <td className="p-3 sm:p-2 align-top whitespace-nowrap">
                     <a href={`mailto:${claim.email}`} className="text-[#2271b1] hover:underline">{claim.email}</a>
                   </td>

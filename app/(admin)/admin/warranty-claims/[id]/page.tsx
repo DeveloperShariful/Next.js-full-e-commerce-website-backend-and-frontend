@@ -1,52 +1,15 @@
 //app/(backend)/admin/warranty-claims/[id]/page.tsx
 
+// app/(backend)/admin/warranty-claims/[id]/page.tsx
+
 import { db } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { updateClaimStatus } from '@/app/actions/admin/warranty/claim-action';
 import TransdirectClientBox from './TransdirectClientBox';
-import { getClient } from '@/lib/apollo-rsc-client'; 
-import { gql } from '@apollo/client';
 import SubmitStatusButton from './SubmitStatusButton';
 
-// ============================================================================
-// ১. TYPESCRIPT INTERFACES (এরর ফিক্স করার জন্য)
-// ============================================================================
-interface SparePartNode {
-  id: string;
-  databaseId: number;
-  name: string;
-  weight: number | null;
-  length: number | null;
-  width: number | null;
-  height: number | null;
-  image?: { sourceUrl: string };
-}
-
-// এই ইন্টারফেসটি অ্যাড করা হলো ডাটার টাইপ ডিফাইন করার জন্য (যাতে লাল দাগ না আসে)
-interface PageQueryData {
-  products: {
-    nodes: SparePartNode[];
-  };
-}
-
-// ============================================================================
-// ২. GRAPHQL QUERY (শুধুমাত্র স্পেয়ার পার্টস আনার জন্য)
-// ============================================================================
-const GET_SPARE_PARTS = gql`
-  query GetSpareParts {
-    products(where: { category: "spare-parts" }, first: 50) {
-      nodes {
-        id
-        databaseId
-        name
-        image { sourceUrl }
-        ... on SimpleProduct { weight length width height }
-        ... on VariableProduct { weight length width height }
-      }
-    }
-  }
-`;
+export const dynamic = 'force-dynamic';
 
 export default async function SingleClaimPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
@@ -56,48 +19,69 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
     where: { id },
   });
 
-  if (!claim) notFound(); 
+  if (!claim) notFound();
 
-  let spareParts: SparePartNode[] = [];
-  let wpOrder: any = null;
   const cleanOrderNumber = claim.orderNumber.replace('#', '').trim();
 
-  // ১. GraphQL দিয়ে স্পেয়ার পার্টস আনা (<PageQueryData> যুক্ত করায় আর লাল দাগ আসবে না)
+  // ১. Prisma দিয়ে সরাসরি ডাটাবেজ থেকে স্পেয়ার পার্টস আনা (No Apollo/GraphQL needed)
+  let spareParts: any[] = [];
   try {
-    const { data } = await getClient().query<PageQueryData>({
-      query: GET_SPARE_PARTS,
-      context: { fetchOptions: { next: { revalidate: 3600 } } }, 
+    const sparePartsData = await db.product.findMany({
+      where: {
+        category: { slug: 'spare-parts' }, // Assuming category slug is 'spare-parts'
+        status: 'ACTIVE'
+      },
+      select: {
+        id: true,
+        productCode: true,
+        name: true,
+        weight: true,
+        length: true,
+        width: true,
+        height: true,
+        featuredImage: true,
+      },
+      take: 50
     });
-    spareParts = data?.products?.nodes || [];
+
+    // Mapping to match the expected format for TransdirectClientBox
+    spareParts = sparePartsData.map(part => ({
+      id: part.id,
+      databaseId: part.productCode,
+      name: part.name,
+      weight: part.weight ? Number(part.weight) : 0.5,
+      length: part.length ? Number(part.length) : null,
+      width: part.width ? Number(part.width) : null,
+      height: part.height ? Number(part.height) : null,
+      image: part.featuredImage ? { sourceUrl: part.featuredImage } : undefined
+    }));
   } catch (error) {
-    console.error("Failed to fetch spare parts", error);
+    console.error("Failed to fetch spare parts from database", error);
   }
 
-  // ২. WooCommerce REST API দিয়ে অর্ডারের ফুল ডিটেইলস আনা (Bulletproof URL Auth Method)
+  // ২. Prisma Order থেকে অর্ডারের ফুল ডিটেইলস আনা (No WooCommerce REST API needed)
+  let localOrder: any = null;
+  let billingDetails: any = {};
+  let shippingDetails: any = {};
+
   try {
-    const wpUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL?.replace(/\/$/, ""); 
-    const ck = process.env.WC_CONSUMER_KEY;
-    const cs = process.env.WC_CONSUMER_SECRET;
-
-    // Header-এর বদলে সরাসরি URL-এ Key পাঠানো হচ্ছে (Server block করতে পারবে না)
-    const apiUrl = `${wpUrl}/wp-json/wc/v3/orders/${cleanOrderNumber}?consumer_key=${ck}&consumer_secret=${cs}`;
-
-    const res = await fetch(apiUrl, {
-      method: 'GET',
-      cache: 'no-store'
+    const orderRecord = await db.order.findUnique({
+      where: { orderNumber: cleanOrderNumber },
+      include: { items: true }
     });
 
-    if (res.ok) {
-      wpOrder = await res.json();
-    } else {
-      console.error(`Failed to fetch order ${cleanOrderNumber}. Status: ${res.status}`);
+    if (orderRecord) {
+      localOrder = orderRecord;
+      // Prisma JSON fields parse
+      billingDetails = typeof orderRecord.billingAddress === 'string' ? JSON.parse(orderRecord.billingAddress) : orderRecord.billingAddress || {};
+      shippingDetails = typeof orderRecord.shippingAddress === 'string' ? JSON.parse(orderRecord.shippingAddress) : orderRecord.shippingAddress || {};
     }
   } catch (error) {
-    console.error("WooCommerce REST API error:", error);
+    console.error("Database query error for order:", error);
   }
 
   const isVideo = claim.mediaUrl?.match(/\.(mp4|mov|webm|m4v)$/i);
-  const emailMismatch = wpOrder && wpOrder.billing?.email && claim.email.toLowerCase() !== wpOrder.billing.email.toLowerCase();
+  const emailMismatch = localOrder && billingDetails?.email && claim.email.toLowerCase() !== billingDetails.email.toLowerCase();
 
   return (
     <div className="w-full pb-10">
@@ -114,15 +98,12 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
         {/* --- LEFT COLUMN --- */}
         <div className="lg:col-span-2 space-y-6">
           
-          <div className="lg:col-span-2 space-y-6">
-          
           <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-sm">
             <h2 className="px-4 py-3 border-b border-[#c3c4c7] text-[13px] sm:text-[14px] font-semibold text-[#1d2327] bg-[#f6f7f7] flex justify-between items-center">
               <span>Submitted Claim Details</span>
               <span className="font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[11px] sm:text-[12px]">Order #{claim.orderNumber}</span>
             </h2>
             
-            {/* 🛑 FIX: Made Responsive (Stack on mobile, Grid on desktop) */}
             <div className="p-4 text-[13px] text-[#3c434a] flex flex-col sm:grid sm:grid-cols-2 gap-4 sm:gap-6">
               
               <div className="w-full">
@@ -135,7 +116,7 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
                 <div className={`font-semibold flex flex-wrap items-center gap-2 ${emailMismatch ? 'text-orange-600' : 'text-[#2271b1]'}`}>
                   <a href={`mailto:${claim.email}`} className="break-all">{claim.email}</a>
                   {emailMismatch && (
-                    <span className="bg-orange-100 text-orange-800 text-[10px] px-1.5 py-0.5 rounded border border-orange-200 whitespace-nowrap" title="Doesn't match WP Order">
+                    <span className="bg-orange-100 text-orange-800 text-[10px] px-1.5 py-0.5 rounded border border-orange-200 whitespace-nowrap" title="Doesn't match Database Order">
                       Mismatch
                     </span>
                   )}
@@ -151,7 +132,6 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
 
             </div>
           </div>
-          </div>
 
           <div className="bg-white border border-[#c3c4c7] shadow-sm">
             <h2 className="px-4 py-3 border-b border-[#c3c4c7] text-[14px] font-semibold text-[#1d2327] bg-[#f6f7f7] flex justify-between items-center">
@@ -159,14 +139,14 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
                 <svg className="w-4 h-4 text-purple-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.97-1.3-3.15-3.61-3.15-2.31 0-3.83 1.25-3.83 3.03 0 1.8 1.4 2.87 3.53 3.32 1.91.41 2.34 1.15 2.34 1.87 0 .53-.39 1.5-2.19 1.5-1.77 0-2.36-.93-2.43-1.84h-1.73c.09 1.93 1.44 3.23 4.14 3.23 2.25 0 3.93-1.18 3.93-3.11-.01-1.83-1.41-2.91-3.56-3.39z"/></svg>
                 Original Order Info
               </span>
-              {wpOrder ? (
-                <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[11px] font-bold tracking-widest uppercase">{wpOrder.status}</span>
+              {localOrder ? (
+                <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-[11px] font-bold tracking-widest uppercase">{localOrder.status}</span>
               ) : (
-                <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[11px] font-bold">NOT FOUND IN WP</span>
+                <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded text-[11px] font-bold">NOT FOUND IN DATABASE</span>
               )}
             </h2>
             
-            {wpOrder ? (
+            {localOrder ? (
               <div className="p-0">
                 <div className="border-b border-[#f0f0f1]">
                   <table className="w-full text-left text-[13px] text-[#3c434a]">
@@ -178,11 +158,11 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {wpOrder.line_items?.map((item: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="py-2 px-4 text-[#2271b1] font-semibold">{item.name}</td>
+                      {localOrder.items?.map((item: any) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="py-2 px-4 text-[#2271b1] font-semibold">{item.productName}</td>
                           <td className="py-2 px-4 text-center">x{item.quantity}</td>
-                          <td className="py-2 px-4 text-right">${item.total}</td>
+                          <td className="py-2 px-4 text-right">${Number(item.total).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -192,28 +172,28 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
                 <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#f0f0f1]">
                   <div className="p-4 text-[13px]">
                     <h3 className="font-bold text-gray-500 uppercase tracking-wider text-[11px] mb-3">Billing Details</h3>
-                    <p className="font-semibold text-[#1d2327] mb-1">{wpOrder.billing?.first_name} {wpOrder.billing?.last_name}</p>
-                    <p className="text-[#2271b1] mb-1"><a href={`mailto:${wpOrder.billing?.email}`}>{wpOrder.billing?.email}</a></p>
-                    <p className="text-[#50575e] mb-2">{wpOrder.billing?.phone}</p>
+                    <p className="font-semibold text-[#1d2327] mb-1">{billingDetails.firstName} {billingDetails.lastName}</p>
+                    <p className="text-[#2271b1] mb-1"><a href={`mailto:${billingDetails.email}`}>{billingDetails.email}</a></p>
+                    <p className="text-[#50575e] mb-2">{billingDetails.phone}</p>
                     <p className="text-[#50575e]">
-                      {wpOrder.billing?.address_1}<br/>
-                      {wpOrder.billing?.city}, {wpOrder.billing?.state} {wpOrder.billing?.postcode}
+                      {billingDetails.address1} {billingDetails.address2}<br/>
+                      {billingDetails.city}, {billingDetails.state} {billingDetails.postcode}
                     </p>
                   </div>
                   
                   <div className="p-4 text-[13px]">
                     <h3 className="font-bold text-gray-500 uppercase tracking-wider text-[11px] mb-3">Shipping Details</h3>
-                    <p className="font-semibold text-[#1d2327] mb-1">{wpOrder.shipping?.first_name} {wpOrder.shipping?.last_name}</p>
+                    <p className="font-semibold text-[#1d2327] mb-1">{shippingDetails.firstName} {shippingDetails.lastName}</p>
                     <p className="text-[#50575e]">
-                      {wpOrder.shipping?.address_1}<br/>
-                      {wpOrder.shipping?.city}, {wpOrder.shipping?.state} {wpOrder.shipping?.postcode}
+                      {shippingDetails.address1} {shippingDetails.address2}<br/>
+                      {shippingDetails.city}, {shippingDetails.state} {shippingDetails.postcode}
                     </p>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="p-6 text-center text-gray-500 text-[13px]">
-                We couldn't find an order with number <strong>#{claim.orderNumber}</strong> in WooCommerce. The customer might have entered it wrong.
+                We couldn't find an order with number <strong>#{claim.orderNumber}</strong> in the database. The customer might have entered it wrong.
               </div>
             )}
           </div>
@@ -291,10 +271,10 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
             trackingNumber={claim.trackingNumber} 
             replacementPart={claim.replacementPart} 
             spareParts={spareParts} 
-            customerAddress={wpOrder?.shipping?.address_1 || claim.address}
-            customerSuburb={wpOrder?.shipping?.city || claim.suburb}
-            customerPostcode={wpOrder?.shipping?.postcode || claim.postcode}
-            customerState={wpOrder?.shipping?.state || claim.state}
+            customerAddress={shippingDetails?.address1 || claim.address}
+            customerSuburb={shippingDetails?.city || claim.suburb}
+            customerPostcode={shippingDetails?.postcode || claim.postcode}
+            customerState={shippingDetails?.state || claim.state}
           />
         </div>
       </div>

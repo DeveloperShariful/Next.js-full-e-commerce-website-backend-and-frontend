@@ -4,7 +4,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { getTransdirectQuotes, confirmTransdirectBooking } from '@/app/(backend)/action/settings/shipping/transdirect-action';
+import { getTransdirectQuotes, confirmTransdirectBooking } from '@/app/actions/admin/warranty/transdirect-action';
 import Image from 'next/image';
 
 export default function TransdirectClientBox({ 

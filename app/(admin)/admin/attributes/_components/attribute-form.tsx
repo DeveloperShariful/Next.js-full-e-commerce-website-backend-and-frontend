@@ -115,7 +115,7 @@ export function AttributeForm({ initialData, onSuccess, isEditing }: FormProps) 
           <label className="block text-[14px] text-[#2c3338] mb-1">Type</label>
           <select 
             value={formData.type} 
-            onChange={(e) => setFormData({...formData, type: e.target.value})} 
+            onChange={(e) => setFormData({...formData, type: e.target.value as "TEXT" | "COLOR" | "BUTTON"})} 
             className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
           >
             <option value="TEXT">Text / Label</option>

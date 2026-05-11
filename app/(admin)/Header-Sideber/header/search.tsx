@@ -80,10 +80,10 @@ export function Search() {
   return (
     <div className="relative w-full max-w-md hidden sm:block group">
       
-      {/* Search Input */}
-      <div className="relative">
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-          {loading ? <Loader2 size={16} className="animate-spin text-blue-500" /> : <SearchIcon size={16} />}
+      {/* 🚀 WP Style Search Input in Admin Bar */}
+      <div className="relative flex items-center">
+        <div className="absolute left-2 text-[#a7aaad]">
+          {loading ? <Loader2 size={14} className="animate-spin text-[#72aee6]" /> : <SearchIcon size={14} />}
         </div>
         
         <input
@@ -95,52 +95,52 @@ export function Search() {
              if(e.target.value.length > 0) setShowResults(true);
           }}
           onFocus={() => { if(query.length >= 2) setShowResults(true); }}
-          placeholder="Search products, orders, customers..."
-          className="w-full h-10 pl-10 pr-12 rounded-lg border border-slate-200 bg-slate-50 text-sm outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 placeholder:text-slate-400"
+          placeholder="Search..."
+          className="w-[180px] focus:w-[280px] h-[28px] pl-7 pr-8 rounded-[3px] border border-[#50575e] bg-[#1d2327] text-[13px] text-white outline-none focus:bg-white focus:text-[#3c434a] focus:border-[#2271b1] transition-all duration-200 placeholder:text-[#a7aaad] focus:placeholder:text-[#8c8f94]"
         />
         
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        <div className="absolute right-2 flex items-center gap-1">
           {query ? (
-            <button onClick={clearSearch} className="text-slate-400 hover:text-slate-600">
+            <button onClick={clearSearch} className="text-[#a7aaad] hover:text-[#d63638]">
                <X size={14} />
             </button>
           ) : (
-            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-slate-200 bg-slate-100 px-1.5 font-mono text-[10px] font-medium text-slate-500">
-              <span className="text-xs">⌘</span>K
+            <kbd className="hidden sm:inline-flex items-center font-mono text-[10px] font-medium text-[#a7aaad]">
+              ⌘K
             </kbd>
           )}
         </div>
       </div>
 
-      {/* Dropdown Results */}
+      {/* 🚀 WP Style Dropdown Results */}
       {showResults && (query.length >= 2) && (
-        <div ref={dropdownRef} className="absolute top-12 left-0 w-full bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50 max-h-[400px] overflow-y-auto animate-in fade-in zoom-in-95">
+        <div ref={dropdownRef} className="absolute top-[36px] left-0 w-full bg-white shadow-md border border-[#c3c4c7] z-50 max-h-[400px] overflow-y-auto">
            
            {!hasResults && !loading && (
-              <div className="p-4 text-center text-slate-500 text-sm">
+              <div className="p-3 text-center text-[#8c8f94] text-[13px] italic">
                  No results found for "{query}"
               </div>
            )}
 
            {/* Products Section */}
            {results.products.length > 0 && (
-             <div className="p-2">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1">Products</h3>
+             <div className="p-1">
+                <h3 className="text-[11px] font-semibold text-[#8c8f94] uppercase tracking-wider px-2 py-1 bg-[#f0f0f1] border-b border-[#e2e4e7]">Products</h3>
                 {results.products.map((p: any) => (
                    <Link 
                      key={p.id} 
                      href={`/admin/products/create?id=${p.id}`} 
                      onClick={clearSearch}
-                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                     className="flex items-center gap-3 px-2 py-1.5 hover:bg-[#f0f0f1] transition cursor-pointer border-b border-[#f0f0f1] last:border-0"
                    >
-                      <div className="w-8 h-8 rounded bg-slate-100 relative overflow-hidden flex-shrink-0 border border-slate-200">
+                      <div className="w-6 h-6 bg-[#f0f0f1] relative flex-shrink-0 border border-[#c3c4c7]">
                          {p.featuredImage ? (
                             <Image src={p.featuredImage} alt={p.name} fill className="object-cover" />
                          ) : (
-                            <Package size={16} className="m-auto text-slate-400"/>
+                            <Package size={14} className="m-auto text-[#8c8f94] mt-1"/>
                          )}
                       </div>
-                      <span className="text-sm text-slate-700 font-medium truncate">{p.name}</span>
+                      <span className="text-[13px] text-[#2271b1] hover:text-[#0a4b78] truncate">{p.name}</span>
                    </Link>
                 ))}
              </div>
@@ -148,21 +148,21 @@ export function Search() {
 
            {/* Orders Section */}
            {results.orders.length > 0 && (
-             <div className="p-2 border-t border-slate-100">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1 mt-1">Orders</h3>
+             <div className="p-1 border-t border-[#c3c4c7]">
+                <h3 className="text-[11px] font-semibold text-[#8c8f94] uppercase tracking-wider px-2 py-1 bg-[#f0f0f1] border-b border-[#e2e4e7]">Orders</h3>
                 {results.orders.map((o: any) => (
                    <Link 
                      key={o.id} 
                      href={`/admin/orders/${o.id}`} 
                      onClick={clearSearch}
-                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                     className="flex items-center gap-3 px-2 py-1.5 hover:bg-[#f0f0f1] transition cursor-pointer border-b border-[#f0f0f1] last:border-0"
                    >
-                      <div className="w-8 h-8 rounded bg-blue-50 flex items-center justify-center flex-shrink-0 text-blue-600">
-                         <ShoppingCart size={16} />
+                      <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-[#8c8f94]">
+                         <ShoppingCart size={14} />
                       </div>
                       <div className="flex flex-col">
-                         <span className="text-sm text-slate-700 font-bold">#{o.orderNumber}</span>
-                         <span className="text-[10px] text-slate-500 uppercase">{o.status} • ৳{o.total}</span>
+                         <span className="text-[13px] text-[#2271b1] hover:text-[#0a4b78]">#{o.orderNumber}</span>
+                         <span className="text-[11px] text-[#8c8f94]">{o.status} &ndash; ৳{o.total}</span>
                       </div>
                    </Link>
                 ))}
@@ -171,21 +171,21 @@ export function Search() {
 
            {/* Customers Section */}
            {results.customers.length > 0 && (
-             <div className="p-2 border-t border-slate-100">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1 mt-1">Customers</h3>
+             <div className="p-1 border-t border-[#c3c4c7]">
+                <h3 className="text-[11px] font-semibold text-[#8c8f94] uppercase tracking-wider px-2 py-1 bg-[#f0f0f1] border-b border-[#e2e4e7]">Customers</h3>
                 {results.customers.map((c: any) => (
                    <Link 
                      key={c.id} 
                      href={`/admin/customers/${c.id}`} 
                      onClick={clearSearch}
-                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                     className="flex items-center gap-3 px-2 py-1.5 hover:bg-[#f0f0f1] transition cursor-pointer border-b border-[#f0f0f1] last:border-0"
                    >
-                      <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center flex-shrink-0 text-orange-600 overflow-hidden relative">
-                         {c.image ? <Image src={c.image} alt={c.name} fill className="object-cover"/> : <User size={16} />}
+                      <div className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-[#8c8f94] overflow-hidden relative">
+                         {c.image ? <Image src={c.image} alt={c.name} fill className="object-cover rounded-full"/> : <User size={14} />}
                       </div>
-                      <div className="flex flex-col">
-                         <span className="text-sm text-slate-700 font-medium">{c.name}</span>
-                         <span className="text-[10px] text-slate-400 truncate max-w-[150px]">{c.email}</span>
+                      <div className="flex flex-col w-full overflow-hidden">
+                         <span className="text-[13px] text-[#2271b1] hover:text-[#0a4b78]">{c.name}</span>
+                         <span className="text-[11px] text-[#8c8f94] truncate">{c.email}</span>
                       </div>
                    </Link>
                 ))}

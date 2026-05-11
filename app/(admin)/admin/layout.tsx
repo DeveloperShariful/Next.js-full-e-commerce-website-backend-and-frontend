@@ -23,13 +23,13 @@ async function getGlobalData() {
     settings: {
       storeSettings: {
         storeName: settings?.storeName || "GoBike",
+        // ... (আপনার বাকি সব কোড সেম থাকবে)
         storeEmail: settings?.storeEmail,
         storePhone: settings?.storePhone,
         currency: settings?.currency || "",
         currencySymbol: settings?.currencySymbol || "",
         weightUnit: settings?.weightUnit || "",
         dimensionUnit: settings?.dimensionUnit || "",
-        
         logo: settings?.logo,
         favicon: settings?.favicon,
         maintenance: settings?.maintenance || false,
@@ -41,7 +41,6 @@ async function getGlobalData() {
         logoMedia: settings?.logoMedia,
         faviconMedia: settings?.faviconMedia,
       },
-      
       seoConfig: {
         siteName: seo?.siteName || "GoBike",
         titleSeparator: seo?.titleSeparator || "|",
@@ -57,7 +56,6 @@ async function getGlobalData() {
         manifestJson: seo?.manifestJson,
         ogMedia: seo?.ogMedia,
       },
-
       marketingConfig: marketing ? {
         gtmEnabled: marketing.gtmEnabled,
         gtmContainerId: marketing.gtmContainerId,
@@ -76,7 +74,7 @@ async function getGlobalData() {
 }
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const session = await auth(); // <--- NextAuth Auth Check
+  const session = await auth(); 
   if (!session?.user?.email) redirect("/sign-in");
 
   const dbUser = await db.user.findUnique({
@@ -94,17 +92,24 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   const rawData = await getGlobalData();
   const cleanData = serializePrismaData(rawData);
+  
   return (
     <GlobalStoreProvider 
       settings={cleanData.settings as any} 
       paymentMethods={cleanData.paymentMethods as any}
       pickupLocations={cleanData.pickupLocations as any}
     >
-      <div className="flex h-screen bg-slate-50/50 font-sans text-slate-800 overflow-hidden">
-        <AdminSidebar user={adminUser} />
-        <div className="flex-1 flex flex-col h-full min-w-0">
-          <AdminHeader user={adminUser} />
-          <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">    
+      <div className="flex flex-col h-screen bg-[#f0f0f1] font-sans text-[#3c434a] overflow-hidden">
+        
+        {/* 🚀 এখানে storeName প্রপস হিসেবে পাঠানো হলো */}
+        <AdminHeader 
+          user={adminUser} 
+          storeName={cleanData.settings.storeSettings.storeName} 
+        />
+        
+        <div className="flex flex-1 overflow-hidden">
+          <AdminSidebar user={adminUser} />
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin scrollbar-thumb-[#c3c4c7] scrollbar-track-transparent">    
             {children}
           </main>
         </div>

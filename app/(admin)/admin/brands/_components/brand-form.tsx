@@ -2,128 +2,215 @@
 
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { upsertBrand } from "@/app/actions/admin/brands/brand-actions";
+import { useState, useEffect } from "react";
+import ImageUpload from "@/components/media/image-upload"; // Ensure this matches your project
+import { BrandData } from "../types";
 import { toast } from "react-hot-toast";
-import { Save, ArrowLeft, Loader2, Globe, MapPin, Search } from "lucide-react";
-import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
-interface BrandFormProps {
-  initialData?: any; // Using any to match Prisma return type loosely or define proper interface
+import { createBrand, updateBrand } from "@/app/actions/admin/brands/brand-actions";
+
+interface FormProps {
+  initialData: Partial<BrandData>; 
+  onSuccess: () => void;
+  isEditing: boolean;
 }
 
-export default function BrandForm({ initialData }: BrandFormProps) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
+export default function BrandForm({ initialData, onSuccess, isEditing }: FormProps) {
+  const [formData, setFormData] = useState({
+    id: initialData.id || "",
+    name: initialData.name || "",
+    slug: initialData.slug || "",
+    description: initialData.description || "",
+    website: initialData.website || "",
+    countryOfOrigin: initialData.countryOfOrigin || "",
+    logo: initialData.logo ? [initialData.logo] : [],
+    metaTitle: initialData.metaTitle || "",
+    metaDesc: initialData.metaDesc || "",
+  });
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setFormData({
+      id: initialData.id || "",
+      name: initialData.name || "",
+      slug: initialData.slug || "",
+      description: initialData.description || "",
+      website: initialData.website || "",
+      countryOfOrigin: initialData.countryOfOrigin || "",
+      logo: initialData.logo ? [initialData.logo] : [],
+      metaTitle: initialData.metaTitle || "",
+      metaDesc: initialData.metaDesc || "",
+    });
+  }, [initialData]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    
-    const formData = new FormData(e.currentTarget);
-    const res = await upsertBrand(formData, initialData?.id);
+    setIsSubmitting(true);
+    const toastId = toast.loading(isEditing ? "Updating..." : "Creating...");
 
-    if (res.success) {
-      toast.success(res.message);
-      router.push("/admin/brands");
-      router.refresh();
-    } else {
-      toast.error(res.message);
+    const data = new FormData();
+    if (isEditing) data.append("id", formData.id);
+    
+    data.append("name", formData.name);
+    data.append("slug", formData.slug);
+    data.append("description", formData.description);
+    data.append("website", formData.website);
+    data.append("countryOfOrigin", formData.countryOfOrigin);
+    if (formData.logo.length > 0) data.append("logo", formData.logo[0]);
+    data.append("metaTitle", formData.metaTitle);
+    data.append("metaDesc", formData.metaDesc);
+
+    try {
+      const res = isEditing ? await updateBrand(data) : await createBrand(data);
+
+      if (res.success) {
+        toast.success(res.message as string, { id: toastId });
+        if (!isEditing) {
+          setFormData({ id: "", name: "", slug: "", description: "", website: "", countryOfOrigin: "", logo: [], metaTitle: "", metaDesc: "" });
+        }
+        onSuccess();
+      } else {
+        toast.error(res.error as string, { id: toastId });
+      }
+    } catch (error) {
+      toast.error("Something went wrong", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
     }
-    setLoading(false);
+  };
+
+  const handleCancel = () => {
+    onSuccess(); 
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">
-          {initialData ? "Edit Brand" : "Create New Brand"}
-        </h2>
-        <Link href="/admin/brands" className="text-sm text-slate-500 hover:text-blue-600 flex items-center gap-1">
-           <ArrowLeft size={16}/> Back to List
-        </Link>
-      </div>
+    <div className="bg-transparent pr-0 lg:pr-4 animate-in fade-in duration-300">
+      
+      <h2 className="text-[18px] font-normal text-[#1d2327] mb-4">
+        {isEditing ? "Edit brand" : "Add new brand"}
+      </h2>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <form onSubmit={handleSubmit} className="space-y-4">
         
-        {/* Left Column: Basic Info */}
-        <div className="lg:col-span-2 space-y-6">
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
-              <h3 className="font-semibold text-slate-800 mb-4">Basic Information</h3>
+        {/* Basic Fields */}
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Name</label>
+          <input 
+            type="text" 
+            required 
+            value={formData.name} 
+            onChange={(e) => setFormData({...formData, name: e.target.value})} 
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          />
+          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">The name is how it appears on your site.</p>
+        </div>
+
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Slug</label>
+          <input 
+            type="text" 
+            value={formData.slug} 
+            onChange={(e) => setFormData({...formData, slug: e.target.value})} 
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          />
+          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">The "slug" is the URL-friendly version of the name. It is usually all lowercase and contains only letters, numbers, and hyphens.</p>
+        </div>
+
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Description</label>
+          <textarea 
+            rows={4} 
+            value={formData.description} 
+            onChange={(e) => setFormData({...formData, description: e.target.value})} 
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none resize-none transition-shadow" 
+          />
+        </div>
+
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Website URL</label>
+          <input 
+            type="url" 
+            value={formData.website} 
+            onChange={(e) => setFormData({...formData, website: e.target.value})} 
+            placeholder="https://..."
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          />
+        </div>
+
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Country of Origin</label>
+          <input 
+            type="text" 
+            value={formData.countryOfOrigin} 
+            onChange={(e) => setFormData({...formData, countryOfOrigin: e.target.value})} 
+            placeholder="e.g. Japan, USA"
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          />
+        </div>
+
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Logo</label>
+          <div className="bg-transparent">
+             <ImageUpload 
+               value={formData.logo} 
+               disabled={isSubmitting} 
+               onChange={(url) => setFormData({...formData, logo: [url]})} 
+               onRemove={() => setFormData({...formData, logo: []})}
+             />
+          </div>
+        </div>
+
+        {/* Custom Meta Fields */}
+        <div className="pt-4">
+           <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">SEO</h3>
+           
+           <div className="space-y-4">
+              <div>
+                <label className="block text-[13px] text-[#2c3338] mb-1">Meta Title</label>
+                <input 
+                  type="text" 
+                  value={formData.metaTitle} 
+                  onChange={(e) => setFormData({...formData, metaTitle: e.target.value})} 
+                  className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none" 
+                />
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Brand Name *</label>
-                    <input name="name" defaultValue={initialData?.name} required placeholder="e.g. Shimano" className="w-full border border-slate-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500 transition"/>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Slug (Optional)</label>
-                    <input name="slug" defaultValue={initialData?.slug} placeholder="e.g. shimano" className="w-full border border-slate-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500 transition"/>
-                  </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                <textarea name="description" defaultValue={initialData?.description} rows={4} placeholder="Brand description..." className="w-full border border-slate-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500 transition"/>
-              </div>
-           </div>
-
-           {/* SEO Section */}
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
-              <div className="flex items-center gap-2 mb-2 text-slate-800">
-                  <Search size={18} />
-                  <h3 className="font-semibold">SEO Configuration</h3>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Meta Title</label>
-                <input name="metaTitle" defaultValue={initialData?.metaTitle} placeholder="SEO Title" className="w-full border border-slate-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500 transition"/>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Meta Description</label>
-                <textarea name="metaDesc" defaultValue={initialData?.metaDesc} rows={2} placeholder="SEO Description" className="w-full border border-slate-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500 transition"/>
+                <label className="block text-[13px] text-[#2c3338] mb-1">Meta Description</label>
+                <textarea 
+                  rows={2} 
+                  value={formData.metaDesc} 
+                  onChange={(e) => setFormData({...formData, metaDesc: e.target.value})} 
+                  className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none resize-none" 
+                />
               </div>
            </div>
         </div>
 
-        {/* Right Column: Details */}
-        <div className="space-y-6">
-           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
-              <h3 className="font-semibold text-slate-800 mb-2">Details</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Website URL</label>
-                <div className="relative">
-                   <Globe size={16} className="absolute left-3 top-3 text-slate-400"/>
-                   <input name="website" defaultValue={initialData?.website} placeholder="https://..." className="w-full border border-slate-300 rounded-lg pl-10 pr-4 py-2 outline-none focus:border-blue-500 transition"/>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Country of Origin</label>
-                <div className="relative">
-                   <MapPin size={16} className="absolute left-3 top-3 text-slate-400"/>
-                   <input name="countryOfOrigin" defaultValue={initialData?.countryOfOrigin} placeholder="e.g. Japan" className="w-full border border-slate-300 rounded-lg pl-10 pr-4 py-2 outline-none focus:border-blue-500 transition"/>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Logo URL</label>
-                <input name="logo" defaultValue={initialData?.logo} placeholder="Image URL" className="w-full border border-slate-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500 transition"/>
-                <p className="text-[10px] text-slate-400 mt-1">Upload functionality coming soon.</p>
-              </div>
-           </div>
-
-           <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition flex justify-center items-center gap-2 disabled:opacity-50 shadow-lg"
-           >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-              {initialData ? "Update Brand" : "Save Brand"}
-           </button>
+        {/* Submit Buttons */}
+        <div className="pt-4 flex items-center gap-2">
+          <button 
+            type="submit" 
+            disabled={isSubmitting} 
+            className="px-3 py-1.5 bg-[#2271b1] text-white text-[13px] font-normal rounded-[3px] border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] transition-colors disabled:opacity-70 flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+             {isSubmitting && <Loader2 className="animate-spin" size={14}/>}
+             {isEditing ? "Update brand" : "Add new brand"}
+          </button>
+          
+          {isEditing && (
+            <button 
+              type="button" 
+              onClick={handleCancel}
+              className="px-3 py-1.5 text-[#d63638] text-[13px] hover:underline"
+            >
+              Cancel
+            </button>
+          )}
         </div>
+        
       </form>
     </div>
   );

@@ -3,67 +3,64 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { createAttribute, updateAttribute, AttributeState } from "@/app/actions/admin/attribute/attribute";
-import { Save, X, Loader2, AlertTriangle } from "lucide-react";
+import { AttributeData } from "../types";
 import { toast } from "react-hot-toast";
+import { Loader2 } from "lucide-react";
 
-interface AttributeFormProps {
-  editingData: any | null;
-  onCancelEdit: () => void;
+import { createAttribute, updateAttribute, AttributeState } from "@/app/actions/admin/attribute/attribute";
+
+interface FormProps {
+  initialData: Partial<AttributeData>; 
   onSuccess: () => void;
+  isEditing: boolean;
 }
 
-export function AttributeForm({ editingData, onCancelEdit, onSuccess }: AttributeFormProps) {
+export function AttributeForm({ initialData, onSuccess, isEditing }: FormProps) {
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   
   const [formData, setFormData] = useState({
-    name: "",
-    slug: "",
-    type: "TEXT",
-    values: "",
+    id: initialData.id || "",
+    name: initialData.name || "",
+    slug: initialData.slug || "",
+    type: initialData.type || "TEXT",
+    values: initialData.values?.join(", ") || "",
   });
 
   useEffect(() => {
-    if (editingData) {
-      setFormData({
-        name: editingData.name,
-        slug: editingData.slug,
-        type: editingData.type || "TEXT",
-        values: editingData.values.join(", ")
-      });
-      setErrors({});
-    } else {
-      setFormData({ name: "", slug: "", type: "TEXT", values: "" });
-    }
-  }, [editingData]);
+    setFormData({
+      id: initialData.id || "",
+      name: initialData.name || "",
+      slug: initialData.slug || "",
+      type: initialData.type || "TEXT",
+      values: initialData.values?.join(", ") || "",
+    });
+    setErrors({});
+  }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
-    if (!formData.name.trim()) {
-      setErrors({ name: ["Name is required"] });
-      return;
-    }
-
-    const toastId = toast.loading(editingData ? "Updating..." : "Creating...");
+    const toastId = toast.loading(isEditing ? "Updating..." : "Creating...");
     const payload = new FormData();
     
-    if (editingData) payload.append("id", editingData.id);
+    if (isEditing) payload.append("id", formData.id);
     payload.append("name", formData.name);
     payload.append("slug", formData.slug);
     payload.append("type", formData.type);
     payload.append("values", formData.values);
 
     startTransition(async () => {
-      const res: AttributeState = editingData 
-        ? await updateAttribute(null, payload) 
-        : await createAttribute(null, payload);
+      const res: AttributeState = isEditing 
+        ? await updateAttribute(payload) 
+        : await createAttribute(payload);
 
       if (res.success) {
         toast.success(res.message || "Operation successful!", { id: toastId });
-        setFormData({ name: "", slug: "", type: "TEXT", values: "" });
+        if (!isEditing) {
+          setFormData({ id: "", name: "", slug: "", type: "TEXT", values: "" });
+        }
         onSuccess();
       } else {
         toast.dismiss(toastId);
@@ -77,78 +74,91 @@ export function AttributeForm({ editingData, onCancelEdit, onSuccess }: Attribut
     });
   };
 
-  return (
-    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-6">
-      <div className="flex items-center justify-between mb-6 border-b pb-4">
-          <h3 className="font-bold text-lg text-slate-800">
-            {editingData ? "Edit Attribute" : "Add Attribute"}
-          </h3>
-          {editingData && (
-            <button onClick={onCancelEdit} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded transition flex items-center gap-1">
-              <X size={14}/> Cancel
-            </button>
-          )}
-      </div>
+  const handleCancel = () => {
+    onSuccess(); 
+  };
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-1.5">
-          <label className="block text-sm font-bold text-slate-700">Name <span className="text-red-500">*</span></label>
+  return (
+    <div className="bg-transparent pr-0 lg:pr-4 animate-in fade-in duration-300">
+      
+      <h2 className="text-[18px] font-normal text-[#1d2327] mb-4">
+        {isEditing ? "Edit attribute" : "Add new attribute"}
+      </h2>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Name</label>
           <input 
             type="text" 
             value={formData.name} 
             onChange={(e) => setFormData({...formData, name: e.target.value})} 
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 outline-none transition ${errors.name ? "border-red-500 focus:ring-red-200" : "border-slate-300 focus:ring-blue-500"}`}
-            placeholder="e.g. Color"
+            className={`w-full px-2 py-[5px] bg-white border rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] outline-none transition-shadow ${errors.name ? "border-[#d63638] focus:ring-1 focus:ring-[#d63638]" : "border-[#8c8f94] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"}`} 
           />
-          {errors.name && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12}/> {errors.name[0]}</p>}
+          {errors.name && <p className="text-[12px] text-[#d63638] mt-1">{errors.name[0]}</p>}
+          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">Name for the attribute (shown on the front-end).</p>
         </div>
-        
-        <div className="space-y-1.5">
-          <label className="block text-sm font-bold text-slate-700">Slug</label>
+
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Slug</label>
           <input 
             type="text" 
             value={formData.slug} 
             onChange={(e) => setFormData({...formData, slug: e.target.value})} 
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" 
-            placeholder="e.g. color"
+            className={`w-full px-2 py-[5px] bg-white border rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] outline-none transition-shadow ${errors.slug ? "border-[#d63638] focus:ring-1 focus:ring-[#d63638]" : "border-[#8c8f94] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"}`} 
           />
-          {errors.slug && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12}/> {errors.slug[0]}</p>}
+          {errors.slug && <p className="text-[12px] text-[#d63638] mt-1">{errors.slug[0]}</p>}
+          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">Unique slug/reference for the attribute; must be no more than 28 characters.</p>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="block text-sm font-bold text-slate-700">Type</label>
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Type</label>
           <select 
             value={formData.type} 
             onChange={(e) => setFormData({...formData, type: e.target.value})} 
-            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
           >
             <option value="TEXT">Text / Label</option>
             <option value="COLOR">Color</option>
             <option value="BUTTON">Button / Image</option>
           </select>
+          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">Determines how this attribute's values are displayed.</p>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="block text-sm font-bold text-slate-700">Values <span className="text-red-500">*</span></label>
+        <div>
+          <label className="block text-[14px] text-[#2c3338] mb-1">Terms / Values</label>
           <textarea 
-            rows={5}
-            value={formData.values}
-            onChange={(e) => setFormData({...formData, values: e.target.value})}
-            className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 outline-none transition resize-none ${errors.values ? "border-red-500 focus:ring-red-200" : "border-slate-300 focus:ring-blue-500"}`}
-            placeholder="Red, Blue, Green"
+            rows={4} 
+            value={formData.values} 
+            onChange={(e) => setFormData({...formData, values: e.target.value})} 
+            className={`w-full px-2 py-[5px] bg-white border rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] outline-none resize-none transition-shadow ${errors.values ? "border-[#d63638] focus:ring-1 focus:ring-[#d63638]" : "border-[#8c8f94] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"}`} 
           />
-          {errors.values && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12}/> {errors.values[0]}</p>}
-          <p className="text-[11px] text-slate-500">Comma separated (e.g. S, M, L).</p>
+          {errors.values && <p className="text-[12px] text-[#d63638] mt-1">{errors.values[0]}</p>}
+          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">Comma separated values (e.g. Small, Medium, Large). For colors use valid names or hex codes.</p>
         </div>
 
-        <button 
-          type="submit" 
-          disabled={isPending} 
-          className="w-full py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-md disabled:opacity-70"
-        >
-          {isPending ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>}
-          {editingData ? "Update Attribute" : "Add Attribute"}
-        </button>
+        {/* Submit Buttons */}
+        <div className="pt-4 flex items-center gap-2">
+          <button 
+            type="submit" 
+            disabled={isPending} 
+            className="px-3 py-1.5 bg-[#2271b1] text-white text-[13px] font-normal rounded-[3px] border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] transition-colors disabled:opacity-70 flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+             {isPending && <Loader2 className="animate-spin" size={14}/>}
+             {isEditing ? "Update attribute" : "Add attribute"}
+          </button>
+          
+          {isEditing && (
+            <button 
+              type="button" 
+              onClick={handleCancel}
+              className="px-3 py-1.5 text-[#d63638] text-[13px] hover:underline"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+        
       </form>
     </div>
   );

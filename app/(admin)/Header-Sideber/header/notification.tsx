@@ -7,7 +7,6 @@ import { Bell, Check, Trash2, CheckSquare, Square, ShoppingBag, AlertTriangle } 
 import Link from "next/link";
 import { getSystemNotifications } from "@/app/actions/admin/header-sideber/get-notifications";
 
-// লোকাল স্টেট এর জন্য ইন্টারফেস (সার্ভার ডাটার সাথে UI স্টেট মিক্স করা)
 interface NotificationState {
   id: string;
   title: string;
@@ -15,7 +14,7 @@ interface NotificationState {
   time: string;
   type: "ORDER" | "STOCK" | "USER";
   isRead: boolean;
-  isSelected: boolean; // UI এর জন্য দরকারি
+  isSelected: boolean; 
 }
 
 export function Notifications() {
@@ -23,19 +22,15 @@ export function Notifications() {
   const [notifications, setNotifications] = useState<NotificationState[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 1. সার্ভার থেকে ডাটা আনা এবং লোকাল স্টেটে সেট করা
   useEffect(() => {
     async function fetchNotes() {
       const serverNotes = await getSystemNotifications();
-      
-      // সার্ভার ডাটার সাথে isSelected ডিফল্ট false যোগ করা
       const formattedNotes: NotificationState[] = serverNotes.map(note => ({
         ...note,
         isSelected: false,
-        isRead: false // ডিফল্ট আনরিড রাখা হচ্ছে
+        isRead: false 
       }));
 
-      // যদি নোটিফিকেশন লিস্ট খালি থাকে তবেই নতুন ডাটা লোড হবে (যাতে ইউজার ডিলিট করলে আবার চলে না আসে)
       setNotifications(prev => {
         if (prev.length === 0) return formattedNotes;
         return prev; 
@@ -44,12 +39,10 @@ export function Notifications() {
     fetchNotes();
   }, []);
 
-  // ক্যালকুলেশন
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const selectedCount = notifications.filter(n => n.isSelected).length;
   const isAllSelected = notifications.length > 0 && selectedCount === notifications.length;
 
-  // ড্রপডাউন বন্ধ করার লজিক
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -60,33 +53,26 @@ export function Notifications() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- ACTIONS (আগের লজিকগুলো) ---
-
-  // 1. Toggle Single Selection
   const toggleSelect = (id: string) => {
     setNotifications(prev => prev.map(n => 
       n.id === id ? { ...n, isSelected: !n.isSelected } : n
     ));
   };
 
-  // 2. Toggle Select All
   const toggleSelectAll = () => {
     setNotifications(prev => prev.map(n => ({ ...n, isSelected: !isAllSelected })));
   };
 
-  // 3. Delete Selected (Local UI remove)
   const deleteSelected = () => {
     setNotifications(prev => prev.filter(n => !n.isSelected));
   };
 
-  // 4. Mark Selected as Read
   const markSelectedRead = () => {
     setNotifications(prev => prev.map(n => 
       n.isSelected ? { ...n, isRead: true, isSelected: false } : n
     ));
   };
 
-  // 5. Mark Single as Read
   const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => 
       n.id === id ? { ...n, isRead: true } : n
@@ -94,46 +80,48 @@ export function Notifications() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      {/* Bell Trigger */}
+    <div className="relative h-full flex items-center" ref={dropdownRef}>
+      {/* 🚀 WP Style Bell Trigger */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full hover:bg-slate-100 transition text-slate-600 focus:outline-none"
+        className="relative h-full px-3 flex items-center justify-center hover:bg-[#2c3338] transition-colors text-[#c3c4c7] focus:outline-none"
       >
-        <Bell size={20} />
+        <Bell size={16} />
         {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+            <span className="absolute top-[8px] right-[6px] w-3.5 h-3.5 bg-[#d63638] text-white flex items-center justify-center rounded-full text-[9px] font-bold border-2 border-[#1d2327]">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
         )}
       </button>
 
+      {/* 🚀 WP Style Dropdown Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+        <div className="absolute top-[46px] right-0 mt-0 w-80 sm:w-96 bg-white border border-[#c3c4c7] shadow-md z-50">
           
           {/* Header Area */}
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center h-12">
+          <div className="px-3 py-2 border-b border-[#c3c4c7] bg-[#f0f0f1] flex justify-between items-center min-h-[40px]">
             {selectedCount > 0 ? (
                // --- ACTION MODE ---
-               <div className="flex items-center gap-3 w-full animate-in fade-in slide-in-from-top-1">
+               <div className="flex items-center gap-3 w-full">
                   <div className="flex items-center gap-2">
-                    <button onClick={toggleSelectAll} className="text-slate-600 hover:text-blue-600">
+                    <button onClick={toggleSelectAll} className="text-[#8c8f94] hover:text-[#2271b1]">
                         {isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}
                     </button>
-                    <span className="text-xs font-semibold text-slate-600">{selectedCount} Selected</span>
+                    <span className="text-[13px] font-semibold text-[#3c434a]">{selectedCount} Selected</span>
                   </div>
                   <div className="ml-auto flex items-center gap-2">
-                    <button onClick={markSelectedRead} className="p-1.5 hover:bg-white rounded-md text-slate-500 hover:text-blue-600 transition" title="Mark Read"><Check size={16}/></button>
-                    <button onClick={deleteSelected} className="p-1.5 hover:bg-white rounded-md text-slate-500 hover:text-red-500 transition" title="Delete"><Trash2 size={16}/></button>
+                    <button onClick={markSelectedRead} className="p-1 hover:bg-white border border-transparent hover:border-[#c3c4c7] text-[#8c8f94] hover:text-[#2271b1] transition" title="Mark Read"><Check size={14}/></button>
+                    <button onClick={deleteSelected} className="p-1 hover:bg-white border border-transparent hover:border-[#c3c4c7] text-[#8c8f94] hover:text-[#d63638] transition" title="Delete"><Trash2 size={14}/></button>
                   </div>
                </div>
             ) : (
                // --- NORMAL MODE ---
                <>
                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm text-slate-800">Notifications</h3>
-                    {unreadCount > 0 && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">{unreadCount} New</span>}
+                    <h3 className="font-semibold text-[13px] text-[#3c434a]">Notifications</h3>
                  </div>
                  {notifications.length > 0 && (
-                    <button onClick={toggleSelectAll} className="text-xs text-slate-500 hover:text-blue-600 font-medium">Select All</button>
+                    <button onClick={toggleSelectAll} className="text-[12px] text-[#2271b1] hover:text-[#0a4b78] hover:underline">Select All</button>
                  )}
                </>
             )}
@@ -142,43 +130,43 @@ export function Notifications() {
           {/* List Area */}
           <div className="max-h-[350px] overflow-y-auto scrollbar-thin">
             {notifications.length === 0 ? (
-                <div className="py-10 text-center text-slate-400">
-                    <Bell size={32} className="mx-auto mb-2 opacity-20" />
-                    <p className="text-xs">No new notifications</p>
+                <div className="py-8 text-center text-[#8c8f94]">
+                    <Bell size={24} className="mx-auto mb-2 opacity-30" />
+                    <p className="text-[13px] italic">No new notifications</p>
                 </div>
             ) : (
                 notifications.map((item) => (
                     <div 
                         key={item.id} 
                         className={`
-                           relative group px-4 py-3 border-b border-slate-50 last:border-0 flex gap-3 items-start transition-colors
-                           ${item.isSelected ? "bg-blue-50/60" : "hover:bg-slate-50"}
-                           ${!item.isRead && !item.isSelected ? "bg-slate-50/30" : ""}
+                           relative group px-3 py-3 border-b border-[#f0f0f1] last:border-0 flex gap-3 items-start transition-colors
+                           ${item.isSelected ? "bg-[#f0f6fc]" : "hover:bg-[#f6f7f7]"}
+                           ${!item.isRead && !item.isSelected ? "bg-[#f6f7f7]" : ""}
                         `}
                     >
                         {/* Checkbox */}
-                        <div className="pt-1">
+                        <div className="pt-0.5">
                            <button 
                              onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
-                             className={`w-4 h-4 rounded border flex items-center justify-center transition ${item.isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 hover:border-blue-400 text-transparent"}`}
+                             className={`w-[14px] h-[14px] rounded-[2px] border flex items-center justify-center transition ${item.isSelected ? "bg-[#2271b1] border-[#2271b1] text-white" : "border-[#8c8f94] hover:border-[#2271b1] text-transparent"}`}
                            >
                              <Check size={10} strokeWidth={3} />
                            </button>
                         </div>
 
                         {/* Icon based on Type */}
-                        <div className={`mt-0.5 p-1.5 rounded-full shrink-0 ${item.type === 'ORDER' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                        <div className={`mt-0.5 shrink-0 ${item.type === 'ORDER' ? 'text-[#2271b1]' : 'text-[#d63638]'}`}>
                             {item.type === 'ORDER' ? <ShoppingBag size={14}/> : <AlertTriangle size={14}/>}
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 cursor-pointer" onClick={() => markAsRead(item.id)}>
                             <div className="flex justify-between items-start">
-                                <p className={`text-sm ${!item.isRead ? "font-bold text-slate-800" : "font-medium text-slate-600"}`}>{item.title}</p>
-                                {!item.isRead && <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1"></span>}
+                                <p className={`text-[13px] ${!item.isRead ? "font-semibold text-[#3c434a]" : "font-normal text-[#2271b1] hover:text-[#0a4b78]"}`}>{item.title}</p>
+                                {!item.isRead && <span className="w-[6px] h-[6px] rounded-full bg-[#2271b1] shrink-0 mt-1"></span>}
                             </div>
-                            <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{item.message}</p>
-                            <p className="text-[10px] text-slate-400 mt-1">{item.time}</p>
+                            <p className="text-[12px] text-[#50575e] mt-1 line-clamp-2 leading-relaxed">{item.message}</p>
+                            <p className="text-[11px] text-[#8c8f94] mt-1">{item.time}</p>
                         </div>
                     </div>
                 ))
@@ -186,8 +174,8 @@ export function Notifications() {
           </div>
 
           {/* Footer */}
-          <div className="p-2 border-t border-slate-100 bg-slate-50/50">
-             <Link href="/admin/logs" className="block w-full py-1.5 text-xs font-medium text-center text-blue-600 hover:underline">
+          <div className="p-2 border-t border-[#c3c4c7] bg-[#f0f0f1]">
+             <Link href="/admin/logs" className="block w-full text-[13px] text-center text-[#2271b1] hover:text-[#0a4b78] hover:underline">
                View All Activity
              </Link>
           </div>

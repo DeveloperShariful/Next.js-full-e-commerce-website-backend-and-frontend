@@ -2,7 +2,7 @@
 
 "use client";
 
-import { AlertTriangle, Package, RefreshCcw, ShieldAlert, Truck } from "lucide-react";
+import { AlertTriangle, Package, RefreshCcw, ShieldAlert, Truck, Wrench } from "lucide-react"; // Wrench icon added for claims
 import Link from "next/link";
 
 interface ActionAlertsProps {
@@ -12,85 +12,67 @@ interface ActionAlertsProps {
     disputes: number;
     lowStock: number;
   };
+  // 🚀 FIX: Added claims to interface to solve TS error
+  claims: {
+    total: number;
+    pending: number;
+    approved: number;
+    recent: any[];
+  };
 }
 
-export function ActionAlerts({ alerts }: ActionAlertsProps) {
+export function ActionAlerts({ alerts, claims }: ActionAlertsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      
-      {/* 1. READY TO SHIP (Paid & Unfulfilled) */}
-      <Link href="/admin/orders?status=unfulfilled&payment=paid">
-        <div className="bg-white p-5 rounded-xl border border-l-4 border-l-blue-600 border-y-slate-200 border-r-slate-200 shadow-sm hover:shadow-md transition group">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ready to Ship</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1 group-hover:text-blue-600 transition">
-                {alerts.unfulfilled}
-              </h3>
-              <p className="text-[10px] text-slate-400 mt-1">Paid orders pending fulfillment</p>
-            </div>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <Truck size={20} />
-            </div>
+    // 🚀 WP Style: Minimal grid, white background, standard borders, WooCommerce "Store Status" vibe
+    <div className="bg-white border border-[#c3c4c7] shadow-sm mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-[#c3c4c7]">
+        
+        {/* 1. READY TO SHIP */}
+        <Link href="/admin/orders?status=unfulfilled&payment=paid" className="p-4 hover:bg-[#f6f7f7] transition group flex flex-col items-center text-center">
+          <div className="flex items-center gap-2 text-[#2271b1] mb-1">
+            <Truck size={18} />
+            <span className="text-[22px] font-normal leading-none group-hover:underline">{alerts.unfulfilled}</span>
           </div>
-        </div>
-      </Link>
+          <p className="text-[12px] text-[#50575e]">Orders to ship</p>
+        </Link>
 
-      {/* 2. RETURNS */}
-      <Link href="/admin/orders/returns">
-        <div className="bg-white p-5 rounded-xl border border-l-4 border-l-orange-500 border-y-slate-200 border-r-slate-200 shadow-sm hover:shadow-md transition group">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Returns</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1 group-hover:text-orange-600 transition">
-                {alerts.returns}
-              </h3>
-              <p className="text-[10px] text-slate-400 mt-1">Requests needing approval</p>
-            </div>
-            <div className="p-2 bg-orange-50 text-orange-500 rounded-lg">
-              <RefreshCcw size={20} />
-            </div>
+        {/* 2. RETURNS */}
+        <Link href="/admin/orders/returns" className="p-4 hover:bg-[#f6f7f7] transition group flex flex-col items-center text-center">
+          <div className="flex items-center gap-2 text-[#d63638] mb-1">
+            <RefreshCcw size={18} />
+            <span className="text-[22px] font-normal leading-none group-hover:underline">{alerts.returns}</span>
           </div>
-        </div>
-      </Link>
+          <p className="text-[12px] text-[#50575e]">Pending returns</p>
+        </Link>
 
-      {/* 3. DISPUTES */}
-      <Link href="/admin/orders/disputes">
-        <div className={`bg-white p-5 rounded-xl border-y-slate-200 border-r-slate-200 shadow-sm hover:shadow-md transition group border-l-4 ${alerts.disputes > 0 ? 'border-l-red-600 bg-red-50' : 'border-l-slate-300'}`}>
-          <div className="flex justify-between items-start">
-            <div>
-              <p className={`text-xs font-bold uppercase tracking-wider ${alerts.disputes > 0 ? 'text-red-600' : 'text-slate-400'}`}>
-                Disputes
-              </p>
-              <h3 className={`text-2xl font-bold mt-1 transition ${alerts.disputes > 0 ? 'text-red-700' : 'text-slate-800'}`}>
-                {alerts.disputes}
-              </h3>
-              <p className="text-[10px] text-slate-400 mt-1">Chargebacks & Issues</p>
-            </div>
-            <div className={`p-2 rounded-lg ${alerts.disputes > 0 ? 'bg-red-200 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
-              <ShieldAlert size={20} />
-            </div>
+        {/* 3. DISPUTES */}
+        <Link href="/admin/orders/disputes" className="p-4 hover:bg-[#f6f7f7] transition group flex flex-col items-center text-center">
+          <div className="flex items-center gap-2 text-[#d63638] mb-1">
+            <ShieldAlert size={18} />
+            <span className="text-[22px] font-normal leading-none group-hover:underline">{alerts.disputes}</span>
           </div>
-        </div>
-      </Link>
+          <p className="text-[12px] text-[#50575e]">Open disputes</p>
+        </Link>
 
-      {/* 4. LOW STOCK */}
-      <Link href="/admin/products?status=low_stock">
-        <div className="bg-white p-5 rounded-xl border border-l-4 border-l-yellow-400 border-y-slate-200 border-r-slate-200 shadow-sm hover:shadow-md transition group">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Low Stock</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1 group-hover:text-yellow-600 transition">
-                {alerts.lowStock}
-              </h3>
-              <p className="text-[10px] text-slate-400 mt-1">Products below threshold</p>
-            </div>
-            <div className="p-2 bg-yellow-50 text-yellow-500 rounded-lg">
-              <AlertTriangle size={20} />
-            </div>
+        {/* 4. LOW STOCK */}
+        <Link href="/admin/products?status=low_stock" className="p-4 hover:bg-[#f6f7f7] transition group flex flex-col items-center text-center">
+          <div className="flex items-center gap-2 text-[#d63638] mb-1">
+            <AlertTriangle size={18} />
+            <span className="text-[22px] font-normal leading-none group-hover:underline">{alerts.lowStock}</span>
           </div>
-        </div>
-      </Link>
+          <p className="text-[12px] text-[#50575e]">Low stock items</p>
+        </Link>
+
+        {/* 5. WARRANTY CLAIMS (NEW) */}
+        <Link href="/admin/warranty-claims?status=PENDING" className="p-4 hover:bg-[#f6f7f7] transition group flex flex-col items-center text-center bg-[#fcf9e8] sm:bg-transparent">
+          <div className="flex items-center gap-2 text-[#d63638] mb-1">
+            <Wrench size={18} />
+            <span className="text-[22px] font-normal leading-none group-hover:underline">{claims.pending}</span>
+          </div>
+          <p className="text-[12px] text-[#50575e]">Pending claims</p>
+        </Link>
+
+      </div>
     </div>
   );
 }

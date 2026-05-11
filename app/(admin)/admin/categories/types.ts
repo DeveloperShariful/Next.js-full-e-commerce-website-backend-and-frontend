@@ -10,6 +10,7 @@ export interface CategoryData {
   menuOrder: number; // Schema Field
   metaTitle: string | null;
   metaDesc: string | null;
+  deletedAt: Date | null; // 🚀 NEW: Added to track trash status
   _count?: { products: number };
   parent?: { name: string };
   children?: CategoryData[];

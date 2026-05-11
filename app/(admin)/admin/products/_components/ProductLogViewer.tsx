@@ -4,8 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { History, X, RefreshCw, User, Loader2, Trash2, Filter, Package, ArrowRight } from "lucide-react";
-import { getProductActivityLogs } from "@/app/actions/admin/product/get-logs"; 
-import { deleteActivityLogs } from "@/app/actions/admin/product/delete-log"; 
+import { getProductActivityLogs ,deleteActivityLogs  } from "@/app/actions/admin/product/product-logs"; 
 import { toast } from "react-hot-toast";
 
 export default function ProductLogViewer() {

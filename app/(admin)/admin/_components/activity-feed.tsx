@@ -11,39 +11,44 @@ interface ActivityFeedProps {
 
 export function ActivityFeed({ activities }: ActivityFeedProps) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-full">
-      <div className="p-6 border-b border-slate-100 flex items-center gap-2">
-        <Activity size={18} className="text-slate-400" />
-        <h3 className="font-bold text-lg text-slate-800">System Activity</h3>
-      </div>
+    // 🚀 WP Style Meta Box
+    <div className="bg-white border border-[#c3c4c7] shadow-sm flex flex-col h-full">
+      
+      {/* Header */}
+      <h2 className="px-4 py-2 border-b border-[#c3c4c7] text-[14px] font-semibold text-[#1d2327] bg-[#f6f7f7] flex items-center gap-2">
+        <Activity size={16} className="text-[#8c8f94]" />
+        System Activity
+      </h2>
 
-      <div className="p-6">
-        <div className="space-y-6 relative before:absolute before:inset-0 before:ml-6 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
-           {activities.length === 0 ? (
-              <p className="text-center text-slate-400 text-xs italic">No activity logs recorded.</p>
-           ) : (
-             activities.map((log, i) => (
-                <div key={i} className="relative flex items-start group">
-                   <div className="absolute left-0 top-1 h-2 w-2 rounded-full border border-white bg-slate-300 shadow ring-4 ring-white group-hover:bg-blue-500 transition"></div>
-                   <div className="ml-6 pl-4 flex-1">
-                      <p className="text-xs text-slate-500 mb-0.5">
-                         <span className="font-bold text-slate-700">{log.user?.name || "System"}</span>
-                         <span className="mx-1">•</span>
-                         {formatDistanceToNow(new Date(log.createdAt))} ago
-                      </p>
-                      <p className="text-sm text-slate-700 font-medium">
-                         {log.action} <span className="text-slate-500 font-normal">{log.entityType ? `- ${log.entityType}` : ""}</span>
-                      </p>
-                      {log.details && (
-                         <div className="mt-1 text-[10px] bg-slate-50 p-2 rounded text-slate-500 font-mono border border-slate-100 truncate max-w-[200px]">
-                            {JSON.stringify(log.details)}
-                         </div>
-                      )}
-                   </div>
+      <div className="p-0">
+        {activities.length === 0 ? (
+          <p className="text-center text-[#8c8f94] text-[13px] italic p-6">No activity logs recorded.</p>
+        ) : (
+          <ul className="divide-y divide-[#f0f0f1]">
+            {activities.map((log, i) => (
+              <li key={i} className="p-3 hover:bg-[#f6f7f7] transition-colors flex flex-col gap-1">
+                <div className="flex justify-between items-start text-[12px]">
+                  <span className="font-semibold text-[#2271b1]">
+                    {log.user?.name || "System"}
+                  </span>
+                  <span className="text-[#8c8f94] whitespace-nowrap ml-2">
+                    {formatDistanceToNow(new Date(log.createdAt))} ago
+                  </span>
                 </div>
-             ))
-           )}
-        </div>
+                
+                <p className="text-[13px] text-[#3c434a]">
+                  {log.action} {log.entityType ? <span className="text-[#8c8f94]">— {log.entityType}</span> : ""}
+                </p>
+
+                {log.details && (
+                  <div className="mt-1 text-[11px] bg-[#f0f0f1] p-1.5 rounded-sm text-[#50575e] font-mono border border-[#e2e4e7] truncate max-w-full">
+                    {JSON.stringify(log.details)}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

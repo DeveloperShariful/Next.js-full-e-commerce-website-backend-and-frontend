@@ -6,11 +6,12 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-// ==============================================================================
-// 1. ZOD SCHEMAS (FIXED)
-// ==============================================================================
+export type AttributeState = {
+  success: boolean;
+  message?: string;
+  errors?: Record<string, string[]>;
+};
 
-// 1. Base Schema (শুধু ফিল্ডগুলো ডিফাইন করা হলো, কোনো refine নেই)
 const BaseAttributeSchema = z.object({
   name: z.string().min(1, { message: "Name is required" }),
   slug: z.string().optional(),
@@ -18,23 +19,18 @@ const BaseAttributeSchema = z.object({
   values: z.array(z.string()).min(1, { message: "At least one value is required" }),
 });
 
-// 2. Refinement Logic (কালার চেক করার লজিক আলাদা ফাংশনে রাখলাম)
 const colorRefinement = (data: { type: string; values: string[] }) => {
   if (data.type === "COLOR") {
-    // Check if values look like colors (Hex or Name)
     return data.values.every((v) => v.includes("#") || /^[a-zA-Z]+$/.test(v));
   }
   return true;
 };
 
-// 3. Create Schema (Base + Refine)
 const AttributeSchema = BaseAttributeSchema.refine(colorRefinement, {
   message: "For Color type, values must be valid colors (e.g. #FF0000 or Red)",
   path: ["values"],
 });
 
-// 4. Update Schema (Base + ID + Refine)
-// [FIXED] আমরা এখন Base স্কিমাকে extend করছি, refined স্কিমাকে নয়
 const UpdateAttributeSchema = BaseAttributeSchema.extend({
   id: z.string().uuid(),
 }).refine(colorRefinement, {
@@ -42,48 +38,37 @@ const UpdateAttributeSchema = BaseAttributeSchema.extend({
   path: ["values"],
 });
 
-// ==============================================================================
-// 2. TYPES
-// ==============================================================================
-
-export type AttributeState = {
-  success: boolean;
-  message?: string;
-  errors?: Record<string, string[]>;
-};
-
-// ==============================================================================
-// 3. ACTIONS (Rest of the code remains same, just ensure schema usage is correct)
-// ==============================================================================
-
-export async function getAttributes(query: string = "", page: number = 1, limit: number = 10) {
+// ==========================================
+// 1. FETCH ATTRIBUTES (With WP Filters)
+// ==========================================
+export async function getAttributes(filter: "active" | "trash" = "active", query: string = "") {
   try {
-    const skip = (page - 1) * limit;
+    const [activeCount, trashCount] = await Promise.all([
+      db.attribute.count({ where: { deletedAt: null } }),
+      db.attribute.count({ where: { deletedAt: { not: null } } })
+    ]);
+
+    const baseWhere = filter === "trash" ? { deletedAt: { not: null } } : { deletedAt: null };
+    
     const whereCondition = query
       ? {
+          ...baseWhere,
           OR: [
             { name: { contains: query, mode: "insensitive" as const } },
             { slug: { contains: query, mode: "insensitive" as const } },
           ],
         }
-      : {};
+      : baseWhere;
 
-    const [attributes, totalCount] = await Promise.all([
-      db.attribute.findMany({
-        where: whereCondition,
-        orderBy: { updatedAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      db.attribute.count({ where: whereCondition }),
-    ]);
+    const attributes = await db.attribute.findMany({
+      where: whereCondition,
+      orderBy: { updatedAt: "desc" },
+    });
 
     const usageCounts = await db.productAttribute.groupBy({
       by: ['name'],
       _count: { name: true },
-      where: {
-        name: { in: attributes.map(a => a.name) }
-      }
+      where: { name: { in: attributes.map(a => a.name) } }
     });
 
     const attributesWithUsage = attributes.map(attr => {
@@ -94,20 +79,18 @@ export async function getAttributes(query: string = "", page: number = 1, limit:
     return {
       success: true,
       data: attributesWithUsage,
-      meta: {
-        total: totalCount,
-        page,
-        limit,
-        totalPages: Math.ceil(totalCount / limit),
-      },
+      counts: { active: activeCount, trash: trashCount, all: activeCount }
     };
   } catch (error) {
     console.error("GET_ATTRIBUTES_ERROR", error);
-    return { success: false, message: "Failed to load attributes." };
+    return { success: false, data: [], counts: { active: 0, trash: 0, all: 0 } };
   }
 }
 
-export async function createAttribute(prevState: any, formData: FormData): Promise<AttributeState> {
+// ==========================================
+// 2. CREATE ATTRIBUTE
+// ==========================================
+export async function createAttribute(formData: FormData): Promise<AttributeState> {
   try {
     const rawData = {
       name: formData.get("name") as string,
@@ -116,9 +99,7 @@ export async function createAttribute(prevState: any, formData: FormData): Promi
       values: (formData.get("values") as string)?.split(",").map(v => v.trim()).filter(Boolean) || [],
     };
 
-    // Use AttributeSchema (Create)
     const validated = AttributeSchema.safeParse(rawData);
-    
     if (!validated.success) {
       return { success: false, message: "Invalid data", errors: validated.error.flatten().fieldErrors };
     }
@@ -140,15 +121,16 @@ export async function createAttribute(prevState: any, formData: FormData): Promi
     });
 
     revalidatePath("/admin/attributes");
-    return { success: true, message: "Attribute created successfully!" };
-
+    return { success: true, message: "Attribute created successfully." };
   } catch (error) {
-    console.error(error);
     return { success: false, message: "Internal Server Error" };
   }
 }
 
-export async function updateAttribute(prevState: any, formData: FormData): Promise<AttributeState> {
+// ==========================================
+// 3. UPDATE ATTRIBUTE
+// ==========================================
+export async function updateAttribute(formData: FormData): Promise<AttributeState> {
   try {
     const rawData = {
       id: formData.get("id") as string,
@@ -158,9 +140,7 @@ export async function updateAttribute(prevState: any, formData: FormData): Promi
       values: (formData.get("values") as string)?.split(",").map(v => v.trim()).filter(Boolean) || [],
     };
 
-    // Use UpdateAttributeSchema (Update)
     const validated = UpdateAttributeSchema.safeParse(rawData);
-    
     if (!validated.success) return { success: false, errors: validated.error.flatten().fieldErrors };
 
     const { id, name, slug, type, values } = validated.data;
@@ -185,13 +165,14 @@ export async function updateAttribute(prevState: any, formData: FormData): Promi
 
     revalidatePath("/admin/attributes");
     return { success: true, message: "Updated successfully" };
-
   } catch (error) {
-    console.error(error);
     return { success: false, message: "Update failed" };
   }
 }
 
+// ==========================================
+// 4. SOFT DELETE (TRASH)
+// ==========================================
 export async function deleteAttribute(id: string) {
   try {
     const attr = await db.attribute.findUnique({ where: { id } });
@@ -200,12 +181,44 @@ export async function deleteAttribute(id: string) {
     const usage = await db.productAttribute.count({ where: { name: attr.name } });
     if (usage > 0) return { success: false, message: `Cannot delete. Used in ${usage} products.` };
 
+    // 🚀 Update deletedAt instead of hard delete
+    await db.attribute.update({ 
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
+    
+    revalidatePath("/admin/attributes");
+    return { success: true, message: "Attribute moved to trash." };
+  } catch (error) {
+    return { success: false, message: "Delete failed" };
+  }
+}
+
+// ==========================================
+// 5. RESTORE
+// ==========================================
+export async function restoreAttribute(id: string) {
+  try {
+    await db.attribute.update({
+      where: { id },
+      data: { deletedAt: null }
+    });
+    revalidatePath("/admin/attributes");
+    return { success: true, message: "Attribute restored." };
+  } catch (error) {
+    return { success: false, message: "Failed to restore." };
+  }
+}
+
+// ==========================================
+// 6. FORCE DELETE
+// ==========================================
+export async function forceDeleteAttribute(id: string) {
+  try {
     await db.attribute.delete({ where: { id } });
     revalidatePath("/admin/attributes");
-    return { success: true, message: "Deleted successfully" };
-
+    return { success: true, message: "Permanently deleted." };
   } catch (error) {
-    console.error(error);
-    return { success: false, message: "Delete failed" };
+    return { success: false, message: "Failed to permanently delete." };
   }
 }

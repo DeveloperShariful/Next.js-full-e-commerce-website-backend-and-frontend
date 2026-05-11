@@ -3,126 +3,195 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Loader2, Layers, CheckCircle, ChevronLeft, ChevronRight, Trash2, Edit2 } from "lucide-react";
-import { deleteAttribute } from "@/app/actions/admin/attribute/attribute";
-import { toast } from "react-hot-toast";
+import { AttributeData } from "../types";
+import { Loader2 } from "lucide-react";
+import AttributeRow from "./attribute-row";
 
-interface AttributeListProps {
-  attributes: any[];
+interface ListProps {
+  attributes: AttributeData[];
   loading: boolean;
-  onEdit: (attr: any) => void;
-  onRefresh: () => void;
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
+  handleEdit: (attr: AttributeData) => void;
+  handleDelete: (id: string, name: string) => void;
+  handleRestore: (id: string) => void;
+  handleForceDelete: (id: string) => void;
+  handleBulkAction: (ids: string[], action: "delete" | "restore" | "force_delete") => Promise<boolean>;
+  currentFilter: "active" | "trash";
+  setCurrentFilter: (f: "active" | "trash") => void;
+  counts: { active: number; trash: number; all: number };
 }
 
 export function AttributeList({ 
-  attributes, loading, onEdit, onRefresh, 
-  currentPage, totalPages, onPageChange, 
-  searchQuery, onSearchChange 
-}: AttributeListProps) {
+  attributes, loading, handleEdit, handleDelete, handleRestore, handleForceDelete, handleBulkAction, currentFilter, setCurrentFilter, counts 
+}: ListProps) {
+  
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkAction, setBulkAction] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return; // Simple confirm for now
+  const allAttrIds = attributes.map(a => a.id);
+  const totalItems = allAttrIds.length;
+  const isAllSelected = totalItems > 0 && selectedIds.length === totalItems;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedIds(allAttrIds);
+    else setSelectedIds([]);
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) setSelectedIds(prev => [...prev, id]);
+    else setSelectedIds(prev => prev.filter(item => item !== id));
+  };
+
+  const executeBulkAction = async () => {
+    if (bulkAction === "" || selectedIds.length === 0) return;
     
-    const toastId = toast.loading("Deleting...");
-    const res = await deleteAttribute(id);
-    
-    if (res.success) {
-      toast.success(res.message, { id: toastId });
-      onRefresh();
-    } else {
-      toast.error(res.message, { id: toastId });
+    setIsProcessing(true);
+    const finished = await handleBulkAction(selectedIds, bulkAction as any);
+    if (finished) {
+      setSelectedIds([]); 
+      setBulkAction("");
     }
+    setIsProcessing(false);
   };
 
   return (
-    <div className="space-y-4">
-      {/* Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
-         <div className="relative w-full sm:max-w-md">
-            <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search attributes..." 
-              value={searchQuery} 
-              onChange={(e) => onSearchChange(e.target.value)} 
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition"
-            />
-         </div>
-         <div className="text-sm text-slate-500">
-           Page <b>{currentPage}</b> of <b>{totalPages}</b>
-         </div>
+    <div className="animate-in fade-in duration-300">
+      
+      {/* 🚀 WP Style Filter Links (All | Trash) */}
+      <ul className="flex items-center gap-1 text-[13px] mb-3 text-[#646970]">
+        <li>
+          <button 
+            onClick={() => { setCurrentFilter("active"); setSelectedIds([]); }} 
+            className={`${currentFilter === "active" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#0a4b78]"}`}
+          >
+            All <span className="text-[#646970] font-normal">({counts.all})</span>
+          </button>
+        </li>
+        {counts.trash > 0 && (
+          <>
+            <li className="text-[#c3c4c7]">|</li>
+            <li>
+              <button 
+                onClick={() => { setCurrentFilter("trash"); setSelectedIds([]); }} 
+                className={`${currentFilter === "trash" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#0a4b78]"}`}
+              >
+                Trash <span className="text-[#646970] font-normal">({counts.trash})</span>
+              </button>
+            </li>
+          </>
+        )}
+      </ul>
+
+      {/* 🚀 WP Style Top Actions Bar */}
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-1">
+          <select 
+            value={bulkAction}
+            onChange={(e) => setBulkAction(e.target.value)}
+            disabled={isProcessing || attributes.length === 0}
+            className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
+          >
+            <option value="">Bulk actions</option>
+            {currentFilter === "active" ? (
+              <option value="delete">Delete</option>
+            ) : (
+              <>
+                <option value="restore">Restore</option>
+                <option value="force_delete">Delete permanently</option>
+              </>
+            )}
+          </select>
+          <button 
+            onClick={executeBulkAction}
+            disabled={bulkAction === "" || selectedIds.length === 0 || isProcessing}
+            className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Apply
+          </button>
+        </div>
+        <div className="text-[13px] text-[#646970]">
+          {loading ? "Loading..." : `${totalItems} items`}
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto min-h-[400px]">
-          <table className="w-full text-left text-sm text-slate-700">
-            <thead className="bg-slate-100 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
+      {/* WP List Table */}
+      <div className="bg-white border border-[#c3c4c7] shadow-sm">
+        <div className="overflow-x-auto min-h-[300px]">
+          <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[600px]">
+            
+            <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
               <tr>
-                <th className="p-4 w-1/4">Name</th>
-                <th className="p-4 w-1/5">Slug</th>
-                <th className="p-4 w-1/6">Type</th>
-                <th className="p-4">Terms</th>
-                <th className="p-4 text-center">In Use</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-2 w-8 text-center border-r border-[#e2e4e7]">
+                  <input 
+                    type="checkbox" 
+                    checked={isAllSelected}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    disabled={loading || totalItems === 0}
+                    className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" 
+                  />
+                </th>
+                <th className="p-2 font-medium">Name</th>
+                <th className="p-2 w-32">Slug</th>
+                <th className="p-2 w-24">Type</th>
+                <th className="p-2 w-64">Terms</th>
+                <th className="p-2 w-20 text-center">In Use</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            
+            <tbody className="divide-y divide-[#f0f0f1]">
               {loading ? (
-                <tr><td colSpan={6} className="p-20 text-center"><Loader2 className="animate-spin text-blue-500 mx-auto" size={32} /></td></tr>
+                <tr>
+                  <td colSpan={6} className="p-10 text-center text-[#50575e]">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="animate-spin text-[#2271b1]" size={20}/>
+                      <span>Loading attributes...</span>
+                    </div>
+                  </td>
+                </tr>
               ) : attributes.length === 0 ? (
-                <tr><td colSpan={6} className="p-20 text-center"><Layers size={48} className="mx-auto mb-4 opacity-50 text-slate-400"/><p>No attributes found</p></td></tr>
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-[#50575e] italic">
+                    No attributes found.
+                  </td>
+                </tr>
               ) : (
-                attributes.map((attr) => (
-                  <tr key={attr.id} className="hover:bg-slate-50 transition group">
-                    <td className="p-4 font-bold text-slate-800">{attr.name}</td>
-                    <td className="p-4 font-mono text-xs text-slate-500">{attr.slug}</td>
-                    <td className="p-4">
-                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${attr.type === 'COLOR' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                         {attr.type}
-                       </span>
-                    </td>
-                    <td className="p-4">
-                       <div className="flex flex-wrap gap-1 max-w-xs">
-                          {attr.values?.slice(0, 5).map((val: string, i: number) => (
-                             <span key={i} className="px-2 py-0.5 rounded bg-white border border-slate-200 text-xs shadow-sm">{val}</span>
-                          ))}
-                          {attr.values?.length > 5 && <span className="text-xs text-slate-400">+{attr.values.length - 5}</span>}
-                       </div>
-                    </td>
-                    <td className="p-4 text-center">
-                       {attr.count > 0 ? (
-                         <span className="inline-flex items-center gap-1 text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs font-bold">
-                           <CheckCircle size={10}/> {attr.count}
-                         </span>
-                       ) : <span className="text-slate-300">-</span>}
-                    </td>
-                    <td className="p-4 text-right">
-                       <div className="flex justify-end gap-2">
-                         <button onClick={() => onEdit(attr)} className="p-2 hover:bg-blue-50 text-blue-600 rounded transition"><Edit2 size={16}/></button>
-                         <button onClick={() => handleDelete(attr.id, attr.name)} className="p-2 hover:bg-red-50 text-red-600 rounded transition"><Trash2 size={16}/></button>
-                       </div>
-                    </td>
-                  </tr>
-                ))
+                <AttributeRow 
+                  attributes={attributes} 
+                  handleEdit={handleEdit} 
+                  handleDelete={handleDelete} 
+                  handleRestore={handleRestore} 
+                  handleForceDelete={handleForceDelete} 
+                  selectedIds={selectedIds} 
+                  handleSelectOne={handleSelectOne} 
+                  currentFilter={currentFilter} 
+                />
               )}
             </tbody>
+
+            {/* Footer */}
+            <tfoot className="bg-[#f6f7f7] border-t border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
+              <tr>
+                <th className="p-2 w-8 text-center border-r border-[#e2e4e7]">
+                  <input 
+                    type="checkbox" 
+                    checked={isAllSelected}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    disabled={loading || totalItems === 0}
+                    className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" 
+                  />
+                </th>
+                <th className="p-2 font-medium">Name</th>
+                <th className="p-2">Slug</th>
+                <th className="p-2">Type</th>
+                <th className="p-2">Terms</th>
+                <th className="p-2 text-center">In Use</th>
+              </tr>
+            </tfoot>
+
           </table>
         </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 bg-gray-50 flex items-center justify-end gap-2">
-             <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 bg-white border rounded hover:bg-gray-100 disabled:opacity-50"><ChevronLeft size={16}/></button>
-             <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 bg-white border rounded hover:bg-gray-100 disabled:opacity-50"><ChevronRight size={16}/></button>
-          </div>
-        )}
       </div>
+      
     </div>
   );
 }

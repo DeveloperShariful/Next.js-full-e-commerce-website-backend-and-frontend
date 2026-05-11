@@ -14,72 +14,80 @@ interface RecentOrdersProps {
 export function RecentOrders({ orders }: RecentOrdersProps) {
   const { formatPrice } = useGlobalStore(); // ✅ Use Global Formatter
 
-  const getStatusColor = (status: string) => {
+  // WP Style Status Labels
+  const getStatusStyle = (status: string) => {
     switch (status) {
-      case "DELIVERED": return "bg-green-100 text-green-700";
-      case "PROCESSING": return "bg-blue-100 text-blue-700";
-      case "PENDING": return "bg-yellow-100 text-yellow-700";
-      case "CANCELLED": return "bg-red-100 text-red-700";
-      default: return "bg-slate-100 text-slate-700";
+      case "DELIVERED": return "bg-[#f0fdf4] text-[#166534] border-[#bbf7d0]";
+      case "PROCESSING": return "bg-[#f0f6fc] text-[#2271b1] border-[#c5d9ed]";
+      case "PENDING": return "bg-[#fff5eb] text-[#c05621] border-[#fbd38d]";
+      case "CANCELLED": return "bg-[#fef2f2] text-[#991b1b] border-[#fecaca]";
+      default: return "bg-[#f6f7f7] text-[#50575e] border-[#c3c4c7]";
     }
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-full">
-      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-        <h3 className="font-bold text-lg text-slate-800">Recent Orders</h3>
-        <Link href="/admin/orders" className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+    // 🚀 WP Style Meta Box
+    <div className="bg-white border border-[#c3c4c7] shadow-sm flex flex-col h-full overflow-hidden">
+      
+      {/* Header */}
+      <div className="px-4 py-2 border-b border-[#c3c4c7] bg-[#f6f7f7] flex justify-between items-center">
+        <h2 className="text-[14px] font-semibold text-[#1d2327]">Recent Orders</h2>
+        <Link href="/admin/orders" className="text-[12px] font-normal text-[#2271b1] hover:text-[#0a4b78] hover:underline">
           View All
         </Link>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-left border-collapse">
+      {/* 🚀 Responsive Table Wrapper */}
+      <div className="flex-1 overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[600px]">
           <thead>
-            <tr className="text-xs text-slate-400 border-b border-slate-50 uppercase tracking-wider bg-slate-50/50">
-              <th className="px-6 py-3 font-semibold">Order</th>
-              <th className="px-6 py-3 font-semibold">Customer</th>
-              <th className="px-6 py-3 font-semibold">Status</th>
-              <th className="px-6 py-3 font-semibold text-right">Total</th>
-              <th className="px-6 py-3 font-semibold text-right">Action</th>
+            <tr className="text-[12px] text-[#1d2327] border-b border-[#c3c4c7] bg-white">
+              <th className="px-4 py-2 font-semibold">Order</th>
+              <th className="px-4 py-2 font-semibold">Customer</th>
+              <th className="px-4 py-2 font-semibold">Status</th>
+              <th className="px-4 py-2 font-semibold text-right">Total</th>
+              <th className="px-4 py-2 font-semibold text-center">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-[#f0f0f1]">
             {orders.length === 0 ? (
-               <tr><td colSpan={5} className="p-6 text-center text-slate-400 text-sm">No recent orders found.</td></tr>
+               <tr><td colSpan={5} className="p-6 text-center text-[#8c8f94] text-[13px] italic">No recent orders found.</td></tr>
             ) : (
-              orders.map((order) => (
-                <tr key={order.id} className="hover:bg-slate-50/80 transition group">
-                  <td className="px-6 py-4">
-                    <span className="font-bold text-slate-700 block">#{order.orderNumber}</span>
-                    <span className="text-xs text-slate-400">{formatDistanceToNow(new Date(order.createdAt))} ago</span>
+              orders.map((order, index) => (
+                // WP alternating row style (Striped)
+                <tr key={order.id} className={`hover:bg-[#f6f7f7] transition-colors group ${index % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f9]'}`}>
+                  <td className="px-4 py-2.5">
+                    <Link href={`/admin/orders/${order.id}`} className="font-semibold text-[#2271b1] hover:underline block text-[13px]">
+                      #{order.orderNumber}
+                    </Link>
+                    <span className="text-[11px] text-[#8c8f94]">{formatDistanceToNow(new Date(order.createdAt))} ago</span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-2.5">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-700">
+                      <span className="text-[13px] font-medium text-[#3c434a]">
                         {order.user?.name || "Guest User"}
                       </span>
-                      <span className="text-xs text-slate-400">{order.guestEmail || order.user?.email}</span>
+                      <span className="text-[11px] text-[#8c8f94]">{order.guestEmail || order.user?.email}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${getStatusColor(order.status)}`}>
+                  <td className="px-4 py-2.5">
+                    <span className={`px-1.5 py-0.5 rounded-sm border text-[11px] font-semibold inline-block ${getStatusStyle(order.status)}`}>
                       {order.status}
                     </span>
                     {order.paymentStatus === "UNPAID" && (
-                       <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] bg-red-50 text-red-600 border border-red-100 font-bold">Unpaid</span>
+                       <span className="ml-1 px-1.5 py-0.5 rounded-sm border border-[#fecaca] bg-[#fef2f2] text-[#991b1b] text-[11px] font-semibold inline-block">Unpaid</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right font-bold text-slate-700">
-                    {/* ✅ Global Formatting */}
+                  <td className="px-4 py-2.5 text-right font-medium text-[#3c434a] text-[13px]">
                     {formatPrice(order.total)}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-4 py-2.5 text-center">
                     <Link 
                       href={`/admin/orders/${order.id}`}
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition"
+                      className="inline-flex items-center justify-center p-1.5 text-[#8c8f94] hover:text-[#2271b1] transition-colors"
+                      title="View Order"
                     >
-                      <Eye size={14} />
+                      <Eye size={16} />
                     </Link>
                   </td>
                 </tr>

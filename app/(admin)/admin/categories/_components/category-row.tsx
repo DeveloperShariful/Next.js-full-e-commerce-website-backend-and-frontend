@@ -1,78 +1,144 @@
 // File: app/(admin)/admin/categories/_components/category-row.tsx
+
 "use client";
+
 import React from "react";
 import { CategoryData } from "../types";
-import { Pencil, Trash2, ImageIcon } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 
 interface RowProps {
   categories: CategoryData[];
   depth?: number;
   handleEdit: (cat: CategoryData) => void;
   handleDelete: (id: string) => void;
+  // 🚀 New Props for Trash actions
+  handleRestore: (id: string) => void;
+  handleForceDelete: (id: string) => void;
   searchQuery: string;
+  selectedIds: string[];
+  handleSelectOne: (id: string, checked: boolean) => void;
+  // 🚀 To check if we are in trash view
+  currentFilter: "active" | "trash";
 }
 
-export default function CategoryRow({ categories, depth = 0, handleEdit, handleDelete, searchQuery }: RowProps) {
+export default function CategoryRow({ 
+  categories, 
+  depth = 0, 
+  handleEdit, 
+  handleDelete, 
+  handleRestore,
+  handleForceDelete,
+  searchQuery,
+  selectedIds,
+  handleSelectOne,
+  currentFilter
+}: RowProps) {
+  
   return (
     <>
-      {categories.map((cat) => {
+      {categories.map((cat, index) => {
         const matchesSearch = !searchQuery || cat.name.toLowerCase().includes(searchQuery.toLowerCase());
         
         // Hide row if search is active and it doesn't match (and doesn't have matching children)
         if (!matchesSearch && (!cat.children || cat.children.length === 0)) return null;
 
+        // Striped rows & Selection Check
+        const isEven = index % 2 === 0;
+        const isSelected = selectedIds.includes(cat.id);
+
         return (
           <React.Fragment key={cat.id}>
-             {matchesSearch && (
-                <tr className="hover:bg-blue-50/30 transition group border-b border-slate-100 last:border-0">
-                  <td className="p-4 w-10 text-center text-xs text-slate-400 font-mono">
-                    {cat.menuOrder}
-                  </td>
-                  <td className="p-4 w-20">
-                    <div className="w-10 h-10 rounded-md bg-gray-100 border border-slate-200 flex items-center justify-center overflow-hidden">
-                      {cat.image ? (
-                        <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <ImageIcon className="text-gray-300" size={16} />
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center" style={{ paddingLeft: `${depth * 24}px` }}>
-                      {depth > 0 && <span className="text-slate-300 mr-2">└─</span>}
-                      <div className="flex flex-col">
-                        <span className={`text-slate-800 ${depth === 0 ? 'font-bold' : 'font-medium'}`}>{cat.name}</span>
-                        <span className="text-[10px] text-slate-400 font-mono hidden sm:inline-block">{cat.slug}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4 text-center">
-                    <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">
-                      {cat._count?.products || 0}
-                    </span>
-                  </td>
-                  <td className="p-4 text-center">
-                    {cat.isActive ? (
-                      <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full uppercase tracking-wide">Active</span>
-                    ) : (
-                      <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full uppercase tracking-wide">Hidden</span>
-                    )}
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEdit(cat)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"><Pencil size={16} /></button>
-                      <button onClick={() => handleDelete(cat.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                </tr>
-             )}
+             <tr className={`group border-b border-[#f0f0f1] transition-colors ${isSelected ? 'bg-[#fff8e5]' : isEven ? 'bg-[#f9f9f9]' : 'bg-white'} hover:bg-[#f0f6fc]`}>
+               
+               {/* Checkbox */}
+               <td className="p-2 text-center border-r border-[#f0f0f1]">
+                 <input 
+                   type="checkbox" 
+                   checked={isSelected}
+                   onChange={(e) => handleSelectOne(cat.id, e.target.checked)}
+                   className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] cursor-pointer focus:ring-[#2271b1]" 
+                 />
+               </td>
+               
+               {/* Image/Thumbnail */}
+               <td className="p-2 border-r border-[#f0f0f1]">
+                 <div className="w-[32px] h-[32px] rounded-[2px] bg-[#f0f0f1] border border-[#c3c4c7] flex items-center justify-center overflow-hidden mx-auto">
+                   {cat.image ? (
+                     <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
+                   ) : (
+                     <ImageIcon className="text-[#8c8f94]" size={14} />
+                   )}
+                 </div>
+               </td>
+               
+               {/* Name & Row Actions */}
+               <td className="p-2 align-top pt-[10px]">
+                 <div className="flex items-start" style={{ paddingLeft: `${depth * 20}px` }}>
+                   {depth > 0 && <span className="text-[#8c8f94] mr-1 select-none">—</span>}
+                   <div className="flex flex-col">
+                     <span className={`text-[#2271b1] font-semibold hover:text-[#0a4b78] ${currentFilter === "trash" ? "cursor-default" : "cursor-pointer"}`} onClick={() => currentFilter === "active" && handleEdit(cat)}>
+                       {cat.name}
+                     </span>
+                     
+                     {/* 🚀 WP Style Row Actions (Dynamic based on Tab) */}
+                     <div className="text-[12px] mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+                       
+                       {currentFilter === "active" ? (
+                         // --- ACTIVE (ALL) TAB ACTIONS ---
+                         <>
+                           <button onClick={() => handleEdit(cat)} className="text-[#2271b1] hover:underline">Edit</button>
+                           <span className="text-[#c3c4c7]">|</span>
+                           <button onClick={() => handleDelete(cat.id)} className="text-[#d63638] hover:underline">Trash</button>
+                           <span className="text-[#c3c4c7]">|</span>
+                           <span className="text-[#8c8f94] text-[10px]">Order: {cat.menuOrder}</span>
+                         </>
+                       ) : (
+                         // --- TRASH TAB ACTIONS ---
+                         <>
+                           <button onClick={() => handleRestore(cat.id)} className="text-[#2271b1] hover:underline">Restore</button>
+                           <span className="text-[#c3c4c7]">|</span>
+                           <button onClick={() => handleForceDelete(cat.id)} className="text-[#d63638] hover:underline">Delete permanently</button>
+                         </>
+                       )}
+
+                     </div>
+                   </div>
+                 </div>
+               </td>
+               
+               {/* Description */}
+               <td className="p-2 text-[13px] text-[#50575e] align-top pt-[10px]">
+                  {cat.description ? (
+                    <p className="line-clamp-2 leading-relaxed max-w-[300px]">{cat.description}</p>
+                  ) : "—"}
+               </td>
+
+               {/* Slug */}
+               <td className="p-2 text-[13px] text-[#50575e] align-top pt-[10px]">
+                 {cat.slug}
+               </td>
+               
+               {/* Count */}
+               <td className="p-2 text-center align-top pt-[10px]">
+                 <span className={`text-[#2271b1] font-medium ${currentFilter === "active" ? "hover:text-[#0a4b78] cursor-pointer" : ""}`}>
+                   {cat._count?.products || 0}
+                 </span>
+               </td>
+             </tr>
+             
+            {/* Render Children Recursively */}
             {cat.children && (
               <CategoryRow 
                 categories={cat.children} 
                 depth={depth + 1} 
                 handleEdit={handleEdit} 
                 handleDelete={handleDelete}
+                handleRestore={handleRestore}
+                handleForceDelete={handleForceDelete}
                 searchQuery={searchQuery}
+                selectedIds={selectedIds} 
+                handleSelectOne={handleSelectOne} 
+                currentFilter={currentFilter}
               />
             )}
           </React.Fragment>

@@ -323,6 +323,20 @@ enum SubscriptionInterval {
   YEAR
 }
 
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  TRASHED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  SPAM
+  TRASH
+}
+
 // ==========================================
 // 3. USER, AUTH & SYSTEM (NextAuth.js Updated)
 // ==========================================
@@ -850,6 +864,8 @@ model Attribute {
   values    String[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  @@index([deletedAt])
 }
 
 model ProductAttribute {
@@ -1524,7 +1540,7 @@ model Review {
   title      String?
   content    String?  @db.Text
   isVerified Boolean  @default(false)
-  status     String   @default("pending")
+  status     ReviewStatus @default(PENDING)
   images     String[]
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1532,6 +1548,7 @@ model Review {
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   reply      String?
   createdAt  DateTime @default(now())
+  deletedAt  DateTime?
   updatedAt  DateTime @updatedAt
 
   @@index([productId])
@@ -2735,4 +2752,32 @@ model InventoryReservation {
 
   @@index([productId, variantId])
   @@index([expiresAt])
+}
+
+model WarrantyClaim {
+  id              String      @id @default(cuid())
+
+  name            String
+  email           String
+  description     String      @db.Text
+  mediaUrl        String?
+  shopPurchased   String
+  
+  orderNumber     String
+  orderDate       DateTime?   
+  wpName          String?     
+  wpEmail         String?     
+  phone           String?     
+  address         String?     
+  suburb          String?     
+  state           String?     
+  postcode        String?     
+  country         String?     @default("AU") 
+  
+  status          ClaimStatus @default(PENDING) 
+  replacementPart String?     
+  trackingNumber  String?     
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }

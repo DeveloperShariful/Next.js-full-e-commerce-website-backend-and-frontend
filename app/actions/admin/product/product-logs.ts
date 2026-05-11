@@ -1,9 +1,8 @@
-// File: app/actions/admin/product/get-logs.ts
+// File: app/actions/admin/product/product-logs.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { cleanupOldLogs } from "./delete-log"; 
 
 export async function getProductActivityLogs(page = 1, limit = 20, actionFilter?: string, productId?: string) {
   try {
@@ -46,5 +45,35 @@ export async function getProductActivityLogs(page = 1, limit = 20, actionFilter?
   } catch (error) {
     console.error("LOG_FETCH_ERROR", error);
     return { success: false, data: [], hasMore: false, total: 0 };
+  }
+}
+
+export async function deleteActivityLogs(ids: string[]) {
+  try {
+    await db.activityLog.deleteMany({
+      where: { id: { in: ids } },
+    });
+    return { success: true, message: "Logs deleted successfully" };
+  } catch (error) {
+    return { success: false, message: "Failed to delete logs" };
+  }
+}
+
+export async function cleanupOldLogs() {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const result = await db.activityLog.deleteMany({
+      where: {
+        createdAt: {
+          lt: thirtyDaysAgo, // Less than 30 days ago
+        },
+      },
+    });
+    return { success: true, count: result.count };
+  } catch (error) {
+    console.error("Auto Cleanup Error:", error);
+    return { success: false, count: 0 };
   }
 }

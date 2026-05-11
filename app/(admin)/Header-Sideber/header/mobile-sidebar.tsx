@@ -5,7 +5,6 @@
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
-// 🚀 Correct Import Path based on your image
 import AdminSidebar from "../sidebar"; 
 
 interface MobileSidebarProps {
@@ -30,35 +29,40 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
 
   return (
     <>
+      {/* 🚀 WP Style: Hamburger Menu in Admin Bar */}
       <button 
         onClick={() => setIsOpen(true)}
-        className="md:hidden p-2 rounded-md hover:bg-slate-100 transition text-slate-600"
+        className="md:hidden h-full px-2 flex items-center justify-center hover:bg-[#2c3338] transition-colors text-[#c3c4c7] focus:outline-none"
       >
-        <Menu size={24} />
+        <Menu size={20} />
       </button>
 
+      {/* Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm transition-opacity duration-300"
+          className="fixed inset-0 bg-black/40 z-50 transition-opacity duration-300"
           onClick={() => setIsOpen(false)}
         />
       )}
 
+      {/* 🚀 WP Style: Mobile Drawer */}
       <div className={`
-        fixed top-0 left-0 h-full w-72 bg-[#1e293b] z-50 shadow-2xl 
+        fixed top-0 left-0 h-full w-[240px] bg-[#1d2327] z-[60] shadow-2xl 
         transform transition-transform duration-300 ease-in-out
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
-        <div className="absolute right-4 top-4 z-50">
+        {/* Close Button */}
+        <div className="absolute right-3 top-3 z-[70]">
            <button 
              onClick={() => setIsOpen(false)} 
-             className="text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-700 transition"
+             className="text-[#a7aaad] hover:text-white p-1 rounded-sm hover:bg-[#2c3338] transition focus:outline-none"
            >
              <X size={20} />
            </button>
         </div>
 
-        <div className="h-full sidebar-mobile-override">
+        {/* Sidebar Content */}
+        <div className="h-full sidebar-mobile-override overflow-hidden">
             <AdminSidebar user={user} /> 
         </div>
       </div>
@@ -68,6 +72,8 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
           display: flex !important;
           width: 100% !important;
           border-right: none !important;
+          height: 100vh !important;
+          top: 0 !important;
         }
       `}</style>
     </>

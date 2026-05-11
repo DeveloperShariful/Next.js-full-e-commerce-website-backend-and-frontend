@@ -1,10 +1,13 @@
 // app/actions/storefront/product/review-actions.ts
 
+// app/actions/storefront/product/review-actions.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { ReviewStatus } from "@prisma/client"; // 🛑 NEW: Import Prisma Enum
 
 export async function createReview(productId: string, data: any) {
   const session = await auth();
@@ -40,7 +43,7 @@ export async function createReview(productId: string, data: any) {
         rating: Number(data.rating),
         title: data.title,
         content: data.content,
-        status: "pending", 
+        status: ReviewStatus.PENDING, // 🛑 FIXED: Used Prisma Enum (Uppercase)
         images: data.images || [], 
       }
     });
@@ -59,7 +62,7 @@ export async function getProductReviews(productId: string) {
     const reviews = await db.review.findMany({
       where: { 
         productId,
-        status: "approved" 
+        status: ReviewStatus.APPROVED // 🛑 FIXED: Used Prisma Enum (Uppercase)
       },
       include: {
         user: {
@@ -79,17 +82,21 @@ export async function getReviewStats(productId: string) {
   try {
     const result = await db.review.groupBy({
       by: ['rating'],
-      where: { productId, status: "approved" },
-      _count: { rating: true },
+      where: { 
+        productId, 
+        status: ReviewStatus.APPROVED // 🛑 FIXED: Used Prisma Enum
+      },
+      _count: { _all: true }, // 🛑 FIXED: Used _all for safe TypeScript counting
     });
 
-    const totalReviews = result.reduce((acc, curr) => acc + curr._count.rating, 0);
+    // _count._all ব্যবহার করে ডাটা অ্যাক্সেস করা হচ্ছে
+    const totalReviews = result.reduce((acc, curr) => acc + curr._count._all, 0);
     
-    const weightedSum = result.reduce((acc, curr) => acc + (curr.rating * curr._count.rating), 0);
+    const weightedSum = result.reduce((acc, curr) => acc + (curr.rating * curr._count._all), 0);
     const average = totalReviews > 0 ? (weightedSum / totalReviews).toFixed(1) : 0;
 
     const breakdown = [5, 4, 3, 2, 1].map(star => {
-      const count = result.find(r => r.rating === star)?._count.rating || 0;
+      const count = result.find(r => r.rating === star)?._count._all || 0;
       const percentage = totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
       return { star, count, percentage };
     });

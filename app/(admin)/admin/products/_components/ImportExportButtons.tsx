@@ -4,16 +4,19 @@
 
 import { useState, useRef } from "react";
 import { exportProductsCSV, importProductsCSV } from "@/app/actions/admin/product/import-export";
-import { Download, Upload, Loader2 } from "lucide-react";
+import { Download, Upload, Loader2 } from "lucide-react"; 
 import { toast } from "react-hot-toast";
 
 export default function ImportExportButtons() {
-    const [loading, setLoading] = useState(false);
+    // 🚀 FIXED: Separate loading states for Import and Export
+    const [isExporting, setIsExporting] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // --- HANDLE EXPORT ---
     const handleExport = async () => {
-        setLoading(true);
+        setIsExporting(true);
         const res = await exportProductsCSV();
         if (res.success && res.csv) {
             const blob = new Blob([res.csv], { type: "text/csv" });
@@ -26,7 +29,7 @@ export default function ImportExportButtons() {
         } else {
             toast.error("Export failed");
         }
-        setLoading(false);
+        setIsExporting(false);
     };
 
     // --- HANDLE IMPORT ---
@@ -38,30 +41,30 @@ export default function ImportExportButtons() {
         reader.onload = async (event) => {
             const text = event.target?.result as string;
             if (text) {
-                setLoading(true);
+                setIsImporting(true);
                 toast.loading("Importing products... This may take a while.");
                 
                 const res = await importProductsCSV(text);
                 
-                toast.dismiss(); // Remove loading toast
+                toast.dismiss(); 
                 if (res.success) {
                     toast.success(res.message);
-                    window.location.reload(); // পেজ রিফ্রেশ করে নতুন ডাটা দেখানো
+                    window.location.reload(); 
                 } else {
                     toast.error(res.message);
                 }
-                setLoading(false);
+                setIsImporting(false);
             }
         };
         reader.readAsText(file);
         
-        // ইনপুট রিসেট করা যাতে একই ফাইল আবার আপলোড করা যায়
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
+    const isLoading = isExporting || isImporting;
+
     return (
-        <div className="flex items-center gap-1">
-            {/* Hidden Input for Import */}
+        <div className="flex items-center gap-1.5">
             <input 
                 type="file" 
                 accept=".csv" 
@@ -70,21 +73,22 @@ export default function ImportExportButtons() {
                 className="hidden" 
             />
 
+            {/* 🚀 WP Style Buttons with Individual Loading States */}
             <button 
                 onClick={() => fileInputRef.current?.click()}
-                disabled={loading}
-                className="flex items-center gap-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                disabled={isLoading}
+                className="px-2.5 py-1 border border-[#c3c4c7] bg-[#f6f7f7] text-[#2271b1] text-[13px] rounded-[3px] hover:bg-[#f0f0f1] transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
             >
-                {loading ? <Loader2 className="animate-spin w-4 h-4"/> : <Upload className="w-4 h-4"/>}
+                {isImporting ? <Loader2 className="animate-spin" size={14}/> : <Upload size={14}/>}
                 Import
             </button>
 
             <button 
                 onClick={handleExport}
-                disabled={loading}
-                className="flex items-center gap-1 px-3 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                disabled={isLoading}
+                className="px-2.5 py-1 border border-[#c3c4c7] bg-[#f6f7f7] text-[#2271b1] text-[13px] rounded-[3px] hover:bg-[#f0f0f1] transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
             >
-                <Download className="w-4 h-4"/>
+                {isExporting ? <Loader2 className="animate-spin" size={14}/> : <Download size={14}/>}
                 Export
             </button>
         </div>

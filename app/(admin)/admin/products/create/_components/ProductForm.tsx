@@ -62,7 +62,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     
     const handler = setTimeout(() => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(formValues));
-    }, 1000); // Debounce 1s
+    }, 1000); 
 
     return () => clearTimeout(handler);
   }, [formValues, isDirty]);
@@ -74,9 +74,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // Don't restore if editing a different product
           if (isEdit && parsed.id !== initialData.id) return;
-          if (!isEdit && parsed.id) return; // Don't restore edit draft to create page
+          if (!isEdit && parsed.id) return; 
 
           setHasDraft(true);
         } catch (e) {
@@ -131,7 +130,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
         const result = await action(formData);
 
         if (result.success) {
-          localStorage.removeItem(STORAGE_KEY); // Clear draft on success
+          localStorage.removeItem(STORAGE_KEY); 
           toast.success(isEdit ? "Updated successfully!" : "Product published!", { id: toastId });
           router.push("/admin/products");
           router.refresh();
@@ -147,26 +146,29 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
 
   return (
     <FormProvider {...methods}>
-        <div className="m-1 min-h-screen bg-[#f0f0f1] font-sans text-sm text-[#3c434a] relative">
+        {/* 🚀 WP Style Background & Font Base */}
+        <div className="min-h-screen bg-[#f0f0f1] font-sans text-[13px] text-[#3c434a] relative pb-1">
             <input type="hidden" {...methods.register("version")} />
-            {/* Draft Recovery Alert */}
+            
+            {/* 🚀 WP Style Notice / Alert Box */}
             {hasDraft && (
-                <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-                    <div className="flex items-center gap-2 text-yellow-800">
-                        <AlertTriangle size={16} />
-                        <span className="font-medium">Unsaved changes found from your last session.</span>
+                <div className="bg-white border-l-4 border-[#d63638] px-4 py-3 shadow-sm mx-4 md:mx-1 mt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[#1d2327]">
+                        <AlertTriangle size={16} className="text-[#d63638]" />
+                        <span className="font-medium text-[13px]">Unsaved changes found from your last session.</span>
                     </div>
                     <div className="flex gap-2">
-                        <button onClick={restoreDraft} className="px-3 py-1 bg-yellow-600 text-white rounded text-xs font-bold hover:bg-yellow-700 flex items-center gap-1">
+                        <button type="button" onClick={restoreDraft} className="px-3 py-1 bg-white border border-[#c3c4c7] text-[#2271b1] rounded-sm text-[12px] hover:bg-[#f6f7f7] hover:text-[#0a4b78] transition-colors flex items-center gap-1 shadow-sm">
                             <RefreshCw size={12}/> Restore
                         </button>
-                        <button onClick={discardDraft} className="px-3 py-1 bg-white border border-yellow-300 text-yellow-800 rounded text-xs font-bold hover:bg-yellow-50">
+                        <button type="button" onClick={discardDraft} className="px-3 py-1 bg-white border border-[#c3c4c7] text-[#d63638] rounded-sm text-[12px] hover:bg-[#fef2f2] transition-colors shadow-sm">
                             Discard
                         </button>
                     </div>
                 </div>
             )}
 
+            {/* 🚀 Simple Page Title (No Save Buttons here in WP) */}
             <Header 
                 loading={isSubmitting || isPending} 
                 onSubmit={handleSubmit(onSubmit)} 
@@ -174,19 +176,25 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 isEdit={isEdit} 
             />
             
-            <div className="w-full p-0 md:p-6 flex flex-col lg:flex-row gap-4 md:gap-5">
+            {/* 🚀 WP Style Two-Column Layout */}
+            <div className="w-full px-1 md:px-1 py-1 flex flex-col lg:flex-row gap-5 items-start">
                 
-                <div className="flex-1 min-w-0 space-y-4 md:space-y-5">
-                    <div className="space-y-2 px-4 md:px-0 mt-4 md:mt-0">
+                {/* =======================================
+                    LEFT COLUMN: MAIN CONTENT (70%)
+                ======================================= */}
+                <div className="flex-1 w-full min-w-0 space-y-4">
+                    
+                    {/* 🚀 Product Title & Permalink */}
+                    <div className="space-y-1">
                         <input 
                             {...methods.register("name")}
                             placeholder="Product Name"
-                            className="w-full px-3 py-2 border border-gray-400 text-lg rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none shadow-sm"
+                            className="w-full px-3 py-2 bg-white border border-[#8c8f94] text-[18px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none rounded-[3px] transition-shadow"
                         />
                         {methods.watch("name") && (
-                            <div className="text-xs flex flex-wrap items-center gap-1 text-[#646970] leading-relaxed">
-                                <span className="font-semibold whitespace-nowrap">Permalink:</span>
-                                <span className="break-all">
+                            <div className="text-[12px] flex flex-wrap items-center gap-1 text-[#646970] mt-1 ml-1">
+                                <span className="font-semibold text-[#50575e]">Permalink:</span>
+                                <span className="text-[#2271b1]">
                                     {typeof window !== 'undefined' ? window.location.origin : ''}/product/
                                 </span>
                                 <input 
@@ -196,24 +204,26 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                             setValue("slug", val, { shouldDirty: true });
                                         }
                                     })}
-                                    className="bg-transparent border border-transparent hover:border-gray-400 px-1 rounded text-xs text-[#3c434a] font-medium focus:border-[#2271b1] outline-none min-w-[50px] max-w-full"
+                                    className="bg-transparent border border-transparent hover:border-[#8c8f94] px-1 py-0.5 rounded-sm text-[12px] text-[#2271b1] underline focus:border-[#2271b1] outline-none min-w-[50px]"
                                 />
                             </div>
                         )}
                     </div>
                     
-                    <ShortDescription />
+                    {/* Main Description */}
                     <Description />
 
-                    <div className="bg-white border-y md:border border-gray-300 md:rounded-sm shadow-sm">
+                    {/* 🚀 WooCommerce "Product Data" Meta Box */}
+                    <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px]">
                         
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-50 gap-3 sm:gap-0">
-                            <div className="flex items-center gap-3">
-                                <span className="font-semibold text-[#1d2327]">Product Data</span>
-                                <span className="text-gray-300 hidden sm:inline">|</span>
+                        {/* Box Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center px-3 py-2 border-b border-[#c3c4c7] bg-white gap-3 sm:gap-4">
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[#1d2327] text-[14px]">Product data</span>
+                                <span className="text-[#c3c4c7]">—</span>
                                 <select 
                                     {...methods.register("productType")}
-                                    className="border border-gray-300 rounded-sm px-2 py-1 text-xs focus:border-[#2271b1] outline-none font-medium text-[#3c434a]"
+                                    className="border border-[#8c8f94] rounded-[3px] px-2 py-0.5 text-[13px] focus:border-[#2271b1] outline-none text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)]"
                                 >
                                     <option value="SIMPLE">Simple product</option>
                                     <option value="VARIABLE">Variable product</option>
@@ -221,18 +231,20 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                     <option value="GIFT_CARD">Gift Card</option>
                                 </select>
                             </div>
-                            <div className="flex gap-4 text-xs text-[#3c434a]">
-                                <label className="flex items-center gap-1 cursor-pointer select-none">
-                                    <input type="checkbox" {...methods.register("isVirtual")}/> Virtual
+                            <div className="flex gap-4 text-[12px] text-[#3c434a]">
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input type="checkbox" {...methods.register("isVirtual")} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]" /> Virtual
                                 </label>
-                                <label className="flex items-center gap-1 cursor-pointer select-none">
-                                    <input type="checkbox" {...methods.register("isDownloadable")}/> Downloadable
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input type="checkbox" {...methods.register("isDownloadable")} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]" /> Downloadable
                                 </label>
                             </div>
                         </div>
 
+                        {/* 🚀 WooCommerce Style Vertical Tabs */}
                         <div className="flex flex-col md:flex-row min-h-[400px]">
-                            <ul className="w-full md:w-44 bg-gray-100 border-b md:border-b-0 md:border-r border-gray-300 pt-1 shrink-0 flex md:flex-col overflow-x-auto md:overflow-visible no-scrollbar">
+                            {/* Left Side: Tabs */}
+                            <ul className="w-full md:w-[150px] bg-[#f6f7f7] border-b md:border-b-0 md:border-r border-[#c3c4c7] shrink-0 flex md:flex-col overflow-x-auto md:overflow-visible no-scrollbar">
                                 {[
                                     {id: 'general', label: 'General', show: productType !== 'BUNDLE'}, 
                                     {id: 'inventory', label: 'Inventory', show: true},
@@ -244,17 +256,18 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                     {id: 'advanced', label: 'Advanced', show: true},
                                 ].map(tab => tab.show && (
                                     <li key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                        className={`cursor-pointer px-4 py-3 md:py-2.5 border-r md:border-r-0 md:border-b border-gray-200 text-xs flex justify-between items-center transition-colors whitespace-nowrap
+                                        className={`cursor-pointer px-3 py-2.5 text-[13px] transition-colors border-b border-[#f0f0f1] whitespace-nowrap md:whitespace-normal
                                         ${activeTab === tab.id 
-                                            ? 'bg-white font-bold text-[#3c434a] md:border-r-white md:-mr-[1px] border-b-white md:border-b-gray-200' 
-                                            : 'text-[#2271b1] hover:bg-gray-50 hover:text-[#135e96]'}`}
+                                            ? 'bg-white font-semibold text-[#1d2327] md:border-r-0 md:-mr-[1px] relative z-10' 
+                                            : 'text-[#2271b1] hover:text-[#0a4b78] bg-transparent'}`}
                                     >
                                         {tab.label}
                                     </li>
                                 ))}
                             </ul>
 
-                            <div className="flex-1 p-5 bg-white">
+                            {/* Right Side: Tab Content */}
+                            <div className="flex-1 p-4 bg-white relative z-0">
                                 {activeTab === 'general' && <General />}
                                 {activeTab === 'inventory' && <Inventory />}
                                 {activeTab === 'shipping' && <Shipping />}
@@ -266,16 +279,28 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                             </div>
                         </div>
                     </div>
+
+                    {/* Short Description */}
+                    <ShortDescription />
+
                 </div>
 
-                <div className="w-full lg:w-[280px] space-y-4 md:space-y-5 shrink-0 px-4 md:px-0 pb-10 md:pb-0">
+                {/* =======================================
+                    RIGHT COLUMN: SIDEBAR WIDGETS (30%)
+                ======================================= */}
+                <div className="w-full lg:w-[280px] xl:w-[320px] shrink-0 space-y-4">
+                    
+                    {/* 🚀 WP Publish Box (Save/Update button is inside here) */}
                     <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
+                    
+                    {/* Sub Widgets */}
                     <Categories />
                     <Collections />
-                    <ProductImage />
-                    <GalleryImages />
                     <Brand /> 
                     <Tag />
+                    <ProductImage />
+                    <GalleryImages />
+                    
                 </div>
             </div>
         </div>

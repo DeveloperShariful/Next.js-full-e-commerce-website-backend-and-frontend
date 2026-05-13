@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { History, X, RefreshCw, User, Loader2, Trash2, Filter, Package, ArrowRight } from "lucide-react";
-import { getProductActivityLogs ,deleteActivityLogs  } from "@/app/actions/admin/product/product-logs"; 
+import { getProductActivityLogs, deleteActivityLogs } from "@/app/actions/admin/product/product-logs"; 
 import { toast } from "react-hot-toast";
 
 export default function ProductLogViewer() {
@@ -77,7 +77,7 @@ export default function ProductLogViewer() {
     if (val === 0) return "0"; 
     if (val === false) return "False";
     if (val === true) return "True";
-    if (val === "" || val === null || val === undefined) return <span className="text-gray-400 italic">Empty</span>;
+    if (val === "" || val === null || val === undefined) return <span className="text-[#8c8f94] italic">Empty</span>;
     if (typeof val === 'object') return JSON.stringify(val);
     return String(val);
   };
@@ -92,27 +92,27 @@ export default function ProductLogViewer() {
     if (entries.length === 0) return null;
 
     return (
-        <div className="bg-gray-50 p-3 rounded-md border border-gray-200 mt-2 space-y-3">
+        <div className="bg-[#f0f0f1] p-3 rounded-[3px] border border-[#e2e4e7] mt-3 space-y-3 shadow-inner">
             {entries.map(([key, value]: [string, any]) => {
                 const isDiff = value && typeof value === 'object' && ('old' in value || 'new' in value);
 
                 if (isDiff) {
                     return (
-                        <div key={key} className="flex flex-col border-b border-gray-200 last:border-0 pb-2 last:pb-0">
-                            <span className="font-bold capitalize text-gray-700 mb-1 text-xs">
+                        <div key={key} className="flex flex-col border-b border-[#c3c4c7] last:border-0 pb-2 last:pb-0">
+                            <span className="font-semibold capitalize text-[#1d2327] mb-1.5 text-[12px]">
                                 {key.replace(/([A-Z])/g, ' $1').trim()}
                             </span>
                             
-                            <div className="flex items-center gap-2 text-xs">
+                            <div className="flex items-center gap-2 text-[12px]">
                                 {/* OLD Value */}
-                                <div className="flex-1 bg-red-50 border border-red-100 p-1.5 rounded text-red-700 line-through decoration-red-400/50 break-all opacity-80">
+                                <div className="flex-1 bg-[#fef2f2] border border-[#fecaca] p-1.5 rounded-[2px] text-[#991b1b] line-through decoration-red-400/50 break-all opacity-80 shadow-sm">
                                     {formatValue(value.old)}
                                 </div>
                                 
-                                <ArrowRight size={14} className="text-gray-400 shrink-0"/>
+                                <ArrowRight size={14} className="text-[#8c8f94] shrink-0"/>
                                 
                                 {/* NEW Value */}
-                                <div className="flex-1 bg-green-50 border border-green-100 p-1.5 rounded text-green-800 font-medium break-all">
+                                <div className="flex-1 bg-[#f0fdf4] border border-[#bbf7d0] p-1.5 rounded-[2px] text-[#166534] font-medium break-all shadow-sm">
                                     {formatValue(value.new)}
                                 </div>
                             </div>
@@ -121,9 +121,9 @@ export default function ProductLogViewer() {
                 }
                 
                 return (
-                    <div key={key} className="flex gap-2 text-xs">
-                        <span className="font-bold capitalize text-gray-700">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                        <span className="text-gray-800 break-all">{formatValue(value)}</span>
+                    <div key={key} className="flex gap-2 text-[12px] border-b border-[#e2e4e7] last:border-0 pb-1.5 last:pb-0">
+                        <span className="font-semibold capitalize text-[#1d2327]">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                        <span className="text-[#50575e] break-all">{formatValue(value)}</span>
                     </div>
                 );
             })}
@@ -133,59 +133,65 @@ export default function ProductLogViewer() {
 
   return (
     <>
+      {/* 🚀 WP Style Secondary Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded hover:bg-gray-50 hover:text-blue-600 transition shadow-sm text-sm"
+        className="px-2.5 py-1 border border-[#c3c4c7] bg-[#f6f7f7] text-[#2271b1] text-[13px] rounded-[3px] hover:bg-[#f0f0f1] transition-colors shadow-sm flex items-center gap-1.5"
       >
-        <History size={16} /> Activity Logs
+        <History size={14} className="text-[#8c8f94]"/> Activity Logs
       </button>
 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex justify-end">
+          {/* Overlay */}
           <div 
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity" 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
             onClick={() => setIsOpen(false)}
           ></div>
 
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+          {/* Slide Panel */}
+          <div className="relative w-full max-w-md bg-[#f0f0f1] h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 border-l border-[#c3c4c7]">
             
-            <div className="flex flex-col border-b border-gray-200 bg-gray-50">
+            {/* Header Area */}
+            <div className="flex flex-col border-b border-[#c3c4c7] bg-white">
                 <div className="flex items-center justify-between p-4">
-                    <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                        <History size={18} /> Product History
+                    <h2 className="font-normal text-[#1d2327] text-[18px] flex items-center gap-2">
+                        <History size={18} className="text-[#8c8f94]" /> Product History
                     </h2>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                         {selectedIds.length > 0 && (
                             <button 
                                 onClick={handleDelete}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded text-xs font-bold transition"
+                                className="flex items-center gap-1 px-2.5 py-1 bg-[#fef2f2] border border-[#fecaca] text-[#d63638] hover:bg-[#d63638] hover:text-white rounded-[3px] text-[12px] transition-colors"
                             >
-                                <Trash2 size={14} /> ({selectedIds.length})
+                                <Trash2 size={12} /> Delete ({selectedIds.length})
                             </button>
                         )}
                         <button 
                             onClick={() => fetchLogs(true)} 
                             disabled={loading}
-                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
+                            className="p-1.5 text-[#2271b1] hover:bg-[#f0f6fc] rounded-[3px] transition-colors border border-transparent hover:border-[#2271b1]"
+                            title="Refresh Logs"
                         >
-                            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                         </button>
                         <button 
                             onClick={() => setIsOpen(false)}
-                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition"
+                            className="p-1.5 text-[#8c8f94] hover:text-[#d63638] hover:bg-[#fef2f2] rounded-[3px] transition-colors border border-transparent hover:border-[#fecaca]"
+                            title="Close Panel"
                         >
-                            <X size={20} />
+                            <X size={16} />
                         </button>
                     </div>
                 </div>
 
                 <div className="px-4 pb-3 flex gap-2">
                     <div className="relative flex-1">
-                        <Filter size={14} className="absolute left-2.5 top-2.5 text-gray-400"/>
+                        <Filter size={12} className="absolute left-2.5 top-2 text-[#8c8f94]"/>
                         <select 
                             value={actionFilter}
                             onChange={(e) => setActionFilter(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded outline-none focus:border-blue-500 bg-white"
+                            className="w-full pl-7 pr-2 py-[3px] text-[12px] border border-[#8c8f94] rounded-[3px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] bg-white text-[#3c434a] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)]"
                         >
                             <option value="">All Actions</option>
                             <option value="CREATED_PRODUCT">Created</option>
@@ -198,16 +204,18 @@ export default function ProductLogViewer() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 custom-scrollbar">
+            {/* Logs Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
               
               {loading && logs.length === 0 && (
-                <div className="flex justify-center py-10 text-gray-400">
-                  <Loader2 size={24} className="animate-spin" />
+                <div className="flex flex-col items-center justify-center py-10 text-[#8c8f94] gap-2">
+                  <Loader2 size={24} className="animate-spin text-[#2271b1]" />
+                  <span className="text-[12px]">Loading history...</span>
                 </div>
               )}
 
               {!loading && logs.length === 0 && (
-                <div className="text-center py-10 text-gray-400 text-sm">
+                <div className="text-center py-10 text-[#8c8f94] text-[13px] italic">
                   No activity found.
                 </div>
               )}
@@ -215,7 +223,7 @@ export default function ProductLogViewer() {
               {logs.map((log) => (
                 <div 
                     key={log.id} 
-                    className={`bg-white p-3 rounded border shadow-sm text-sm transition-all ${selectedIds.includes(log.id) ? 'border-blue-400 ring-1 ring-blue-400 bg-blue-50/30' : 'border-gray-200 hover:border-gray-300'}`}
+                    className={`bg-white p-3 rounded-[3px] border shadow-sm text-[13px] transition-all ${selectedIds.includes(log.id) ? 'border-[#2271b1] bg-[#f0f6fc]' : 'border-[#c3c4c7] hover:border-[#8c8f94]'}`}
                 >
                     <div className="flex gap-3">
                         <div className="pt-1">
@@ -223,27 +231,27 @@ export default function ProductLogViewer() {
                                 type="checkbox" 
                                 checked={selectedIds.includes(log.id)} 
                                 onChange={() => toggleSelect(log.id)}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] rounded-[2px] focus:ring-[#2271b1] cursor-pointer"
                             />
                         </div>
 
                         <div className="flex-1 min-w-0">
+                            
                             {/* Header: User & Time */}
                             <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                                        {/* 🚀 FIX: HTML img tag used instead of Next Image to prevent external domain crashes */}
+                                    <div className="w-6 h-6 rounded-[2px] overflow-hidden bg-[#f0f0f1] border border-[#c3c4c7] flex items-center justify-center shrink-0">
                                         {log.user?.image ? (
-                                        <img src={log.user.image} alt="" className="w-full h-full object-cover" />
+                                           <img src={log.user.image} alt="" className="w-full h-full object-cover" />
                                         ) : (
-                                        <User size={14} className="text-gray-400" />
+                                           <User size={14} className="text-[#8c8f94]" />
                                         )}
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="font-semibold text-gray-700 text-xs truncate max-w-[120px]">
+                                        <span className="font-semibold text-[#2271b1] text-[12px] truncate max-w-[150px]">
                                             {log.user?.name || "Unknown"}
                                         </span>
-                                        <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                        <span className="text-[10px] text-[#8c8f94] whitespace-nowrap">
                                             {new Date(log.createdAt).toLocaleString()}
                                         </span>
                                     </div>
@@ -251,21 +259,21 @@ export default function ProductLogViewer() {
                             </div>
 
                             {/* Badge */}
-                            <div className="mb-2 font-medium text-xs">
-                                {log.action === "CREATED_PRODUCT" && <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100">Created product</span>}
-                                {log.action === "UPDATED_PRODUCT" && <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Updated product</span>}
-                                {log.action === "ARCHIVED_PRODUCT" && <span className="text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">Moved to trash</span>}
-                                {log.action === "DUPLICATED_PRODUCT" && <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">Duplicated product</span>}
+                            <div className="mb-2 font-semibold text-[11px]">
+                                {log.action === "CREATED_PRODUCT" && <span className="text-[#008a20] bg-[#f0fdf4] px-1.5 py-0.5 rounded-[2px] border border-[#bbf7d0]">Created product</span>}
+                                {log.action === "UPDATED_PRODUCT" && <span className="text-[#2271b1] bg-[#f0f6fc] px-1.5 py-0.5 rounded-[2px] border border-[#c5d9ed]">Updated product</span>}
+                                {log.action === "ARCHIVED_PRODUCT" && <span className="text-[#d63638] bg-[#fef2f2] px-1.5 py-0.5 rounded-[2px] border border-[#fecaca]">Moved to trash</span>}
+                                {log.action === "DUPLICATED_PRODUCT" && <span className="text-[#8224e3] bg-[#f4f1fa] px-1.5 py-0.5 rounded-[2px] border border-[#e0c8f6]">Duplicated product</span>}
                                 {!["CREATED_PRODUCT", "UPDATED_PRODUCT", "ARCHIVED_PRODUCT", "DUPLICATED_PRODUCT"].includes(log.action) && 
-                                    <span className="text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{log.action.replace(/_/g, " ")}</span>
+                                    <span className="text-[#3c434a] bg-[#f6f7f7] px-1.5 py-0.5 rounded-[2px] border border-[#c3c4c7]">{log.action.replace(/_/g, " ")}</span>
                                 }
                             </div>
 
                             {/* Product Name */}
                             {log.details?.productName && (
-                                <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-600">
-                                    <Package size={14} className="text-gray-400"/>
-                                    <span className="font-bold text-gray-800">{log.details.productName}</span>
+                                <div className="mb-2 flex items-center gap-1.5 text-[12px] text-[#50575e]">
+                                    <Package size={12} className="text-[#8c8f94]"/>
+                                    <span className="font-semibold text-[#1d2327]">{log.details.productName}</span>
                                 </div>
                             )}
 
@@ -280,9 +288,9 @@ export default function ProductLogViewer() {
                   <button 
                     onClick={() => fetchLogs(false)} 
                     disabled={loadingMore}
-                    className="w-full py-2 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded transition flex justify-center items-center gap-2"
+                    className="w-full py-1 text-[12px] font-semibold text-[#2271b1] border border-[#2271b1] bg-[#f6f7f7] hover:bg-[#f0f0f1] rounded-[3px] transition-colors flex justify-center items-center gap-2 shadow-sm"
                   >
-                    {loadingMore ? <Loader2 size={14} className="animate-spin"/> : "Load More Logs"}
+                    {loadingMore ? <Loader2 size={12} className="animate-spin"/> : "Load More Logs"}
                   </button>
               )}
             </div>

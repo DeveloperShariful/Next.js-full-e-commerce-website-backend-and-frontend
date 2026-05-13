@@ -4,15 +4,17 @@
 
 import { useState } from "react";
 import { useFormContext } from "react-hook-form";
-import { Plus, X, Type, Info } from "lucide-react";
+import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { ProductFormData } from "../types";
 import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
-import Image from "next/image";
 
 export default function GalleryImages() {
     const { watch, setValue } = useFormContext<ProductFormData>();
     const galleryImages = watch("galleryImages") || [];
     const [open, setOpen] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
+
+    const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
     const handleSelect = (media: any | any[]) => {
         const selected = Array.isArray(media) ? media : [media];
@@ -48,78 +50,108 @@ export default function GalleryImages() {
         setValue("galleryImages", newImages, { shouldDirty: true });
     };
 
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+        setDraggedIdx(index);
+        e.dataTransfer.effectAllowed = "move";
+        setTimeout(() => {
+            if (e.target instanceof HTMLElement) e.target.style.opacity = "0.5";
+        }, 0);
+    };
+
+    const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        setDraggedIdx(null);
+        if (e.target instanceof HTMLElement) e.target.style.opacity = "1";
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+        e.preventDefault(); 
+        e.dataTransfer.dropEffect = "move";
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
+        e.preventDefault();
+        if (draggedIdx === null || draggedIdx === dropIndex) return;
+
+        const newImages = [...galleryImages];
+        const draggedItem = newImages[draggedIdx];
+        
+        newImages.splice(draggedIdx, 1);
+        newImages.splice(dropIndex, 0, draggedItem);
+
+        setValue("galleryImages", newImages, { shouldDirty: true, shouldValidate: true });
+        setDraggedIdx(null);
+    };
+
     return (
-        <div className="bg-white border border-gray-300 shadow-sm rounded-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                <span className="font-semibold text-xs text-gray-700 uppercase tracking-wide">Product Gallery</span>
-                <span className="text-xs text-gray-400 font-mono">{galleryImages.length} items</span>
+        <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px]">
+            <div 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex justify-between items-center px-3 py-2 border-b border-[#f0f0f1] bg-white cursor-pointer select-none"
+            >
+                <span className="font-semibold text-[14px] text-[#1d2327]">Product gallery</span>
+                {isExpanded ? <ChevronUp size={16} className="text-[#8c8f94]" /> : <ChevronDown size={16} className="text-[#8c8f94]" />}
             </div>
             
-            <div className="p-4">
-                {/* 🔥 NEW: UI Hint for Deletion */}
-                <div className="mb-3 flex items-start gap-2 text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
-                    <Info size={14} className="shrink-0 mt-0.5 text-blue-500" />
-                    <p>
-                        Removing an image here only unlinks it from this product. 
-                        The original file remains in your <strong>Media Library</strong>.
-                    </p>
-                </div>
+            {isExpanded && (
+                <div className="p-3 bg-white">
+                    {galleryImages.length > 0 && (
+                        // 🚀 FIXED: grid-cols-4 for mobile ensures small square images just like desktop
+                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-4 xl:grid-cols-4 gap-2 mb-3">
+                            {galleryImages.map((img: any, index: number) => {
+                                const url = typeof img === 'string' ? img : img.url;
+                                const alt = typeof img === 'object' ? img.altText : "";
 
-                <div className="grid grid-cols-3 gap-3">
-                    {galleryImages.map((img: any, index: number) => {
-                        const url = typeof img === 'string' ? img : img.url;
-                        const alt = typeof img === 'object' ? img.altText : "";
+                                return (
+                                    <div 
+                                        key={index} 
+                                        draggable 
+                                        onDragStart={(e) => handleDragStart(e, index)}
+                                        onDragOver={(e) => handleDragOver(e, index)}
+                                        onDrop={(e) => handleDrop(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        className={`relative group bg-white border border-[#c3c4c7] flex flex-col cursor-move transition-all ${draggedIdx === index ? 'opacity-50' : 'opacity-100'}`}
+                                    >
+                                        <div className="relative aspect-square w-full bg-[#f0f0f1] overflow-hidden">
+                                            <img 
+                                                src={url} 
+                                                alt={alt || `Gallery ${index}`} 
+                                                className="w-full h-full object-cover pointer-events-none" 
+                                            />
+                                            
+                                            {/* 🚀 FIXED: Delete button is always visible on Mobile, but visible on Hover for Desktop */}
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleRemove(index)}
+                                                className=" absolute -top-0.5 -right-0.5 bg-[#d63638] text-white rounded-full p-0.5 hover:bg-red-700 transition shadow-sm z-10 opacity-100 lg:opacity-0 group-hover:opacity-100"
+                                                title="Remove image"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
 
-                        return (
-                            <div key={index} className="relative group aspect-square bg-gray-100 rounded-md border border-gray-200 overflow-hidden shadow-sm">
-                                <Image 
-                                    src={url} 
-                                    alt={alt || `Gallery ${index}`} 
-                                    fill
-                                    className="object-cover"
-                                />
-                                
-                                <div className="absolute bottom-0 left-0 w-full bg-black/70 p-1.5 translate-y-full group-hover:translate-y-0 transition duration-200 flex items-center gap-1">
-                                    <Type size={10} className="text-gray-400 shrink-0"/>
-                                    <input 
-                                        type="text" 
-                                        value={alt || ""} 
-                                        onChange={(e) => updateAltText(index, e.target.value)}
-                                        placeholder="SEO Alt Text"
-                                        className="w-full text-[10px] bg-transparent text-white border-b border-white/30 outline-none px-1 placeholder:text-gray-400 focus:border-white"
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                </div>
+                                        <input 
+                                            type="text" 
+                                            value={alt || ""} 
+                                            onChange={(e) => updateAltText(index, e.target.value)}
+                                            placeholder="Alt text"
+                                            className="w-full text-[10px] px-1 py-1 border-t border-[#c3c4c7] text-[#3c434a] outline-none focus:bg-[#f0f6fc]"
+                                            onClick={(e) => e.stopPropagation()} 
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
 
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleRemove(index)}
-                                    className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition z-10 opacity-0 group-hover:opacity-100"
-                                    title="Unlink image"
-                                >
-                                    <X size={12} />
-                                </button>
-                            </div>
-                        );
-                    })}
-
-                    <button 
+                    <button
                         type="button"
                         onClick={() => setOpen(true)}
-                        className="aspect-square flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md hover:border-[#2271b1] hover:bg-blue-50 transition text-gray-400 hover:text-[#2271b1]"
-                        title="Add Images"
+                        className="text-[13px] text-[#2271b1] hover:underline text-left w-full"
                     >
-                        <Plus size={20} />
-                        <span className="text-[10px] font-bold mt-1">Add</span>
+                        Add product gallery images
                     </button>
                 </div>
-
-                {galleryImages.length === 0 && (
-                    <p className="text-[11px] text-gray-400 mt-3 text-center italic">
-                        No images added to gallery yet.
-                    </p>
-                )}
-            </div>
+            )}
 
             {open && (
                 <MediaSelectorModal 

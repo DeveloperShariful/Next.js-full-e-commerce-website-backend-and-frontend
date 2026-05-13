@@ -3,105 +3,109 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface PaginationControlsProps {
   total: number;
   currentPage: number;
   totalPages: number;
-  perPage: number;
+  perPage: number; // Keeping it for API limit logic, though WP doesn't always show the dropdown
 }
 
 export function PaginationControls({
   total,
   currentPage,
   totalPages,
-  perPage,
 }: PaginationControlsProps) {
   const router = useRouter();
-  const pathname = usePathname(); // ✅ অটোমেটিক বর্তমান পেজের পাথ ধরবে (যেমন: /admin/products)
+  const pathname = usePathname(); 
   const searchParams = useSearchParams();
+  
+  // Local state for the input box so user can type a page number
+  const [pageInput, setPageInput] = useState(String(currentPage));
 
-  // --- URL Update Function ---
-  const updateUrl = (key: string, value: string) => {
+  useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
+
+  const updateUrl = (pageNumber: number) => {
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+    
     const params = new URLSearchParams(searchParams.toString());
-    params.set(key, value);
-    
-    // Limit পাল্টালে Page 1 এ রিসেট করা
-    if (key === "limit") params.set("page", "1");
-    
-    // ✅ ডাইনামিক রাউটিং (Hardcoded Path সরানো হয়েছে)
+    params.set("page", String(pageNumber));
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const start = (currentPage - 1) * perPage + 1;
-  const end = Math.min(currentPage * perPage, total);
+  const handleInputSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const num = parseInt(pageInput);
+      if (!isNaN(num)) {
+        updateUrl(num);
+      } else {
+        setPageInput(String(currentPage)); // Reset if invalid
+      }
+    }
+  };
 
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-center py-4 border-t border-slate-200 mt-4 gap-4 text-sm text-slate-600 select-none">
+    // 🚀 WP Style Pagination: Right aligned, small text, compact buttons
+    <div className="flex items-center gap-2 text-[13px] text-[#3c434a] ml-auto">
+      <span className="text-[#646970]">{total} items</span>
       
-      {/* Left: Showing Info */}
-      <div className="font-medium">
-        Showing {total === 0 ? 0 : start} to {end} of {total} items
-      </div>
-
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-1">
+        {/* First Page */}
+        <button 
+          onClick={() => updateUrl(1)} 
+          disabled={currentPage <= 1}
+          className="px-1.5 py-[3px] bg-[#f6f7f7] border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] hover:bg-white transition-colors disabled:opacity-50 disabled:bg-[#f0f0f1]"
+          title="First Page"
+        >
+          <ChevronsLeft size={14} />
+        </button>
         
-        {/* Rows Per Page Dropdown */}
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-slate-500">Rows per page:</span>
-          <Select
-            value={String(perPage)}
-            onValueChange={(val) => updateUrl("limit", val)}
-          >
-            <SelectTrigger className="h-8 w-[70px] bg-white border-slate-300">
-              <SelectValue placeholder={String(perPage)} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="20">20</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-              <SelectItem value="100">100</SelectItem>
-              <SelectItem value="200">200</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Previous Page */}
+        <button 
+          onClick={() => updateUrl(currentPage - 1)} 
+          disabled={currentPage <= 1}
+          className="px-1.5 py-[3px] bg-[#f6f7f7] border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] hover:bg-white transition-colors disabled:opacity-50 disabled:bg-[#f0f0f1]"
+          title="Previous Page"
+        >
+          <ChevronLeft size={14} />
+        </button>
 
-        {/* Navigation Buttons */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 lg:w-auto lg:px-3 bg-white border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-            disabled={currentPage <= 1}
-            onClick={() => updateUrl("page", String(currentPage - 1))}
-          >
-            <ChevronLeft className="h-4 w-4 lg:mr-1" />
-            <span className="hidden lg:inline">Previous</span>
-          </Button>
+        {/* Current Page Input & Total Pages */}
+        <span className="mx-1 flex items-center">
+           <input 
+             type="text" 
+             value={pageInput} 
+             onChange={(e) => setPageInput(e.target.value)}
+             onKeyDown={handleInputSubmit}
+             className="w-10 px-1 py-[3px] text-center border border-[#8c8f94] rounded-[3px] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none mx-1 text-[13px] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)]"
+           /> 
+           <span className="text-[#646970]">of <span className="font-semibold text-[#3c434a] ml-0.5">{totalPages || 1}</span></span>
+        </span>
 
-          <div className="h-8 px-3 flex items-center justify-center border border-blue-500 bg-blue-50 text-blue-600 rounded-md font-bold min-w-[32px]">
-            {currentPage}
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 lg:w-auto lg:px-3 bg-white border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-            disabled={currentPage >= totalPages}
-            onClick={() => updateUrl("page", String(currentPage + 1))}
-          >
-            <span className="hidden lg:inline">Next</span>
-            <ChevronRight className="h-4 w-4 lg:ml-1" />
-          </Button>
-        </div>
+        {/* Next Page */}
+        <button 
+          onClick={() => updateUrl(currentPage + 1)} 
+          disabled={currentPage >= totalPages || totalPages === 0}
+          className="px-1.5 py-[3px] bg-[#f6f7f7] border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] hover:bg-white transition-colors disabled:opacity-50 disabled:bg-[#f0f0f1]"
+          title="Next Page"
+        >
+          <ChevronRight size={14} />
+        </button>
+        
+        {/* Last Page */}
+        <button 
+          onClick={() => updateUrl(totalPages)} 
+          disabled={currentPage >= totalPages || totalPages === 0}
+          className="px-1.5 py-[3px] bg-[#f6f7f7] border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] hover:bg-white transition-colors disabled:opacity-50 disabled:bg-[#f0f0f1]"
+          title="Last Page"
+        >
+          <ChevronsRight size={14} />
+        </button>
       </div>
     </div>
   );

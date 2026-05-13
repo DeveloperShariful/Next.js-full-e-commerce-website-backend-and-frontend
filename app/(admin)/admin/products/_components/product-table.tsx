@@ -5,20 +5,29 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Image as ImageIcon, Star, Loader2 } from "lucide-react";
+import { Image as ImageIcon, Star, Loader2 } from "lucide-react";
 import { bulkProductAction, moveToTrash, deleteProduct } from "@/app/actions/admin/product/product-list"; 
 import { duplicateProduct } from "@/app/actions/admin/product/duplicate-product"; 
 import { toast } from "react-hot-toast";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { PaginationControls } from "./pagination-controls"; // 🚀 Added Pagination Import
 
 interface ProductTableProps {
   products: any[];
   categories: any[];
+  brands: any[]; 
   counts: any;
   statusFilter: string;
+  totalProducts: number;
+  totalPages: number;
+  currentPage: number;
+  limit: number;
 }
 
-export default function ProductTable({ products, categories, counts, statusFilter }: ProductTableProps) {
+export default function ProductTable({ 
+  products, categories, brands, counts, statusFilter, totalProducts, totalPages, currentPage, limit 
+}: ProductTableProps) {
+  
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -28,20 +37,35 @@ export default function ProductTable({ products, categories, counts, statusFilte
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState("");
+  
   const [query, setQuery] = useState(searchParams.get("query") || "");
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get("category") || "");
+  const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
+  const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") || "");
+  const [stockFilter, setStockFilter] = useState(searchParams.get("stock_status") || ""); 
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(searchParams.toString());
     if (query) params.set("query", query);
     else params.delete("query");
+    params.set("page", "1");
     router.push(`/admin/products?${params.toString()}`);
   };
 
-  const handleFilter = (type: string, value: string) => {
-    const params = new URLSearchParams(searchParams);
-    if (value) params.set(type, value);
-    else params.delete(type);
+  const handleApplyFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (categoryFilter) params.set("category", categoryFilter);
+    else params.delete("category");
+    
+    if (typeFilter) params.set("type", typeFilter);
+    else params.delete("type");
+
+    if (brandFilter) params.set("brand", brandFilter);
+    else params.delete("brand");
+
+    params.set("page", "1");
     router.push(`/admin/products?${params.toString()}`);
   };
 
@@ -55,7 +79,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
     else setSelectedIds([...selectedIds, id]);
   };
 
-  // ✅ FIX 1: Bulk Action Fix
   const handleBulkApply = async () => {
     if (!bulkAction) return toast.error("Select an action");
     if (selectedIds.length === 0) return toast.error("Select items first");
@@ -69,9 +92,9 @@ export default function ProductTable({ products, categories, counts, statusFilte
             const res = await bulkProductAction(formData);
             if (res.success) {
                 toast.success(res.message || "Bulk action successful");
-                setSelectedIds([]); // সিলেকশন ক্লিয়ার
-                setBulkAction("");  // ড্রপডাউন রিসেট
-                router.refresh();   // 🔥 ফোর্স রিফ্রেশ (UI সাথে সাথে আপডেট হবে)
+                setSelectedIds([]); 
+                setBulkAction("");  
+                router.refresh();   
             } else {
                 toast.error(res.message || "Action failed");
             }
@@ -81,7 +104,6 @@ export default function ProductTable({ products, categories, counts, statusFilte
     });
   };
 
-  // ✅ FIX 2: Single Action Fix (Try-Finally)
   const handleSingleAction = (id: string, actionType: 'duplicate' | 'trash' | 'restore' | 'delete') => {
       setLoadingId(id);
       
@@ -104,14 +126,13 @@ export default function ProductTable({ products, categories, counts, statusFilte
     
               if(res?.success) {
                   toast.success(res.message || "Success");
-                  router.refresh(); // 🔥 ফোর্স রিফ্রেশ
+                  router.refresh(); 
               } else {
                   toast.error(res?.message || "Action failed");
               }
           } catch (error) {
               toast.error("An error occurred");
           } finally {
-              // 🔥 কাজ শেষ হোক বা এরর হোক, লোডিং বন্ধ হবেই
               setLoadingId(null);
           }
       });
@@ -119,35 +140,61 @@ export default function ProductTable({ products, categories, counts, statusFilte
 
   const formatDate = (date: Date) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
 
-  return (
-    <div className="w-full">
-      <div className="flex flex-wrap gap-2 text-sm mb-4 text-slate-500">
-         <Link href="/admin/products" className={`${!statusFilter ? 'font-bold text-black' : 'text-blue-600 hover:underline'}`}>
-            All <span className="text-slate-400">({counts.all})</span>
-         </Link>
-         <span className="text-slate-300 hidden sm:inline">|</span>
-         <Link href="/admin/products?status=active" className={`${statusFilter === 'active' ? 'font-bold text-black' : 'text-blue-600 hover:underline'}`}>
-            Published <span className="text-slate-400">({counts.active})</span>
-         </Link>
-         <span className="text-slate-300 hidden sm:inline">|</span>
-         <Link href="/admin/products?status=draft" className={`${statusFilter === 'draft' ? 'font-bold text-black' : 'text-blue-600 hover:underline'}`}>
-            Drafts <span className="text-slate-400">({counts.draft})</span>
-         </Link>
-         <span className="text-slate-300 hidden sm:inline">|</span>
-         <Link href="/admin/products?status=archived" className={`${statusFilter === 'archived' ? 'font-bold text-black' : 'text-blue-600 hover:underline'}`}>
-            Trash <span className="text-slate-400">({counts.archived})</span>
-         </Link>
-      </div>
+  const renderStars = (isFeatured: boolean) => {
+    return (
+      <span className={`text-[16px] leading-none select-none transition-colors ${isFeatured ? "text-[#f56e28]" : "text-[#c3c4c7]"}`}>
+        {isFeatured ? "★" : "☆"}
+      </span>
+    );
+  };
 
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-           <div className="flex gap-2 w-full sm:w-auto">
+  return (
+    <div className="w-full animate-in fade-in duration-300">
+      
+      {/* 🚀 WP Style Filter Links */}
+      <ul className="flex flex-wrap items-center gap-1 text-[13px] mb-3 text-[#646970]">
+         <li className="flex items-center gap-1">
+            <Link href="/admin/products" className={`${!statusFilter ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                All <span className="text-[#646970] font-normal">({counts.all})</span>
+            </Link>
+            <span className="text-[#c3c4c7] ml-1">|</span>
+         </li>
+         <li className="flex items-center gap-1">
+            <Link href="/admin/products?status=active" className={`${statusFilter === 'active' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                Published <span className="text-[#646970] font-normal">({counts.active})</span>
+            </Link>
+            <span className="text-[#c3c4c7] ml-1">|</span>
+         </li>
+         <li className="flex items-center gap-1">
+            <Link href="/admin/products?status=draft" className={`${statusFilter === 'draft' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                Drafts <span className="text-[#646970] font-normal">({counts.draft})</span>
+            </Link>
+            {counts.archived > 0 && <span className="text-[#c3c4c7] ml-1">|</span>}
+         </li>
+         {counts.archived > 0 && (
+           <li className="flex items-center gap-1">
+              <Link href="/admin/products?status=archived" className={`${statusFilter === 'archived' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                  Trash <span className="text-[#646970] font-normal">({counts.archived})</span>
+              </Link>
+           </li>
+         )}
+      </ul>
+
+      {/* 🚀 WP Style Actions Bar (Filters & Search) */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-2 gap-2">
+        
+        {/* Left Side: Bulk Actions & Advanced Filters */}
+        <div className="flex flex-wrap items-center gap-1.5 w-full xl:w-auto">
+           
+           {/* Bulk Actions */}
+           <div className="flex items-center gap-1 mr-1">
                <select 
                   value={bulkAction} 
                   onChange={(e) => setBulkAction(e.target.value)}
-                  className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none focus:border-blue-500 w-full sm:w-auto cursor-pointer"
+                  disabled={isPending || products.length === 0}
+                  className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
                >
-                  <option value="">Bulk Actions</option>
+                  <option value="">Bulk actions</option>
                   {statusFilter === 'archived' ? (
                       <>
                         <option value="restore">Restore</option>
@@ -163,163 +210,246 @@ export default function ProductTable({ products, categories, counts, statusFilte
                </select>
                <button 
                   onClick={handleBulkApply} 
-                  disabled={isPending || !bulkAction}
-                  className="h-9 px-4 border border-slate-400 rounded text-sm bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[80px]"
+                  disabled={isPending || !bulkAction || selectedIds.length === 0}
+                  className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                >
-                  {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Apply"}
+                  {isPending && <Loader2 className="w-3 h-3 animate-spin" />} Apply
                </button>
            </div>
            
-           <div className="flex gap-2 w-full sm:w-auto">
-              <select onChange={(e) => handleFilter("category", e.target.value)} className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none w-full sm:w-40 cursor-pointer">
-                 <option value="">Select a category</option>
-                 {categories.map((c) => (
-                    <option key={c.name} value={c.name}>{c.name}</option>
-                 ))}
-              </select>
-              <select onChange={(e) => handleFilter("type", e.target.value)} className="h-9 px-3 border border-slate-400 rounded text-sm bg-white outline-none w-full sm:w-32 cursor-pointer">
-                 <option value="">Filter by type</option>
-                 <option value="SIMPLE">Simple</option>
-                 <option value="VARIABLE">Variable</option>
-              </select>
-           </div>
+           {/* Filters */}
+           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
+              <option value="">Select a category</option>
+              {categories.map((c) => (<option key={c.name} value={c.name}>{c.name}</option>))}
+           </select>
+           
+           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none hidden sm:block">
+              <option value="">Filter by product type</option>
+              <option value="SIMPLE">Simple product</option>
+              <option value="VARIABLE">Variable product</option>
+           </select>
+
+           <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none hidden md:block">
+              <option value="">Filter by stock status</option>
+              <option value="instock">In stock</option>
+              <option value="outofstock">Out of stock</option>
+           </select>
+
+           <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none hidden lg:block">
+              <option value="">Filter by brand</option>
+              {brands.map((b) => (<option key={b.name} value={b.name}>{b.name}</option>))}
+           </select>
+
+           <button 
+             onClick={handleApplyFilters} 
+             className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors"
+           >
+             Filter
+           </button>
         </div>
         
-        <form onSubmit={handleSearch} className="relative w-full lg:w-auto">
-           <input 
-             value={query}
-             onChange={(e) => setQuery(e.target.value)}
-             placeholder="Search products..." 
-             className="h-9 pl-3 pr-8 border border-slate-400 rounded text-sm w-full lg:w-64 outline-none focus:border-blue-500" 
-           />
-           <button type="submit" className="absolute right-0 top-0 h-9 w-9 flex items-center justify-center text-slate-500 hover:text-slate-700 cursor-pointer">
-              <Search size={16} />
-           </button>
-        </form>
+        {/* Right Side: Search Box */}
+        <div className="flex items-center gap-2 ml-auto w-full xl:w-auto mt-2 xl:mt-0">
+           <form onSubmit={handleSearch} className="flex items-stretch shadow-sm w-full sm:w-auto">
+             <input 
+               value={query}
+               onChange={(e) => setQuery(e.target.value)}
+               className="w-full sm:w-[180px] px-2 py-[3px] border border-[#8c8f94] text-[13px] text-[#3c434a] focus:border-[#2271b1] outline-none rounded-l-[3px]"
+               placeholder="Search products..."
+             />
+             <button type="submit" className="px-3 py-[3px] border border-l-0 border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] text-[13px] hover:bg-[#f0f0f1] transition-colors rounded-r-[3px] whitespace-nowrap">
+               Search products
+             </button>
+           </form>
+        </div>
+        
+      </div>
+      <div className="flex items-center gap-2 ml-auto w-full xl:w-auto mt-2 xl:mt-0">
+         {/* 🚀 WP Style Pagination (Top) */}
+      {totalProducts > 0 && (
+        <PaginationControls total={totalProducts} totalPages={totalPages} currentPage={currentPage} perPage={limit} />
+      )}
       </div>
 
-      <div className={`bg-white border border-slate-300 shadow-sm overflow-x-auto rounded-sm transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-        <table className="w-full text-left border-collapse text-sm min-w-[600px] md:min-w-full">
-          <thead className="bg-white border-b border-slate-300 text-slate-700">
-            <tr>
-              <th className="p-3 w-10 text-center">
-                  <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="rounded border-slate-400 cursor-pointer w-4 h-4 accent-blue-600" />
-              </th>
-              <th className="p-3 w-16 text-center"><ImageIcon size={16} className="mx-auto text-slate-400" /></th>
-              <th className="p-3 font-semibold text-blue-600 min-w-[200px]">Name</th>
-              <th className="p-3 font-semibold hidden md:table-cell">SKU</th>
-              <th className="p-3 font-semibold">Stock</th>
-              <th className="p-3 font-semibold">Price</th>
-              <th className="p-3 font-semibold hidden lg:table-cell">Categories</th>
-              <th className="p-3 font-semibold hidden xl:table-cell">Brand</th> 
-              <th className="p-3 font-semibold hidden 2xl:table-cell">Tags</th>
-              <th className="p-3 font-semibold text-center hidden sm:table-cell"><Star size={16} className="mx-auto text-slate-400" /></th>
-              <th className="p-3 font-semibold hidden lg:table-cell">Date</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {products.length === 0 ? (
-              <tr><td colSpan={11} className="p-16 text-center text-slate-500">No products found.</td></tr>
-            ) : (
-              products.map((product) => {
-                const displayImage = product.featuredImage || product.images[0]?.url || null;
-                const stock = product.inventoryLevels?.reduce((acc: number, curr: any) => acc + curr.quantity, 0) || 0;
-                const isProcessing = loadingId === product.id;
+      
 
-                return (
-                  <tr key={product.id} className="hover:bg-[#F9F9F9] group align-top transition-colors">
-                    <td className="p-3 text-center">
-                        <input type="checkbox" checked={selectedIds.includes(product.id)} onChange={() => toggleSelect(product.id)} className="rounded border-slate-400 cursor-pointer w-4 h-4 accent-blue-600" />
-                    </td>
-                    <td className="p-3">
-                       <div className="h-10 w-10 bg-slate-100 border border-slate-300 flex items-center justify-center overflow-hidden rounded-sm">
-                          {displayImage ? (
-                             <img src={displayImage} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                             <ImageIcon className="text-slate-300" size={20} />
-                          )}
-                       </div>
-                    </td>
-                    <td className="p-3">
-                       <Link href={`/admin/products/create?id=${product.id}`} className="font-semibold text-blue-600 hover:underline block mb-1">
-                          {product.name} 
-                          {product.status === 'DRAFT' && <span className="text-slate-400 font-normal italic text-xs ml-1">— Draft</span>}
-                       </Link>
-                       <div className="flex flex-wrap gap-1 text-[11px] text-slate-400 mt-1 items-center h-5">
-                          <span className="text-slate-500 font-bold bg-slate-100 px-1 rounded">ID: {product.productCode} | </span>
-                          
-                          {statusFilter === 'archived' ? (
-                             <div className="flex gap-2 items-center">
-                                <button onClick={() => handleSingleAction(product.id, 'restore')} disabled={isProcessing} className="text-blue-600 hover:underline disabled:opacity-50 flex items-center gap-1">
-                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Restore"}
-                                </button>
-                                <span className="text-slate-300"> | </span>
-                                <button onClick={() => handleSingleAction(product.id, 'delete')} disabled={isProcessing} className="text-red-600 hover:underline disabled:opacity-50 flex items-center gap-1">
-                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Delete Permanently"}
-                                </button>
-                             </div>
-                          ) : (
-                             <div className="flex gap-2 items-center">
-                                <Link href={`/admin/products/create?id=${product.id}`} className="text-blue-600 hover:underline">Edit</Link>
-                                <span className="text-slate-300"> | </span>
-                                <button onClick={() => handleSingleAction(product.id, 'trash')} disabled={isProcessing} className="text-red-600 hover:underline disabled:opacity-50 flex items-center gap-1">
-                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Trash"}
-                                </button>
-                                <span className="text-slate-300"> | </span>
-                                <Link href={`/product/${product.slug}`} target="_blank" className="text-blue-600 hover:underline">View</Link>
-                                <span className="text-slate-300"> | </span>
-                                <button onClick={() => handleSingleAction(product.id, 'duplicate')} disabled={isProcessing} className="text-blue-600 hover:underline disabled:opacity-50 flex items-center gap-1">
-                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin"/> : "Duplicate"}
-                                </button>
-                             </div>
-                          )}
-                       </div>
-                    </td>
-                    <td className="p-3 text-slate-600 hidden md:table-cell">{product.sku || <span className="text-slate-400">–</span>}</td>
-                    <td className="p-3">
-                       {product.trackQuantity ? (
-                          <span className={`text-xs font-bold ${stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                             {stock > 0 ? 'In stock' : 'Out of stock'} <span className="font-normal text-slate-500">({stock})</span>
-                          </span>
-                       ) : (
-                          <span className="text-green-600 text-xs font-bold">In stock</span>
-                       )}
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                       {product.salePrice ? (
-                          <div className="flex flex-col">
-                             <span className="line-through text-slate-400 text-xs">{formatPrice(product.price)}</span>
-                             <span className="font-medium text-slate-800">{formatPrice(product.salePrice)}</span>
-                          </div>
-                       ) : (
-                          <span className="font-medium text-slate-800">{formatPrice(product.price)}</span>
-                       )}
-                    </td>
-                    <td className="p-3 text-blue-600 hover:underline cursor-pointer hidden lg:table-cell">
-                       {product.category?.name || <span className="text-slate-400">–</span>}
-                    </td>
-                    <td className="p-3 text-slate-600 hidden xl:table-cell">
-                        {product.brand?.name || <span className="text-slate-400">–</span>}
-                    </td>
-                    <td className="p-3 text-slate-600 hidden 2xl:table-cell">
-                       {product.tags && product.tags.length > 0 
-                          ? product.tags.map((t:any) => t.name).join(', ') 
-                          : <span className="text-slate-400">–</span>}
-                    </td>
-                    <td className="p-3 text-center hidden sm:table-cell">
-                       <Star size={16} className={`mx-auto cursor-pointer transition-colors ${product.isFeatured ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300 hover:text-yellow-400'}`} />
-                    </td>
-                    <td className="p-3 text-slate-500 text-xs hidden lg:table-cell">
-                       {product.status === 'ACTIVE' ? 'Published' : 'Last Modified'} <br/>
-                       <span className="text-slate-700">{formatDate(product.updatedAt)}</span>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+      {/* 🚀 WP List Table */}
+      <div className={`bg-white border border-[#c3c4c7] shadow-sm transition-opacity duration-200 mt-2 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+        <div className="overflow-x-auto min-h-[400px]">
+          <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[1200px]">
+            <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
+              <tr>
+                <th className="p-2 w-8 text-center border-r border-[#e2e4e7]">
+                    <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
+                </th>
+                <th className="p-2 w-14 border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
+                <th className="p-2 font-medium min-w-[200px]">Name</th>
+                <th className="p-2 font-medium w-32">SKU</th>
+                <th className="p-2 font-medium w-24">Stock</th>
+                <th className="p-2 font-medium w-32">Price</th>
+                <th className="p-2 font-medium w-24">Cost</th>
+                <th className="p-2 font-medium w-40">Categories</th>
+                <th className="p-2 font-medium w-32">Tags</th>
+                <th className="p-2 font-medium w-12 text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
+                <th className="p-2 font-medium w-40">Date</th>
+                <th className="p-2 font-medium w-32">Brands</th>
+              </tr>
+            </thead>
+            
+            <tbody className="divide-y divide-[#f0f0f1]">
+              {products.length === 0 ? (
+                <tr><td colSpan={12} className="p-10 text-center text-[#50575e] italic">No products found.</td></tr>
+              ) : (
+                products.map((product, index) => {
+                  const displayImage = product.featuredImage || product.images[0]?.url || null;
+                  const stock = product.inventoryLevels?.reduce((acc: number, curr: any) => acc + curr.quantity, 0) || 0;
+                  const isProcessing = loadingId === product.id;
+                  
+                  const isAlternate = index % 2 !== 0; 
+                  const isSelected = selectedIds.includes(product.id);
+                  let rowBg = isSelected ? 'bg-[#fff8e5]' : isAlternate ? 'bg-[#f9f9f9]' : 'bg-white';
+
+                  return (
+                    <tr key={product.id} className={`group align-top transition-colors ${rowBg} hover:bg-[#f0f6fc]`}>
+                      
+                      <td className="p-2 text-center border-r border-[#f0f0f1] pt-[14px]">
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(product.id)} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
+                      </td>
+                      
+                      <td className="p-2 border-r border-[#f0f0f1] pt-[14px]">
+                         <div className="w-[32px] h-[32px] bg-[#f0f0f1] border border-[#c3c4c7] rounded-[2px] flex items-center justify-center overflow-hidden mx-auto">
+                            {displayImage ? (
+                               <img src={displayImage} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                               <ImageIcon className="text-[#8c8f94]" size={14} />
+                            )}
+                         </div>
+                      </td>
+                      
+                      <td className="p-2 pt-[14px]">
+                         <div className="flex flex-col">
+                           <div className="flex items-center gap-1.5">
+                             <Link href={`/admin/products/create?id=${product.id}`} className="font-semibold text-[#2271b1] hover:text-[#0a4b78] hover:underline">
+                                {product.name} 
+                             </Link>
+                             {product.status === 'DRAFT' && <span className="text-[#3c434a] font-bold text-[11px]">— Draft</span>}
+                           </div>
+                           
+                           <div className="text-[12px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 flex-wrap">
+                               <span className="text-[#8c8f94] text-[10px]">ID: {product.productCode}</span>
+                               <span className="text-[#c3c4c7]">|</span>
+                               
+                               {statusFilter === 'archived' ? (
+                                  <>
+                                     <button onClick={() => handleSingleAction(product.id, 'restore')} disabled={isProcessing} className="text-[#2271b1] hover:underline">Restore</button>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <button onClick={() => handleSingleAction(product.id, 'delete')} disabled={isProcessing} className="text-[#d63638] hover:underline">Delete Permanently</button>
+                                  </>
+                               ) : (
+                                  <>
+                                     <Link href={`/admin/products/create?id=${product.id}`} className="text-[#2271b1] hover:underline">Edit</Link>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <button className="text-[#2271b1] hover:underline">Quick Edit</button>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <button onClick={() => handleSingleAction(product.id, 'trash')} disabled={isProcessing} className="text-[#d63638] hover:underline">Trash</button>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <Link href={`/product/${product.slug}`} target="_blank" className="text-[#2271b1] hover:underline">View</Link>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <button onClick={() => handleSingleAction(product.id, 'duplicate')} disabled={isProcessing} className="text-[#2271b1] hover:underline">Duplicate</button>
+                                  </>
+                               )}
+                           </div>
+                         </div>
+                      </td>
+                      
+                      <td className="p-2 pt-[14px]">
+                         <span className="text-[#2271b1] hover:underline cursor-pointer">{product.sku || "—"}</span>
+                      </td>
+                      
+                      <td className="p-2 pt-[14px]">
+                         {product.trackQuantity ? (
+                            <span className={`text-[12px] font-semibold ${stock > 0 ? 'text-[#008a20]' : 'text-[#d63638]'}`}>
+                               {stock > 0 ? 'In stock' : 'Out of stock'}
+                            </span>
+                         ) : (
+                            <span className="text-[#008a20] text-[12px] font-semibold">In stock</span>
+                         )}
+                      </td>
+                      
+                      <td className="p-2 pt-[14px] text-[#2271b1]">
+                         {product.salePrice ? (
+                            <div className="flex flex-col">
+                               <span className="line-through text-[#8c8f94] text-[11px]">{formatPrice(product.price)}</span>
+                               <span>{formatPrice(product.salePrice)}</span>
+                            </div>
+                         ) : (
+                            <span>{formatPrice(product.price)}</span>
+                         )}
+                      </td>
+
+                      <td className="p-2 pt-[14px] text-[#50575e]">
+                         {product.costPerItem ? formatPrice(product.costPerItem) : "—"}
+                      </td>
+                      
+                      <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
+                         {product.category?.name || "—"}
+                      </td>
+                      
+                      <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
+                         {product.tags && product.tags.length > 0 
+                            ? product.tags.map((t:any) => t.name).join(', ') 
+                            : "—"}
+                      </td>
+                      
+                      <td className="p-2 pt-[14px] text-center">
+                         {renderStars(product.isFeatured)}
+                      </td>
+                      
+                      <td className="p-2 pt-[14px] text-[#50575e] text-[12px]">
+                         {product.status === 'ACTIVE' ? 'Published' : 'Last Modified'} <br/>
+                         <span className="text-[#3c434a] font-medium">{formatDate(product.updatedAt)}</span>
+                      </td>
+
+                      <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
+                         {product.brand?.name || "—"}
+                      </td>
+                      
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+
+            <tfoot className="bg-[#f6f7f7] border-t border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
+              <tr>
+                <th className="p-2 w-8 text-center border-r border-[#e2e4e7]">
+                  <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
+                </th>
+                <th className="p-2 text-center border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
+                <th className="p-2 font-medium">Name</th>
+                <th className="p-2 font-medium">SKU</th>
+                <th className="p-2 font-medium">Stock</th>
+                <th className="p-2 font-medium">Price</th>
+                <th className="p-2 font-medium">Cost</th>
+                <th className="p-2 font-medium">Categories</th>
+                <th className="p-2 font-medium">Tags</th>
+                <th className="p-2 font-medium text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
+                <th className="p-2 font-medium">Date</th>
+                <th className="p-2 font-medium">Brands</th>
+              </tr>
+            </tfoot>
+
+          </table>
+        </div>
       </div>
+
+      {/* 🚀 WP Style Pagination (Bottom) */}
+      {totalProducts > 0 && (
+        <div className="mt-2">
+          <PaginationControls total={totalProducts} totalPages={totalPages} currentPage={currentPage} perPage={limit} />
+        </div>
+      )}
+
     </div>
   );
 }

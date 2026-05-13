@@ -1,5 +1,7 @@
 // File: app/admin/products/create/_components/Inventory.tsx
 
+"use client";
+
 import { useEffect, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { getLocations } from "@/app/actions/admin/product/product-read";
@@ -16,7 +18,6 @@ export default function Inventory() {
     const inventoryData = watch("inventoryData") || [];
     const isPreOrder = watch("isPreOrder");
 
-    // 1. Fetch Locations
     useEffect(() => {
         getLocations().then(res => {
             if(res.success && res.data) {
@@ -37,7 +38,6 @@ export default function Inventory() {
         });
     }, []);
 
-    // 2. Stock Handler
     const handleStockChange = (locId: string, qtyStr: string) => {
         const newQty = parseInt(qtyStr) || 0;
         const existingItem = inventoryData.find(i => i.locationId === locId);
@@ -61,108 +61,156 @@ export default function Inventory() {
     };
 
     return (
-        <div className="space-y-6 max-w-2xl">
+        <div className="space-y-4 max-w-2xl">
+            
             {/* Identity Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="md:text-right font-medium text-xs">SKU</label>
-                <input {...register("sku")} className="md:col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" placeholder="Stock Keeping Unit"/>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                <label className="md:text-left text-[13px] text-[#3c434a]">SKU</label>
+                <input 
+                    {...register("sku")} 
+                    className="md:col-span-2 w-full md:w-2/3 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+                />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="md:text-right font-medium text-xs">Barcode</label>
-                <input {...register("barcode")} className="md:col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="md:text-right font-medium text-xs">MPN</label>
-                <input {...register("mpn")} className="md:col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" placeholder="Manufacturer Part Number" />
-            </div>
-
-            <hr className="border-gray-200" />
-
-            {/* Track Quantity */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <div className="md:col-start-2 md:col-span-2">
-                    <label className="flex items-center gap-2 text-xs select-none cursor-pointer">
-                        <input type="checkbox" {...register("trackQuantity")}/> Track stock quantity
-                    </label>
-                </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Barcode</label>
+                <input 
+                    {...register("barcode")} 
+                    className="md:col-span-2 w-full md:w-2/3 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none" 
+                />
             </div>
 
-            {/* Stock Table */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#f0f0f1] pb-4">
+                <label className="md:text-left text-[13px] text-[#3c434a]">MPN</label>
+                <input 
+                    {...register("mpn")} 
+                    className="md:col-span-2 w-full md:w-2/3 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none" 
+                />
+            </div>
+
+            {/* Track Quantity Checkbox */}
+            <div className="pt-2">
+                <label className="flex items-center gap-2 text-[13px] text-[#3c434a] cursor-pointer select-none">
+                    <input 
+                        type="checkbox" 
+                        {...register("trackQuantity")}
+                        className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]"
+                    /> 
+                    Track stock quantity for this product
+                </label>
+            </div>
+
+            {/* Stock Table for Simple Product */}
             {data.trackQuantity && data.productType === 'SIMPLE' && (
-                <div className="mt-4 bg-gray-50 border border-gray-200 rounded p-4 animate-in fade-in">
-                    <h4 className="text-xs font-bold text-gray-700 mb-3 flex items-center gap-2">
-                        <MapPin size={14}/> Inventory by Location
-                    </h4>
-                    {loadingLocs ? <p className="text-xs text-gray-400">Loading...</p> : (
-                        <div className="space-y-2">
-                            {locations.map(loc => (
-                                <div key={loc.id} className="flex justify-between items-center bg-white p-2 border border-gray-200 rounded-sm">
-                                    <span className="text-xs font-semibold text-gray-800">{loc.name} {loc.isDefault && <span className="text-[10px] text-blue-600 bg-blue-50 px-1 rounded ml-1">Default</span>}</span>
-                                    <input type="number" min="0" value={getQtyForLoc(loc.id)} onChange={(e) => handleStockChange(loc.id, e.target.value)} className="w-24 border border-gray-300 px-2 py-1 text-right text-sm rounded focus:border-[#2271b1] outline-none font-medium"/>
+                <div className="mt-4 bg-white border border-[#c3c4c7] rounded-[3px] animate-in fade-in">
+                    <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2">
+                        <h4 className="text-[13px] font-semibold text-[#1d2327] flex items-center gap-2">
+                            <MapPin size={14} className="text-[#8c8f94]"/> Inventory by Location
+                        </h4>
+                    </div>
+                    <div className="p-3">
+                        {loadingLocs ? <p className="text-[12px] text-[#8c8f94] italic">Loading locations...</p> : (
+                            <div className="space-y-2">
+                                {locations.map(loc => (
+                                    <div key={loc.id} className="flex justify-between items-center bg-white p-2 border border-[#f0f0f1]">
+                                        <span className="text-[13px] text-[#3c434a]">
+                                            {loc.name} {loc.isDefault && <span className="text-[10px] text-[#166534] bg-[#f0fdf4] border border-[#bbf7d0] px-1 rounded-sm ml-1 uppercase">Default</span>}
+                                        </span>
+                                        <input 
+                                            type="number" 
+                                            min="0" 
+                                            value={getQtyForLoc(loc.id)} 
+                                            onChange={(e) => handleStockChange(loc.id, e.target.value)} 
+                                            className="w-20 border border-[#8c8f94] px-2 py-1 text-right text-[13px] rounded-[3px] focus:border-[#2271b1] outline-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)]"
+                                        />
+                                    </div>
+                                ))}
+                                <div className="flex justify-between items-center pt-3 border-t border-[#f0f0f1] mt-3">
+                                    <span className="text-[12px] font-semibold text-[#646970] uppercase">Total Stock</span>
+                                    <span className="text-[14px] font-bold text-[#1d2327] mr-1">{data.stock}</span>
                                 </div>
-                            ))}
-                            <div className="flex justify-between items-center pt-2 border-t border-gray-200 mt-2">
-                                <span className="text-xs font-bold text-gray-600 uppercase">Total Stock</span>
-                                <span className="text-sm font-bold text-[#2271b1]">{data.stock}</span>
                             </div>
+                        )}
+                        <div className="mt-4 pt-4 border-t border-[#c3c4c7] grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                            <label className="md:text-left text-[13px] text-[#3c434a]">Low stock threshold</label>
+                            <input 
+                                type="number" 
+                                {...register("lowStockThreshold")} 
+                                className="w-20 border border-[#8c8f94] px-2 py-1 text-right text-[13px] rounded-[3px] focus:border-[#2271b1] outline-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)]" 
+                                placeholder="2" 
+                            />
                         </div>
-                    )}
-                    <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                        <label className="md:text-right font-medium text-xs">Low stock threshold</label>
-                        <input type="number" {...register("lowStockThreshold")} className="md:col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" placeholder="2" />
                     </div>
                 </div>
             )}
 
             {data.productType === 'VARIABLE' && (
-                <div className="bg-blue-50 text-blue-800 p-3 rounded text-xs flex gap-2 items-start border border-blue-200">
-                    <AlertCircle size={16} className="shrink-0 mt-0.5"/>
+                <div className="bg-[#f0f6fc] border-l-4 border-[#2271b1] text-[#3c434a] p-3 text-[13px] flex gap-2 items-start shadow-sm mt-4">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-[#2271b1]"/>
                     <p>Stock for variable products is managed at the <strong>Variations</strong> tab.</p>
                 </div>
             )}
 
             {/* Backorders & Limits */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <label className="md:text-right font-medium text-xs">Allow backorders?</label>
-                <select {...register("backorderStatus")} className="md:col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm">
-                    <option value="DO_NOT_ALLOW">Do not allow</option>
-                    <option value="ALLOW">Allow</option>
-                    <option value="ALLOW_BUT_NOTIFY">Allow, but notify customer</option>
-                </select>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mt-6">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Allow backorders?</label>
+                <div className="md:col-span-2">
+                    <select 
+                        {...register("backorderStatus")} 
+                        className="w-full md:w-2/3 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
+                    >
+                        <option value="DO_NOT_ALLOW">Do not allow</option>
+                        <option value="ALLOW">Allow</option>
+                        <option value="ALLOW_BUT_NOTIFY">Allow, but notify customer</option>
+                    </select>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <div className="md:col-start-2 md:col-span-2">
-                    <label className="flex items-center gap-2 text-xs select-none">
-                        <input type="checkbox" {...register("soldIndividually")}/> Sold individually (Limit 1 per order)
+            <div className="grid grid-cols-1 gap-4 items-center border-b border-[#f0f0f1] pb-4 mt-4">
+                <div>
+                    <label className="flex items-center gap-2 text-[13px] text-[#3c434a] select-none cursor-pointer">
+                        <input type="checkbox" {...register("soldIndividually")} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]"/> 
+                        Sold individually (Limit 1 per order)
                     </label>
                 </div>
             </div>
 
-            <hr className="border-gray-200" />
-
-            {/* 🔥 NEW: Pre-order Section */}
-            <div className="bg-orange-50 border border-orange-200 rounded p-4">
-                <div className="flex items-center gap-2 mb-4">
-                    <input type="checkbox" {...register("isPreOrder")} className="accent-orange-600 w-4 h-4"/>
-                    <label className="font-bold text-sm text-orange-800 flex items-center gap-2">
-                        <Clock size={16}/> Enable Pre-order
-                    </label>
-                </div>
+            {/* 🔥 Pre-order Section */}
+            <div className="pt-2">
+                <label className="flex items-center gap-2 text-[13px] text-[#3c434a] font-semibold cursor-pointer mb-3">
+                    <input type="checkbox" {...register("isPreOrder")} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] text-[#d63638] focus:ring-[#d63638]"/> 
+                    <span className="flex items-center gap-1.5"><Clock size={14} className="text-[#8c8f94]"/> Enable Pre-order</span>
+                </label>
 
                 {isPreOrder && (
-                    <div className="space-y-4 pl-6 animate-in fade-in slide-in-from-top-2">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                            <label className="md:text-right font-medium text-xs text-orange-900">Release Date</label>
-                            <input type="date" {...register("preOrderReleaseDate")} className="md:col-span-2 w-full border border-orange-300 px-2 py-1.5 rounded-sm focus:border-orange-500 outline-none text-sm bg-white" />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                            <label className="md:text-right font-medium text-xs text-orange-900">Pre-order Limit</label>
-                            <input type="number" {...register("preOrderLimit")} className="md:col-span-2 w-full border border-orange-300 px-2 py-1.5 rounded-sm focus:border-orange-500 outline-none text-sm bg-white" placeholder="Optional limit" />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                            <label className="md:text-right font-medium text-xs text-orange-900">Message</label>
-                            <input type="text" {...register("preOrderMessage")} className="md:col-span-2 w-full border border-orange-300 px-2 py-1.5 rounded-sm focus:border-orange-500 outline-none text-sm bg-white" placeholder="e.g. Ships in late October" />
+                    <div className="bg-[#fff5eb] border border-[#fbd38d] rounded-[3px] p-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                <label className="text-[13px] text-[#c05621] font-semibold">Release Date <span className="text-[#d63638]">*</span></label>
+                                <input 
+                                    type="date" 
+                                    {...register("preOrderReleaseDate")} 
+                                    className="md:col-span-2 w-full md:w-1/2 border border-[#fbd38d] px-2 py-1 rounded-[3px] text-[13px] text-[#3c434a] outline-none focus:border-[#c05621] bg-white shadow-sm" 
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                <label className="text-[13px] text-[#c05621] font-semibold">Pre-order Limit</label>
+                                <input 
+                                    type="number" 
+                                    {...register("preOrderLimit")} 
+                                    className="md:col-span-2 w-full md:w-1/3 border border-[#fbd38d] px-2 py-1 rounded-[3px] text-[13px] text-[#3c434a] outline-none focus:border-[#c05621] bg-white shadow-sm" 
+                                    placeholder="Optional" 
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                <label className="text-[13px] text-[#c05621] font-semibold">Message</label>
+                                <input 
+                                    type="text" 
+                                    {...register("preOrderMessage")} 
+                                    className="md:col-span-2 w-full border border-[#fbd38d] px-2 py-1 rounded-[3px] text-[13px] text-[#3c434a] outline-none focus:border-[#c05621] bg-white shadow-sm" 
+                                    placeholder="e.g. Ships in late October" 
+                                />
+                            </div>
                         </div>
                     </div>
                 )}

@@ -1,8 +1,10 @@
 // app/admin/products/create/_components/categoris.tsx
 
+"use client";
+
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
-import { ChevronUp } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { getCategories } from "@/app/actions/admin/product/category";
 import { ProductFormData } from "../types";
 
@@ -12,6 +14,7 @@ export default function Categories() {
     
     const [dbCategories, setDbCategories] = useState<{id: string, name: string}[]>([]);
     const [input, setInput] = useState("");
+    const [isExpanded, setIsExpanded] = useState(true);
 
     useEffect(() => {
         getCategories().then(res => {
@@ -29,36 +32,64 @@ export default function Categories() {
     };
 
     return (
-        <div className="bg-white border border-gray-300 shadow-sm rounded-sm">
-            <div className="flex justify-between items-center px-3 py-2 border-b border-gray-300 bg-gray-50 font-semibold text-xs text-gray-700">
-                <span>Product Categories</span>
-                <ChevronUp size={14} />
+        <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px]">
+            {/* Header */}
+            <div 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex justify-between items-center px-3 py-2 border-b border-[#f0f0f1] bg-white cursor-pointer select-none"
+            >
+                <span className="font-semibold text-[14px] text-[#1d2327]">Product categories</span>
+                {isExpanded ? <ChevronUp size={16} className="text-[#8c8f94]" /> : <ChevronDown size={16} className="text-[#8c8f94]" />}
             </div>
-            <div className="p-3">
-                <div className="max-h-[150px] overflow-y-auto border border-gray-200 p-2 bg-gray-50 mb-2 rounded-sm">
-                    {dbCategories.map(cat => (
-                        <label key={cat.id} className="flex items-center gap-2 mb-1 select-none text-xs">
+            
+            {/* Content */}
+            {isExpanded && (
+                <div className="p-3 bg-white">
+                    {/* Category List */}
+                    <div className="max-h-[200px] overflow-y-auto border border-[#c3c4c7] p-2 bg-white mb-3 rounded-[3px] custom-scrollbar">
+                        {dbCategories.length === 0 ? (
+                            <p className="text-[12px] text-[#8c8f94] italic">No categories found.</p>
+                        ) : (
+                            <ul className="space-y-1.5">
+                                {dbCategories.map(cat => (
+                                    <li key={cat.id}>
+                                        <label className="flex items-start gap-2 select-none text-[13px] text-[#3c434a] cursor-pointer hover:text-[#2271b1]">
+                                            <input 
+                                                type="radio" 
+                                                checked={currentCategory === cat.name} 
+                                                onChange={() => setValue("category", cat.name, { shouldDirty: true, shouldValidate: true })}
+                                                className="mt-0.5 w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]"
+                                            />
+                                            <span className="leading-tight">{cat.name}</span>
+                                        </label>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    {/* Add New Category Input */}
+                    <div className="mt-2">
+                        <label className="text-[12px] text-[#2271b1] hover:underline cursor-pointer mb-1 block">+ Add new category</label>
+                        <div className="flex gap-2">
                             <input 
-                                type="radio" 
-                                checked={currentCategory === cat.name} 
-                                onChange={() => setValue("category", cat.name, { shouldDirty: true, shouldValidate: true })}
-                                className="text-[#2271b1]"
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                placeholder="New category name" 
+                                className="flex-1 border border-[#8c8f94] px-2 py-1 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px]"
+                                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCategory())}
                             />
-                            <span>{cat.name}</span>
-                        </label>
-                    ))}
+                            <button 
+                                type="button" 
+                                onClick={addCategory} 
+                                className="px-3 py-1 bg-[#f6f7f7] border border-[#c3c4c7] text-[#2271b1] text-[13px] font-medium hover:bg-[#f0f0f1] rounded-[3px] transition-colors"
+                            >
+                                Add
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <input 
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        placeholder="New category name" 
-                        className="flex-1 border border-gray-300 px-2 py-1 text-xs outline-none focus:border-[#2271b1]"
-                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCategory())}
-                    />
-                    <button type="button" onClick={addCategory} className="px-2 py-1 bg-gray-100 border border-gray-300 text-xs font-medium text-[#2271b1] hover:bg-gray-200">Add</button>
-                </div>
-            </div>
+            )}
         </div>
     );
 }

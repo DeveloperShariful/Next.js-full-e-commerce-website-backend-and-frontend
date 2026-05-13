@@ -4,14 +4,14 @@
 
 import { useState } from "react"; 
 import { useFormContext } from "react-hook-form";
-import { X, RefreshCw, ImagePlus } from "lucide-react"; 
+import { ChevronUp, ChevronDown } from "lucide-react"; 
 import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
 import { ProductFormData } from "../types";
-import Image from "next/image";
 
 export default function ProductImage() {
     const { watch, setValue } = useFormContext<ProductFormData>();
     const [open, setOpen] = useState(false); 
+    const [isExpanded, setIsExpanded] = useState(true);
     
     const featuredImage = watch("featuredImage");
 
@@ -23,60 +23,55 @@ export default function ProductImage() {
     };
 
     return (
-        <div className="bg-white border border-gray-300 shadow-sm rounded-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                <span className="font-semibold text-xs text-gray-700 uppercase tracking-wide">Featured Image</span>
-                {featuredImage && (
-                    <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">Set</span>
-                )}
+        <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px]">
+            {/* Header */}
+            <div 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex justify-between items-center px-3 py-2 border-b border-[#f0f0f1] bg-white cursor-pointer select-none"
+            >
+                <span className="font-semibold text-[14px] text-[#1d2327]">Product image</span>
+                {isExpanded ? <ChevronUp size={16} className="text-[#8c8f94]" /> : <ChevronDown size={16} className="text-[#8c8f94]" />}
             </div>
             
-            <div className="p-4">
-                {featuredImage ? (
-                    <div className="flex flex-col gap-3">
-                        <div className="relative w-full aspect-square bg-gray-100 rounded-lg border border-gray-200 overflow-hidden shadow-inner group">
-                            <Image 
-                                src={featuredImage} 
-                                alt="Featured Product Image" 
-                                fill
-                                className="object-cover transition-transform group-hover:scale-105 duration-500"
-                            />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                            <button 
-                                type="button" 
-                                onClick={() => setOpen(true)} 
-                                className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-[#2271b1] border border-blue-200 rounded text-xs font-semibold hover:bg-blue-100 transition"
+            {/* Content */}
+            {isExpanded && (
+                <div className="p-3 bg-white">
+                    {featuredImage ? (
+                        <div className="flex flex-col gap-3">
+                            <div 
+                                onClick={() => setOpen(true)}
+                                className="relative w-full cursor-pointer hover:opacity-80 transition-opacity"
+                                title="Click to change image"
                             >
-                                <RefreshCw size={14} /> Change
-                            </button>
-
+                                <img 
+                                    src={featuredImage} 
+                                    alt="Featured Product Image" 
+                                    className="w-full h-auto object-cover border border-[#c3c4c7]"
+                                />
+                            </div>
+                            
                             <button 
                                 type="button" 
                                 onClick={() => {
                                     setValue("featuredImage", null, { shouldDirty: true, shouldValidate: true });
                                     setValue("featuredMediaId", null, { shouldDirty: true });
                                 }} 
-                                className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded text-xs font-semibold hover:bg-red-100 transition"
+                                className="text-[13px] text-[#d63638] hover:underline text-left"
                             >
-                                <X size={14} /> Remove
+                                Remove product image
                             </button>
                         </div>
-                    </div>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setOpen(true)}
-                        className="group flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-lg hover:bg-blue-50 hover:border-[#2271b1] transition-all duration-200"
-                    >
-                        <div className="p-3 bg-gray-100 rounded-full group-hover:bg-white group-hover:text-[#2271b1] transition mb-2">
-                            <ImagePlus size={24} className="text-gray-400 group-hover:text-[#2271b1]" />
-                        </div>
-                        <span className="text-xs font-semibold text-gray-600 group-hover:text-[#2271b1]">Set Product Image</span>
-                    </button>
-                )}
-            </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setOpen(true)}
+                            className="text-[13px] text-[#2271b1] hover:underline text-left w-full"
+                        >
+                            Set product image
+                        </button>
+                    )}
+                </div>
+            )}
 
             {open && (
                 <MediaSelectorModal 

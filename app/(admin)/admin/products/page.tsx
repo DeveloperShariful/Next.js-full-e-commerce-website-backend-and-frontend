@@ -6,7 +6,6 @@ import { ProductType, ProductStatus, Prisma } from '@prisma/client';
 import ProductTable from './_components/product-table';
 import ProductLogViewer from './_components/ProductLogViewer';
 import ImportExportButtons from './_components/ImportExportButtons';
-import { PaginationControls } from "./_components/pagination-controls";
 import { serializeData } from "@/app/actions/admin/product/product-utils";
 
 interface ProductsPageProps {
@@ -52,7 +51,8 @@ export default async function ProductListPage(props: ProductsPageProps) {
     ]
   };
 
-  const [products, totalProducts, categories, statusCounts] = await Promise.all([
+  // 🚀 Fetching Brands as well for the new Filter
+  const [products, totalProducts, categories, brands, statusCounts] = await Promise.all([
     db.product.findMany({
       where: whereCondition,
       select: {
@@ -63,6 +63,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
         sku: true,
         price: true,
         salePrice: true,
+        costPerItem: true, // 🚀 Added Cost
         status: true,
         productType: true,
         trackQuantity: true,
@@ -81,6 +82,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
     }),
     db.product.count({ where: whereCondition }),
     db.category.findMany({ select: { name: true }, orderBy: { name: 'asc' } }),
+    db.brand.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }), // 🚀 Brand Filter Support
     db.product.groupBy({
       by: ['status'],
       _count: { status: true }
@@ -88,7 +90,6 @@ export default async function ProductListPage(props: ProductsPageProps) {
   ]);
 
   const serializedProducts = serializeData(products);
-
   const totalPages = Math.ceil(totalProducts / limit);
 
   const counts = {
@@ -99,47 +100,49 @@ export default async function ProductListPage(props: ProductsPageProps) {
   };
 
   return (
-    <div className="p-3 md:p-6 min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
+    <div className="font-sans text-[#3c434a] max-w-full">
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      {/* 🚀 WP Style Header Row (Matched with your screenshot) */}
+      {/* 🚀 WP Style Header Row */}
+      <div className="mb-4 flex justify-between items-start md:items-center">
         
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-800">Products</h1>
-          <p className="text-sm text-slate-500 mt-1 hidden sm:block">Manage your product catalog</p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <Link 
-            href="/admin/products/create" 
-            className="flex-1 md:flex-none text-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition shadow-sm whitespace-nowrap"
-          >
-            + Add New
-          </Link>
+        {/* Left Side: Title and Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           
-          <div className="flex gap-1 flex-1 md:flex-none justify-end md:justify-start">
-             <ImportExportButtons />
-             <ProductLogViewer />
+          <div className="flex items-center gap-2">
+            <h1 className="text-[23px] font-normal text-[#1d2327]">Products</h1>
+            
+            <Link 
+              href="/admin/products/create" 
+              className="px-2 py-1 text-[13px] border border-[#2271b1] text-[#2271b1] bg-[#f0f6fc] hover:bg-[#2271b1] hover:text-white rounded-[3px] transition-colors shadow-sm whitespace-nowrap"
+            >
+              Add new 
+            </Link>
+          </div>
+          <div className="mt-1 sm:mt-0">
+            <ImportExportButtons />
           </div>
         </div>
+        <div className="mt-1 sm:mt-0">
+           <ProductLogViewer />
+          </div>
       </div>
 
-      <div className="w-full">
+      {/* Main Table Component */}
+      <div className="w-full mt-4">
         <ProductTable 
           products={serializedProducts}
           categories={categories}
+          brands={brands} // 🚀 Passing brands for the new filter
           counts={counts}
           statusFilter={statusFilter}
+          totalProducts={totalProducts}
+          totalPages={totalPages}
+          currentPage={page}
+          limit={limit}
         />
       </div>
 
-      {totalProducts > 0 && (
-        <PaginationControls 
-          total={totalProducts}
-          totalPages={totalPages}
-          currentPage={page}
-          perPage={limit}
-        />
-      )}
     </div>
   );
 }

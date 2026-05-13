@@ -1,8 +1,10 @@
 // app/admin/products/create/_components/Collections.tsx
 
+"use client";
+
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
-import { ChevronUp, Search, Check } from "lucide-react";
+import { ChevronUp, ChevronDown, Search } from "lucide-react";
 import { getCollections } from "@/app/actions/admin/product/product-read";
 import { ProductFormData } from "../types";
 
@@ -12,6 +14,7 @@ export default function Collections() {
 
     const [dbCollections, setDbCollections] = useState<{id: string, name: string}[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
+    const [isExpanded, setIsExpanded] = useState(true);
 
     useEffect(() => {
         getCollections().then(res => { 
@@ -31,46 +34,57 @@ export default function Collections() {
     );
 
     return (
-        <div className="bg-white border border-gray-300 shadow-sm rounded-sm">
-            <div className="flex justify-between items-center px-3 py-2 border-b border-gray-300 bg-gray-50 font-semibold text-xs text-gray-700">
-                <span>Collections</span>
-                <ChevronUp size={14} />
+        <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px]">
+            {/* Header */}
+            <div 
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex justify-between items-center px-3 py-2 border-b border-[#f0f0f1] bg-white cursor-pointer select-none"
+            >
+                <span className="font-semibold text-[14px] text-[#1d2327]">Product Collections</span>
+                {isExpanded ? <ChevronUp size={16} className="text-[#8c8f94]" /> : <ChevronDown size={16} className="text-[#8c8f94]" />}
             </div>
             
-            <div className="p-3">
-                <div className="relative mb-2">
-                    <input 
-                        type="text" 
-                        placeholder="Search collections..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full border border-gray-300 pl-7 pr-2 py-1.5 text-xs rounded-sm outline-none focus:border-[#2271b1]"
-                    />
-                    <Search size={12} className="absolute left-2 top-2 text-gray-400"/>
-                </div>
+            {/* Content */}
+            {isExpanded && (
+                <div className="p-3 bg-white">
+                    {/* Search */}
+                    <div className="relative mb-3">
+                        <input 
+                            type="text" 
+                            placeholder="Search collections..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full border border-[#8c8f94] pl-7 pr-2 py-1 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
+                        />
+                        <Search size={14} className="absolute left-2 top-1.5 text-[#8c8f94]"/>
+                    </div>
 
-                <div className="max-h-[150px] overflow-y-auto border border-gray-200 p-2 bg-gray-50 mb-2 rounded-sm custom-scrollbar">
-                    {filteredCollections.length > 0 ? filteredCollections.map(col => (
-                        <label key={col.id} className="flex items-center gap-2 mb-1.5 select-none text-xs cursor-pointer hover:bg-gray-100 p-1 rounded transition">
-                            <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center transition-colors ${selectedIds.includes(col.id) ? 'bg-[#2271b1] border-[#2271b1]' : 'border-gray-400 bg-white'}`}>
-                                {selectedIds.includes(col.id) && <Check size={10} className="text-white"/>}
-                            </div>
-                            
-                            <input 
-                                type="checkbox" 
-                                checked={selectedIds.includes(col.id)} 
-                                onChange={() => toggleCollection(col.id)}
-                                className="hidden"
-                            />
-                            <span className={selectedIds.includes(col.id) ? 'font-medium text-[#2271b1]' : 'text-gray-700'}>{col.name}</span>
-                        </label>
-                    )) : (
-                        <div className="text-xs text-gray-400 text-center py-2">
-                            {searchTerm ? "No matching collections" : "No collections found"}
-                        </div>
-                    )}
+                    {/* Collection List */}
+                    <div className="max-h-[150px] overflow-y-auto border border-[#c3c4c7] p-2 bg-white rounded-[3px] custom-scrollbar">
+                        {filteredCollections.length > 0 ? (
+                            <ul className="space-y-1.5">
+                                {filteredCollections.map(col => (
+                                    <li key={col.id}>
+                                        <label className="flex items-start gap-2 select-none text-[13px] text-[#3c434a] cursor-pointer hover:text-[#2271b1]">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedIds.includes(col.id)} 
+                                                onChange={() => toggleCollection(col.id)}
+                                                className="mt-0.5 w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]"
+                                            />
+                                            <span className="leading-tight">{col.name}</span>
+                                        </label>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-[12px] text-[#8c8f94] italic text-center py-2">
+                                {searchTerm ? "No match found." : "No collections available."}
+                            </p>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

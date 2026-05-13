@@ -48,33 +48,33 @@ const CreatableSelect = ({
     return (
         <div className="relative" ref={wrapperRef}>
             <div 
-                className={`w-full border px-3 py-2 rounded-sm text-sm flex justify-between items-center cursor-pointer bg-white transition-colors ${isOpen ? 'border-[#2271b1] ring-1 ring-[#2271b1]' : 'border-gray-400 hover:border-gray-500'}`}
+                className={`w-full border px-2 py-1 rounded-[3px] text-[13px] flex justify-between items-center cursor-pointer bg-white transition-colors ${isOpen ? 'border-[#2271b1] ring-1 ring-[#2271b1]' : 'border-[#8c8f94] hover:border-[#50575e]'}`}
                 onClick={() => setIsOpen(!isOpen)}
             >
-                <span className={value ? "text-[#3c434a]" : "text-gray-400"}>
+                <span className={value ? "text-[#3c434a]" : "text-[#8c8f94]"}>
                     {value || placeholder}
                 </span>
-                <ChevronDown size={14} className={`text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`}/>
+                <ChevronDown size={14} className={`text-[#8c8f94] transition-transform ${isOpen ? "rotate-180" : ""}`}/>
             </div>
 
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-sm shadow-lg max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
-                    <div className="p-2 border-b border-gray-100">
+                <div className="absolute z-50 w-full mt-1 bg-white border border-[#c3c4c7] rounded-[3px] shadow-sm max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+                    <div className="p-2 border-b border-[#f0f0f1]">
                         <input 
                             autoFocus
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Type to search or create..."
-                            className="w-full text-xs px-2 py-1.5 bg-gray-50 border border-gray-200 rounded outline-none focus:border-[#2271b1]"
+                            className="w-full text-[12px] px-2 py-1 bg-white border border-[#8c8f94] rounded-[3px] outline-none focus:border-[#2271b1]"
                         />
                     </div>
 
-                    <div className="overflow-y-auto flex-1">
+                    <div className="overflow-y-auto flex-1 custom-scrollbar">
                         {filteredOptions.map((opt) => (
                             <div 
                                 key={opt}
                                 onClick={() => handleSelect(opt)}
-                                className={`px-3 py-2 text-xs cursor-pointer hover:bg-blue-50 flex justify-between items-center ${value === opt ? 'bg-blue-50 text-[#2271b1] font-medium' : 'text-gray-700'}`}
+                                className={`px-3 py-1.5 text-[12px] cursor-pointer hover:bg-[#f0f6fc] hover:text-[#2271b1] flex justify-between items-center ${value === opt ? 'bg-[#f0f6fc] text-[#2271b1] font-medium' : 'text-[#3c434a]'}`}
                             >
                                 {opt}
                                 {value === opt && <Check size={12}/>}
@@ -84,14 +84,14 @@ const CreatableSelect = ({
                         {search && !filteredOptions.some(o => o.toLowerCase() === search.toLowerCase()) && (
                             <div 
                                 onClick={() => handleSelect(search)}
-                                className="px-3 py-2 text-xs cursor-pointer hover:bg-green-50 text-green-700 border-t border-gray-100 flex items-center gap-2 font-medium"
+                                className="px-3 py-2 text-[12px] cursor-pointer hover:bg-[#f0fdf4] text-[#166534] border-t border-[#f0f0f1] flex items-center gap-2 font-medium"
                             >
                                 <Plus size={12}/> Create &quot;{search}&quot;
                             </div>
                         )}
 
                         {filteredOptions.length === 0 && !search && (
-                            <div className="px-3 py-4 text-center text-xs text-gray-400">
+                            <div className="px-3 py-4 text-center text-[12px] text-[#8c8f94] italic">
                                 No options found.
                             </div>
                         )}
@@ -150,10 +150,11 @@ export default function General() {
     };
 
     return (
-        <div className="space-y-5 max-w-lg">
+        <div className="space-y-4 max-w-2xl">
             
-            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800 flex gap-2 items-start mb-4">
-                <Info size={16} className="shrink-0 mt-0.5" />
+            {/* Tax Settings Notice */}
+            <div className="bg-[#fff8e5] border-l-4 border-[#f56e28] px-3 py-2 text-[12px] text-[#3c434a] flex gap-2 items-start mb-4">
+                <Info size={14} className="shrink-0 mt-0.5 text-[#f56e28]" />
                 <div>
                     <strong>Tax Settings:</strong> Prices entered here are considered 
                     <span className="font-bold uppercase mx-1">
@@ -163,31 +164,32 @@ export default function General() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Regular price ({currency})</label>
-                <div className="col-span-2">
+            {/* Regular Price */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#f0f0f1] pb-4">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Regular price ({currency})</label>
+                <div className="md:col-span-2">
                     <input 
                         type="number" 
                         step="0.01"
                         {...register("price")}
-                        className="w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                        className="w-full md:w-1/2 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow"
                         placeholder="0.00"
                     />
-                    {errors.price && <p className="text-red-500 text-[10px] mt-1">{errors.price.message}</p>}
+                    {errors.price && <p className="text-[#d63638] text-[11px] mt-1">{errors.price.message}</p>}
                 </div>
             </div>
 
-            {/* Sale Price (Hidden for Gift Cards) */}
+            {/* Sale Price */}
             {productType !== 'GIFT_CARD' && (
-                <div>
-                    <div className="grid grid-cols-3 gap-4 items-center">
-                        <label className="text-right font-medium text-xs">Sale price ({currency})</label>
-                        <div className="col-span-2 flex items-center gap-2">
+                <div className="border-b border-[#f0f0f1] pb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                        <label className="md:text-left text-[13px] text-[#3c434a]">Sale price ({currency})</label>
+                        <div className="md:col-span-3 flex items-center gap-3">
                             <input 
                                 type="number" 
                                 step="0.01"
                                 {...register("salePrice")}
-                                className="w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                                className="w-full md:w-1/3 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow"
                                 placeholder="0.00"
                             />
                             <button 
@@ -199,30 +201,32 @@ export default function General() {
                                         setValue("saleEnd", null, { shouldDirty: true });
                                     }
                                 }}
-                                className="text-xs text-[#2271b1] hover:underline whitespace-nowrap"
+                                className="text-[12px] text-[#2271b1] hover:text-[#0a4b78] hover:underline"
                             >
-                                {showSchedule ? "Cancel" : "Schedule"}
+                                {showSchedule ? "Cancel schedule" : "Schedule"}
                             </button>
                         </div>
                     </div>
 
                     {showSchedule && (
-                        <div className="mt-2 grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-1">
-                            <div className="col-start-2 col-span-2 flex gap-2">
-                                <div className="w-1/2">
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-1">
+                            <div className="md:col-start-2 md:col-span-3 flex flex-col sm:flex-row gap-3">
+                                <div className="w-full sm:w-1/3">
+                                    <label className="block text-[11px] text-[#8c8f94] mb-1">From</label>
                                     <input 
                                         type="date" 
                                         {...register("saleStart")}
-                                        className="w-full border border-gray-400 px-2 py-1 rounded-sm text-xs outline-none focus:border-[#2271b1]"
+                                        className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[12px] text-[#2c3338] focus:border-[#2271b1] outline-none"
                                     />
                                 </div>
-                                <div className="w-1/2">
+                                <div className="w-full sm:w-1/3">
+                                    <label className="block text-[11px] text-[#8c8f94] mb-1">To</label>
                                     <input 
                                         type="date" 
                                         {...register("saleEnd")}
-                                        className="w-full border border-gray-400 px-2 py-1 rounded-sm text-xs outline-none focus:border-[#2271b1]"
+                                        className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[12px] text-[#2c3338] focus:border-[#2271b1] outline-none"
                                     />
-                                    {errors.saleEnd && <p className="text-red-500 text-[10px] mt-1">{errors.saleEnd.message}</p>}
+                                    {errors.saleEnd && <p className="text-[#d63638] text-[10px] mt-1">{errors.saleEnd.message}</p>}
                                 </div>
                             </div>
                         </div>
@@ -230,77 +234,112 @@ export default function General() {
                 </div>
             )}
 
+            {/* Gift Card Config */}
             {productType === 'GIFT_CARD' && (
-                 <div className="bg-purple-50 border border-purple-200 rounded p-4 animate-in fade-in">
-                     <h3 className="text-xs font-bold text-purple-900 mb-2">Gift Card Configuration</h3>
+                 <div className="bg-[#f0f6fc] border border-[#c5d9ed] rounded-[3px] p-4 mb-4">
+                     <h3 className="text-[13px] font-semibold text-[#1d2327] mb-2">Gift Card Configuration</h3>
                      
-                     <label className="text-xs font-medium text-purple-800">Pre-defined Amounts</label>
-                     <div className="flex gap-2 mb-2">
+                     <label className="text-[12px] text-[#3c434a]">Pre-defined Amounts</label>
+                     <div className="flex gap-2 mb-3 mt-1">
                          <input 
                             type="number" 
                             value={amountInput} 
                             onChange={e => setAmountInput(e.target.value)}
-                            className="border border-purple-300 rounded px-2 py-1 text-sm outline-none focus:border-purple-500 w-24"
+                            className="border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[13px] outline-none focus:border-[#2271b1] w-24"
                             placeholder="Amount"
                             onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addGiftAmount())}
                          />
-                         <button type="button" onClick={addGiftAmount} className="bg-purple-600 text-white px-3 text-xs rounded font-bold hover:bg-purple-700">Add</button>
+                         <button type="button" onClick={addGiftAmount} className="bg-[#f6f7f7] border border-[#c3c4c7] text-[#2271b1] px-3 text-[13px] rounded-[3px] hover:bg-[#f0f0f1]">Add</button>
                      </div>
 
                      <div className="flex flex-wrap gap-2">
                          {giftCardAmounts.map(amt => (
-                             <span key={amt} className="bg-white border border-purple-300 text-purple-700 px-2 py-1 rounded text-xs flex items-center gap-1 font-mono">
-                                 {amt}
-                                 <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => removeGiftAmount(amt)}/>
+                             <span key={amt} className="bg-white border border-[#c3c4c7] text-[#3c434a] px-2 py-1 rounded-[3px] text-[12px] flex items-center gap-1 font-mono shadow-sm">
+                                 {currency}{amt}
+                                 <X size={12} className="cursor-pointer text-[#8c8f94] hover:text-[#d63638]" onClick={() => removeGiftAmount(amt)}/>
                              </span>
                          ))}
                      </div>
                  </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs text-gray-500">Cost per item ({currency})</label>
-                <div className="col-span-2">
+            {/* Cost Per Item */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#f0f0f1] pb-4">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Cost per item ({currency})</label>
+                <div className="md:col-span-2">
                     <input 
                         type="number" 
                         step="0.01"
                         {...register("costPerItem")}
-                        className="w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
+                        className="w-full md:w-1/2 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow"
                         placeholder="0.00"
                     />
-                     <p className="text-[10px] text-gray-500 mt-1">Customers won&apos;t see this</p>
+                     <p className="text-[11px] text-[#646970] mt-1 italic">Customers won&apos;t see this</p>
                 </div>
             </div>
 
-            <hr className="border-gray-200 my-4"/>
-
-            <h3 className="text-xs font-bold text-gray-700">Product Video</h3>
-            <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Video URL</label>
-                <input 
-                    type="text" 
-                    {...register("videoUrl")}
-                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
-                    placeholder="e.g. YouTube or Vimeo link"
-                />
-            </div>
-            <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Thumbnail URL</label>
-                <input 
-                    type="text" 
-                    {...register("videoThumbnail")}
-                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
-                    placeholder="Image URL for video cover"
-                />
+            {/* Tax Settings */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center pt-2">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Tax status</label>
+                <div className="md:col-span-2">
+                    <select 
+                        {...register("taxStatus")}
+                        className="w-full md:w-1/2 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
+                    >
+                        <option value="TAXABLE">Taxable</option>
+                        <option value="SHIPPING_ONLY">Shipping only</option>
+                        <option value="NONE">None</option>
+                    </select>
+                </div>
             </div>
 
-            <hr className="border-gray-200 my-4"/>
+            {data.taxStatus === 'TAXABLE' && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center pb-4 border-b border-[#f0f0f1]">
+                    <label className="md:text-left text-[13px] text-[#3c434a]">Tax class</label>
+                    <div className="md:col-span-2">
+                        <select 
+                            {...register("taxRateId")}
+                            className="w-full md:w-1/2 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
+                        >
+                            <option value="">Standard</option>
+                            {taxClasses.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            )}
 
-            <h3 className="text-xs font-bold text-gray-700">Demographics</h3>
-            
-            <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Gender</label>
-                <div className="col-span-2">
+            {/* Video Settings */}
+            <h3 className="text-[14px] font-semibold text-[#1d2327] mt-6 mb-3">Product Video</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Video URL</label>
+                <div className="md:col-span-3">
+                    <input 
+                        type="text" 
+                        {...register("videoUrl")}
+                        className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
+                        placeholder="e.g. YouTube or Vimeo link"
+                    />
+                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#f0f0f1] pb-4">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Thumbnail URL</label>
+                <div className="md:col-span-3">
+                    <input 
+                        type="text" 
+                        {...register("videoThumbnail")}
+                        className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
+                        placeholder="Image URL for video cover"
+                    />
+                </div>
+            </div>
+
+            {/* Demographics */}
+            <h3 className="text-[14px] font-semibold text-[#1d2327] mt-6 mb-3">Demographics</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Gender</label>
+                <div className="md:col-span-2">
                     <CreatableSelect 
                         options={genderOptions}
                         value={data.gender || ""}
@@ -309,10 +348,9 @@ export default function General() {
                     />
                 </div>
             </div>
-
-            <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Age Group</label>
-                <div className="col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center pb-4 border-b border-[#f0f0f1]">
+                <label className="md:text-left text-[13px] text-[#3c434a]">Age Group</label>
+                <div className="md:col-span-2">
                     <CreatableSelect 
                         options={ageGroupOptions}
                         value={data.ageGroup || ""}
@@ -322,95 +360,80 @@ export default function General() {
                 </div>
             </div>
 
-            <hr className="border-gray-200 my-4"/>
-
-            <div className="grid grid-cols-3 gap-4 items-center">
-                <label className="text-right font-medium text-xs">Tax status</label>
-                <select 
-                    {...register("taxStatus")}
-                    className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
-                >
-                    <option value="TAXABLE">Taxable</option>
-                    <option value="SHIPPING_ONLY">Shipping only</option>
-                    <option value="NONE">None</option>
-                </select>
-            </div>
-
-            {data.taxStatus === 'TAXABLE' && (
-                <div className="grid grid-cols-3 gap-4 items-center">
-                    <label className="text-right font-medium text-xs">Tax class</label>
-                    <select 
-                        {...register("taxRateId")}
-                        className="col-span-2 w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm"
-                    >
-                        <option value="">Standard</option>
-                        {taxClasses.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                    </select>
-                </div>
-            )}
-
+            {/* Downloadable Settings */}
             {data.isDownloadable && (
-                <div className="mt-6 border-t border-gray-200 pt-4 animate-in fade-in">
-                    <h3 className="text-xs font-bold text-gray-700 mb-3 ml-1">Download Settings</h3>
+                <div className="mt-6 border-t border-[#f0f0f1] pt-4 animate-in fade-in">
+                    <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">Downloadable files</h3>
                     
-                    <div className="mb-4 bg-gray-50 border border-gray-300 p-3 rounded-sm">
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="text-xs font-bold text-gray-600">Files</label>
-                            <button type="button" onClick={addFile} className="text-[10px] bg-[#2271b1] text-white px-2 py-0.5 rounded hover:bg-[#1a5c91]">Add File</button>
-                        </div>
-                        
-                        {data.digitalFiles?.map((file, i) => (
-                            <div key={i} className="mb-2 bg-white border border-gray-200 p-2 rounded flex flex-col gap-2 shadow-sm">
-                                <div className="flex gap-2 items-start">
-                                    <div className="flex-1 space-y-2">
-                                        <input 
-                                            placeholder="File Name" 
-                                            {...register(`digitalFiles.${i}.name`)}
-                                            className="w-full border border-gray-300 px-2 py-1 text-xs rounded focus:border-[#2271b1] outline-none" 
-                                        />
-                                        <input 
-                                            placeholder="File URL" 
-                                            {...register(`digitalFiles.${i}.url`)}
-                                            className="w-full border border-gray-300 px-2 py-1 text-xs rounded focus:border-[#2271b1] outline-none" 
-                                        />
-                                        {errors.digitalFiles?.[i]?.url && (
-                                            <p className="text-red-500 text-[10px]">{errors.digitalFiles[i]?.url?.message}</p>
-                                        )}
-                                    </div>
-                                    <button type="button" onClick={() => removeFile(i)} className="text-red-400 hover:text-red-600 p-1"><X size={14}/></button>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <label className="text-[10px] flex items-center gap-1 cursor-pointer select-none text-gray-600">
-                                        <input type="checkbox" {...register(`digitalFiles.${i}.isSecure`)} />
-                                        Secure File (Require Login/Presigned URL)
-                                    </label>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="mb-4">
+                        <table className="w-full text-left border-collapse border border-[#c3c4c7] mb-2">
+                            <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[12px] text-[#3c434a]">
+                                <tr>
+                                    <th className="p-2 border-r border-[#e2e4e7] w-1/3">Name</th>
+                                    <th className="p-2 border-r border-[#e2e4e7]">File URL</th>
+                                    <th className="p-2 w-10 text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.digitalFiles?.length === 0 ? (
+                                    <tr><td colSpan={3} className="p-4 text-center text-[#8c8f94] italic text-[12px]">No files added yet.</td></tr>
+                                ) : (
+                                    data.digitalFiles?.map((file, i) => (
+                                        <tr key={i} className="border-b border-[#f0f0f1] bg-white group">
+                                            <td className="p-2 border-r border-[#f0f0f1]">
+                                                <input 
+                                                    placeholder="File Name" 
+                                                    {...register(`digitalFiles.${i}.name`)}
+                                                    className="w-full border border-[#8c8f94] px-2 py-1 text-[12px] rounded-[3px] focus:border-[#2271b1] outline-none" 
+                                                />
+                                            </td>
+                                            <td className="p-2 border-r border-[#f0f0f1]">
+                                                <input 
+                                                    placeholder="File URL" 
+                                                    {...register(`digitalFiles.${i}.url`)}
+                                                    className="w-full border border-[#8c8f94] px-2 py-1 text-[12px] rounded-[3px] focus:border-[#2271b1] outline-none" 
+                                                />
+                                                {errors.digitalFiles?.[i]?.url && (
+                                                    <p className="text-[#d63638] text-[10px] mt-0.5">{errors.digitalFiles[i]?.url?.message}</p>
+                                                )}
+                                                <label className="text-[10px] flex items-center gap-1 mt-1 cursor-pointer select-none text-[#50575e]">
+                                                    <input type="checkbox" {...register(`digitalFiles.${i}.isSecure`)} className="rounded-[2px] border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]" />
+                                                    Secure File (Require Login)
+                                                </label>
+                                            </td>
+                                            <td className="p-2 text-center">
+                                                <button type="button" onClick={() => removeFile(i)} className="text-[#d63638] hover:text-[#b32d2e]"><X size={14}/></button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                        <button type="button" onClick={addFile} className="px-3 py-1 bg-[#f6f7f7] border border-[#c3c4c7] text-[#2271b1] text-[12px] rounded-[3px] hover:bg-[#f0f0f1] transition-colors">Add File</button>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 items-center mb-3">
-                        <label className="text-right font-medium text-xs">Download limit</label>
-                        <div className="col-span-2">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center mb-4">
+                        <label className="md:text-left text-[13px] text-[#3c434a]">Download limit</label>
+                        <div className="md:col-span-2">
                             <input 
                                 type="number" 
                                 {...register("downloadLimit")}
-                                className="w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                                className="w-full md:w-1/3 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] focus:border-[#2271b1] outline-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)]" 
                                 placeholder="Unlimited" 
                             />
+                            <span className="text-[#8c8f94] text-[11px] ml-2 italic">Leave blank for unlimited re-downloads.</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 items-center">
-                        <label className="text-right font-medium text-xs">Download expiry</label>
-                        <div className="col-span-2">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                        <label className="md:text-left text-[13px] text-[#3c434a]">Download expiry</label>
+                        <div className="md:col-span-2">
                             <input 
                                 type="number" 
                                 {...register("downloadExpiry")}
-                                className="w-full border border-gray-400 px-2 py-1.5 rounded-sm focus:border-[#2271b1] outline-none text-sm" 
+                                className="w-full md:w-1/3 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] focus:border-[#2271b1] outline-none shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)]" 
                                 placeholder="Never" 
                             />
+                            <span className="text-[#8c8f94] text-[11px] ml-2 italic">Enter number of days before a download link expires.</span>
                         </div>
                     </div>
                 </div>

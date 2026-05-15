@@ -32,7 +32,7 @@ export default async function CouponsPage(props: CouponsPageProps) {
   const typedCounts: CouponCountsType = meta?.counts || { all: 0, published: 0, affiliate: 0, mine: 0, trash: 0 };
 
   return (
-    <div className="p-4 md:p-5 max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
+    <div className="max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
       
       <CouponsHeader 
         counts={typedCounts} 

@@ -55,7 +55,7 @@ export default async function LogsPage(props: LogsPageProps) {
 
   return (
     // WordPress Classic Admin Background Color (#f0f0f1)
-    <div className="p-4 md:p-5 max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
+    <div className="max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
       
       {/* Header contains Title, Search, and Advanced Filters */}
       <LogsHeader 

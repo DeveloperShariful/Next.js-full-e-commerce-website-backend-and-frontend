@@ -6,21 +6,16 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-
-// --- SERVER ACTIONS ---
 import { createManualOrder } from "@/app/actions/admin/order/create_order/create-manual-order";
-
 // --- WOOCOMMERCE STYLE META BOX COMPONENTS ---
 import { CreateDetailsMeta } from "./_components/create-details-meta";
 import { CreateItemsMeta } from "./_components/create-items-meta";
 import { CustomFieldsMeta } from "../[orderId]/_components/custom-fields-meta"; 
 import { DownloadablePermissionsMeta } from "../[orderId]/_components/downloadable-permissions-meta"; 
-
 import { CreateSidebarActions } from "./_components/create-sidebar-actions";
 import { CreateTransdirectSidebar } from "./_components/create-transdirect-sidebar";
 import { CreateSidebarNotes } from "./_components/create-sidebar-notes";
 import { CreateAttributionSidebar } from "./_components/create-attribution-sidebar";
-
 // --- TYPES ---
 import { OrderDataType } from "./types";
 
@@ -32,6 +27,7 @@ export default function CreateOrderPage() {
   // ==========================================
   // CENTRALIZED ORDER STATE
   // ==========================================
+  
   const [orderData, setOrderData] = useState<OrderDataType>({
     createdAt: new Date(),
     status: "PENDING",
@@ -44,30 +40,25 @@ export default function CreateOrderPage() {
     
     items: [],
     shippingCost: 0,
-    shippingMethod: "",
-    
+    shippingMethod: "",   
     selectedCourierCode: "",
-    transdirectBookingId: "",
-    
+    transdirectBookingId: "",   
     discountCode: "",
     discountAmount: 0,
     taxRate: 0,
-    taxName: "Tax",
-    
+    taxName: "Tax",   
     customerNote: "",
     adminNote: "",
     customFields: [],
   });
+
   // Totals Calculation (Real-time WooCommerce Recalculate)
   const totals = useMemo(() => {
     // subtotal calculation
     const subtotal = orderData.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    
-    // safe math to avoid NaN
     const safeDiscount = Number(orderData.discountAmount) || 0;
     const safeShipping = Number(orderData.shippingCost) || 0;
     const safeTaxRate = Number(orderData.taxRate) || 0;
-
     const taxableAmount = Math.max(0, subtotal - safeDiscount + safeShipping);
     const taxTotal = taxableAmount * (safeTaxRate / 100);
     const finalTotal = taxableAmount + taxTotal;
@@ -78,6 +69,7 @@ export default function CreateOrderPage() {
   // ==========================================
   // SUBMIT HANDLER (SAVE TO DB)
   // ==========================================
+
   const handleCreateOrder = async (isDraft: boolean) => {
     // Basic validations
     if (orderData.items.length === 0) {
@@ -101,22 +93,16 @@ export default function CreateOrderPage() {
         items: orderData.items,
         shippingCost: Number(orderData.shippingCost),
         shippingMethod: orderData.shippingMethod || "Standard Shipping",
-        selectedCourierCode: orderData.selectedCourierCode || null,
-        
+        selectedCourierCode: orderData.selectedCourierCode || null,        
         discountCode: orderData.discountCode || null,
-        discountAmount: Number(orderData.discountAmount),
-        
+        discountAmount: Number(orderData.discountAmount),        
         taxTotal: totals.taxTotal,
         total: totals.finalTotal,
-        
-        // Priority to shipping address, fallback to billing
-        address: orderData.shipping.address1 ? orderData.shipping : orderData.billing,
-        
+        address: orderData.shipping.address1 ? orderData.shipping : orderData.billing,       
         adminNote: orderData.adminNote || null,
         customerNote: orderData.customerNote || null,
         paymentMethod: "Manual",
-        currency: currency, 
-        
+        currency: currency,        
         status: isDraft ? "DRAFT" : orderData.status,
         paymentStatus: isDraft ? "UNPAID" : (totals.finalTotal === 0 ? "PAID" : "UNPAID"),
         isDraft
@@ -157,7 +143,6 @@ export default function CreateOrderPage() {
         <div className="w-full lg:w-[70%] xl:w-[75%] space-y-5">
           
           <CreateDetailsMeta orderData={orderData} setOrderData={setOrderData} />
-
           <CreateItemsMeta orderData={orderData} setOrderData={setOrderData} totals={totals} />
           
           {/* Note: Dummy order object is passed to reuse the Edit Page's UI Box safely */}
@@ -177,9 +162,7 @@ export default function CreateOrderPage() {
             />
             
             <CreateTransdirectSidebar orderData={orderData} setOrderData={setOrderData} />
-            
-            <CreateSidebarNotes orderData={orderData} setOrderData={setOrderData} />
-            
+            <CreateSidebarNotes orderData={orderData} setOrderData={setOrderData} />  
             <CreateAttributionSidebar />
         </div>
       </div>

@@ -22,7 +22,7 @@ import { updateReturnRequest } from "@/app/actions/admin/order/update-return";
 interface ReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  returnReq: any; // The return object
+  returnReq: any;  
 }
 
 export const ReturnModal = ({ isOpen, onClose, returnReq }: ReturnModalProps) => {

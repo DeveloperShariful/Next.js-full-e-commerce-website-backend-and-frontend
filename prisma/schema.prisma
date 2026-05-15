@@ -1059,6 +1059,8 @@ model Order {
   netAmount              Decimal            @default(0) @db.Decimal(12, 2)
   refundedAmount         Decimal            @default(0) @db.Decimal(12, 2)
   netTotal               Decimal            @default(0) @db.Decimal(12, 2)
+
+  metadata               Json?
   
   paymentGateway         String?
   paymentMethod          String?

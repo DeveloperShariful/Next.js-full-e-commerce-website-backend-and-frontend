@@ -1,17 +1,11 @@
 //app/admin/orders/_components/pagination-controls.tsx
 
+// File Location: app/admin/orders/_components/pagination-controls.tsx
+
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PaginationControlsProps {
   total: number;
@@ -27,81 +21,96 @@ export function PaginationControls({
   perPage,
 }: PaginationControlsProps) {
   const router = useRouter();
-  const pathname = usePathname(); // ✅ অটোমেটিক বর্তমান পেজের পাথ ধরবে (যেমন: /admin/products)
+  const pathname = usePathname(); 
   const searchParams = useSearchParams();
 
-  // --- URL Update Function ---
   const updateUrl = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set(key, value);
     
-    // Limit পাল্টালে Page 1 এ রিসেট করা
+    // Page reset on limit change
     if (key === "limit") params.set("page", "1");
     
-    // ✅ ডাইনামিক রাউটিং (Hardcoded Path সরানো হয়েছে)
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const start = (currentPage - 1) * perPage + 1;
-  const end = Math.min(currentPage * perPage, total);
+  // WooCommerce Action Button Style Class
+  const btnClass = "min-w-[30px] h-[30px] px-2 flex items-center justify-center border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-center py-4 border-t border-slate-200 mt-4 gap-4 text-sm text-slate-600 select-none">
+    <div className="flex flex-col sm:flex-row justify-between items-center py-3 mt-2 text-[13px] text-[#3c434a] font-sans">
       
-      {/* Left: Showing Info */}
-      <div className="font-medium">
-        Showing {total === 0 ? 0 : start} to {end} of {total} items
+      {/* Left: WooCommerce classic limits dropdown */}
+      <div className="flex items-center gap-2 mb-3 sm:mb-0">
+          <select 
+            value={String(perPage)}
+            onChange={(e) => updateUrl("limit", e.target.value)}
+            className="border border-[#8c8f94] bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:border-[#2271b1] focus:ring-1 outline-none shadow-sm"
+          >
+              <option value="20">20 per page</option>
+              <option value="50">50 per page</option>
+              <option value="100">100 per page</option>
+              <option value="200">200 per page</option>
+          </select>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* Right: The Classic WP Navigation ( 926 items << < 1 of 47 > >> ) */}
+      <div className="flex items-center gap-2">
         
-        {/* Rows Per Page Dropdown */}
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-slate-500">Rows per page:</span>
-          <Select
-            value={String(perPage)}
-            onValueChange={(val) => updateUrl("limit", val)}
-          >
-            <SelectTrigger className="h-8 w-[70px] bg-white border-slate-300">
-              <SelectValue placeholder={String(perPage)} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="20">20</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-              <SelectItem value="100">100</SelectItem>
-              <SelectItem value="200">200</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <span className="text-[#646970] mr-2">{total} items</span>
 
-        {/* Navigation Buttons */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 lg:w-auto lg:px-3 bg-white border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-            disabled={currentPage <= 1}
-            onClick={() => updateUrl("page", String(currentPage - 1))}
-          >
-            <ChevronLeft className="h-4 w-4 lg:mr-1" />
-            <span className="hidden lg:inline">Previous</span>
-          </Button>
+        {/* First Page (<<) */}
+        <button
+          className={btnClass}
+          disabled={currentPage <= 1}
+          onClick={() => updateUrl("page", "1")}
+          title="First page"
+        >
+          «
+        </button>
 
-          <div className="h-8 px-3 flex items-center justify-center border border-blue-500 bg-blue-50 text-blue-600 rounded-md font-bold min-w-[32px]">
-            {currentPage}
-          </div>
+        {/* Previous Page (<) */}
+        <button
+          className={btnClass}
+          disabled={currentPage <= 1}
+          onClick={() => updateUrl("page", String(currentPage - 1))}
+          title="Previous page"
+        >
+          ‹
+        </button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 lg:w-auto lg:px-3 bg-white border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-            disabled={currentPage >= totalPages}
-            onClick={() => updateUrl("page", String(currentPage + 1))}
-          >
-            <span className="hidden lg:inline">Next</span>
-            <ChevronRight className="h-4 w-4 lg:ml-1" />
-          </Button>
-        </div>
+        {/* Input Box: [ 1 ] of 47 */}
+        <span className="flex items-center gap-1 mx-1 text-[#646970]">
+          <input 
+            type="text" 
+            value={currentPage} 
+            readOnly
+            className="w-[35px] h-[30px] text-center border border-[#8c8f94] bg-white text-[#32373c] shadow-inner outline-none"
+          />
+          <span className="mx-1">of</span>
+          <span className="font-medium text-[#3c434a]">{totalPages}</span>
+        </span>
+
+        {/* Next Page (>) */}
+        <button
+          className={btnClass}
+          disabled={currentPage >= totalPages}
+          onClick={() => updateUrl("page", String(currentPage + 1))}
+          title="Next page"
+        >
+          ›
+        </button>
+
+        {/* Last Page (>>) */}
+        <button
+          className={btnClass}
+          disabled={currentPage >= totalPages}
+          onClick={() => updateUrl("page", String(totalPages))}
+          title="Last page"
+        >
+          »
+        </button>
+
       </div>
     </div>
   );

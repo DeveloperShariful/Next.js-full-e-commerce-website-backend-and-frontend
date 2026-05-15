@@ -3,85 +3,109 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Truck, RefreshCw, CheckCircle, AlertTriangle, FileText, Printer } from "lucide-react";
+import { ChevronUp, ChevronDown, RefreshCw, FileText, Printer, CheckCircle, AlertTriangle } from "lucide-react";
 import { syncOrderToTransdirect } from "@/app/actions/admin/order/transdirect-sync-order";
 import { toast } from "sonner"; 
+import { useRouter } from "next/navigation";
 
-export const TransdirectBooking = ({ order }: { order: any }) => {
-  const [loading, setLoading] = useState(false);
+// ✅ STRICT TYPES IMPORT
+import { OrderDetailsType } from "../types";
+
+interface TransdirectSidebarProps {
+  order: OrderDetailsType;
+}
+
+export const TransdirectSidebar = ({ order }: TransdirectSidebarProps) => {
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const handleSync = async () => {
     setLoading(true);
     const res = await syncOrderToTransdirect(order.id);
     if (res.success) {
       toast.success(res.message);
-      // Optional: window.location.reload() to show new buttons
-    } else {
-      toast.error(res.error);
-    }
+      router.refresh();
+    } else toast.error(res.error);
     setLoading(false);
   };
 
   const isSynced = !!order.transdirectBookingId;
 
   return (
-    <Card className="border-blue-200 shadow-sm border-t-4 border-t-[#2271b1]">
-      <CardHeader className="pb-3 border-b border-blue-50 bg-blue-50/30">
-        <CardTitle className="text-xs font-bold uppercase text-[#2271b1] flex items-center gap-2 tracking-wider">
-          <Truck size={14} /> Transdirect Integration
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-5 space-y-3">
-        
-        {/* Status Indicator */}
-        {isSynced ? (
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-[10px] text-green-700 font-bold bg-green-50 p-2 rounded justify-center border border-green-200">
-                    <CheckCircle size={12}/> Synced: #{order.transdirectBookingId}
+    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
+      
+      <div 
+        className="px-3 py-2 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none hover:bg-[#f6f7f7] transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Transdirect Sync</h2>
+        <button type="button" className="text-[#646970]">
+            {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="p-3 text-[13px] text-[#3c434a]">
+            
+            <div className="mb-3">
+                <span className="font-semibold text-[#1d2327]">Status: </span>
+                {isSynced ? (
+                    <span className="text-[#5b841b] font-medium flex items-center gap-1 mt-1">
+                        <CheckCircle size={12}/> Order has been booked.
+                    </span>
+                ) : (
+                    <span className="text-[#d63638] font-medium flex items-center gap-1 mt-1">
+                        <AlertTriangle size={12}/> Order is pending booking.
+                    </span>
+                )}
+            </div>
+
+            {isSynced && order.transdirectBookingId && (
+                <div className="mb-3 p-2 bg-[#f6f7f7] border border-[#e2e4e7] rounded-[3px]">
+                    <span className="font-semibold text-[#1d2327] block mb-1">Transdirect ID:</span>
+                    <span className="font-mono text-[#2271b1]">{order.transdirectBookingId}</span>
                 </div>
-                
-                {/* ✅ NEW: Download Buttons */}
-                <div className="flex gap-2">
+            )}
+
+            {/* Labels & Invoices (Schema Based) */}
+            {isSynced && (order.transdirectLabelUrl || order.transdirectInvoiceUrl) && (
+                <div className="flex gap-2 mb-3">
                     {order.transdirectLabelUrl && (
-                        <Button variant="outline" className="flex-1 text-xs h-8 gap-2 border-blue-200 text-blue-700 hover:bg-blue-50" asChild>
-                            <a href={order.transdirectLabelUrl} target="_blank">
-                                <Printer size={12}/> Label
-                            </a>
-                        </Button>
+                        <a 
+                            href={order.transdirectLabelUrl} 
+                            target="_blank"
+                            className="border border-[#8c8f94] bg-white text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[12px] rounded-[3px] font-medium transition-colors shadow-sm flex-1 flex justify-center items-center gap-1"
+                        >
+                            <Printer size={12}/> Print Label
+                        </a>
                     )}
                     {order.transdirectInvoiceUrl && (
-                        <Button variant="outline" className="flex-1 text-xs h-8 gap-2 border-slate-200 hover:bg-slate-50" asChild>
-                            <a href={order.transdirectInvoiceUrl} target="_blank">
-                                <FileText size={12}/> Invoice
-                            </a>
-                        </Button>
+                        <a 
+                            href={order.transdirectInvoiceUrl} 
+                            target="_blank"
+                            className="border border-[#8c8f94] bg-white text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[12px] rounded-[3px] font-medium transition-colors shadow-sm flex-1 flex justify-center items-center gap-1"
+                        >
+                            <FileText size={12}/> Invoice
+                        </a>
                     )}
                 </div>
-            </div>
-        ) : (
-             <div className="flex items-center gap-1.5 text-[10px] text-amber-700 font-medium bg-amber-50 p-2 rounded justify-center border border-amber-200">
-                <AlertTriangle size={12}/> Not booked yet
-            </div>
-        )}
+            )}
 
-        <p className="text-xs text-slate-600">
-          Sync this order to Transdirect to get quotes and book couriers.
-        </p>
-        
-        <Button 
-          onClick={handleSync} 
-          disabled={loading}
-          className={`w-full text-white gap-2 transition-all ${
-            loading ? "bg-slate-400" : "bg-[#2271b1] hover:bg-[#1a5c92]"
-          }`}
-        >
-          {loading ? <RefreshCw size={14} className="animate-spin"/> : <Truck size={14}/>}
-          {loading ? "Syncing..." : (isSynced ? "Re-Sync Order" : "Book with Transdirect")}
-        </Button>
-
-      </CardContent>
-    </Card>
+            <button 
+                onClick={handleSync} 
+                disabled={loading}
+                className="w-full bg-[#2271b1] text-white hover:bg-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm mb-2"
+            >
+                <RefreshCw size={14} className={loading ? "animate-spin" : ""}/>
+                {loading ? "Processing..." : "Recalculate & Send"}
+            </button>
+            
+            <p className="text-[11px] text-[#646970] m-0 leading-snug">
+                Clicking this will re-calculate shipping based on current order details, generate a new Booking ID, and send it to Transdirect.
+            </p>
+        </div>
+      )}
+    </div>
   );
 };

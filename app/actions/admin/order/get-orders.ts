@@ -59,6 +59,12 @@ export async function getOrders(
         where: whereCondition,
         include: {
           user: { select: { name: true, email: true } },
+          // 🔥 NEW: Added affiliate relation to fetch dynamic Origin
+          affiliate: {
+            include: {
+              user: { select: { name: true } }
+            }
+          },
           items: { select: { quantity: true } }, 
           _count: { select: { items: true } }
         },
@@ -91,12 +97,15 @@ export async function getOrders(
         refundedAmount: Number(order.refundedAmount || 0),
     }));
 
+    // 🔥 NEW: Added missing status counts for WooCommerce header
     const counts = {
       all: statusCounts.reduce((acc, curr) => acc + curr._count.status, 0),
       pending: statusCounts.find(s => s.status === 'PENDING')?._count.status || 0,
       processing: statusCounts.find(s => s.status === 'PROCESSING')?._count.status || 0,
       completed: statusCounts.find(s => s.status === 'DELIVERED')?._count.status || 0, 
       cancelled: statusCounts.find(s => s.status === 'CANCELLED')?._count.status || 0,
+      refunded: statusCounts.find(s => s.status === 'REFUNDED')?._count.status || 0,
+      failed: statusCounts.find(s => s.status === 'FAILED')?._count.status || 0,
       trash: trashCount
     };
 
@@ -109,5 +118,60 @@ export async function getOrders(
   } catch (error: any) {
     console.error("GET_ORDERS_ERROR", error);
     return { success: false, error: "Failed to fetch orders" };
+  }
+}
+
+export async function getOrderDetails(orderId: string) {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        // 1. Customer
+        user: true,
+        
+        // 🔥 NEW: Affiliate & Subscription (From Schema)
+        affiliate: { include: { user: true } },
+        subscription: true,
+        
+        // 2. Items with LIVE Product Data
+        items: {
+            include: {
+                product: { 
+                  select: { 
+                    id: true, 
+                    stock: true, 
+                    name: true, 
+                    featuredImage: true 
+                  } 
+                }
+            }
+        },
+        
+        // 3. Logistics
+        shipments: { orderBy: { shippedDate: 'desc' } },
+        pickupLocation: true, 
+        
+        // 4. Financials
+        transactions: { orderBy: { createdAt: 'desc' } },
+        refunds: { orderBy: { createdAt: 'desc' } },
+        disputes: true, 
+        
+        // 5. Marketing
+        discount: true, 
+        
+        // 6. After Sales
+        returns: true, 
+
+        // 7. Communication
+        orderNotes: { orderBy: { createdAt: 'desc' } }
+      }
+    });
+    
+    if (!order) return { success: false, error: "Order not found" };
+    return { success: true, data: order };
+    
+  } catch (error) {
+    console.error("GET_ORDER_DETAILS_ERROR", error);
+    return { success: false, error: "Database error" };
   }
 }

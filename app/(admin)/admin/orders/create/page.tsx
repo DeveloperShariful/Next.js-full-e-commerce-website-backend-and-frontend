@@ -161,8 +161,8 @@ export default function CreateOrderPage() {
           <CreateItemsMeta orderData={orderData} setOrderData={setOrderData} totals={totals} />
           
           {/* Note: Dummy order object is passed to reuse the Edit Page's UI Box safely */}
-          <CustomFieldsMeta order={{ id: "new", metadata: {} }} />
-          <DownloadablePermissionsMeta order={{ id: "new", metadata: {} }} />
+          <CustomFieldsMeta order={{ id: "new", metadata: {} } as any} />
+          <DownloadablePermissionsMeta order={{ id: "new", metadata: {} } as any} />
         </div>
 
         {/* === RIGHT COLUMN === */}

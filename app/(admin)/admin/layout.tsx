@@ -2,7 +2,7 @@
 
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth"; // <--- NextAuth Session
+import { auth } from "@/auth"; 
 import { db } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import AdminSidebar from "@/app/(admin)/Header-Sideber/sidebar";
@@ -10,20 +10,29 @@ import AdminHeader from "@/app/(admin)/Header-Sideber/header";
 import { GlobalStoreProvider } from "@/app/providers/global-store-provider";
 import { serializePrismaData } from "@/lib/format-data"; 
 
+// ✅ নতুন ক্যাশ ফাংশনগুলো ইম্পোর্ট করা হলো
+import { 
+  getCachedStoreSettings, 
+  getCachedSeoConfig, 
+  getCachedMarketingConfig,
+  getCachedPaymentMethods,
+  getCachedPickupLocations
+} from "@/lib/global-settings-cache";
+
 async function getGlobalData() {
+  // ✅ ডাটাবেজ টাইমআউট থেকে বাঁচার জন্য সরাসরি ক্যাশ থেকে কল
   const [settings, seo, marketing, paymentMethods, pickupLocations] = await Promise.all([
-    db.storeSettings.findUnique({ where: { id: "settings" }, include: { logoMedia: true, faviconMedia: true } }),
-    db.seoGlobalConfig.findUnique({ where: { id: "global_seo" }, include: { ogMedia: true } }),
-    db.marketingIntegration.findUnique({ where: { id: "marketing_config" } }),
-    db.paymentMethodConfig.findMany({ where: { isEnabled: true } }), 
-    db.location.findMany({ where: { isActive: true } }) 
+    getCachedStoreSettings(),
+    getCachedSeoConfig(),
+    getCachedMarketingConfig(),
+    getCachedPaymentMethods(),
+    getCachedPickupLocations() 
   ]);
 
   return {
     settings: {
       storeSettings: {
         storeName: settings?.storeName || "GoBike",
-        // ... (আপনার বাকি সব কোড সেম থাকবে)
         storeEmail: settings?.storeEmail,
         storePhone: settings?.storePhone,
         currency: settings?.currency || "",
@@ -100,8 +109,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       pickupLocations={cleanData.pickupLocations as any}
     >
       <div className="flex flex-col h-screen bg-[#f0f0f1] font-sans text-[#3c434a] overflow-hidden">
-        
-        {/* 🚀 এখানে storeName প্রপস হিসেবে পাঠানো হলো */}
         <AdminHeader 
           user={adminUser} 
           storeName={cleanData.settings.storeSettings.storeName} 

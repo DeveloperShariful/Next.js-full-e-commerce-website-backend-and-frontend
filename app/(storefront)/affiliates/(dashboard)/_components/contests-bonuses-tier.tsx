@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format, isValid } from "date-fns";
-import { getContestLeaderboard } from "@/app/actions/storefront/affiliates/_services/marketing-service";
+import { getContestLeaderboard } from "@/app/actions/storefront/affiliate/_services/marketing-service";
 
 // ✅ Dialog/Modal Components (Internal)
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

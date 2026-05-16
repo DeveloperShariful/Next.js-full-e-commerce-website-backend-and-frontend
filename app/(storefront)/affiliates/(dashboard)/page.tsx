@@ -5,7 +5,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import AffiliateMainView from "./_components/affiliate-main-view";
 import { serializePrismaData } from "@/lib/format-data"; 
 import { db } from "@/lib/prisma";
-import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
+import { getAuthAffiliate } from "@/app/actions/storefront/affiliate/auth-helper";
 import { 
   getStats, 
   getRecentActivity, 
@@ -13,11 +13,11 @@ import {
   getTierProgress, 
   getActiveRules, 
   getActiveContests // ✅ Already imported
-} from "@/app/actions/storefront/affiliates/_services/dashboard-service";
-import { getLinks, getCampaigns, getCreatives, getCoupons } from "@/app/actions/storefront/affiliates/_services/marketing-service";
-import { getWalletData, getPayoutHistory, getLedger } from "@/app/actions/storefront/affiliates/_services/finance-service";
-import { getSponsor, getNetworkTree, getNetworkStats } from "@/app/actions/storefront/affiliates/_services/network-service";
-import { getSettings } from "@/app/actions/storefront/affiliates/_services/settings-service";
+} from "@/app/actions/storefront/affiliate/_services/dashboard-service";
+import { getLinks, getCampaigns, getCreatives, getCoupons } from "@/app/actions/storefront/affiliate/_services/marketing-service";
+import { getWalletData, getPayoutHistory, getLedger } from "@/app/actions/storefront/affiliate/_services/finance-service";
+import { getSponsor, getNetworkTree, getNetworkStats } from "@/app/actions/storefront/affiliate/_services/network-service";
+import { getSettings } from "@/app/actions/storefront/affiliate/_services/settings-service";
 
 export const metadata = {
   title: "Partner Dashboard | GoBike",

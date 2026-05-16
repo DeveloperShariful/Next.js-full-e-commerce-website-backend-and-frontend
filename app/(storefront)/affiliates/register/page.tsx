@@ -3,7 +3,7 @@
 import { db } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import RegisterForm from "./_components/register-form";
-import { requireUser } from "@/app/actions/storefront/affiliates/auth-helper";
+import { requireUser } from "@/app/actions/storefront/affiliate/auth-helper";
 import { serializePrismaData } from "@/lib/format-data";
 import { Star, ShieldCheck, Zap } from "lucide-react"; 
 

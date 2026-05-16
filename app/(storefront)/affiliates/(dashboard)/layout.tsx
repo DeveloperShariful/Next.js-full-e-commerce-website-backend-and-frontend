@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { db } from "@/lib/prisma";
 // ✅ getAuthAffiliate ইমপোর্ট করা আছে
-import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
+import { getAuthAffiliate } from "@/app/actions/storefront/affiliate/auth-helper";
 import { AlertTriangle, Ban, LifeBuoy, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 

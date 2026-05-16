@@ -12,7 +12,7 @@ import {
     Instagram, CheckCircle2, TrendingUp, DollarSign, ShieldCheck 
 } from "lucide-react"; 
 import { useRouter } from "next/navigation";
-import { registerAffiliateAction } from "@/app/actions/storefront/affiliates/_services/register-affiliate";
+import { registerAffiliateAction } from "@/app/actions/storefront/affiliate/_services/register-affiliate";
 
 // ✅ Enhanced Schema
 const schema = z.object({

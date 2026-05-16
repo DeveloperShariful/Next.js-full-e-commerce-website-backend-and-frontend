@@ -11,6 +11,7 @@ interface NotificationPayload {
   data?: any;           
   orderId?: string;     
   userId?: string;     
+  replyTo?: string; // <<< নতুন অপশন যুক্ত করা হলো >>>
 }
 
 export async function sendNotification({ 
@@ -19,7 +20,8 @@ export async function sendNotification({
   channel = "EMAIL", 
   data, 
   orderId, 
-  userId 
+  userId,
+  replyTo // <<< রিসিভ করা হলো >>>
 }: NotificationPayload) {
   try {
     if (channel === "SMS") {
@@ -47,23 +49,39 @@ export async function sendNotification({
 
     let finalRecipient = recipient;
 
+    // =====================================================================
+    // 🛑 FIX: BULLETPROOF ADMIN EMAIL ROUTING LOGIC (No Duplicate Emails)
+    // =====================================================================
     if (template.recipientType === 'admin' && !finalRecipient) {
         const settings = await db.storeSettings.findUnique({
             where: { id: "settings" },
             select: { storeEmail: true }
         });
+        
         const emailConfig = await db.emailConfiguration.findUnique({
             where: { id: "email_config" },
             select: { senderEmail: true }
         });
         
-        finalRecipient = settings?.storeEmail || emailConfig?.senderEmail || "";
+        const adminEmails = new Set<string>();
+
+        if (settings?.storeEmail && settings.storeEmail.trim() !== '') {
+            adminEmails.add(settings.storeEmail.trim().toLowerCase());
+        }
+        if (emailConfig?.senderEmail && emailConfig.senderEmail.trim() !== '') {
+            adminEmails.add(emailConfig.senderEmail.trim().toLowerCase());
+        }
+
+        const uniqueEmails = Array.from(adminEmails);
         
-        if (!finalRecipient) {
+        if (uniqueEmails.length === 0) {
             return { success: false, error: "No admin email configured" };
         }
+
+        finalRecipient = uniqueEmails.join(", ");
     }
 
+    // ডাটাবেসে কিউ (Queue) তৈরি
     await db.notificationQueue.create({
       data: {
         channel: "EMAIL",
@@ -74,12 +92,17 @@ export async function sendNotification({
         attempts: 0,
         orderId: orderId || null,
         userId: userId || null,
-        metadata: data || {}, 
+        // <<< FIX: metadata এর ভেতরে হিডেনভাবে replyTo সেভ করা হচ্ছে >>>
+        metadata: { ...(data || {}), _replyTo: replyTo || null }, 
       }
     });
 
+    // ব্যাকগ্রাউন্ডে কিউ প্রসেসরকে কল করা হচ্ছে
     try {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const isLocal = process.env.NODE_ENV === 'development';
+        const fallbackUrl = isLocal ? "http://localhost:3000" : "https://gobike.au";
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || fallbackUrl;
+        
         fetch(`${appUrl}/api/email/process-email-queue`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },

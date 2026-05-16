@@ -1,354 +1,466 @@
-// app/actions/storefront/header-footer/header-client.tsx
+// app/(storefront)/header-footer/header-client.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
-import { Search, Menu, X, LayoutDashboard, User, Network, LogOut, Loader2 } from "lucide-react";
-import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { Cart_Icon } from "./Cart_Icon"; 
-import { cn } from "@/lib/utils";
+import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useCart } from '@/context/CartContext';
+import { useSession, signOut } from "next-auth/react"; // NextAuth Import
+import SearchOverlay from '@/components/SearchOverlay'; // পাথ ঠিক করে নিবেন
+import MiniCart from '@/components/MiniCart'; // পাথ ঠিক করে নিবেন
+import Image from 'next/image';
+import { 
+  IoSearch, 
+  IoMenu, 
+  IoClose, 
+  IoPersonOutline, 
+  IoLogOutOutline, 
+  IoTrendingUpOutline, 
+  IoPersonCircleOutline, 
+  IoSpeedometerOutline,
+  IoChevronDown, 
+  IoChevronUp   
+} from "react-icons/io5";
 
-// ✅ 1. মেনু আইটেমের টাইপ ডিফাইন
-type MenuItem = {
-  id: string;
+type SubNavItem = {
+  path: string;
   label: string;
-  url: string;
-  target?: string;
-  children?: MenuItem[];
+  tag?: string; 
 };
 
-// ✅ 2. মেনু আইটেমের ডাটা
-const mainMenuItems: MenuItem[] = [
-  { id: "1", label: "Home", url: "/" },
-  { id: "2", label: "Shop", url: "/shop" },
+type NavItem = {
+  path: string;
+  label: string;
+  subItems?: SubNavItem[]; 
+};
+
+const navItems: NavItem[] = [
+  { path: '/', label: 'Home' },
   { 
-    id: "3", 
-    label: "Categories", 
-    url: "/categories",
-    children: [
-      { id: "3-1", label: "Electronics", url: "/shop/electronics" },
-      { id: "3-2", label: "Fashion", url: "/shop/fashion" },
-      { id: "3-3", label: "Accessories", url: "/shop/accessories" },
+    path: '/bikes', 
+    label: 'Bikes',
+    subItems: [
+      { path: '/product/ebike-for-kids-12-inch-electric-bike-ages-2-5', label: '12" Electric Bike', tag: 'Ages 2-5' },
+      { path: '/product/ebike-for-sale-16-inch-gobike-ages-5-9', label: '16" Electric Bike', tag: 'Ages 5-9' },
+      { path: '/product/20-inch-electric-bikes-for-sale-ebike-for-kids', label: '20" Electric Bike', tag: 'Ages 9-16' },
+      { path: '/product/gobike-24-inch-electric-bike-teens-high-speed-performance-for-ages-13', label: '24" Electric Bike', tag: 'Ages 13+' },
     ]
   },
-  { id: "4", label: "About Us", url: "/about" },
-  { id: "5", label: "Contact", url: "/contact" },
+  { 
+    path: '/electric-bike-parts', 
+    label: 'Spare Parts',
+    subItems: [
+      { path: '/electric-bike-parts/battery', label: 'Electric Bike Batteries' },
+      { path: '/electric-bike-parts/tyre-tube', label: 'Electric Bike Tyres and Tube' },
+
+    ]
+  },
+  { path: '/apparel', label: 'Apparel' },
+  { path: '/shop', label: 'Shop' },
+  { path: '/about', label: 'About' },
+  { path: '/contact', label: 'Contact' },
+  { path: '/faq', label: 'FAQ' },
+  { path: '/blog', label: 'Blog' },
 ];
 
 interface HeaderClientProps {
-  cartCount: number;
-  isAffiliate: boolean; 
+  isAffiliate: boolean;
 }
 
-export default function HeaderClient({ cartCount, isAffiliate }: HeaderClientProps) {
-  const { storeName, logo, primaryColor } = useGlobalStore();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
+  const { cartItems, isMiniCartOpen, openMiniCart, closeMiniCart } = useCart();
+  const { data: session } = useSession(); // NextAuth Session
+  
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthDropdownOpen, setIsAuthDropdownOpen] = useState(false);
+  const [openMobileMenus, setOpenMobileMenus] = useState<Record<string, boolean>>({});
   
-  // Hydration ফিক্স করার জন্য State
-  const [mounted, setMounted] = useState(false);
-  
-  const { data: session, status } = useSession();
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  
+  // Real-time Cart Count
+  const totalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
+  
+  const user = session?.user;
+
+  const closeAllOverlays = () => {
+    setIsMenuOpen(false);
+    setIsSearchOpen(false);
+    setIsAuthDropdownOpen(false);
+  }
 
   useEffect(() => {
-    setMounted(true);
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsAuthDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isLoggedIn = status === "authenticated";
-  const isLoading = status === "loading";
-  const isAdmin = session?.user?.role === "SUPER_ADMIN" || session?.user?.role === "ADMIN" || pathname.startsWith("/admin");
+  const toggleDropdown = () => {
+    setIsAuthDropdownOpen(!isAuthDropdownOpen);
+  };
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/" });
+    closeAllOverlays();
+  };
+
+  const toggleMobileMenu = (path: string) => {
+    setOpenMobileMenus(prev => ({ ...prev, [path]: !prev[path] }));
+  };
+
+  // ★★★ SEO ENHANCEMENT 1: Organization Schema (Brand Logo & Details) ★★★
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "GoBike Australia",
+    "url": "https://gobikes.au",
+    "logo": "https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids-1.webp"
+  };
+
+  // ★★★ SEO ENHANCEMENT 2: Site Navigation Schema (For Google Sitelinks) ★★★
+  const siteNavigationSchema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "itemListElement": navItems.map((item, index) => ({
+      "@type": "SiteNavigationElement",
+      "position": index + 1,
+      "name": item.label,
+      "url": `https://gobikes.au${item.path}`
+    }))
+  };
 
   return (
     <>
-      <header className="border-b sticky top-0 z-50 bg-white/90 backdrop-blur-md transition-all duration-200">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          
-          {/* -------------------- 1. LEFT: LOGO -------------------- */}
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-md"
-            >
-              <Menu size={24} />
-            </button>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteNavigationSchema) }} />
 
-            <Link href="/" className="flex items-center gap-2 group">
-              {logo?.url ? (
-                <div className="relative w-8 h-8 sm:w-auto">
+      <header className="bg-white border-b border-[#eaeaea] py-1.3 sticky top-[55px] z-50 transition-[top] duration-300 ease-in-out md:top-[48px] shadow-md">
+        
+        <div className="max-w-[1400px] mx-auto px-6 flex pb-3 pt-3 lg:grid lg:grid-cols-3 items-center justify-between relative ">
+          
+          <div className="flex flex-1 lg:flex-none items-center justify-start">
+            <button 
+                onClick={() => setIsMenuOpen(true)} 
+                className="flex lg:hidden bg-transparent border-none cursor-pointer p-2 text-[#333] items-center mr-2"
+                aria-label="Open Mobile Menu"
+                aria-expanded={isMenuOpen} 
+            >
+                <IoMenu size={35} />
+            </button>
+            <div className="hidden lg:block">
+              <Link href="/" className="flex items-center no-underline" aria-label="GoBike Home">
                   <Image 
-                    src={logo.url} 
-                    alt={logo.altText || storeName || "Logo"} 
-                    width={logo.width || 40} 
-                    height={logo.height || 40}
-                    className="object-contain max-h-10 w-auto"
+                    src="https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids-1.webp" 
+                    alt="GoBike Australia Logo" 
+                    width={1846} 
+                    height={417} 
+                    priority 
+                    className="h-[60px] w-auto max-w-full" 
                   />
-                </div>
-              ) : (
-                <div 
-                  className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold shadow-sm transition-transform group-hover:scale-105"
-                  style={{ backgroundColor: primaryColor || "#000" }}
-                >
-                  {storeName ? storeName.substring(0, 2).toUpperCase() : "ST"}
-                </div>
-              )}
-              <span className="font-bold text-xl text-slate-900 hidden sm:block tracking-tight">
-                {storeName || "Store"}
-              </span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="block lg:hidden absolute left-1/2 -translate-x-1/2">
+            <Link href="/" className="flex items-center no-underline" aria-label="GoBike Home">
+               <Image 
+                src="https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids-1.webp" 
+                alt="GoBike Australia Logo" 
+                width={1846} 
+                height={417} 
+                priority 
+                className="h-[50px] w-auto max-w-full" 
+               />
             </Link>
           </div>
-
-          {/* -------------------- 2. CENTER: NAVIGATION -------------------- */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {mainMenuItems.length > 0 ? (
-              mainMenuItems.map((item) => (
-                <div key={item.id} className="relative group">
-                  <Link 
-                    href={item.url} 
-                    target={item.target}
-                    className={cn(
-                      "px-4 py-2 text-sm font-medium text-slate-600 hover:text-black hover:bg-slate-50 rounded-full transition-all flex items-center gap-1",
-                      pathname === item.url && "text-black bg-slate-50"
-                    )}
-                  >
+          
+          {/* Main Desktop Navigation */}
+          <nav className="hidden lg:flex gap-6 xl:gap-7 items-center justify-self-center" aria-label="Main Navigation">
+            {navItems.map((item) => (
+              <div key={item.path} className="relative group">
+                <Link 
+                    href={item.path} 
+                    className={`no-underline text-[15px] xl:text-[18px] font-medium transition-colors duration-200 ease-in-out flex items-center gap-1 hover:text-black hover:font-bold whitespace-nowrap ${pathname === item.path || (pathname.startsWith(item.path) && item.path !== '/') ? 'text-black font-bold' : 'text-[#353535]'}`}
+                    aria-haspopup={item.subItems ? "true" : "false"}
+                >
                     {item.label}
-                    {item.children && item.children.length > 0 && (
-                      <span className="opacity-50 text-[10px]">▼</span>
-                    )}
-                  </Link>
-                  
-                  {item.children && item.children.length > 0 && (
-                     <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-slate-100 shadow-lg rounded-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform translate-y-2 group-hover:translate-y-0 z-50">
-                       {item.children.map((subItem) => (
-                         <Link 
-                           key={subItem.id} 
-                           href={subItem.url}
-                           target={subItem.target}
-                           className="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-black rounded-lg"
-                         >
-                           {subItem.label}
-                         </Link>
-                       ))}
-                     </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <>
-                <Link href="/" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-black hover:bg-slate-50 rounded-full">Home</Link>
-                <Link href="/shop" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-black hover:bg-slate-50 rounded-full">Shop</Link>
-              </>
-            )}
+                    {item.subItems && <IoChevronDown size={14} className="mt-0.5 group-hover:rotate-180 transition-transform duration-200" aria-hidden="true" />}
+                </Link>
+
+                {item.subItems && (
+                  <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                    <div className="bg-white border border-[#eaeaea] shadow-[0_10px_20px_rgba(0,0,0,0.05)] rounded-md py-2 px-1 flex flex-col min-w-[220px]">
+                      {item.subItems.map((subItem) => (
+                        <Link 
+                          key={subItem.path} 
+                          href={subItem.path}
+                          className="flex items-center justify-between px-4 py-2.5 text-sm text-[#353535] hover:bg-[#f8f9fa] hover:text-black hover:font-semibold rounded transition-colors no-underline whitespace-nowrap"
+                        >
+                          <span>{subItem.label}</span>
+                          {subItem.tag && <span className="text-xs text-gray-400 font-normal ml-6">{subItem.tag}</span>}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </nav>
 
-          {/* -------------------- 3. RIGHT: ACTIONS -------------------- */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            
+          {/* Right Icons */}
+          <div className="flex flex-1 lg:flex-none items-center justify-end gap-2 justify-self-end">
             <button 
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                className="hidden lg:flex items-center gap-2 bg-transparent border-b border-[#d8d8d8] cursor-pointer px-2 pb-0.5 text-[#333] hover:border-black transition-colors" 
+                onClick={() => setIsSearchOpen(true)} 
+                aria-label="Open Search Bar"
             >
-              {isSearchOpen ? <X size={20} /> : <Search size={20} />}
+              <IoSearch size={22} aria-hidden="true" />
+              <span className="text-sm font-medium">Search</span>
             </button>
+            
+            <div className="relative" ref={dropdownRef}>
+                <button 
+                    onClick={toggleDropdown}
+                    className="hidden lg:flex bg-transparent border-none cursor-pointer p-2 text-[#333] items-center gap-2 hover:text-black transition-colors font-medium text-sm whitespace-nowrap"
+                    aria-label="My Account Menu"
+                    aria-haspopup="true" 
+                    aria-expanded={isAuthDropdownOpen} 
+                >
+                  <IoPersonOutline size={24} aria-hidden="true" />
+                  {user && <span>My Account</span>}
+                </button>
 
-            <Cart_Icon initialCount={cartCount} />
+                {isAuthDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-[#e0e0e0] rounded-lg shadow-lg z-50 overflow-hidden animate-fadeIn">
 
-            <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+                        {!user && (
+                            <>
+                                <Link 
+                                    href="/sign-in" 
+                                    className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa] border-b border-[#f0f0f0]"
+                                    onClick={closeAllOverlays}
+                                >
+                                    <IoPersonCircleOutline size={20} />
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold">Login / Register</span>
+                                        <span className="text-xs text-gray-500">Access your orders</span>
+                                    </div>
+                                </Link>
+                                <Link 
+                                    href="/affiliate-portal" 
+                                    className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa]"
+                                    onClick={closeAllOverlays}
+                                >
+                                    <IoTrendingUpOutline size={20} />
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold">Affiliate Portal</span>
+                                        <span className="text-xs text-gray-500">Earn commissions</span>
+                                    </div>
+                                </Link>
+                            </>
+                        )}
 
-            {/* Auth Buttons */}
-            <div className="flex items-center gap-2">
-              
-              {/* Hydration ও Loading স্টেট চেক */}
-              {!mounted || isLoading ? (
-                <div className="w-8 h-8 rounded-full bg-slate-100 animate-pulse hidden sm:block" />
-              ) : (
-                <>
-                  {/* --- SIGNED OUT VIEW --- */}
-                  {!isLoggedIn && (
-                    <>
-                      <Link href="/sign-in" className="text-sm font-semibold px-4 py-2 border border-slate-200 rounded-full hover:border-slate-400 transition text-slate-700 hidden sm:block">
-                        Login
-                      </Link>
-                      <Link href="/sign-up" className="text-sm font-bold px-4 py-2 bg-black text-white rounded-full hover:bg-slate-800 transition shadow-sm hidden sm:block">
-                        Register
-                      </Link>
-                      <Link href="/sign-in" className="sm:hidden p-2 text-slate-600">
-                        <User size={20} />
-                      </Link>
-                    </>
-                  )}
+                        {user && (
+                            <>
+                                <div className="px-4 py-3 bg-gray-50 border-b border-[#f0f0f0]">
+                                    <p className="text-xs text-gray-500">Signed in as</p>
+                                    <p className="text-sm font-bold text-[#333] truncate">{user.name || user.email}</p>
+                                </div>
+                                
+                                <Link 
+                                    href="/account" 
+                                    className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa] border-b border-[#f0f0f0]"
+                                    onClick={closeAllOverlays}
+                                >
+                                    <IoPersonOutline size={18} />
+                                    My Account
+                                </Link>
 
-                  {/* --- SIGNED IN VIEW --- */}
-                  {isLoggedIn && (
-                    <>
-                      {isAdmin && (
-                        <Link 
-                          href="/admin" 
-                          className="hidden md:flex items-center gap-2 text-xs font-bold text-white bg-slate-900 px-3 py-1.5 rounded-full hover:bg-slate-700 transition"
-                        >
-                          <LayoutDashboard size={14} />
-                          Admin
-                        </Link>
-                      )}
+                                {isAffiliate && (
+                                    <Link 
+                                        href="/affiliate/dashboard" 
+                                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f0f8ff] border-b border-[#f0f0f0]"
+                                        onClick={closeAllOverlays}
+                                    >
+                                        <IoSpeedometerOutline size={18} className="text-blue-600"/>
+                                        <span className="font-semibold text-blue-600">Affiliate Dashboard</span>
+                                    </Link>
+                                )}
 
-                      {isAffiliate && !isAdmin && (
-                        <Link 
-                          href="/affiliates" 
-                          className="hidden md:flex items-center gap-2 text-xs font-bold text-white bg-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-700 transition shadow-sm shadow-indigo-200"
-                        >
-                          <Network size={14} />
-                          Partner Portal
-                        </Link>
-                      )}
-
-                      {!isAdmin && !isAffiliate && (
-                        <Link 
-                          href="/affiliates/register" 
-                          className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full hover:bg-slate-200 transition"
-                        >
-                          <User size={14} />
-                          Join Affiliate
-                        </Link>
-                      )}
-                      
-                      <div className="ml-2 flex items-center gap-3 border-l pl-3">
- 
-                        <Link href="/profile" className="w-9 h-9 border-2 border-slate-100 rounded-full flex items-center justify-center bg-slate-100 overflow-hidden cursor-pointer hover:border-slate-300 transition" title="Go to Profile">
-                          {session?.user?.image ? (
-                           <Image src={session.user.image} alt="Avatar" width={36} height={36} className="object-cover" />
-                              ) : (
-                                <User size={18} className="text-slate-600" />
-                             )}
-                        </Link>
-                         <button onClick={() => signOut({ callbackUrl: "/" })} className="hidden sm:block text-slate-500 hover:text-red-500 transition" title="Logout">
-                          <LogOut size={18} />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
+                                <button 
+                                    onClick={handleLogout}
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 text-left transition-colors"
+                                >
+                                    <IoLogOutOutline size={18} />
+                                    Logout
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
+            
+            {/* Cart Icon */}
+            <button 
+                className="bg-transparent border-none cursor-pointer relative text-[#333] p-2 hover:text-black transition-colors" 
+                onClick={openMiniCart} 
+                aria-label="Open Shopping Cart" 
+            >
+              <span className="text-[26px]" aria-hidden="true">🛒</span>
+              {totalItems > 0 && (
+                <span className="absolute top-0 right-0 bg-black text-white rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold">
+                    {totalItems}
+                </span>
+              )}
+            </button>
           </div>
         </div>
-
-        {/* -------------------- 4. SEARCH OVERLAY -------------------- */}
-        {isSearchOpen && (
-          <div className="absolute top-16 left-0 w-full bg-white border-b shadow-sm p-4 animate-in slide-in-from-top-2 z-40">
-            <div className="container mx-auto max-w-3xl relative">
-              <Search className="absolute left-4 top-3.5 text-slate-400 h-5 w-5" />
-              <input 
-                type="text" 
-                placeholder="Search products, categories..." 
-                className="w-full bg-slate-50 border border-slate-200 rounded-full py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-slate-400 transition-all"
-                autoFocus
-              />
-              <button 
-                onClick={() => setIsSearchOpen(false)}
-                className="absolute right-4 top-3 text-xs font-bold text-slate-400 hover:text-black bg-slate-100 px-2 py-1 rounded"
-              >
-                ESC
-              </button>
-            </div>
-          </div>
-        )}
       </header>
 
-      {/* -------------------- 5. MOBILE MENU -------------------- */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-          
-          <div className="fixed inset-y-0 left-0 w-3/4 max-w-xs bg-white shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col">
-            <div className="p-4 border-b flex items-center justify-between">
-              <span className="font-bold text-lg truncate">{storeName}</span>
-              <button 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-full"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {mainMenuItems.length > 0 ? (
-                mainMenuItems.map((item) => (
-                  <div key={item.id} className="space-y-1">
-                    <Link 
-                      href={item.url} 
-                      className="block px-4 py-3 text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      {item.label}
-                    </Link>
-                    {item.children?.map((child) => (
-                      <Link 
-                        key={child.id} 
-                        href={child.url}
-                        className="block px-4 py-2 ml-4 text-sm text-slate-500 hover:text-black border-l border-slate-200"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        {child.label}
-                      </Link>
-                    ))}
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <Link href="/" className="block px-4 py-3 text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg">Home</Link>
-                  <Link href="/shop" className="block px-4 py-3 text-base font-medium text-slate-700 hover:bg-slate-50 rounded-lg">Shop</Link>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t bg-slate-50 space-y-3">
-              {mounted && !isLoading && (
-                isLoggedIn ? (
-                  <>
-                    {isAdmin && (
-                        <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-slate-900 text-white rounded-lg shadow-sm">
-                          <LayoutDashboard size={18} /> <span className="font-medium text-sm">Admin Dashboard</span>
-                        </Link>
-                    )}
-                    {isAffiliate && !isAdmin && (
-                        <Link href="/affiliates" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-indigo-600 text-white rounded-lg shadow-sm">
-                          <Network size={18} /> <span className="font-medium text-sm">Partner Portal</span>
-                        </Link>
-                    )}
-                    {!isAdmin && !isAffiliate && (
-                        <Link href="/affiliates/register" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 bg-white border rounded-lg shadow-sm hover:bg-gray-50">
-                          <User size={18} /> <span className="font-medium text-sm">Join Affiliate</span>
-                        </Link>
-                    )}
-  
-                    <button 
-                      onClick={() => signOut({ callbackUrl: "/" })} 
-                      className="flex w-full items-center justify-center gap-2 px-4 py-3 mt-2 bg-red-50 text-red-600 rounded-lg shadow-sm hover:bg-red-100"
-                    >
-                      <LogOut size={18} /> <span className="font-medium text-sm">Log Out</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/sign-in" onClick={() => setIsMobileMenuOpen(false)}>
-                      <button className="w-full py-2.5 text-sm font-semibold border bg-white rounded-lg mb-2">Login</button>
-                    </Link>
-                    <Link href="/sign-up" onClick={() => setIsMobileMenuOpen(false)}>
-                      <button className="w-full py-2.5 text-sm font-bold bg-black text-white rounded-lg">Register</button>
-                    </Link>
-                  </>
-                )
-              )}
-            </div>
+      {/* MOBILE MENU */}
+      <div 
+        className={`fixed top-0 left-0 w-[350px] h-[100dvh] bg-white z-[1001] transition-transform duration-300 ease-in-out flex flex-col p-6 shadow-[5px_0_15px_rgba(0,0,0,0.1)] ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        role="dialog"
+        aria-modal="true"
+      >
+          <div className="flex justify-between items-center mb-8 border-b border-[#f0f0f0] pb-4">
+             <button 
+                className="flex items-center gap-3 w-full bg-transparent border-none border-b border-[#e0e0e0] p-3 mr-4 text-[1.1rem] font-medium text-[#333] cursor-pointer text-left" 
+                onClick={() => setIsSearchOpen(true) } 
+                aria-label="Search Products"
+             >
+              <IoSearch size={22} aria-hidden="true" />
+              <span>Search products</span>
+            </button>
+            <button 
+                className="bg-transparent border-none cursor-pointer text-[#333] flex items-center p-2" 
+                onClick={() => setIsMenuOpen(false)} 
+                aria-label="Close Mobile Menu"
+            >
+                <IoClose size={28} aria-hidden="true" />
+            </button>
           </div>
-        </div>
+            
+            <nav className="flex flex-col gap-2 flex-grow overflow-y-auto" aria-label="Mobile Navigation">
+                {navItems.map((item) => (
+                    <div key={item.path} className="w-full">
+                        <div className="flex items-center justify-between border-b border-[#ececec]">
+                            <Link 
+                                href={item.path} 
+                                className={`text-[1.2rem] font-medium no-underline flex items-center gap-3 bg-transparent w-full text-left cursor-pointer py-3 hover:text-black hover:font-bold ${pathname === item.path ? 'text-black font-bold' : 'text-[#333]'}`}
+                                onClick={() => !item.subItems && closeAllOverlays()}
+                            >
+                                {item.label === 'Contact' ? 'Contact us' : item.label}
+                            </Link>
+                            
+                            {item.subItems && (
+                                <button 
+                                  onClick={() => toggleMobileMenu(item.path)}
+                                  className="p-3 text-[#333] cursor-pointer"
+                                  aria-label={`Toggle ${item.label} Submenu`}
+                                  aria-expanded={!!openMobileMenus[item.path]}
+                                  aria-controls={`mobile-submenu-${item.label.replace(/\s+/g, '-').toLowerCase()}`}
+                                >
+                                  {openMobileMenus[item.path] ? <IoChevronUp size={20} aria-hidden="true" /> : <IoChevronDown size={20} aria-hidden="true" />}
+                                </button>
+                            )}
+                        </div>
+
+                        {item.subItems && (
+                           <div 
+                              id={`mobile-submenu-${item.label.replace(/\s+/g, '-').toLowerCase()}`}
+                              className={`overflow-hidden transition-all duration-300 ease-in-out ${openMobileMenus[item.path] ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}
+                           >
+                             <div className="flex flex-col pl-6 border-l-2 border-[#f0f0f0] ml-2 mb-2">
+                               {item.subItems.map((subItem) => (
+                                 <Link 
+                                   key={subItem.path} 
+                                   href={subItem.path} 
+                                   className="py-2.5 text-[1.05rem] text-[#555] no-underline hover:text-black hover:font-semibold flex justify-between pr-4"
+                                   onClick={closeAllOverlays}
+                                 >
+                                   <span>{subItem.label}</span>
+                                   {subItem.tag && <span className="text-[0.85rem] text-gray-400">{subItem.tag}</span>}
+                                 </Link>
+                               ))}
+                             </div>
+                           </div>
+                        )}
+                    </div>
+                ))}
+            </nav>
+          
+          <div className="border-t border-[#f0f0f0] pt-4 mt-6">
+
+            {user ? (
+                <>
+                 <Link 
+                    href="/account"
+                    className="text-[1.2rem] font-medium text-[#333] no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-black hover:font-bold mb-4"
+                    onClick={closeAllOverlays}
+                 >
+                    <IoPersonOutline aria-hidden="true" />
+                    <span>My Account</span>
+                 </Link>
+                 
+                 {isAffiliate && (
+                    <Link 
+                        href="/affiliate/dashboard"
+                        className="text-[1.2rem] font-medium text-blue-600 no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-blue-800 hover:font-bold mb-4"
+                        onClick={closeAllOverlays}
+                    >
+                        <IoSpeedometerOutline aria-hidden="true" />
+                        <span>Affiliate Dashboard</span>
+                    </Link>
+                 )}
+
+                 <button 
+                    onClick={handleLogout}
+                    className="text-[1.2rem] font-medium text-red-600 flex items-center gap-3 w-full text-left p-0 mt-2"
+                 >
+                    <IoLogOutOutline aria-hidden="true" />
+                    <span>Logout</span>
+                 </button>
+                </>
+            ) : (
+                <div className="flex flex-col gap-4">
+                    <Link 
+                        href="/sign-in"
+                        className="text-[1.2rem] font-medium text-[#333] no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-black hover:font-bold"
+                        onClick={closeAllOverlays}
+                    >
+                        <IoPersonCircleOutline aria-hidden="true" />
+                        <span>Login / Register</span>
+                    </Link>
+                     <Link 
+                        href="/affiliate-portal"
+                        className="text-[1.2rem] font-medium text-[#333] no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-black hover:font-bold"
+                        onClick={closeAllOverlays}
+                    >
+                        <IoTrendingUpOutline aria-hidden="true" />
+                        <span>Affiliate Portal</span>
+                    </Link>
+                </div>
+            )}
+          </div>
+      </div>
+      
+      {isMenuOpen && (
+        <div 
+            className="fixed top-0 left-0 w-full h-full bg-black/50 z-[1000]" 
+            onClick={() => setIsMenuOpen(false)} 
+            aria-label="Close Overlay"
+        ></div>
       )}
+      
+      {/* Search Overlay & Mini Cart */}
+      {isSearchOpen && <SearchOverlay onClose={() => setIsSearchOpen(false)} aria-label="Close searchber"/>}
+      <MiniCart isOpen={isMiniCartOpen} onClose={closeMiniCart} />
     </>
   );
 }

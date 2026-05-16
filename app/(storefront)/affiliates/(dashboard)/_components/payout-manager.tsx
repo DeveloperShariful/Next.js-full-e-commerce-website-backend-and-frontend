@@ -9,7 +9,7 @@ import { PayoutMethod } from "@prisma/client";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { requestPayoutAction } from "@/app/actions/storefront/affiliates/_services/finance-service";
+import { requestPayoutAction } from "@/app/actions/storefront/affiliate/_services/finance-service";
 // ✅ IMPORT ADDED
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 

@@ -6,9 +6,9 @@ import { useState, useRef, useEffect } from "react";
 import { Bell, CheckCheck, Info, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 // ✅ Import Server Action
-import { getAnnouncements } from "@/app/actions/storefront/affiliates/_services/dashboard-service";
+import { getAnnouncements } from "@/app/actions/storefront/affiliate/_services/dashboard-service";
 import { formatDistanceToNow } from "date-fns";
-import { getAuthAffiliate } from "@/app/actions/storefront/affiliates/auth-helper";
+import { getAuthAffiliate } from "@/app/actions/storefront/affiliate/auth-helper";
 
 interface Notification {
   id: string;

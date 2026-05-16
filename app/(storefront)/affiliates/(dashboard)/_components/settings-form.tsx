@@ -9,7 +9,7 @@ import {
     Save, Loader2, CreditCard, Code, MousePointerClick, 
     ShieldCheck, UploadCloud, FileText, CheckCircle, XCircle 
 } from "lucide-react";
-import { updateSettingsAction, addPixelAction, uploadKYCAction } from "@/app/actions/storefront/affiliates/_services/settings-service";
+import { updateSettingsAction, addPixelAction, uploadKYCAction } from "@/app/actions/storefront/affiliate/_services/settings-service";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 // ✅ Import MediaPicker (Single Selection)

@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Link as LinkIcon, QrCode, ArrowRight, Loader2, Search, Globe, MousePointer2, Sparkles, Check, Copy } from "lucide-react";
-import { generateLinkAction } from "@/app/actions/storefront/affiliates/_services/marketing-service";
+import { generateLinkAction } from "@/app/actions/storefront/affiliate/_services/marketing-service";
 import { cn } from "@/lib/utils";
 // ✅ IMPORT GLOBAL STORE
 import { useGlobalStore } from "@/app/providers/global-store-provider";

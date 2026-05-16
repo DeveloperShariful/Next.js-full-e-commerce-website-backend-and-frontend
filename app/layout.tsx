@@ -6,13 +6,19 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react"; 
 import NextTopLoader from 'nextjs-toploader';
-import { db } from "@/lib/prisma";
 import { 
   GlobalStoreProvider, 
   StoreAddress, 
   SocialLinks 
 } from "@/app/providers/global-store-provider"; 
 import { AffiliateTrackerProvider } from "@/app/providers/affiliate-tracker-provider";
+
+// ✅ সরাসরি ডাটাবেজের বদলে আমাদের নতুন সুপার-ফাস্ট ক্যাশ ফাইল ইম্পোর্ট করা হলো
+import { 
+  getCachedStoreSettings, 
+  getCachedSeoConfig, 
+  getCachedMarketingConfig 
+} from "@/lib/global-settings-cache";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,28 +35,17 @@ export const metadata: Metadata = {
   description: "Admin panel for GoBike e-commerce",
 };
 
-// ✅ Helper to fetch data safely without crashing the app on DB timeout
-async function fetchSafe(query: Promise<any>) {
-  try {
-    return await query;
-  } catch (error) {
-    console.error("⚠️ Layout DB Fetch Error:", error);
-    return null; // Return null on error so the page still loads
-  }
-}
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   
-  // 1. Fetch ALL Required Settings concurrently with SAFE handling
-  // Promise.allSettled is better here, but manual try-catch wrapper works too.
+  // ✅ 1. ডাটাবেজ জ্যাম না করে জিরো সেকেন্ডে মেমোরি থেকে ডেটা ফেচ করা হলো
   const [storeSettings, seoConfig, marketingConfig] = await Promise.all([
-    fetchSafe(db.storeSettings.findUnique({ where: { id: "settings" }, include: { logoMedia: true, faviconMedia: true } })),
-    fetchSafe(db.seoGlobalConfig.findUnique({ where: { id: "global_seo" }, include: { ogMedia: true } })),
-    fetchSafe(db.marketingIntegration.findUnique({ where: { id: "marketing_config" } }))
+    getCachedStoreSettings(),
+    getCachedSeoConfig(),
+    getCachedMarketingConfig()
   ]);
 
   // 2. Prepare the settings object explicitly casting JSON fields
@@ -95,6 +90,7 @@ export default async function RootLayout({
             speed={200}
             shadow="0 0 10px #2271b1,0 0 5px #2271b1"
           />
+          {/* Root Layout এ একবারই Toaster থাকবে */}
           <Toaster position="top-center" />
           
           <GlobalStoreProvider settings={providerSettings as any}>

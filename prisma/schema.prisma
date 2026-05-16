@@ -198,6 +198,7 @@ enum DisputeStatus {
 enum NotificationStatus {
   PENDING
   PROCESSING
+  SENT
   COMPLETED
   FAILED
   CANCELLED

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { User, ChevronRight, ChevronDown, Network, Search, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { NetworkNode } from "@/app/actions/storefront/affiliates/_services/network-service";
+import { NetworkNode } from "@/app/actions/storefront/affiliate/_services/network-service";
 // ✅ IMPORT GLOBAL STORE
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 

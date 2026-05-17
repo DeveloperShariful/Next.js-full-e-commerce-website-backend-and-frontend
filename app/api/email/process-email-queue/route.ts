@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import nodemailer from "nodemailer";
-	import { generateEmailHtml } from "@/app/actions/admin/settings/email/email-generator";
+	import { generateEmailHtml } from "@/app/actions/backend/settings/email/email-generator";
 
 export async function GET(req: Request) {
   try {

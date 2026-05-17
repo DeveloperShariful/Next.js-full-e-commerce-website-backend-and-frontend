@@ -1,7 +1,7 @@
 //app/api/affiliate/process-order/route.ts
 
 import { NextResponse } from "next/server";
-import { processOrder } from "@/app/actions/admin/settings/affiliate/affiliate-engine";
+import { processOrder } from "@/app/actions/backend/settings/affiliate/affiliate-engine";
 import { auditService } from "@/lib/audit-service";
 import { hmacService } from "@/lib/hmac-service";
 import { db } from "@/lib/prisma"; 

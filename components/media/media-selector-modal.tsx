@@ -5,8 +5,8 @@
 import { useState, useEffect } from "react";
 import { X, Search, Check, Loader2, Image as ImageIcon, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
-import { getAllMedia, MediaItem } from "@/app/actions/admin/media/media-read";
-import { saveMedia } from "@/app/actions/admin/media/media-create";
+import { getAllMedia, MediaItem } from "@/app/actions/backend/media/media-read";
+import { saveMedia } from "@/app/actions/backend/media/media-create";
 import ImageUpload from "@/components/media/image-upload"; 
 import { toast } from "react-hot-toast";
 

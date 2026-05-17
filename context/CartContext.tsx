@@ -11,7 +11,7 @@ import {
   updateCartItemQuantityAction, 
   removeFromCartAction, 
   clearCartAction 
-} from '@/app/actions/storefront/cart/cartActions';
+} from '@/app/actions/frontend/cart/cartActions';
 
 export interface CartItemAttribute {
     id: string;

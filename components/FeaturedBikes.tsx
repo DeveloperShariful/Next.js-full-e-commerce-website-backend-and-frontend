@@ -2,9 +2,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getFeaturedBikesAction } from '@/app/actions/storefront/home/getFeaturedBikesAction';
+import { getFeaturedBikesAction } from '@/app/actions/frontend/home/getFeaturedBikesAction';
 import ProductCard from '@/components/ProductCard'; 
-import { StorefrontProduct } from '@/app/(storefront)/types'; 
+import { StorefrontProduct } from '@/app/(frontend)/types'; 
 
 export default function FeaturedBikes() {
   const [products, setProducts] = useState<StorefrontProduct[]>([]);

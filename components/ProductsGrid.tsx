@@ -1,7 +1,7 @@
 'use client'; 
 
 import ProductCard from '@/components/ProductCard'; // পাথ ঠিক থাকলে এভাবেই রাখুন
-import { StorefrontProduct } from '@/app/(storefront)/types'; // আমাদের ১০০% অরিজিনাল ডাটাবেজ টাইপ
+import { StorefrontProduct } from '@/app/(frontend)/types'; // আমাদের ১০০% অরিজিনাল ডাটাবেজ টাইপ
 
 // পুরানো interface Product পুরোপুরি মুছে ফেলা হয়েছে
 interface ProductsGridProps {

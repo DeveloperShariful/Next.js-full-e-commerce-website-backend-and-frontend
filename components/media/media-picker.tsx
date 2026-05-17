@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MediaSelectorModal } from "./media-selector-modal";
-import { MediaItem } from "@/app/actions/admin/media/media-read";
+import { MediaItem } from "@/app/actions/backend/media/media-read";
 import { Image as ImageIcon, X, RefreshCw } from "lucide-react";
 import Image from "next/image";
 

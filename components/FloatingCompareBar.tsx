@@ -1,10 +1,9 @@
 // components/FloatingCompareBar.tsx
-
 'use client';
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation'; // <-- Import usePathname
+import { usePathname } from 'next/navigation'; 
 import { useCompare } from '@/context/CompareContext';
 
 export default function FloatingCompareBar() {
@@ -18,6 +17,7 @@ export default function FloatingCompareBar() {
     <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] z-50 p-4 transform transition-transform duration-300 ease-in-out">
       <div className="max-w-[1300px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         
+        {/* Left Side: Items Count & Images */}
         <div className="flex items-center gap-4">
           <span className="font-bold text-gray-900 text-lg">
             Compare Products ({compareItems.length}/4)
@@ -26,8 +26,9 @@ export default function FloatingCompareBar() {
           <div className="hidden md:flex gap-2">
             {compareItems.map((item) => (
               <div key={item.id} className="w-12 h-12 relative bg-gray-50 border border-gray-200 rounded-md overflow-hidden">
+                {/* Image Null Safety Check */}
                 {item.image ? (
-                  <Image src={item.image} alt={item.name} fill className="object-contain p-1" />
+                  <Image src={item.image} alt={item.name} fill className="object-contain p-1" sizes="48px" />
                 ) : (
                   <span className="text-[10px] flex items-center justify-center h-full text-gray-400">No Img</span>
                 )}
@@ -36,6 +37,7 @@ export default function FloatingCompareBar() {
           </div>
         </div>
 
+        {/* Right Side: Buttons */}
         <div className="flex items-center gap-4 w-full sm:w-auto">
           <button 
             onClick={clearCompare} 

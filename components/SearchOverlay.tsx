@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { IoClose } from 'react-icons/io5';
 import Image from 'next/image';
-import { searchProductsAction } from '@/app/actions/storefront/home/searchProductsAction';
+import { searchProductsAction } from '@/app/actions/frontend/home/searchProductsAction';
 
 interface SearchResult {
   id: string;

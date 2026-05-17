@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaStar, FaTimes, FaPlayCircle } from 'react-icons/fa';
-import { getHomePageReviewsAction } from '@/app/actions/storefront/home/getHomePageReviewsAction';
+import { getHomePageReviewsAction } from '@/app/actions/frontend/home/getHomePageReviewsAction';
 
 // --- Types ---
 interface ReviewSummary {

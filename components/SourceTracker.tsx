@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { trackVisitAction } from '@/app/actions/storefront/affiliate/trackVisitAction';
+import { trackVisitAction } from '@/app/actions/frontend/affiliate/trackVisitAction';
 
 const SourceTracker = () => {
   const searchParams = useSearchParams();

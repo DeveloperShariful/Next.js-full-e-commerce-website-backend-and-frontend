@@ -1,128 +1,101 @@
-// app/admin/products/create/_components/RichTextEditor.tsx
-
+// app(backend)/admin/products/create/_components/RichTextEditor.tsx
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState } from "react";
+// SSR (Server-Side Rendering) বন্ধ করার জন্য next/dynamic ইম্পোর্ট
 import dynamic from "next/dynamic";
-import "react-quill-new/dist/quill.snow.css"; 
-import { Code, Eye, Type, Copy, Check } from "lucide-react";
+
+// TinyMCE কে ডাইনামিক্যালি লোড করা হচ্ছে যাতে Hydration Error না হয়
+const Editor = dynamic(() => import("@tinymce/tinymce-react").then((mod) => mod.Editor), {
+    ssr: false,
+    loading: () => <div className="h-[400px] w-full bg-gray-100 animate-pulse flex items-center justify-center text-gray-500">Loading Editor...</div>,
+});
 
 interface RichTextEditorProps {
     value: string;
     onChange: (value: string) => void;
     label: string;
+    // Hydration ফিক্স করার জন্য একটি ফিক্সড আইডি নেওয়া হচ্ছে
+    id?: string; 
 }
 
-export default function RichTextEditor({ value, onChange, label }: RichTextEditorProps) {
-    const ReactQuill = useMemo(() => dynamic(() => import("react-quill-new"), { ssr: false }), []);
-    const [activeTab, setActiveTab] = useState<"visual" | "code" | "preview">("visual");
-    const [copied, setCopied] = useState(false);
+export default function RichTextEditor({ value, onChange, label, id }: RichTextEditorProps) {
+    const [editorValue, setEditorValue] = useState("");
 
-    const modules = useMemo(() => ({
-        toolbar: [
-            [{ header: [1, 2, 3, 4, 5, 6, false] }],
-            ["bold", "italic", "underline", "strike", "blockquote", "code-block"],
-            [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
-            [{ color: [] }, { background: [] }],
-            [{ align: [] }],
-            ["link", "image", "video"],
-            ["clean"],
-        ],
-    }), []);
+    // শুধুমাত্র প্রথমবার লোড হওয়ার সময় ডেটা সেট করবে (হ্যাং বন্ধ করার জন্য)
+    useEffect(() => {
+        if (value && !editorValue) {
+            const cleanedValue = value
+                .replace(/\\n/g, '<br/>')  
+                .replace(/\\r/g, '')        
+                .replace(/\n/g, '<br/>');   
+            setEditorValue(cleanedValue);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    const copyToClipboard = useCallback(() => {
-        navigator.clipboard.writeText(value);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    }, [value]);
+    // ইউজার যখন এডিটরে টাইপ করবে, তখন এই ফাংশন রান হবে
+    const handleEditorChange = (content: string) => {
+        setEditorValue(content);
+        // সরাসরি ফর্মে ক্লিন ডেটা পাঠানো হচ্ছে
+        onChange(content);
+    };
+
+    // Hydration সেফটির জন্য ফিক্সড আইডি তৈরি
+    const editorId = id || `editor-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
 
     return (
-        <div className="bg-white border border-gray-300 rounded-sm shadow-sm mt-2 flex flex-col h-full">
+        <div className="bg-white border border-gray-300 rounded-sm shadow-sm mt-2 flex flex-col h-full w-full">
             
-            <div className="flex flex-col sm:flex-row justify-between items-center px-3 py-2 border-b border-gray-300 bg-gray-50">
-                <span className="font-semibold text-xs text-gray-700 uppercase tracking-wide mb-2 sm:mb-0">{label}</span>
-                
-                <div className="flex bg-gray-200 rounded p-1 gap-1">
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab("visual")}
-                        className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded transition ${
-                            activeTab === "visual" ? "bg-white text-[#2271b1] shadow-sm" : "text-gray-600 hover:text-gray-900"
-                        }`}
-                    >
-                        <Type size={14} /> Visual
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab("code")}
-                        className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded transition ${
-                            activeTab === "code" ? "bg-white text-[#2271b1] shadow-sm" : "text-gray-600 hover:text-gray-900"
-                        }`}
-                    >
-                        <Code size={14} /> Code
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setActiveTab("preview")}
-                        className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded transition ${
-                            activeTab === "preview" ? "bg-white text-[#2271b1] shadow-sm" : "text-gray-600 hover:text-gray-900"
-                        }`}
-                    >
-                        <Eye size={14} /> Preview
-                    </button>
-                </div>
+            {/* Top Label Bar */}
+            <div className="flex justify-between items-center px-4 py-3 border-b border-gray-300 bg-gray-50">
+                <span className="font-bold text-sm text-gray-800 uppercase tracking-wide">
+                    {label}
+                </span>
+                <span className="text-xs text-blue-600 font-bold bg-blue-50 border border-blue-200 px-2 py-1 rounded">
+                    WordPress Compatible
+                </span>
             </div>
 
-            <div className="relative min-h-[300px] flex-1">
-                
-                {activeTab === "visual" && (
-                    <ReactQuill 
-                        theme="snow" 
-                        value={value} 
-                        onChange={onChange} 
-                        modules={modules}
-                        className="h-[250px]"
-                    />
-                )}
-
-                {activeTab === "code" && (
-                    <div className="relative h-full">
-                        <textarea
-                            value={value}
-                            onChange={(e) => onChange(e.target.value)}
-                            className="w-full h-[300px] p-4 font-mono text-sm bg-[#1e1e1e] text-green-400 outline-none resize-y"
-                            spellCheck={false}
-                        />
-                        <button 
-                            onClick={copyToClipboard}
-                            className="absolute top-2 right-2 p-1.5 bg-white/10 hover:bg-white/20 rounded text-white transition"
-                            title="Copy HTML"
-                        >
-                            {copied ? <Check size={14}/> : <Copy size={14}/>}
-                        </button>
-                    </div>
-                )}
-
-                {activeTab === "preview" && (
-                    <div className="p-5 h-[300px] overflow-y-auto bg-white prose max-w-none border-b border-gray-200">
-                        <div dangerouslySetInnerHTML={{ __html: value }} />
+            {/* TinyMCE Editor */}
+            <div className="relative flex-1 w-full">
+                <Editor
+                    id={editorId} // ★ Hydration Fix: ফিক্সড আইডি
+                    apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY} 
+                    value={editorValue}
+                    onEditorChange={handleEditorChange}
+                    init={{
+                        height: 400,
+                        menubar: false,
+                        statusbar: true,
+                        plugins: [
+                            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+                        ],
+                        toolbar: 
+                            'blocks | ' +
+                            'bold italic underline strikethrough | ' +
+                            'alignleft aligncenter alignright alignjustify | ' +
+                            'bullist numlist outdent indent | ' +
+                            'link image media | ' +
+                            'removeformat | code | fullscreen',
                         
-                        {value.trim() === "" && (
-                            <p className="text-gray-400 italic text-center mt-10">Nothing to preview...</p>
-                        )}
-                    </div>
-                )}
-
+                        valid_elements: '*[*]', 
+                        extended_valid_elements: 'script[src|async|defer|type|charset],style,div[*],span[*]', 
+                        forced_root_block: false, 
+                        convert_urls: false, 
+                        entity_encoding: "raw", 
+                        
+                        content_style: `
+                            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #333; margin: 16px; }
+                            div, span, section { box-sizing: border-box; }
+                        `,
+                        branding: false, 
+                    }}
+                />
             </div>
             
-            <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 text-[10px] text-gray-500 flex justify-between mt-auto">
-                {activeTab === 'visual' && <span>WYSIWYG Mode Active</span>}
-                {activeTab === 'code' && <span>HTML Source Editor</span>}
-                {activeTab === 'preview' && <span>Live Content Preview</span>}
-                <span>{value.length} characters</span>
-            </div>
         </div>
     );
 }

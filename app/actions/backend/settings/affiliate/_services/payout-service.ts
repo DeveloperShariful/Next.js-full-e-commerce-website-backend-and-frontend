@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/payout-service.ts
+// File: app/actions/admin/affiliate/_services/payout-service.ts
 
 "use server";
 
@@ -196,7 +196,7 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
     });
   });
 
-  revalidatePath("/admin/settings/affiliate/payouts");
+  revalidatePath("/admin/affiliate/payouts");
   return { success: true };
 }
 export async function rejectPayout(payoutId: string, reason: string) {
@@ -259,7 +259,7 @@ export async function rejectPayout(payoutId: string, reason: string) {
     });
   });
 
-  revalidatePath("/admin/settings/affiliate/payouts");
+  revalidatePath("/admin/affiliate/payouts");
   return { success: true };
 }
 

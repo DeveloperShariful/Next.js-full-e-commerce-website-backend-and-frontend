@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/general-config-service.ts
+// File: app/actions/admin/affiliate/_services/general-config-service.ts
 
 "use server";
 
@@ -168,7 +168,7 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
       });
     });
 
-    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/admin/affiliate");
     return { success: true, message: "Configuration updated successfully." };
   } catch (error: any) {
     console.error(error);

@@ -1,7 +1,5 @@
 //app/(backend)/action/shipping/transdirect-action.ts
 
-// app/actions/admin/warranty/transdirect-action.ts
-
 'use server';
 
 import { db } from '@/lib/prisma';

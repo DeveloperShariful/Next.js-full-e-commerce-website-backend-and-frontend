@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/account-service.ts
+// File: app/actions/admin/affiliate/_services/account-service.ts
 
 "use server";
 
@@ -171,7 +171,7 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
         });
     });
 
-    revalidatePath("/admin/settings/affiliate/users");
+    revalidatePath("/admin/affiliate/users");
     return { success: true, message: "Affiliate approved successfully." };
   } catch (error: any) {
     return { success: false, message: error.message };
@@ -226,7 +226,7 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
         });
     });
 
-    revalidatePath("/admin/settings/affiliate/users");
+    revalidatePath("/admin/affiliate/users");
     return { success: true, message: "Affiliate rejected." };
   } catch (error: any) {
     return { success: false, message: error.message };
@@ -279,7 +279,7 @@ export async function bulkStatusAction(ids: string[], status: AffiliateStatus): 
         });
     });
 
-    revalidatePath("/admin/settings/affiliate/users");
+    revalidatePath("/admin/affiliate/users");
     return { success: true, message: `${toUpdate.length} affiliates updated.` };
   } catch (error: any) {
     return { success: false, message: "Bulk update failed." };
@@ -304,7 +304,7 @@ export async function bulkGroupAction(ids: string[], groupId: string): Promise<A
       meta: { action: "BULK_GROUP_ASSIGN" }
     });
 
-    revalidatePath("/admin/settings/affiliate/users");
+    revalidatePath("/admin/affiliate/users");
     return { success: true, message: "Group assigned." };
   } catch (error: any) {
     return { success: false, message: "Bulk group assignment failed." };
@@ -331,7 +331,7 @@ export async function bulkTagAction(ids: string[], tagId: string): Promise<Actio
       meta: { action: "BULK_TAG_ADD" }
     });
 
-    revalidatePath("/admin/settings/affiliate/users");
+    revalidatePath("/admin/affiliate/users");
     return { success: true, message: "Tag added to affiliates." };
   } catch (error: any) {
     return { success: false, message: "Bulk tagging failed." };
@@ -358,7 +358,7 @@ export async function bulkDeleteAction(ids: string[]): Promise<ActionResponse> {
       meta: { ids, method: "SOFT_DELETE" }
     });
 
-    revalidatePath("/admin/settings/affiliate/users");
+    revalidatePath("/admin/affiliate/users");
     return { success: true, message: "Selected users moved to trash." };
   } catch (error: any) {
     return { success: false, message: "Bulk delete failed." };
@@ -400,7 +400,7 @@ export async function updateCommissionAction(
         meta: { updatedBy: "ADMIN_MANUAL_OVERRIDE" }
     });
 
-    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/admin/affiliate");
     return { success: true, message: "Commission updated successfully." };
   } catch (error: any) {
     return { success: false, message: error.message };

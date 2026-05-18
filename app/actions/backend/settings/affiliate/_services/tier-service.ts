@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/tier-service.ts
+// File: app/actions/admin/affiliate/_services/tier-service.ts
 
 "use server";
 
@@ -101,7 +101,7 @@ export async function upsertTierAction(data: TierInput): Promise<ActionResponse>
       newData: payload
     });
 
-    revalidatePath("/admin/settings/affiliate/tiers");
+    revalidatePath("/admin/affiliate/tiers");
     return { success: true, message: payload.id ? "Tier updated." : "Tier created." };
 
   } catch (error: any) {
@@ -131,7 +131,7 @@ export async function deleteTierAction(id: string): Promise<ActionResponse> {
       entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/tiers");
+    revalidatePath("/admin/affiliate/tiers");
     return { success: true, message: "Tier deleted successfully." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete tier." };

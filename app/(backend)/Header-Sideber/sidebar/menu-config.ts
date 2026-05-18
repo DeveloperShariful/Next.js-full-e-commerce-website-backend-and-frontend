@@ -1,10 +1,13 @@
 // File: app/(backend)/admin/Header-Sideber/sidebar/menu-config.ts
 
 import { 
+  // আপনার আগের আইকনগুলো...
   LayoutDashboard, ShoppingCart, Package, Users, 
   TicketPercent, BarChart3, Settings, 
   FileText, ShieldCheck, MessageSquare, ScrollText, 
-  Undo2, Megaphone, Truck, MedalIcon
+  Undo2, Megaphone, Truck, MedalIcon,
+  
+  Handshake, Link, Network, UserPlus
 } from "lucide-react";
 import { Role } from "@prisma/client";
 
@@ -74,6 +77,7 @@ export const sidebarConfig: SidebarGroup[] = [
     items: [
       { name: "Coupons", href: "/admin/coupons", icon: TicketPercent },
       { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ]
   },
   {

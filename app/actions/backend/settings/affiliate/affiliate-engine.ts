@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/affiliate-engine.ts
+// File: app/actions/admin/affiliate/affiliate-engine.ts
 
 "use server";
 

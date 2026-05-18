@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/ledger-service.ts
+// File: app/actions/admin/affiliate/_services/ledger-service.ts
 
 "use server";
 
@@ -114,7 +114,7 @@ export async function createAdjustmentAction(
         });
     });
 
-    revalidatePath("/admin/settings/affiliate/ledger");
+    revalidatePath("/admin/affiliate/ledger");
     return { success: true, message: "Adjustment applied successfully." };
   } catch (error: any) {
     return { success: false, message: error.message };

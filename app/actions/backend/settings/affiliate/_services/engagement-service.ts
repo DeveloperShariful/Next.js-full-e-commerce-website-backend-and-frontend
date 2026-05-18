@@ -1,4 +1,4 @@
-//File: app/actions/admin/settings/affiliate/_services/engagement-service.ts
+//File: app/actions/admin/affiliate/_services/engagement-service.ts
 
 "use server";
 
@@ -162,7 +162,7 @@ export async function upsertContestAction(data: ContestInput): Promise<ActionRes
         newData: payload
     });
 
-    revalidatePath("/admin/settings/affiliate/contests");
+    revalidatePath("/admin/affiliate/contests");
     return { success: true, message: "Contest saved successfully." };
   } catch (error: any) {
     return { success: false, message: "Failed to save contest." };
@@ -182,7 +182,7 @@ export async function deleteContestAction(id: string): Promise<ActionResponse> {
         entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/contests");
+    revalidatePath("/admin/affiliate/contests");
     return { success: true, message: "Contest deleted." };
   } catch (error) {
     return { success: false, message: "Failed to delete contest." };
@@ -266,7 +266,7 @@ export async function deleteCampaignAction(id: string): Promise<ActionResponse> 
       oldData: { name: deleted.name, affiliateId: deleted.affiliateId }
     });
 
-    revalidatePath("/admin/settings/affiliate/campaigns");
+    revalidatePath("/admin/affiliate/campaigns");
     return { success: true, message: "Campaign deleted successfully." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete campaign." };

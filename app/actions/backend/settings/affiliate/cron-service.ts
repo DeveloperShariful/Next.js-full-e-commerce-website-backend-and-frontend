@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/cron-service.ts
+// File: app/actions/admin/affiliate/cron-service.ts
 
 "use server";
 

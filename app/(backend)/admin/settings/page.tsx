@@ -64,7 +64,7 @@ export default function SettingsDashboard() {
       title: "Affiliate Program",
       description: "Manage referrals, MLM tiers, commission rules, and assets.",
       icon: Users,
-      href: "/admin/settings/affiliate",
+      href: "/admin/affiliate",
       color: "text-indigo-600",
       bgColor: "bg-indigo-50",
     },

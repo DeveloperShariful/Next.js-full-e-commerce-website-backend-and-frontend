@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/marketing-assets-service.ts
+// File: app/actions/admin/affiliate/_services/marketing-assets-service.ts
 
 "use server";
 
@@ -137,7 +137,7 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
       newData: payload
     });
 
-    revalidatePath("/admin/settings/affiliate/announcements");
+    revalidatePath("/admin/affiliate/announcements");
     return { success: true, message: "Announcement published." };
   } catch (error: any) {
     return { success: false, message: error.message };
@@ -155,7 +155,7 @@ export async function deleteAnnouncementAction(id: string): Promise<ActionRespon
       entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/announcements");
+    revalidatePath("/admin/affiliate/announcements");
     return { success: true, message: "Deleted successfully." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete." };
@@ -176,7 +176,7 @@ export async function toggleAnnouncementStatusAction(id: string, isActive: boole
         entityId: id,
         newData: { isActive }
     });
-    revalidatePath("/admin/settings/affiliate/announcements");
+    revalidatePath("/admin/affiliate/announcements");
     return { success: true, message: "Status updated." };
   } catch (error: any) {
     return { success: false, message: "Update failed." };
@@ -222,7 +222,7 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
       newData: dbPayload
     });
 
-    revalidatePath("/admin/settings/affiliate/creatives");
+    revalidatePath("/admin/affiliate/creatives");
     return { success: true, message: "Creative asset saved successfully." };
 
   } catch (error: any) {
@@ -244,7 +244,7 @@ export async function deleteCreativeAction(id: string): Promise<ActionResponse> 
       entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/creatives");
+    revalidatePath("/admin/affiliate/creatives");
     return { success: true, message: "Asset deleted successfully." };
   } catch (error) {
     return { success: false, message: "Failed to delete asset." };
@@ -318,7 +318,7 @@ export async function upsertAnnouncementAction(data: z.infer<typeof announcement
       newData: payload
     });
 
-    revalidatePath("/admin/settings/affiliate/announcements");
+    revalidatePath("/admin/affiliate/announcements");
     return { success: true, message: payload.id ? "Announcement updated." : "Announcement published." };
   } catch (error: any) {
     return { success: false, message: error.message };

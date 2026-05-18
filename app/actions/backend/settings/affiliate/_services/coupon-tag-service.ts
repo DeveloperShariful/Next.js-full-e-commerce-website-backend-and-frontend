@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/coupon-tag-service.ts
+// File: app/actions/admin/affiliate/_services/coupon-tag-service.ts
 
 "use server";
 
@@ -89,7 +89,7 @@ export async function createAndLinkCouponAction(
         meta: { code, value, type, affiliateCommissionRate }
     });
 
-    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/admin/affiliate");
     return { success: true, message: "Coupon assigned successfully." };
 
   } catch (error: any) {
@@ -109,7 +109,7 @@ export async function unlinkCouponAction(couponId: string): Promise<ActionRespon
         }
     });
 
-    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/admin/affiliate");
     return { success: true, message: "Coupon unlinked." };
   } catch (error: any) {
     return { success: false, message: error.message };
@@ -137,7 +137,7 @@ export async function createTagAction(name: string): Promise<ActionResponse> {
         newData: { name }
     });
 
-    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/admin/affiliate");
     return { success: true, message: "Tag created." };
   } catch (error: any) {
     return { success: false, message: "Failed to create tag." };
@@ -159,7 +159,7 @@ export async function deleteTagAction(id: string): Promise<ActionResponse> {
         entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/admin/affiliate");
     return { success: true, message: "Tag deleted." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete tag." };
@@ -208,7 +208,7 @@ export async function updateCouponAction(
       newData: { code, value, type, affiliateId, affiliateCommissionRate }
     });
 
-    revalidatePath("/admin/settings/affiliate");
+    revalidatePath("/admin/affiliate");
     return { success: true, message: "Coupon updated successfully." };
 
   } catch (error: any) {

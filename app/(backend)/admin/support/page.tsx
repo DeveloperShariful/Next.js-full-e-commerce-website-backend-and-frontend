@@ -1,122 +1,120 @@
-// app/admin/support/page.tsx
+// File: app/admin/support/page.tsx
 
 "use client";
 
 import { useState, useEffect } from "react";
-import { getTickets } from "@/app/actions/backend/support";
-import Link from "next/link";
+import { getTickets } from "@/app/actions/backend/support/support";
 import { 
-  MessageSquare, Search, RefreshCcw, 
-  Loader2, CheckCircle2, Clock, AlertCircle 
-} from "lucide-react";
+  TicketWithRelations, 
+  SupportQueryParams, 
+  SupportCounts, 
+  GetTicketsResponse 
+} from "./types";
+import { TicketStatus } from "@prisma/client";
+
+// Component Imports
+import { WcSupportHeader } from "./_components/wc-support-header";
+import { WcSupportStatusLinks } from "./_components/wc-support-status-links";
+import { WcSupportToolbar } from "./_components/wc-support-toolbar";
+import { WcSupportTable } from "./_components/wc-support-table";
 
 export default function SupportPage() {
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  // State Management
+  const [tickets, setTickets] = useState<TicketWithRelations[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [counts, setCounts] = useState<SupportCounts>({ 
+    ALL: 0, OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 
+  });
+  const [meta, setMeta] = useState<GetTicketsResponse["meta"]>();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
+  // Query Parameters State
+  const [queryParams, setQueryParams] = useState<SupportQueryParams>({
+    search: "",
+    status: "ALL",
+    page: 1,
+    limit: 20,
+  });
 
-  const fetchData = async () => {
+  // Data Fetching Function
+  const fetchTickets = async () => {
     setLoading(true);
-    const res = await getTickets(filter);
-    if (res.success) setTickets(res.data);
+    const res = await getTickets(queryParams);
+    if (res.success) {
+      setTickets(res.data || []);
+      setCounts(res.counts || { ALL: 0, OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 });
+      setMeta(res.meta);
+    }
     setLoading(false);
   };
 
+  // Debounce Effect for Search & Filters
   useEffect(() => {
-    fetchData();
-  }, [filter]);
+    const timer = setTimeout(() => {
+      fetchTickets();
+    }, 400); 
+    return () => clearTimeout(timer);
+  }, [queryParams]);
 
-  const StatusBadge = ({ status }: { status: string }) => {
-    const styles: any = {
-      open: "bg-green-100 text-green-700",
-      closed: "bg-gray-100 text-slate-600",
-      pending: "bg-orange-100 text-orange-700"
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${styles[status] || styles.pending}`}>
-        {status}
-      </span>
-    );
+  // Bulk Selection Handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(tickets.map((t) => t.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds((prev) => [...prev, id]);
+    } else {
+      setSelectedIds((prev) => prev.filter((item) => item !== id));
+    }
   };
 
   return (
-    <div className="p-6 max-w-[1920px] mx-auto min-h-screen bg-[#F0F0F1] font-sans text-slate-800">
-      
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <MessageSquare className="text-blue-600" /> Support Tickets
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">Manage customer inquiries and issues.</p>
+    /* WP-Admin Background Color: #f0f0f1 */
+    <div className="min-h-screen bg-[#f0f0f1] font-sans text-[#1d2327]">
+      <div className="max-w-[1920px] mx-auto">
+        
+        {/* ১. Page Header & Stats (100% Responsive) */}
+        <WcSupportHeader counts={counts} />
+
+        {/* ২. Status Links (All | Open | In Progress ...) */}
+        <WcSupportStatusLinks 
+          counts={counts} 
+          currentStatus={queryParams.status || "ALL"}
+          onStatusChange={(status) => setQueryParams({ ...queryParams, status, page: 1 })}
+        />
+
+        {/* ৩. Table Toolbar (Bulk Actions, Search & Pagination) */}
+        <WcSupportToolbar 
+          queryParams={queryParams}
+          setQueryParams={setQueryParams}
+          meta={meta}
+          selectedIds={selectedIds}
+          onRefresh={fetchTickets}
+          setSelectedIds={setSelectedIds}
+        />
+
+        {/* ৪. WooCommerce Style Data Table */}
+        <WcSupportTable 
+          tickets={tickets}
+          loading={loading}
+          selectedIds={selectedIds}
+          onSelectAll={handleSelectAll}
+          onSelectOne={handleSelectOne}
+          onRefresh={fetchTickets}
+        />
+
+        {/* ৫. Bottom Pagination Info */}
+        <div className="mt-2 flex justify-end">
+           <span className="text-[13px] text-[#50575e]">
+             {meta ? `${meta.total} items` : '0 items'}
+           </span>
         </div>
-        <button onClick={fetchData} className="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50 flex gap-2">
-             <RefreshCcw size={16} className={loading ? "animate-spin" : ""}/> Refresh
-        </button>
-      </div>
 
-      {/* TABS */}
-      <div className="flex gap-1 mb-6 border-b border-slate-200">
-        {["all", "open", "closed"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-6 py-3 text-sm font-bold border-b-2 capitalize transition ${
-              filter === tab 
-                ? "border-blue-600 text-blue-600" 
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* LIST */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        {loading ? (
-            <div className="p-20 text-center flex justify-center"><Loader2 className="animate-spin text-blue-600"/></div>
-        ) : tickets.length === 0 ? (
-            <div className="p-20 text-center text-slate-500">No tickets found.</div>
-        ) : (
-            <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 border-b text-xs uppercase font-bold text-slate-500">
-                    <tr>
-                        <th className="p-4">Ticket ID</th>
-                        <th className="p-4">Subject</th>
-                        <th className="p-4">Customer</th>
-                        <th className="p-4">Priority</th>
-                        <th className="p-4 text-center">Status</th>
-                        <th className="p-4 text-center">Date</th>
-                        <th className="p-4 text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                    {tickets.map((t) => (
-                        <tr key={t.id} className="hover:bg-slate-50 transition">
-                            <td className="p-4 font-mono text-xs text-slate-500">#{t.id.slice(0,6)}</td>
-                            <td className="p-4 font-medium text-slate-800">{t.subject}</td>
-                            <td className="p-4">
-                                <div className="font-bold text-sm">{t.user?.name || "Guest"}</div>
-                                <div className="text-xs text-slate-500">{t.user?.email}</div>
-                            </td>
-                            <td className="p-4">
-                                <span className={`text-xs font-bold ${t.priority === 'high' ? 'text-red-600' : 'text-slate-600'}`}>
-                                    {t.priority}
-                                </span>
-                            </td>
-                            <td className="p-4 text-center"><StatusBadge status={t.status}/></td>
-                            <td className="p-4 text-center text-xs text-slate-500">{new Date(t.createdAt).toLocaleDateString()}</td>
-                            <td className="p-4 text-right">
-                                <Link href={`/admin/support/${t.id}`} className="px-3 py-1.5 border rounded text-xs font-bold hover:bg-blue-50 text-blue-600">
-                                    Reply
-                                </Link>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        )}
       </div>
     </div>
   );

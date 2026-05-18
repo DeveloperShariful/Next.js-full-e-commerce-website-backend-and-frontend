@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/mlm-network-service.ts
+// File: app/actions/admin/affiliate/_services/mlm-network-service.ts
 
 "use server";
 
@@ -159,7 +159,7 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
         newData: result.data
     });
 
-    revalidatePath("/admin/settings/affiliate/network");
+    revalidatePath("/admin/affiliate/network");
     return { success: true, message: "Network settings saved." };
   } catch (error: any) {
     return { success: false, message: error.message || "Failed to save." };

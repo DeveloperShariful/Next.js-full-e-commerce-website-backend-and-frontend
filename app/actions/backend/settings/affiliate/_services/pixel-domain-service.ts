@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/pixel-domain-service.ts
+// File: app/actions/admin/affiliate/_services/pixel-domain-service.ts
 
 "use server";
 
@@ -51,7 +51,7 @@ export async function createPixelAction(data: Prisma.AffiliatePixelCreateInput):
       newData: data
     });
 
-    revalidatePath("/admin/settings/affiliate/pixels");
+    revalidatePath("/admin/affiliate/pixels");
     return { success: true, message: "Tracking pixel added." };
   } catch (error: any) {
     return { success: false, message: "Failed to create pixel." };
@@ -65,7 +65,7 @@ export async function togglePixelStatusAction(id: string, isEnabled: boolean): P
       where: { id },
       data: { isEnabled }
     });
-    revalidatePath("/admin/settings/affiliate/pixels");
+    revalidatePath("/admin/affiliate/pixels");
     return { success: true, message: `Pixel ${isEnabled ? "enabled" : "disabled"}.` };
   } catch (error: any) {
     return { success: false, message: "Failed to update status." };
@@ -84,7 +84,7 @@ export async function deletePixelAction(id: string): Promise<ActionResponse> {
         entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/pixels");
+    revalidatePath("/admin/affiliate/pixels");
     return { success: true, message: "Pixel deleted." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete pixel." };
@@ -153,7 +153,7 @@ export async function addDomainAction(data: z.infer<typeof domainSchema>): Promi
       entityId: record.id,
       newData: { domain: cleanDomain, affiliateId }
     });
-    revalidatePath("/admin/settings/affiliate/domains");
+    revalidatePath("/admin/affiliate/domains");
     return { success: true, message: "Domain added. Verification required." };
   } catch (error: any) {
     return { success: false, message: error.message };
@@ -192,7 +192,7 @@ export async function verifyDomainAction(id: string): Promise<ActionResponse> {
         entityId: id,
         newData: { isVerified: true }
       });
-      revalidatePath("/admin/settings/affiliate/domains");
+      revalidatePath("/admin/affiliate/domains");
       return { success: true, message: "Domain verified successfully." };
     } else {
       return { success: false, message: "DNS TXT record not found matching the token." };
@@ -213,7 +213,7 @@ export async function deleteDomainAction(id: string): Promise<ActionResponse> {
         entity: "AffiliateDomain",
         entityId: id
     });
-    revalidatePath("/admin/settings/affiliate/domains");
+    revalidatePath("/admin/affiliate/domains");
     return { success: true, message: "Domain removed." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete domain." };

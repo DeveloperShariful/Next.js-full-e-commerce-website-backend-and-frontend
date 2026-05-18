@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/group-service.ts
+// File: app/actions/admin/affiliate/_services/group-service.ts
 
 "use server";
 
@@ -146,7 +146,7 @@ export async function upsertGroupAction(data: GroupInput): Promise<ActionRespons
       }
     });
 
-    revalidatePath("/admin/settings/affiliate/groups");
+    revalidatePath("/admin/affiliate/groups");
     return { success: true, message: payload.id ? "Group updated." : "Group created." };
 
   } catch (error: any) {
@@ -184,7 +184,7 @@ export async function deleteGroupAction(id: string): Promise<ActionResponse> {
       oldData: { name: deleted.name }
     });
     
-    revalidatePath("/admin/settings/affiliate/groups");
+    revalidatePath("/admin/affiliate/groups");
     return { success: true, message: "Group deleted successfully." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete group." };

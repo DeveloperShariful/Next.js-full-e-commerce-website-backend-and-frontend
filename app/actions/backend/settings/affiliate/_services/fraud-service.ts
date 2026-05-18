@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/fraud-service.ts
+// File: app/actions/admin/affiliate/_services/fraud-service.ts
 
 "use server";
 
@@ -57,7 +57,7 @@ export async function createFraudRuleAction(data: z.infer<typeof ruleSchema>): P
       newData: result.data
     });
 
-    revalidatePath("/admin/settings/affiliate/fraud");
+    revalidatePath("/admin/affiliate/fraud");
     return { success: true, message: "Security rule activated." };
   } catch (error: any) {
     return { success: false, message: "Failed to create rule." };
@@ -77,7 +77,7 @@ export async function deleteFraudRuleAction(id: string): Promise<ActionResponse>
         entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/fraud");
+    revalidatePath("/admin/affiliate/fraud");
     return { success: true, message: "Rule removed." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete rule." };

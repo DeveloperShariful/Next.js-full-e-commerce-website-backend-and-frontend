@@ -192,7 +192,7 @@ export default function DiscountClient() {
               </li>
               <li className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <span className="bg-blue-600 text-white font-bold py-1 px-3 rounded-lg text-sm">20" Bike</span>
-                <span className="text-gray-700 font-medium">Ideal for Pre-Teens (Ages 9-16)</span>
+                <span className="text-gray-700 font-medium">Ideal for Pre-Teens (Ages 8-14)</span>
               </li>
               <li className="flex items-center gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                 <span className="bg-blue-600 text-white font-bold py-1 px-3 rounded-lg text-sm">24" Bike</span>

@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/kyc-service.ts
+// File: app/actions/admin/affiliate/_services/kyc-service.ts
 
 "use server";
 
@@ -121,7 +121,7 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
       });
     });
 
-    revalidatePath("/admin/settings/affiliate/kyc");
+    revalidatePath("/admin/affiliate/kyc");
     return { success: true, message: "Document verified successfully." };
   } catch (error: any) {
     return { success: false, message: error.message || "Verification failed." };
@@ -181,7 +181,7 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
       });
     });
 
-    revalidatePath("/admin/settings/affiliate/kyc");
+    revalidatePath("/admin/affiliate/kyc");
     return { success: true, message: "Document rejected." };
   } catch (error: any) {
     return { success: false, message: error.message || "Rejection failed." };

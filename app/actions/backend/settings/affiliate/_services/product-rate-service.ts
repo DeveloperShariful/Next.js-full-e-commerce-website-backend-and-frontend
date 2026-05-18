@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/product-rate-service.ts
+// File: app/actions/admin/affiliate/_services/product-rate-service.ts
 
 "use server";
 
@@ -172,7 +172,7 @@ export async function upsertRateAction(data: {
         newData: data
     });
 
-    revalidatePath("/admin/settings/affiliate/product-rates");
+    revalidatePath("/admin/affiliate/product-rates");
     return { success: true, message: "Commission override saved successfully." };
   } catch (error: any) {
     console.error(error);
@@ -193,7 +193,7 @@ export async function deleteRateAction(id: string): Promise<ActionResponse> {
         entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/product-rates");
+    revalidatePath("/admin/affiliate/product-rates");
     return { success: true, message: "Rule removed." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete." };
@@ -250,7 +250,7 @@ export async function bulkImportRatesAction(rates: {
       meta: { count: validRates.length }
     });
 
-    revalidatePath("/admin/settings/affiliate/product-rates");
+    revalidatePath("/admin/affiliate/product-rates");
     return { success: true, message: `Imported ${validRates.length} rates successfully.` };
   } catch (error: any) {
     return { success: false, message: "Bulk import failed." };

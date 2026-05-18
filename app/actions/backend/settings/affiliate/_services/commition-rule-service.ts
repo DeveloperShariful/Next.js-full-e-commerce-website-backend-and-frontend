@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/affiliate/_services/commition-rule-service.ts
+// File: app/actions/admin/affiliate/_services/commition-rule-service.ts
 
 "use server";
 
@@ -113,7 +113,7 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
         newData: prismaData
     });
 
-    revalidatePath("/admin/settings/affiliate/rules");
+    revalidatePath("/admin/affiliate/rules");
     return { success: true, message: "Commission rule saved successfully." };
 
   } catch (error: any) {
@@ -142,7 +142,7 @@ export async function reorderRulesAction(items: { id: string; priority: number }
         meta: { count: items.length }
     });
 
-    revalidatePath("/admin/settings/affiliate/rules");
+    revalidatePath("/admin/affiliate/rules");
     return { success: true, message: "Priorities updated." };
   } catch (error) {
     return { success: false, message: "Failed to reorder rules." };
@@ -162,7 +162,7 @@ export async function deleteRuleAction(id: string): Promise<ActionResponse> {
         entityId: id
     });
 
-    revalidatePath("/admin/settings/affiliate/rules");
+    revalidatePath("/admin/affiliate/rules");
     return { success: true, message: "Rule deleted." };
   } catch (error) {
     return { success: false, message: "Failed to delete rule." };

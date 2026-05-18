@@ -9,7 +9,7 @@ import { Trophy, Calendar, Plus, Trash2, Edit, TrendingUp, Users, Medal, Loader2
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { deleteContestAction, upsertContestAction } from "@/app/actions/backend/settings/affiliate/_services/engagement-service";
+import { deleteContestAction, upsertContestAction } from "@/app/actions/backend/affiliate/_services/engagement-service";
 
 interface Props {
   initialContests: AffiliateContest[];

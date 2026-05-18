@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { deleteRuleAction, upsertRuleAction } from "@/app/actions/backend/settings/affiliate/_services/commition-rule-service";
+import { deleteRuleAction, upsertRuleAction } from "@/app/actions/backend/affiliate/_services/commition-rule-service";
 
 // ============================================================================
 // PART 1: MAIN COMPONENT (LIST VIEW)

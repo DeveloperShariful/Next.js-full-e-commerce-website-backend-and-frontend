@@ -9,9 +9,9 @@ import { Plus, Search, Edit, Trash2, X, Loader2, Package, User, Users, CheckCirc
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { deleteRateAction, upsertRateAction, searchProducts } from "@/app/actions/backend/settings/affiliate/_services/product-rate-service";
-import { searchAffiliatesForDropdown } from "@/app/actions/backend/settings/affiliate/_services/coupon-tag-service";
-import { getAllGroups } from "@/app/actions/backend/settings/affiliate/_services/group-service";
+import { deleteRateAction, upsertRateAction, searchProducts } from "@/app/actions/backend/affiliate/_services/product-rate-service";
+import { searchAffiliatesForDropdown } from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
+import { getAllGroups } from "@/app/actions/backend/affiliate/_services/group-service";
 
 interface ProductRateWithRelations extends AffiliateProductRate {
   product: { 

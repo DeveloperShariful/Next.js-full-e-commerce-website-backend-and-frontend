@@ -1,4 +1,4 @@
-// File: app/actions/admin/affiliate/_services/product-rate-service.ts
+// File: app/actions/backend/affiliate/_services/product-rate-service.ts
 
 "use server";
 

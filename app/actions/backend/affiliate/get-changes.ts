@@ -1,4 +1,4 @@
-//File: app/actions/admin/affiliate/get-changes.ts
+//File: app/actions/backend/affiliate/get-changes.ts
 
 import { Prisma } from "@prisma/client";
 

@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { AffiliateUserTableItem } from "@/app/actions/backend/settings/affiliate/types";
+import { AffiliateUserTableItem } from "@/app/actions/backend/affiliate/types";
 import { 
   approveAffiliateAction, 
   rejectAffiliateAction, 
@@ -22,8 +22,8 @@ import {
   bulkGroupAction, 
   bulkTagAction,
   updateCommissionAction
-} from "@/app/actions/backend/settings/affiliate/_services/account-service";
-import { createAdjustmentAction } from "@/app/actions/backend/settings/affiliate/_services/ledger-service";
+} from "@/app/actions/backend/affiliate/_services/account-service";
+import { createAdjustmentAction } from "@/app/actions/backend/affiliate/_services/ledger-service";
 
 import {
   DropdownMenu,

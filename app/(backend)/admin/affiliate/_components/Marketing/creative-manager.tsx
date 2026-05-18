@@ -7,7 +7,7 @@ import { AffiliateCreative, MediaType } from "@prisma/client";
 import { Edit, Trash2, Image as ImageIcon, Link as LinkIcon, Copy, Plus, ExternalLink, FileText, Check, X, Loader2, Save, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
-import { deleteCreativeAction, upsertCreativeAction, trackCreativeUsageAction } from "@/app/actions/backend/settings/affiliate/_services/marketing-assets-service";
+import { deleteCreativeAction, upsertCreativeAction, trackCreativeUsageAction } from "@/app/actions/backend/affiliate/_services/marketing-assets-service";
 import { MediaPicker } from "@/components/media/media-picker";
 
 interface CreativeWithStats extends Omit<AffiliateCreative, 'usageCount'> {

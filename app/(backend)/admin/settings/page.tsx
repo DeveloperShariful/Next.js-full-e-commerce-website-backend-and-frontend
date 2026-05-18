@@ -59,15 +59,7 @@ export default function SettingsDashboard() {
       color: "text-pink-600",
       bgColor: "bg-pink-50",
     },
-    // ✅ NEW AFFILIATE MODULE ADDED HERE
-    {
-      title: "Affiliate Program",
-      description: "Manage referrals, MLM tiers, commission rules, and assets.",
-      icon: Users,
-      href: "/admin/affiliate",
-      color: "text-indigo-600",
-      bgColor: "bg-indigo-50",
-    },
+   
   ];
 
   return (

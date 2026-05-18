@@ -11,9 +11,9 @@ import {
   Shield, Clock, Network, Percent, AlertTriangle, CheckCircle 
 } from "lucide-react";
 import { z } from "zod";
-import { affiliateGeneralSchema } from "@/app/actions/backend/settings/affiliate/schemas";
-import { updateGeneralSettingsAction } from "@/app/actions/backend/settings/affiliate/_services/general-config-service";
-import { AffiliateGeneralSettings } from "@/app/actions/backend/settings/affiliate/types";
+import { affiliateGeneralSchema } from "@/app/actions/backend/affiliate/schemas";
+import { updateGeneralSettingsAction } from "@/app/actions/backend/affiliate/_services/general-config-service";
+import { AffiliateGeneralSettings } from "@/app/actions/backend/affiliate/types";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 

@@ -1,4 +1,4 @@
-//File: app/actions/admin/affiliate/permission-service.ts
+//File: app/actions/backend/affiliate/permission-service.ts
 
 "use server";
 

@@ -12,7 +12,7 @@ import {
   DollarSign, Wallet, MousePointer, AlertCircle, ArrowUpRight 
 } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { DashboardKPI, ChartDataPoint } from "@/app/actions/backend/settings/affiliate/types";
+import { DashboardKPI, ChartDataPoint } from "@/app/actions/backend/affiliate/types";
 
 interface Props {
   kpi: DashboardKPI;

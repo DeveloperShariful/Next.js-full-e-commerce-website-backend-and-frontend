@@ -8,7 +8,7 @@ import { Edit, Trash2, Users, Trophy, Plus, TrendingUp, X, Loader2, Save } from 
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { deleteTierAction, upsertTierAction } from "@/app/actions/backend/settings/affiliate/_services/tier-service";
+import { deleteTierAction, upsertTierAction } from "@/app/actions/backend/affiliate/_services/tier-service";
 
 // ============================================================================
 // PART 1: MAIN COMPONENT (LIST VIEW)

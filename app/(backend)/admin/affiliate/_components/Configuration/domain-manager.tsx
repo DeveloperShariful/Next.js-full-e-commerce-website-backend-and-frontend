@@ -10,7 +10,7 @@ import {
   addDomainAction, 
   deleteDomainAction, 
   verifyDomainAction 
-} from "@/app/actions/backend/settings/affiliate/_services/pixel-domain-service";
+} from "@/app/actions/backend/affiliate/_services/pixel-domain-service";
 
 interface DomainWithAffiliate extends AffiliateDomain {
   affiliate: {

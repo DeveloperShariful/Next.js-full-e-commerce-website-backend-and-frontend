@@ -1,4 +1,4 @@
-// File: app/actions/admin/affiliate/_services/payout-service.ts
+// File: app/actions/backend/affiliate/_services/payout-service.ts
 
 "use server";
 

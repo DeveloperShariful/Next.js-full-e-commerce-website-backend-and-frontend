@@ -1,4 +1,4 @@
-//File: app/actions/admin/affiliate/_services/log-service.ts
+//File: app/actions/backend/affiliate/_services/log-service.ts
 
 "use server";
 

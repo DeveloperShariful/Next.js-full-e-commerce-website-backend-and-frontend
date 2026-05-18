@@ -7,7 +7,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { Save, Plus, Trash2, Loader2, GitGraph, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { updateMlmConfigAction } from "@/app/actions/backend/settings/affiliate/_services/mlm-network-service";
+import { updateMlmConfigAction } from "@/app/actions/backend/affiliate/_services/mlm-network-service";
 
 interface MLMFormValues {
   isEnabled: boolean;

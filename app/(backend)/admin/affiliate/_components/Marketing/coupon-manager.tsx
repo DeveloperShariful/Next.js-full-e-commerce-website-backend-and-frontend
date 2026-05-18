@@ -12,7 +12,7 @@ import {
   unlinkCouponAction, 
   updateCouponAction,
   searchAffiliatesForDropdown 
-} from "@/app/actions/backend/settings/affiliate/_services/coupon-tag-service";
+} from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 import { cn } from "@/lib/utils";
 
 interface Coupon {

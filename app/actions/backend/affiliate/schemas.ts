@@ -1,4 +1,4 @@
-// File: app/actions/admin/affiliate/schemas.ts
+// File: app/actions/backend/affiliate/schemas.ts
 
 import { z } from "zod";
 

@@ -1,7 +1,7 @@
 // File: app/api/affiliate/process-refund/route.ts
 
 import { NextResponse } from "next/server";
-import { processRefund } from "@/app/actions/backend/settings/affiliate/affiliate-engine";
+import { processRefund } from "@/app/actions/backend/affiliate/affiliate-engine";
 import { auditService } from "@/lib/audit-service";
 import { hmacService } from "@/lib/hmac-service";
 

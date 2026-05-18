@@ -1,4 +1,4 @@
-// File: app/actions/admin/affiliate/_services/commition-rule-service.ts
+// File: app/actions/backend/affiliate/_services/commition-rule-service.ts
 
 "use server";
 

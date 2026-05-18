@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { deleteLogsAction } from "@/app/actions/backend/settings/affiliate/_services/log-service";
+import { deleteLogsAction } from "@/app/actions/backend/affiliate/_services/log-service";
 
 interface Props {
   auditData: { logs: any[]; total: number; totalPages: number };
@@ -26,13 +26,9 @@ export default function LogViewer({ auditData, systemData, currentPage, currentT
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  
-  // State
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  // Current Data Source based on Tab
   const currentData = currentTab === "AUDIT" ? auditData.logs : systemData.logs;
   const totalPages = currentTab === "AUDIT" ? auditData.totalPages : systemData.totalPages;
 

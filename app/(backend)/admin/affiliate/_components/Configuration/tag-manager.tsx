@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { Tag, Plus, Trash2, Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
-import { createTagAction, deleteTagAction } from "@/app/actions/backend/settings/affiliate/_services/coupon-tag-service";
+import { createTagAction, deleteTagAction } from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 
 export default function TagManager({ initialTags }: { initialTags: any[] }) {
   const [tags, setTags] = useState(initialTags);

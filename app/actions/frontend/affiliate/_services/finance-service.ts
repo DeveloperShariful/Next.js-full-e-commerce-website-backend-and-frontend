@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { AffiliateConfigDTO } from "@/app/actions/backend/settings/affiliate/types";
+import { AffiliateConfigDTO } from "@/app/actions/backend/affiliate/types";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { PayoutMethod } from "@prisma/client";

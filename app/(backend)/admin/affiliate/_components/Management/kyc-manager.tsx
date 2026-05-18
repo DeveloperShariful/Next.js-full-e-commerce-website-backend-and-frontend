@@ -7,7 +7,7 @@ import { AffiliateDocument } from "@prisma/client";
 import { Search, Eye, CheckCircle, XCircle, FileText, Download, X, Loader2, ShieldCheck, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { rejectDocumentAction, verifyDocumentAction } from "@/app/actions/backend/settings/affiliate/_services/kyc-service";
+import { rejectDocumentAction, verifyDocumentAction } from "@/app/actions/backend/affiliate/_services/kyc-service";
 
 interface DocumentWithUser extends AffiliateDocument {
   affiliate: {

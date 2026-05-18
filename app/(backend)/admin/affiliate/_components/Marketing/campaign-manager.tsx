@@ -7,7 +7,7 @@ import { Trash2, Megaphone, Calendar, MousePointer, Percent } from "lucide-react
 import { toast } from "sonner";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format } from "date-fns";
-import { deleteCampaignAction } from "@/app/actions/backend/settings/affiliate/_services/engagement-service";
+import { deleteCampaignAction } from "@/app/actions/backend/affiliate/_services/engagement-service";
 
 interface CampaignItem {
   id: string;

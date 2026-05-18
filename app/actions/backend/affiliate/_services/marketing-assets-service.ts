@@ -1,4 +1,4 @@
-// File: app/actions/admin/affiliate/_services/marketing-assets-service.ts
+// File: app/actions/backend/affiliate/_services/marketing-assets-service.ts
 
 "use server";
 

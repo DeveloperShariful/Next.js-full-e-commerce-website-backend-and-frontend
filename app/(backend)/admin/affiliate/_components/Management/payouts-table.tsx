@@ -3,14 +3,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { PayoutQueueItem } from "@/app/actions/backend/settings/affiliate/types"; 
+import { PayoutQueueItem } from "@/app/actions/backend/affiliate/types"; 
 import { toast } from "sonner";
 import { Check, X, FileText, ExternalLink, Loader2, AlertCircle, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { markAsPaid, rejectPayout, getInvoiceData } from "@/app/actions/backend/settings/affiliate/_services/payout-service";
+import { markAsPaid, rejectPayout, getInvoiceData } from "@/app/actions/backend/affiliate/_services/payout-service";
 import { cn } from "@/lib/utils";
 
 interface Props {

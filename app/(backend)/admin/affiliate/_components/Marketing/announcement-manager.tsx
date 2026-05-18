@@ -19,8 +19,8 @@ import {
   deleteAnnouncementAction,
   toggleAnnouncementStatusAction,
   getTargetingOptions // New helper
-} from "@/app/actions/backend/settings/affiliate/_services/marketing-assets-service";
-import { searchAffiliatesForDropdown } from "@/app/actions/backend/settings/affiliate/_services/coupon-tag-service";
+} from "@/app/actions/backend/affiliate/_services/marketing-assets-service";
+import { searchAffiliatesForDropdown } from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 
 // --- TYPES ---
 interface AnnouncementWithTargets extends AffiliateAnnouncement {

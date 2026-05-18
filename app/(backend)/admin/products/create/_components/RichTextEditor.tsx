@@ -61,7 +61,7 @@ export default function RichTextEditor({ value, onChange, label, id }: RichTextE
             <div className="relative flex-1 w-full">
                 <Editor
                     id={editorId} // ★ Hydration Fix: ফিক্সড আইডি
-                    apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY} 
+                    apiKey={process.env.NEXT_PUBLIC_TINYMCE_API} 
                     value={editorValue}
                     onEditorChange={handleEditorChange}
                     init={{

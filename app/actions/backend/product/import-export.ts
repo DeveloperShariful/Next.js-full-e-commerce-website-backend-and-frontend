@@ -1,12 +1,13 @@
-// File: app/actions/admin/product/import-export.ts
+// File: app/actions/backend/product/import-export.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
 import Papa from "papaparse";
-import { generateSlug, serializeData } from "./product-utils"; // 🔥 serializeData imported
+import { generateSlug, serializeData } from "./product-utils"; 
 import { ProductStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import crypto from "crypto";
 
 // --- EXPORT FUNCTION ---
 export async function exportProductsCSV() {
@@ -16,38 +17,38 @@ export async function exportProductsCSV() {
       orderBy: { id: 'desc' }
     });
 
-    // 🔥 FIX: Serialize data to handle Decimals & Dates before CSV conversion
     const safeProducts = serializeData(products);
 
     const csvData = safeProducts.map((p: any) => ({
       ID: p.id,
       Type: p.productType.toLowerCase(),
       SKU: p.sku || "",
+      "GTIN, UPC, EAN, or ISBN": p.barcode || "",
       Name: p.name,
       Published: p.status === "ACTIVE" ? 1 : 0,
       "Is featured?": p.isFeatured ? 1 : 0,
+      "Visibility in catalog": "visible",
       "Short description": p.shortDescription || "",
       Description: p.description || "",
-      "Regular price": p.price, // Now it's a number
+      "Regular price": p.price || "",
       "Sale price": p.salePrice || "",
       "Cost of goods": p.costPerItem || "", 
-      Stock: p.stock,
+      "In stock?": p.trackQuantity ? 1 : 0,
+      Stock: p.stock || 0,
+      "Backorders allowed?": p.backorderStatus === "ALLOW" ? 1 : 0,
+      "Sold individually?": p.soldIndividually ? 1 : 0,
       "Weight (kg)": p.weight || "",
       "Length (cm)": p.length || "",
       "Width (cm)": p.width || "",
       "Height (cm)": p.height || "",
       "Allow customer reviews?": p.enableReviews ? 1 : 0,
-      
-      "Is Pre-order?": p.isPreOrder ? 1 : 0,
-      "Pre-order Release Date": p.preOrderReleaseDate ? p.preOrderReleaseDate.split('T')[0] : "",
-      "Pre-order Limit": p.preOrderLimit || "",
-      "Pre-order Message": p.preOrderMessage || "",
-
+      "Purchase note": p.purchaseNote || "",
       Categories: p.category?.name || "",
       Brands: p.brand?.name || "",
-      Tags: p.tags.map((t: any) => t.name).join(", "),
-      Images: p.featuredImage || "",
-      Parent: ""
+      Tags: p.tags?.map((t: any) => t.name).join(", ") || "",
+      Images: [p.featuredImage, ...(p.images?.map((img:any) => img.url) || [])].filter(Boolean).join(", "),
+      "Meta: rank_math_title": p.metaTitle || "",
+      "Meta: rank_math_description": p.metaDesc || "",
     }));
 
     const csvString = Papa.unparse(csvData);
@@ -63,169 +64,213 @@ export async function importProductsCSV(csvString: string) {
     try {
         const { data } = Papa.parse(csvString, { header: true, skipEmptyLines: true });
         const skuToIdMap = new Map<string, string>();
+        let successCount = 0;
+        let failCount = 0;
 
         // --- PASS 1: Simple & Parent Products ---
         for (const row of data as any[]) {
-            const type = row["Type"]?.toLowerCase() || "simple";
-            if (type === "variation") continue; 
+            try {
+                const type = row["Type"]?.toLowerCase() || "simple";
+                if (type === "variation") continue; 
 
-            const name = row["Name"];
-            if (!name) continue;
+                const name = row["Name"];
+                if (!name) continue;
 
-            const sku = row["SKU"] || `IMP-${Date.now()}-${Math.floor(Math.random()*1000)}`;
-            const slug = generateSlug(name);
-            
-            const price = parseFloat(row["Regular price"]) || 0;
-            const salePrice = row["Sale price"] ? parseFloat(row["Sale price"]) : null;
-            const costPerItem = row["Cost of goods"] ? parseFloat(row["Cost of goods"]) : null;
-            
-            const weight = row["Weight (kg)"] ? parseFloat(row["Weight (kg)"]) : null;
-            const length = row["Length (cm)"] ? parseFloat(row["Length (cm)"]) : null;
-            const width = row["Width (cm)"] ? parseFloat(row["Width (cm)"]) : null;
-            const height = row["Height (cm)"] ? parseFloat(row["Height (cm)"]) : null;
+                // Unique SKU Logic
+                const rawSku = row["SKU"]?.trim();
+                const sku = rawSku || `IMP-${crypto.randomUUID().substring(0, 8)}`;
+                const slug = generateSlug(name);
+                
+                // Numbers Conversion
+                const price = parseFloat(row["Regular price"]) || 0;
+                const salePrice = row["Sale price"] ? parseFloat(row["Sale price"]) : null;
+                const costPerItem = row["Cost of goods"] ? parseFloat(row["Cost of goods"]) : null;
+                const weight = row["Weight (kg)"] ? parseFloat(row["Weight (kg)"]) : null;
+                const length = row["Length (cm)"] ? parseFloat(row["Length (cm)"]) : null;
+                const width = row["Width (cm)"] ? parseFloat(row["Width (cm)"]) : null;
+                const height = row["Height (cm)"] ? parseFloat(row["Height (cm)"]) : null;
 
-            const enableReviews = row["Allow customer reviews?"] == "1";
-            const soldIndividually = row["Sold individually?"] == "1";
-            const isFeatured = row["Is featured?"] == "1";
-            const status = row["Published"] == "1" ? "ACTIVE" : "DRAFT";
+                // Booleans & Enums
+                const enableReviews = row["Allow customer reviews?"] == "1";
+                const soldIndividually = row["Sold individually?"] == "1";
+                const isFeatured = row["Is featured?"] == "1";
+                const status = row["Published"] == "1" ? "ACTIVE" : "DRAFT";
+                const barcode = row["GTIN, UPC, EAN, or ISBN"] || null;
+                const purchaseNote = row["Purchase note"] || null;
 
-            const isPreOrder = row["Is Pre-order?"] == "1";
-            const preOrderReleaseDate = row["Pre-order Release Date"] ? new Date(row["Pre-order Release Date"]) : null;
-            const preOrderLimit = row["Pre-order Limit"] ? parseInt(row["Pre-order Limit"]) : null;
-            const preOrderMessage = row["Pre-order Message"] || null;
+                // Metafields & SEO Processing
+                let metafields: any = {};
+                let metaTitle = "";
+                let metaDesc = "";
 
-            let categoryConnect = undefined;
-            if (row["Categories"]) {
-                const catName = row["Categories"].split(",")[0].trim(); 
-                if(catName) {
-                    categoryConnect = {
-                        connectOrCreate: {
-                            where: { slug: generateSlug(catName) },
-                            create: { name: catName, slug: generateSlug(catName) }
+                Object.keys(row).forEach((key) => {
+                    if (key.startsWith("Meta:")) {
+                        const metaKey = key.replace("Meta: ", "").trim();
+                        const metaValue = row[key];
+                        
+                        if (metaValue) {
+                            if (["rank_math_title", "_aioseo_title", "title"].includes(metaKey)) {
+                                metaTitle = metaValue;
+                            } else if (["rank_math_description", "_aioseo_description", "description"].includes(metaKey)) {
+                                metaDesc = metaValue;
+                            } else {
+                                metafields[metaKey] = metaValue;
+                            }
                         }
-                    };
-                }
-            }
+                    }
+                });
 
-            let brandConnect = undefined;
-            const brandName = (row["Brands"] || row["Brand"])?.trim();
-            if (brandName) {
-                brandConnect = {
+                // Arrays processing
+                const upsellIds = row["Upsells"] ? row["Upsells"].split(",").map((i:string) => i.trim()) : [];
+                const crossSellIds = row["Cross-sells"] ? row["Cross-sells"].split(",").map((i:string) => i.trim()) : [];
+
+                // Relations (Connect or Create)
+                const categoryConnect = row["Categories"] ? {
                     connectOrCreate: {
-                        where: { slug: generateSlug(brandName) },
-                        create: { name: brandName, slug: generateSlug(brandName) }
+                        where: { slug: generateSlug(row["Categories"].split(",")[0].trim()) },
+                        create: { name: row["Categories"].split(",")[0].trim(), slug: generateSlug(row["Categories"].split(",")[0].trim()) }
                     }
-                };
-            }
+                } : undefined;
 
-            let tagsConnect = undefined;
-            if (row["Tags"]) {
-                const tagNames = row["Tags"].split(",").map((t: string) => t.trim()).filter((t: string) => t !== "");
-                if (tagNames.length > 0) {
-                    tagsConnect = {
-                        connectOrCreate: tagNames.map((t: string) => ({
-                            where: { slug: generateSlug(t) },
-                            create: { name: t, slug: generateSlug(t) }
-                        }))
-                    };
-                }
-            }
-
-            const images = row["Images"] ? row["Images"].split(",").map((url: string) => url.trim()) : [];
-            const featuredImage = images.length > 0 ? images[0] : null;
-
-            const product = await db.product.create({
-                data: {
-                    name,
-                    slug: `${slug}-${Math.floor(Math.random() * 1000)}`,
-                    sku,
-                    productType: type === "variable" ? "VARIABLE" : "SIMPLE",
-                    status: status as ProductStatus,
-                    price,
-                    salePrice,
-                    costPerItem,
-                    description: row["Description"] || "",
-                    shortDescription: row["Short description"] || "",
-                    stock: parseInt(row["Stock"]) || 0,
-                    trackQuantity: row["In stock?"] == "1",
-                    weight,
-                    length,
-                    width,
-                    height,
-                    enableReviews,
-                    soldIndividually,
-                    isFeatured,
-                    isPreOrder,
-                    preOrderReleaseDate,
-                    preOrderLimit,
-                    preOrderMessage,
-                    category: categoryConnect,
-                    brand: brandConnect,
-                    tags: tagsConnect,
-                    featuredImage,
-                    images: {
-                        create: images.map((url: string, idx: number) => ({
-                            url,
-                            position: idx
-                        }))
+                const brandConnect = row["Brands"] ? {
+                    connectOrCreate: {
+                        where: { slug: generateSlug(row["Brands"].split(",")[0].trim()) },
+                        create: { name: row["Brands"].split(",")[0].trim(), slug: generateSlug(row["Brands"].split(",")[0].trim()) }
                     }
-                }
-            });
+                } : undefined;
 
-            if (sku) skuToIdMap.set(sku, product.id);
+                const tagsConnect = row["Tags"] ? {
+                    connectOrCreate: row["Tags"].split(",").filter(Boolean).map((t: string) => ({
+                        where: { slug: generateSlug(t.trim()) },
+                        create: { name: t.trim(), slug: generateSlug(t.trim()) }
+                    }))
+                } : undefined;
+
+                // Images Processing
+                const images = row["Images"] ? row["Images"].split(",").map((url: string) => url.trim()) : [];
+                const featuredImage = images.length > 0 ? images[0] : null;
+
+                // Upsert
+                const product = await db.product.upsert({
+                    where: { sku: rawSku ? rawSku : "NO_MATCH_FOR_RANDOM" }, 
+                    update: {
+                        name, status: status as ProductStatus,
+                        price, salePrice, costPerItem,
+                        description: row["Description"] || "",
+                        shortDescription: row["Short description"] || "",
+                        stock: parseInt(row["Stock"]) || 0,
+                        trackQuantity: row["In stock?"] == "1",
+                        weight, length, width, height,
+                        enableReviews, soldIndividually, isFeatured,
+                        barcode, purchaseNote,
+                        upsellIds, crossSellIds,
+                        metafields, metaTitle, metaDesc,
+                        category: categoryConnect,
+                        brand: brandConnect,
+                        tags: tagsConnect,
+                        featuredImage,
+                    },
+                    create: {
+                        name,
+                        slug: `${slug}-${crypto.randomBytes(3).toString("hex")}`,
+                        sku,
+                        productType: type === "variable" ? "VARIABLE" : "SIMPLE",
+                        status: status as ProductStatus,
+                        price, salePrice, costPerItem,
+                        description: row["Description"] || "",
+                        shortDescription: row["Short description"] || "",
+                        stock: parseInt(row["Stock"]) || 0,
+                        trackQuantity: row["In stock?"] == "1",
+                        weight, length, width, height,
+                        enableReviews, soldIndividually, isFeatured,
+                        barcode, purchaseNote,
+                        upsellIds, crossSellIds,
+                        metafields, metaTitle, metaDesc,
+                        category: categoryConnect,
+                        brand: brandConnect,
+                        tags: tagsConnect,
+                        featuredImage,
+                        images: {
+                            create: images.map((url: string, idx: number) => ({ url, position: idx }))
+                        }
+                    }
+                });
+
+                if (product.sku) skuToIdMap.set(product.sku, product.id);
+                successCount++;
+
+            } catch (err) {
+                console.error(`Row Failed (SKU: ${row["SKU"]}):`, err);
+                failCount++;
+            }
         }
 
         // --- PASS 2: Variations ---
         for (const row of data as any[]) {
-            if (row["Type"]?.toLowerCase() !== "variation") continue;
+            try {
+                if (row["Type"]?.toLowerCase() !== "variation") continue;
 
-            const parentSku = row["Parent"];
-            const parentId = skuToIdMap.get(parentSku);
+                const parentSku = row["Parent"];
+                const parentId = skuToIdMap.get(parentSku);
 
-            if (!parentId) continue;
+                if (!parentId) continue; 
 
-            const price = parseFloat(row["Regular price"]) || 0;
-            const stock = parseInt(row["Stock"]) || 0;
-            const weight = row["Weight (kg)"] ? parseFloat(row["Weight (kg)"]) : null;
-            
-            const isPreOrder = row["Is Pre-order?"] == "1";
-            const preOrderReleaseDate = row["Pre-order Release Date"] ? new Date(row["Pre-order Release Date"]) : null;
-
-            let attributes: any = {};
-            Object.keys(row).forEach(key => {
-                if (key.startsWith("Attribute") && key.endsWith("name")) {
-                    const index = key.match(/\d+/)?.[0]; 
-                    if (index) {
-                        const attrName = row[`Attribute ${index} name`];
-                        const attrValue = row[`Attribute ${index} value(s)`];
-                        if (attrName && attrValue) {
-                            attributes[attrName] = attrValue;
+                const varSku = row["SKU"] || `VAR-${crypto.randomUUID().substring(0, 8)}`;
+                const price = parseFloat(row["Regular price"]) || 0;
+                const salePrice = row["Sale price"] ? parseFloat(row["Sale price"]) : null;
+                const stock = parseInt(row["Stock"]) || 0;
+                const weight = row["Weight (kg)"] ? parseFloat(row["Weight (kg)"]) : null;
+                
+                let attributes: any = {};
+                Object.keys(row).forEach(key => {
+                    if (key.startsWith("Attribute") && key.endsWith("name")) {
+                        const index = key.match(/\d+/)?.[0]; 
+                        if (index) {
+                            const attrName = row[`Attribute ${index} name`];
+                            const attrValue = row[`Attribute ${index} value(s)`];
+                            if (attrName && attrValue) attributes[attrName] = attrValue;
                         }
                     }
-                }
-            });
+                });
 
-            await db.productVariant.create({
-                data: {
-                    productId: parentId,
-                    name: row["Name"] || "Variation",
-                    sku: row["SKU"],
-                    price: price,
-                    stock: stock,
-                    trackQuantity: true,
-                    weight: weight,
-                    attributes: attributes,
-                    isPreOrder,
-                    preOrderReleaseDate
+                const existingSku = row["SKU"] ? row["SKU"].trim() : null;
+
+                const existingVariant = existingSku ? await db.productVariant.findFirst({
+                    where: { sku: existingSku }
+                }) : null;
+
+                if (existingVariant) {
+                    await db.productVariant.update({
+                        where: { id: existingVariant.id },
+                        data: { price, salePrice, stock, weight, attributes }
+                    });
+                } else {
+                    await db.productVariant.create({
+                        data: {
+                            productId: parentId,
+                            name: row["Name"] || "Variation",
+                            sku: varSku,
+                            price, salePrice, stock, weight,
+                            trackQuantity: true,
+                            attributes: attributes,
+                        }
+                    });
                 }
-            });
+
+            // 🚀 এই ব্র্যাকেটগুলো মিসিং ছিল!
+            } catch (err) {
+                console.error(`Variant Row Failed:`, err);
+            }
         }
 
         revalidatePath("/admin/products");
-        return { success: true, message: `Imported successfully!` };
+        return { 
+            success: true, 
+            message: `Import completed! Success: ${successCount}. Failed: ${failCount}.` 
+        };
 
     } catch (error: any) {
-        console.error("Import Error:", error);
-        return { success: false, message: error.message || "Import failed" };
+        console.error("Critical Import Error:", error);
+        return { success: false, message: "Critical error during import." };
     }
 }

@@ -1,4 +1,4 @@
-// app/admin/products/_components/product-table.tsx
+// File: app/admin/products/_components/product-table.tsx
 
 "use client";
 
@@ -10,7 +10,7 @@ import { bulkProductAction, moveToTrash, deleteProduct } from "@/app/actions/bac
 import { duplicateProduct } from "@/app/actions/backend/product/duplicate-product"; 
 import { toast } from "react-hot-toast";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { PaginationControls } from "./pagination-controls"; // 🚀 Added Pagination Import
+import { PaginationControls } from "./pagination-controls"; 
 
 interface ProductTableProps {
   products: any[];
@@ -151,48 +151,66 @@ export default function ProductTable({
   return (
     <div className="w-full animate-in fade-in duration-300">
       
-      {/* 🚀 WP Style Filter Links */}
-      <ul className="flex flex-wrap items-center gap-1 text-[13px] mb-3 text-[#646970]">
-         <li className="flex items-center gap-1">
-            <Link href="/admin/products" className={`${!statusFilter ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
-                All <span className="text-[#646970] font-normal">({counts.all})</span>
-            </Link>
-            <span className="text-[#c3c4c7] ml-1">|</span>
-         </li>
-         <li className="flex items-center gap-1">
-            <Link href="/admin/products?status=active" className={`${statusFilter === 'active' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
-                Published <span className="text-[#646970] font-normal">({counts.active})</span>
-            </Link>
-            <span className="text-[#c3c4c7] ml-1">|</span>
-         </li>
-         <li className="flex items-center gap-1">
-            <Link href="/admin/products?status=draft" className={`${statusFilter === 'draft' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
-                Drafts <span className="text-[#646970] font-normal">({counts.draft})</span>
-            </Link>
-            {counts.archived > 0 && <span className="text-[#c3c4c7] ml-1">|</span>}
-         </li>
-         {counts.archived > 0 && (
+      {/* 🚀 WP Style Top Row: Status Links & Search (100% Responsive) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-3">
+        
+        {/* Left: Status Links */}
+        <ul className="flex flex-wrap items-center gap-1 text-[13px] text-[#646970]">
            <li className="flex items-center gap-1">
-              <Link href="/admin/products?status=archived" className={`${statusFilter === 'archived' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
-                  Trash <span className="text-[#646970] font-normal">({counts.archived})</span>
+              <Link href="/admin/products" className={`${!statusFilter ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                  All <span className="text-[#646970] font-normal">({counts.all})</span>
               </Link>
+              <span className="text-[#c3c4c7] ml-1">|</span>
            </li>
-         )}
-      </ul>
+           <li className="flex items-center gap-1">
+              <Link href="/admin/products?status=active" className={`${statusFilter === 'active' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                  Published <span className="text-[#646970] font-normal">({counts.active})</span>
+              </Link>
+              <span className="text-[#c3c4c7] ml-1">|</span>
+           </li>
+           <li className="flex items-center gap-1">
+              <Link href="/admin/products?status=draft" className={`${statusFilter === 'draft' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                  Drafts <span className="text-[#646970] font-normal">({counts.draft})</span>
+              </Link>
+              {counts.archived > 0 && <span className="text-[#c3c4c7] ml-1">|</span>}
+           </li>
+           {counts.archived > 0 && (
+             <li className="flex items-center gap-1">
+                <Link href="/admin/products?status=archived" className={`${statusFilter === 'archived' ? 'font-semibold text-[#1d2327]' : 'text-[#2271b1] hover:text-[#0a4b78]'}`}>
+                    Trash <span className="text-[#646970] font-normal">({counts.archived})</span>
+                </Link>
+             </li>
+           )}
+        </ul>
 
-      {/* 🚀 WP Style Actions Bar (Filters & Search) */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-2 gap-2">
+        {/* Right: Search Box */}
+        <form onSubmit={handleSearch} className="flex items-stretch shadow-sm w-full md:w-auto">
+          <input 
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full md:w-[200px] px-2 py-[3px] border border-[#8c8f94] text-[13px] text-[#3c434a] focus:border-[#2271b1] outline-none rounded-l-[3px]"
+            placeholder="Search products..."
+          />
+          <button type="submit" className="px-3 py-[3px] border border-l-0 border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] text-[13px] hover:bg-[#f0f0f1] transition-colors rounded-r-[3px] whitespace-nowrap">
+            Search products
+          </button>
+        </form>
+
+      </div>
+
+      {/* 🚀 WP Style Toolbar Row: Bulk Actions, Filters & Pagination */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-2 gap-3">
         
         {/* Left Side: Bulk Actions & Advanced Filters */}
         <div className="flex flex-wrap items-center gap-1.5 w-full xl:w-auto">
            
            {/* Bulk Actions */}
-           <div className="flex items-center gap-1 mr-1">
+           <div className="flex items-center gap-1 mr-1 w-full sm:w-auto">
                <select 
                   value={bulkAction} 
                   onChange={(e) => setBulkAction(e.target.value)}
                   disabled={isPending || products.length === 0}
-                  className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
+                  className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
                >
                   <option value="">Bulk actions</option>
                   {statusFilter === 'archived' ? (
@@ -211,71 +229,49 @@ export default function ProductTable({
                <button 
                   onClick={handleBulkApply} 
                   disabled={isPending || !bulkAction || selectedIds.length === 0}
-                  className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap"
                >
                   {isPending && <Loader2 className="w-3 h-3 animate-spin" />} Apply
                </button>
            </div>
            
-           {/* Filters */}
-           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
+           {/* Filters (Removed hidden classes so they wrap nicely on mobile) */}
+           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
               <option value="">Select a category</option>
               {categories.map((c) => (<option key={c.name} value={c.name}>{c.name}</option>))}
            </select>
            
-           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none hidden sm:block">
+           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
               <option value="">Filter by product type</option>
               <option value="SIMPLE">Simple product</option>
               <option value="VARIABLE">Variable product</option>
            </select>
 
-           <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none hidden md:block">
-              <option value="">Filter by stock status</option>
-              <option value="instock">In stock</option>
-              <option value="outofstock">Out of stock</option>
-           </select>
-
-           <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)} className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none hidden lg:block">
+           <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
               <option value="">Filter by brand</option>
               {brands.map((b) => (<option key={b.name} value={b.name}>{b.name}</option>))}
            </select>
 
            <button 
              onClick={handleApplyFilters} 
-             className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors"
+             className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors whitespace-nowrap"
            >
              Filter
            </button>
         </div>
-        
-        {/* Right Side: Search Box */}
-        <div className="flex items-center gap-2 ml-auto w-full xl:w-auto mt-2 xl:mt-0">
-           <form onSubmit={handleSearch} className="flex items-stretch shadow-sm w-full sm:w-auto">
-             <input 
-               value={query}
-               onChange={(e) => setQuery(e.target.value)}
-               className="w-full sm:w-[180px] px-2 py-[3px] border border-[#8c8f94] text-[13px] text-[#3c434a] focus:border-[#2271b1] outline-none rounded-l-[3px]"
-               placeholder="Search products..."
-             />
-             <button type="submit" className="px-3 py-[3px] border border-l-0 border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] text-[13px] hover:bg-[#f0f0f1] transition-colors rounded-r-[3px] whitespace-nowrap">
-               Search products
-             </button>
-           </form>
+
+        {/* Right Side: Pagination (Top) - Properly aligned inside flex box */}
+        <div className="flex items-center w-full xl:w-auto justify-end mt-2 xl:mt-0">
+          {totalProducts > 0 && (
+            <PaginationControls total={totalProducts} totalPages={totalPages} currentPage={currentPage} perPage={limit} />
+          )}
         </div>
         
       </div>
-      <div className="flex items-center gap-2 ml-auto w-full xl:w-auto mt-2 xl:mt-0">
-         {/* 🚀 WP Style Pagination (Top) */}
-      {totalProducts > 0 && (
-        <PaginationControls total={totalProducts} totalPages={totalPages} currentPage={currentPage} perPage={limit} />
-      )}
-      </div>
-
-      
 
       {/* 🚀 WP List Table */}
       <div className={`bg-white border border-[#c3c4c7] shadow-sm transition-opacity duration-200 mt-2 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-        <div className="overflow-x-auto min-h-[400px]">
+        <div className="overflow-x-auto ">
           <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[1200px]">
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
               <tr>
@@ -445,7 +441,7 @@ export default function ProductTable({
 
       {/* 🚀 WP Style Pagination (Bottom) */}
       {totalProducts > 0 && (
-        <div className="mt-2">
+        <div className="mt-2 flex justify-end">
           <PaginationControls total={totalProducts} totalPages={totalPages} currentPage={currentPage} perPage={limit} />
         </div>
       )}

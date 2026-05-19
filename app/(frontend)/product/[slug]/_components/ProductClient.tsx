@@ -329,7 +329,7 @@ export default function ProductClient({ product }: { product: Product }) {
 
           {product.shortDescription && (
             <div 
-                className="[&>ul]:grid [&>ul]:grid-cols-1 md:[&>ul]:grid-cols-2 gap-x-8 gap-y-2 list-none p-0 [&>li]:relative [&>li]:pl-6 [&>li:before]:content-['✓'] [&>li:before]:absolute [&>li:before]:left-0 [&>li:before]:text-green-600 [&>li:before]:font-bold mt-6" 
+                className="w-full break-words overflow-hidden [&_p]:break-words [&_a]:break-all [&>ul]:grid [&>ul]:grid-cols-1 md:[&>ul]:grid-cols-2 gap-x-8 gap-y-2 list-none p-0 [&>li]:relative [&>li]:pl-6 [&>li:before]:content-['✓'] [&>li:before]:absolute [&>li:before]:left-0 [&>li:before]:text-green-600 [&>li:before]:font-bold mt-6 text-[#444]" 
                 dangerouslySetInnerHTML={{ __html: product.shortDescription }} 
             />
           )}
@@ -443,7 +443,7 @@ export default function ProductClient({ product }: { product: Product }) {
         {product.description && (
             <section className="mt-16 border-t border-[#eaeaea] pt-12">
                 <h2 className="text-center text-[2rem] font-bold mb-8">Description</h2>
-                <div className="leading-[1.8] text-[#444] text-base md:text-lg" dangerouslySetInnerHTML={{ __html: product.description }} />
+                <div className="prose prose-slate max-w-none break-words overflow-hidden w-full [&>img]:max-w-full [&>img]:h-auto [&_p]:break-words [&_a]:break-all" dangerouslySetInnerHTML={{ __html: product.description }} />
             </section>
         )}
 

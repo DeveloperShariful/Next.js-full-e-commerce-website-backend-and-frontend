@@ -238,7 +238,7 @@ export default function ProductTable({
            {/* Filters (Removed hidden classes so they wrap nicely on mobile) */}
            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
               <option value="">Select a category</option>
-              {categories.map((c) => (<option key={c.name} value={c.name}>{c.name}</option>))}
+              {categories.map((c) => (<option key={c.id} value={c.name}>{c.name}</option>))}
            </select>
            
            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">

@@ -124,21 +124,59 @@ export async function importProductsCSV(csvString: string) {
                 const upsellIds = row["Upsells"] ? row["Upsells"].split(",").map((i:string) => i.trim()) : [];
                 const crossSellIds = row["Cross-sells"] ? row["Cross-sells"].split(",").map((i:string) => i.trim()) : [];
 
-                // Relations (Connect or Create)
-                const categoryConnect = row["Categories"] ? {
-                    connectOrCreate: {
-                        where: { slug: generateSlug(row["Categories"].split(",")[0].trim()) },
-                        create: { name: row["Categories"].split(",")[0].trim(), slug: generateSlug(row["Categories"].split(",")[0].trim()) }
+                // --- 🚀 HIERARCHICAL CATEGORY LOGIC (Fixing Parent > Child) ---
+                let categoryIdToConnect = null;
+                if (row["Categories"]) {
+                    const categoryPath = row["Categories"].split(",")[0].split(">").map((c: string) => c.trim()).filter(Boolean);
+                    
+                    let currentParentId = null;
+
+                    for (const catName of categoryPath) {
+                        const catSlug = generateSlug(catName);
+                        
+                        // Check if category exists with this parent
+                        let cat: any = await db.category.findFirst({
+                            where: { slug: catSlug, parentId: currentParentId }
+                        });
+
+                        // Create if not exists
+                        if (!cat) {
+                            cat = await db.category.create({
+                                data: {
+                                    name: catName,
+                                    slug: catSlug + (currentParentId ? `-${Math.floor(Math.random()*1000)}` : ''), 
+                                    parentId: currentParentId
+                                }
+                            });
+                        }
+                        
+                        currentParentId = cat.id;
+                        categoryIdToConnect = cat.id; // Final child ID
                     }
+                }
+
+                const categoryConnect = categoryIdToConnect ? {
+                    connect: { id: categoryIdToConnect }
                 } : undefined;
 
-                const brandConnect = row["Brands"] ? {
-                    connectOrCreate: {
-                        where: { slug: generateSlug(row["Brands"].split(",")[0].trim()) },
-                        create: { name: row["Brands"].split(",")[0].trim(), slug: generateSlug(row["Brands"].split(",")[0].trim()) }
-                    }
-                } : undefined;
+                // --- 🚀 BRAND LOGIC FIX ---
+                let brandConnect = undefined;
+                if (row["Brands"] || row["Brand"]) {
+                    const brandString = row["Brands"] || row["Brand"];
+                    const brandParts = brandString.split(",")[0].split(">");
+                    const finalBrandName = brandParts[brandParts.length - 1].trim();
 
+                    if (finalBrandName) {
+                        brandConnect = {
+                            connectOrCreate: {
+                                where: { slug: generateSlug(finalBrandName) },
+                                create: { name: finalBrandName, slug: generateSlug(finalBrandName) }
+                            }
+                        };
+                    }
+                }
+
+                // Tags processing
                 const tagsConnect = row["Tags"] ? {
                     connectOrCreate: row["Tags"].split(",").filter(Boolean).map((t: string) => ({
                         where: { slug: generateSlug(t.trim()) },
@@ -150,7 +188,7 @@ export async function importProductsCSV(csvString: string) {
                 const images = row["Images"] ? row["Images"].split(",").map((url: string) => url.trim()) : [];
                 const featuredImage = images.length > 0 ? images[0] : null;
 
-                // Upsert
+                // Upsert Product
                 const product = await db.product.upsert({
                     where: { sku: rawSku ? rawSku : "NO_MATCH_FOR_RANDOM" }, 
                     update: {
@@ -257,7 +295,6 @@ export async function importProductsCSV(csvString: string) {
                     });
                 }
 
-            // 🚀 এই ব্র্যাকেটগুলো মিসিং ছিল!
             } catch (err) {
                 console.error(`Variant Row Failed:`, err);
             }

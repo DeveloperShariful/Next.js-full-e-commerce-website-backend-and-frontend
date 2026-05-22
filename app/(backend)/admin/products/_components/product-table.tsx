@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Image as ImageIcon, Star, Loader2 } from "lucide-react";
 import { bulkProductAction, moveToTrash, deleteProduct } from "@/app/actions/backend/product/product-list"; 
-import { duplicateProduct } from "@/app/actions/backend/product/duplicate-product"; 
+import { duplicateProduct } from "@/app/actions/backend/product/product-duplicate"; 
 import { toast } from "react-hot-toast";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { PaginationControls } from "./pagination-controls"; 
@@ -235,10 +235,10 @@ export default function ProductTable({
                </button>
            </div>
            
-           {/* Filters (Removed hidden classes so they wrap nicely on mobile) */}
+           {/* Filters (🚀 FIXED ALL KEYS) */}
            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
               <option value="">Select a category</option>
-              {categories.map((c) => (<option key={c.id} value={c.name}>{c.name}</option>))}
+              {categories?.map((c, index) => (<option key={c.id || `cat-${index}`} value={c.name}>{c.name}</option>))}
            </select>
            
            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
@@ -249,7 +249,7 @@ export default function ProductTable({
 
            <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
               <option value="">Filter by brand</option>
-              {brands.map((b) => (<option key={b.name} value={b.name}>{b.name}</option>))}
+              {brands?.map((b, index) => (<option key={b.id || `brand-${index}`} value={b.name}>{b.name}</option>))}
            </select>
 
            <button 
@@ -260,7 +260,7 @@ export default function ProductTable({
            </button>
         </div>
 
-        {/* Right Side: Pagination (Top) - Properly aligned inside flex box */}
+        {/* Right Side: Pagination (Top) */}
         <div className="flex items-center w-full xl:w-auto justify-end mt-2 xl:mt-0">
           {totalProducts > 0 && (
             <PaginationControls total={totalProducts} totalPages={totalPages} currentPage={currentPage} perPage={limit} />

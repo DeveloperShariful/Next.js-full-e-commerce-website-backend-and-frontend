@@ -1,10 +1,11 @@
-// app/layout.tsx
+// File: app/layout.tsx
 
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SessionProvider } from "next-auth/react"; 
+import NextAuthSessionProvider from "@/app/providers/session-provider"; 
+
 import NextTopLoader from 'nextjs-toploader';
 import { 
   GlobalStoreProvider, 
@@ -13,7 +14,6 @@ import {
 } from "@/app/providers/global-store-provider"; 
 import { AffiliateTrackerProvider } from "@/app/providers/affiliate-tracker-provider";
 
-// ✅ সরাসরি ডাটাবেজের বদলে আমাদের নতুন সুপার-ফাস্ট ক্যাশ ফাইল ইম্পোর্ট করা হলো
 import { 
   getCachedStoreSettings, 
   getCachedSeoConfig, 
@@ -41,14 +41,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   
-  // ✅ 1. ডাটাবেজ জ্যাম না করে জিরো সেকেন্ডে মেমোরি থেকে ডেটা ফেচ করা হলো
   const [storeSettings, seoConfig, marketingConfig] = await Promise.all([
     getCachedStoreSettings(),
     getCachedSeoConfig(),
     getCachedMarketingConfig()
   ]);
 
-  // 2. Prepare the settings object explicitly casting JSON fields
   const providerSettings = {
     storeSettings: storeSettings ? {
       ...storeSettings,
@@ -73,7 +71,8 @@ export default async function RootLayout({
   };
 
   return (
-    <SessionProvider>
+    // 🚀 FIXED: NextAuthSessionProvider (আপনার বানানো ক্লায়েন্ট কম্পোনেন্ট) ব্যবহার করা হলো
+    <NextAuthSessionProvider>
       <html lang="en">
         <body
           suppressHydrationWarning={true}
@@ -90,7 +89,6 @@ export default async function RootLayout({
             speed={200}
             shadow="0 0 10px #2271b1,0 0 5px #2271b1"
           />
-          {/* Root Layout এ একবারই Toaster থাকবে */}
           <Toaster position="top-center" />
           
           <GlobalStoreProvider settings={providerSettings as any}>
@@ -100,6 +98,6 @@ export default async function RootLayout({
           
         </body>
       </html>
-    </SessionProvider>
+    </NextAuthSessionProvider>
   );
 }

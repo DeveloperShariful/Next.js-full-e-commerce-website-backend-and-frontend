@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { ChevronUp, ChevronDown } from "lucide-react";
-import { getCategories } from "@/app/actions/backend/product/category";
+import { getCategories } from "@/app/actions/backend/product/product-category";
 import { ProductFormData } from "../types";
 
 export default function Categories() {

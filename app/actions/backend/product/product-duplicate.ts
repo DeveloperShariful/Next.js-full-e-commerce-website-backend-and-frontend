@@ -1,4 +1,4 @@
-// File: app/actions/admin/product/duplicate-product.ts
+// File: app/actions/admin/product/product-duplicate.ts
 
 "use server";
 

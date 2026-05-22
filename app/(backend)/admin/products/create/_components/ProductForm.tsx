@@ -10,7 +10,7 @@ import { toast } from "react-hot-toast";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { productSchema, ProductFormValues } from "../schema";
-import { createProduct, updateProduct } from "@/app/actions/backend/product/create-update-product";
+import { createProduct, updateProduct } from "@/app/actions/backend/product/product-create-update";
 
 import Header from "./header";
 import General from "./General";
@@ -101,7 +101,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     toast.success("Draft discarded");
   };
 
-  // --- 3. Submit Handler ---
+ // --- 3. Submit Handler ---
   const onSubmit = async (data: ProductFormValues) => {
     if (isEdit && !isDirty) {
         toast.success("No changes detected.");
@@ -124,24 +124,26 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
         }
     });
 
-    startTransition(async () => {
-      try {
+    try {
         const action = isEdit ? updateProduct : createProduct;
+        // 🚀 FIXED: Removed unstable startTransition for async operations
         const result = await action(formData);
 
         if (result.success) {
-          localStorage.removeItem(STORAGE_KEY); 
-          toast.success(isEdit ? "Updated successfully!" : "Product published!", { id: toastId });
-          router.push("/admin/products");
-          router.refresh();
+            localStorage.removeItem(STORAGE_KEY); 
+            
+            // 🚀 FIXED: Shows exact message from server (e.g. "No changes detected" or "Updated")
+            toast.success(result.message || (isEdit ? "Updated successfully!" : "Product published!"), { id: toastId });
+            
+            router.refresh(); // Refresh first to get new data
+            router.push("/admin/products"); // Then redirect
         } else {
-          toast.error(result.message || "Error saving product", { id: toastId });
+            toast.error(result.message || "Error saving product", { id: toastId });
         }
-      } catch (error) {
-        console.error(error);
-        toast.error("Something went wrong", { id: toastId });
-      }
-    });
+    } catch (error) {
+        console.error("Submit Error:", error);
+        toast.error("Something went wrong while saving.", { id: toastId });
+    }
   };
 
   return (

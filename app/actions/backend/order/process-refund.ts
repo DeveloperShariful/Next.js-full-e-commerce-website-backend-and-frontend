@@ -1,10 +1,11 @@
-// File: app/actions/order/process-refund.ts
+// File: app/actions/backend/order/process-refund.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import Stripe from "stripe";
+import { decrypt } from "@/app/actions/backend/settings/payments/crypto"; // ✅ Add this import for decryption
 
 export async function processRefund(formData: FormData) {
   try {
@@ -14,7 +15,7 @@ export async function processRefund(formData: FormData) {
 
     if (!orderId || !amount) return { success: false, error: "Invalid data" };
 
-    // ১. অর্ডার এবং পেমেন্ট কনফিগারেশন আনা
+    // ১. অর্ডার আনা
     const order = await db.order.findUnique({
       where: { id: orderId },
     });
@@ -22,7 +23,6 @@ export async function processRefund(formData: FormData) {
     if (!order) return { success: false, error: "Order not found" };
 
     // ভ্যালিডেশন: অর্ডারের টোটালের বেশি রিফান্ড করা যাবে না
-    // FIX: Converting Prisma Decimal to Number for calculation
     const currentRefunded = order.refundedAmount ? Number(order.refundedAmount) : 0;
     const orderTotal = Number(order.total);
 
@@ -36,15 +36,24 @@ export async function processRefund(formData: FormData) {
     // =========================================
     // ২. পেমেন্ট গেটওয়ে লজিক (STRIPE)
     // ==========================================
-    if (order.paymentGateway === "stripe") {
-        const stripeConfig = await db.stripeConfig.findFirst({ where: { enableStripe: true } });
+    if (order.paymentGateway === "stripe" || order.paymentGateway?.startsWith("stripe_")) {
+        // ✅ NEW: Fetch Stripe from the unified PaymentGateway table
+        const stripeConfig = await db.paymentGateway.findUnique({ 
+            where: { identifier: "stripe" } 
+        });
         
-        if (!stripeConfig || (!stripeConfig.liveSecretKey && !stripeConfig.testSecretKey)) {
-            return { success: false, error: "Stripe configuration missing." };
+        if (!stripeConfig || !stripeConfig.encryptedSecret) {
+            return { success: false, error: "Stripe configuration or secret key is missing." };
         }
 
-        const secretKey = stripeConfig.testMode ? stripeConfig.testSecretKey : stripeConfig.liveSecretKey;
-        const stripe = new Stripe(secretKey as string, { apiVersion: '2025-01-27.acacia' as any });
+        // ✅ NEW: Decrypt the secret key securely
+        const secretKey = decrypt(stripeConfig.encryptedSecret);
+        
+        if (!secretKey) {
+            return { success: false, error: "Failed to decrypt Stripe API key." };
+        }
+
+        const stripe = new Stripe(secretKey, { apiVersion: '2025-01-27.acacia' as any });
 
         try {
             // Stripe API Call
@@ -53,6 +62,7 @@ export async function processRefund(formData: FormData) {
                 charge: order.chargeId || undefined,
                 amount: Math.round(amount * 100), // Stripe cents এ কাজ করে
                 reason: "requested_by_customer",
+                metadata: { order_id: orderId, reason: reason }
             });
             
             gatewayRefundId = refund.id;
@@ -67,14 +77,21 @@ export async function processRefund(formData: FormData) {
     // ==========================================
     // ৩. পেমেন্ট গেটওয়ে লজিক (PAYPAL)
     // ==========================================
-    else if (order.paymentGateway === "paypal") {
-        const ppConfig = await db.paypalConfig.findFirst({ where: { enablePaypal: true } });
+    else if (order.paymentGateway === "ppcp-gateway" || order.paymentGateway === "paypal") {
+        // ✅ NEW: Fetch PayPal from the unified PaymentGateway table
+        const ppConfig = await db.paymentGateway.findFirst({ 
+            where: { provider: "PAYPAL" } 
+        });
         
-        if (!ppConfig) return { success: false, error: "PayPal config missing" };
+        if (!ppConfig || !ppConfig.publicKey || !ppConfig.encryptedSecret) {
+            return { success: false, error: "PayPal configuration is missing." };
+        }
 
-        const clientId = ppConfig.sandbox ? ppConfig.sandboxClientId : ppConfig.liveClientId;
-        const secret = ppConfig.sandbox ? ppConfig.sandboxClientSecret : ppConfig.liveClientSecret;
-        const baseUrl = ppConfig.sandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+        const isSandbox = ppConfig.mode === "TEST";
+        const clientId = ppConfig.publicKey;
+        // ✅ NEW: Decrypt the secret key securely
+        const secret = decrypt(ppConfig.encryptedSecret);
+        const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 
         try {
             // A. Get Access Token
@@ -83,10 +100,16 @@ export async function processRefund(formData: FormData) {
                 method: "POST",
                 body: "grant_type=client_credentials",
                 headers: { Authorization: `Basic ${auth}` },
+                cache: "no-store"
             });
             const tokenData = await tokenRes.json();
+
+            if (!tokenRes.ok || !tokenData.access_token) {
+                throw new Error("Failed to authenticate with PayPal for refund.");
+            }
             
             // B. Process Refund
+            // Note: order.paymentId should hold the PayPal Capture ID
             const refundRes = await fetch(`${baseUrl}/v2/payments/captures/${order.paymentId}/refund`, {
                 method: "POST",
                 headers: {
@@ -95,17 +118,17 @@ export async function processRefund(formData: FormData) {
                 },
                 body: JSON.stringify({
                     amount: {
-                        value: amount.toString(),
+                        value: amount.toFixed(2), // Ensure exactly 2 decimal places for PayPal
                         currency_code: order.currency
                     },
-                    note_to_payer: reason
+                    note_to_payer: reason || "Refund processed"
                 }),
             });
 
             const refundData = await refundRes.json();
             
             if (!refundRes.ok) {
-                throw new Error(refundData.message || "PayPal refund failed");
+                throw new Error(refundData.message || refundData.name || "PayPal refund failed");
             }
 
             gatewayRefundId = refundData.id;
@@ -118,7 +141,7 @@ export async function processRefund(formData: FormData) {
     }
     
     // ==========================================
-    // ৪. ম্যানুয়াল/অফলাইন রিফান্ড (COD)
+    // ৪. ম্যানুয়াল/অফলাইন রিফান্ড (COD / Bank Transfer)
     // ==========================================
     else {
         gatewayRefundId = `MANUAL-REF-${Date.now()}`;
@@ -129,9 +152,9 @@ export async function processRefund(formData: FormData) {
     // ৫. ডাটাবেস আপডেট (Transaction)
     // ==========================================
     if (transactionStatus === "SUCCESS") {
-        await db.$transaction([
+        await db.$transaction(async (tx) => {
             // A. Create Refund Record
-            db.refund.create({
+            await tx.refund.create({
                 data: {
                     orderId: order.id,
                     amount: amount,
@@ -139,9 +162,10 @@ export async function processRefund(formData: FormData) {
                     status: "completed",
                     gatewayRefundId: gatewayRefundId
                 }
-            }),
+            });
+
             // B. Log Transaction
-            db.orderTransaction.create({
+            await tx.orderTransaction.create({
                 data: {
                     orderId: order.id,
                     gateway: order.paymentGateway || "manual",
@@ -151,23 +175,36 @@ export async function processRefund(formData: FormData) {
                     transactionId: gatewayRefundId,
                     status: "SUCCESS"
                 }
-            }),
+            });
+
             // C. Update Order Status
-            db.order.update({
+            const newRefundedTotal = currentRefunded + amount;
+            const newPaymentStatus = newRefundedTotal >= orderTotal ? "REFUNDED" : "PARTIALLY_REFUNDED";
+
+            await tx.order.update({
                 where: { id: order.id },
                 data: {
-                    refundedAmount: { increment: amount },
-                    // FIX: Using Number variables for comparison
-                    paymentStatus: (currentRefunded + amount) >= orderTotal ? "REFUNDED" : "PARTIALLY_REFUNDED"
+                    refundedAmount: newRefundedTotal,
+                    paymentStatus: newPaymentStatus,
+                    status: newPaymentStatus === "REFUNDED" ? "REFUNDED" : order.status
                 }
-            })
-        ]);
+            });
+
+            // D. Add Order Note
+            await tx.orderNote.create({
+                data: {
+                    orderId: order.id,
+                    content: `Refund of ${order.currency} ${amount} processed. ID: ${gatewayRefundId}`,
+                    isSystem: true
+                }
+            });
+        });
 
         revalidatePath(`/admin/orders/${orderId}`);
         return { success: true, message: "Refund processed successfully" };
     }
 
-    return { success: false, error: "Refund failed unknown error" };
+    return { success: false, error: "Refund failed due to an unknown error." };
 
   } catch (error) {
     console.error("REFUND_ACTION_ERROR:", error);

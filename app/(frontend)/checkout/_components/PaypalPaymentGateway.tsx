@@ -2,149 +2,131 @@
 
 'use client';
 
-import React, { useEffect, useRef } from 'react'; // useState সরিয়ে দিয়েছি কারণ এটার দরকার নেই
-import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+import React, { useRef } from 'react';
+import { PayPalButtons } from '@paypal/react-paypal-js';
 import toast from 'react-hot-toast';
-import { createPayPalOrder, capturePayPalOrder } from '@/app/actions/frontend/checkout/paypal-payments';
+import { useRouter } from 'next/navigation';
 
 interface PayPalGatewayProps {
   total: number;
   isPlacingOrder: boolean;
-  onPlaceOrder: (paymentData: { transaction_id: string; paymentMethodId: string }) => Promise<any>;
+  // ✅ টাইপ আপডেট করা হয়েছে CheckoutClient এর সাথে মিলিয়ে
+  onPlaceOrder: (paymentData?: any) => Promise<{ orderId: string; orderNumber: string } | null>;
   isShippingSelected: boolean;
-  cartId: string;
+  cartItems: any[];
   customerInfo: any;
   shippingInfo: any;
-  selectedShippingId: string;
-  onSuccess: (orderId: string) => void;
-  couponCode?: string;
-  customerNote?: string;
+  selectedShipping: string;
+  shippingRates: any[];
+  appliedCoupons: any[];
 }
 
-export default function PayPalPaymentGateway({ 
-    total, 
-    isPlacingOrder, 
-    isShippingSelected,
-    cartId, 
-    customerInfo, 
-    shippingInfo, 
-    selectedShippingId, 
-    onSuccess, 
-    couponCode,
-    customerNote
-}: PayPalGatewayProps) {
+const PayPalPaymentGatewayComponent = ({ 
+    total, onPlaceOrder, isShippingSelected, cartItems, customerInfo, shippingInfo, selectedShipping, shippingRates, appliedCoupons 
+}: PayPalGatewayProps) => {
   
-  const [{ isPending }] = usePayPalScriptReducer();
-
-  // ✅ Refs to hold latest data without causing re-renders
-  // বাটন রেন্ডার হওয়ার পর প্রপস চেঞ্জ হলে বাটন রিফ্রেশ না করে আমরা Ref আপডেট করব
-  const propsRef = useRef({
-      total,
-      shippingInfo,
-      customerInfo,
-      selectedShippingId,
-      couponCode,
-      customerNote,
-      isShippingSelected
-  });
-
-  // যখনই প্রপস চেঞ্জ হবে, Ref আপডেট হবে (কিন্তু রি-রেন্ডার হবে না)
-  useEffect(() => {
-      propsRef.current = {
-          total,
-          shippingInfo,
-          customerInfo,
-          selectedShippingId,
-          couponCode,
-          customerNote,
-          isShippingSelected
-      };
-  }, [total, shippingInfo, customerInfo, selectedShippingId, couponCode, customerNote, isShippingSelected]);
-
-  if (isPending) return <div className="h-12 w-full bg-gray-100 animate-pulse rounded"></div>;
+  const router = useRouter();
+  const localOrderIdRef = useRef<string | null>(null);
+  const localOrderNumberRef = useRef<string | null>(null);
 
   return (
-      <div className="w-full relative z-0">
-        <PayPalButtons
-            style={{ layout: "vertical", color: 'gold', shape: 'rect', label: 'paypal', height: 48 }}
-            disabled={isPlacingOrder} // isShippingSelected এখানে বাদ দিলাম, validaion ভেতরে করব
-            
-            // ❌ forceReRender একদম বাদ দিয়েছি। এটাই স্লো হওয়ার কারণ ছিল।
-            
-            createOrder={async (data, actions) => {
-                // ✅ Ref থেকে লেটেস্ট ডাটা নেওয়া হচ্ছে
-                const currentProps = propsRef.current; 
+      <PayPalButtons
+        style={{ layout: "vertical", color: 'gold', shape: 'rect', label: 'paypal', height: 48 }}
+        disabled={total <= 0 || !isShippingSelected}
+        forceReRender={[total]}
+        
+        // ১. পেমেন্ট পপআপ খোলার আগে লোকাল অর্ডার তৈরি
+        createOrder={async () => {
+          if (!isShippingSelected) {
+            toast.error("Please select a shipping method first.");
+            throw new Error("Shipping not selected");
+          }
+          
+          const toastId = toast.loading("Connecting to PayPal...", { id: 'paypal-init' });
+          
+          try {
+              // ক. প্রথমে আমাদের ডাটাবেজে পেন্ডিং অর্ডার তৈরি করি
+              const orderDetails = await onPlaceOrder({ paymentMethodId: 'paypal' });
 
-                try {
-                    if (!currentProps.isShippingSelected) {
-                        toast.error("Please select a shipping method first.");
-                        throw new Error("Shipping method not selected");
-                    }
+              if (!orderDetails) throw new Error("Failed to initialize store order.");
+              
+              // খ. আইডিগুলো রেফারেন্সে সেভ করে রাখছি পরবর্তী ধাপের জন্য
+              localOrderIdRef.current = orderDetails.orderId;
+              localOrderNumberRef.current = orderDetails.orderNumber;
 
-                    const res = await createPayPalOrder({
-                        cartId,
-                        shippingMethodId: currentProps.selectedShippingId,
-                        shippingAddress: currentProps.shippingInfo, // Latest Address from Ref
-                        couponCode: currentProps.couponCode
-                    });
+              // গ. পেপ্যাল এপিআই কল করে PayPal Order ID আনা
+              const res = await fetch('/api/paypal/create-order', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      orderId: orderDetails.orderId,
+                      total, cartItems, customerInfo, shippingInfo, 
+                      selectedShipping, appliedCoupons
+                  })
+              });
+              
+              const data = await res.json();
+              toast.dismiss(toastId);
 
-                    const responseData = res as any; 
-                    const orderID = responseData?.data?.orderID || responseData?.orderID;
+              if (!res.ok) throw new Error(data.error || "Failed to create PayPal session");
+              
+              return data.id; // এটি PayPal সার্ভার থেকে আসা পেমেন্ট আইডি
+          } catch (err: any) {
+              toast.dismiss('paypal-init');
+              toast.error(err.message || "Could not start PayPal payment.");
+              throw err;
+          }
+        }}
+        
+        // ২. কাস্টমার পেমেন্ট কনফার্ম করলে টাকা রিসিভ এবং স্টক আপডেট
+        onApprove={async (data) => {
+          const toastId = toast.loading("Verifying your payment...", { id: 'paypal-capture' });
+          try {
+              const res = await fetch('/api/paypal/capture-order', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      paypalOrderId: data.orderID,
+                      wcOrderId: localOrderIdRef.current // আমাদের ডাটাবেজ আইডি
+                  })
+              });
+              
+              const captureData = await res.json();
+              toast.dismiss(toastId);
 
-                    if (!res.success || !orderID) {
-                        throw new Error(res.error || "Could not init PayPal");
-                    }
-                    
-                    return orderID;
+              if (captureData.success) {
+                  toast.success('Payment Successful! Thank you.');
+                  // সাকসেস পেজে রিডাইরেক্ট
+                  router.push(`/order-success?order_id=${localOrderIdRef.current}`);
+              } else {
+                  toast.error(captureData.message || "Payment could not be verified automatically.");
+              }
+          } catch (err) {
+              toast.dismiss('paypal-capture');
+              toast.error("Network error during verification. We are checking the status.");
+          }
+        }}
+        
+        onCancel={() => {
+            toast.error("PayPal checkout was canceled.");
+        }}
 
-                } catch (err: any) {
-                    console.error("PayPal Init Error:", err);
-                    // টোস্ট শুধু একবার দেখানোর জন্য চেক
-                    if (err.message !== "Shipping method not selected") {
-                         toast.error("Could not connect to PayPal");
-                    }
-                    throw err;
-                }
-            }}
-            
-            onApprove={async (data, actions) => {
-                const currentProps = propsRef.current;
-                try {
-                    toast.loading("Processing Order...");
-
-                    const res = await capturePayPalOrder({
-                        payPalOrderId: data.orderID,
-                        cartId,
-                        shippingMethodId: currentProps.selectedShippingId,
-                        shippingAddress: currentProps.shippingInfo, 
-                        billingAddress: currentProps.customerInfo,
-                        couponCode: currentProps.couponCode,
-                        customerNote: currentProps.customerNote
-                    });
-                    
-                    toast.dismiss();
-
-                    const responseData = res as any;
-                    const finalOrderId = responseData?.data?.orderId || responseData?.orderId;
-
-                    if (res.success && finalOrderId) {
-                        toast.success("Order Placed Successfully!");
-                        onSuccess(finalOrderId);
-                    } else {
-                        throw new Error(res.error || "Order creation failed after payment");
-                    }
-
-                } catch (err: any) {
-                    toast.dismiss();
-                    console.error("Capture Error:", err);
-                    toast.error(err.message || "Payment failed");
-                }
-            }}
-            
-            onError={(err) => { 
-                console.error("PayPal Error:", err);
-            }}
-        />
-      </div>
+        onError={(err) => {
+          toast.dismiss();
+          console.error("PayPal system failure:", err);
+          toast.error("A technical error occurred with PayPal. Please try again.");
+        }}
+      />
   );
-}
+};
+
+// পারফরম্যান্স অপ্টিমাইজেশন
+const PayPalPaymentGateway = React.memo(PayPalPaymentGatewayComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.total === nextProps.total &&
+    prevProps.isShippingSelected === nextProps.isShippingSelected &&
+    prevProps.isPlacingOrder === nextProps.isPlacingOrder
+  );
+});
+
+export default PayPalPaymentGateway;

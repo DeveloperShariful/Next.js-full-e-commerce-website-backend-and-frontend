@@ -1,125 +1,113 @@
 //app/(frontend)/checkout/components/StripePaymentGateway.tsx
 
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import React, { useState, forwardRef, useEffect } from 'react';
+import Image from 'next/image';
+import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 import toast from 'react-hot-toast';
-import { createPaymentIntent, } from '@/app/actions/frontend/checkout/stripe-payment';
+import { useRouter } from 'next/navigation';
 
 interface StripePaymentGatewayProps {
   selectedPaymentMethod: string;
-  onPlaceOrder: (paymentData?: { 
-    transaction_id?: string;
-    paymentMethodId?: string;
-  }) => Promise<{ orderId: string, orderKey: string } | void | null>;
-  cartId: string;
+  onPlaceOrder: (paymentData?: any) => Promise<{ orderId: string; orderNumber: string } | null>;
   customerInfo: any;
-  shippingInfo: any;
-  selectedShippingId: string;
-  couponCode?: string;
   total: number;
+  cartItems: any[];
+  shippingInfo: any;
+  selectedShipping: string;
+  appliedCoupons: any[];
 }
 
-export default function StripePaymentGateway({
-  selectedPaymentMethod,
-  onPlaceOrder,
-  cartId,
-  customerInfo,
-  shippingInfo,
-  selectedShippingId,
-  couponCode,
-  total
-}: StripePaymentGatewayProps) {
+const StripePaymentGateway = forwardRef<HTMLFormElement, StripePaymentGatewayProps>((props, ref) => {
+  const { selectedPaymentMethod, onPlaceOrder, customerInfo, total, cartItems, shippingInfo, selectedShipping, appliedCoupons } = props;
   
   const stripe = useStripe();
   const elements = useElements();
+  const router = useRouter();
+  
+  const [clientSecret, setClientSecret] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [internalMethodType, setInternalMethodType] = useState<string>('card');
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  useEffect(() => {
+    if (total > 0) {
+      fetch('/api/stripe/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: total, customerInfo, appliedCoupons })
+      })
+      .then(res => res.json())
+      .then(data => { if (data.clientSecret) setClientSecret(data.clientSecret); });
+    }
+  }, [total, appliedCoupons, customerInfo]);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || !clientSecret || isProcessing) return;
 
     setIsProcessing(true);
-    setErrorMessage(null);
+    const toastId = toast.loading("Securely processing your order...");
 
     try {
-      const { error: submitError } = await elements.submit();
-      if (submitError) {
-        throw new Error(submitError.message);
-      }
+      // ১. ডাটাবেজে পেন্ডিং অর্ডার তৈরি
+      const orderDetails = await onPlaceOrder({ paymentMethodId: selectedPaymentMethod });
+      if (!orderDetails) throw new Error("Could not initialize order session.");
 
-      const orderData = await onPlaceOrder({ paymentMethodId: selectedPaymentMethod });
-      
-      if (!orderData?.orderId) {
-        throw new Error("Failed to create order record. Please try again.");
-      }
-
-      const res = await createPaymentIntent({
-        cartId,
-        shippingMethodId: selectedShippingId,
-        shippingAddress: shippingInfo,
-        couponCode,
-        metadata: { orderId: orderData.orderId } 
+      // ২. পেমেন্ট ইন্টেন্ট আপডেট (Order ID ম্যাপ করা)
+      await fetch('/api/stripe/update-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentIntentId: clientSecret.split('_secret_')[0],
+          orderId: orderDetails.orderId,
+          amount: total,
+          customerInfo,
+          cartItems
+        })
       });
 
-      if (!res.success || !res.data?.clientSecret) {
-        throw new Error(res.error || "Failed to initialize payment.");
-      }
-
-      const result = await stripe.confirmPayment({
+      // ৩. পেমেন্ট কনফার্মেশন
+      const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
-        clientSecret: res.data.clientSecret, 
+        clientSecret,
         confirmParams: {
-          return_url: `${window.location.origin}/order-success?order_id=${orderData.orderId}`,
-          payment_method_data: {
-            billing_details: {
-              name: `${customerInfo.firstName} ${customerInfo.lastName}`,
-              email: customerInfo.email,
-              phone: customerInfo.phone,
-              address: {
-                line1: customerInfo.address1,
-                city: customerInfo.city,
-                state: customerInfo.state,
-                postal_code: customerInfo.postcode,
-                country: 'AU',
-              }
-            }
-          }
+          return_url: `${window.location.origin}/order-success?order_id=${orderDetails.orderId}`,
         },
+        redirect: 'if_required',
       });
 
-      if (result.error) {
-
-        throw new Error(result.error.message);
+      if (error) throw new Error(error.message);
+      
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // ৪. পেমেন্ট ক্যাপচার করা (স্টক আপডেট)
+        await fetch('/api/stripe/capture-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: orderDetails.orderId, paymentIntentId: paymentIntent.id })
+        });
+        toast.success("Success! Order placed.", { id: toastId });
+        router.push(`/order-success?order_id=${orderDetails.orderId}`);
       }
-
     } catch (err: any) {
-      console.error(err);
-      setErrorMessage(err.message || "Payment failed");
-      toast.error(err.message || "Payment failed");
-    } finally {
+      toast.error(err.message || "Payment failed", { id: toastId });
       setIsProcessing(false);
     }
   };
 
+  if (!clientSecret) return <div className="py-10 text-center text-gray-400 animate-pulse font-medium text-sm">Initializing Secure Gateway...</div>;
+
   return (
-    <form onSubmit={handleSubmit} className="w-full">
-      <div className="mb-4">
-        <PaymentElement />
-      </div>
-
-      {errorMessage && <div className="text-red-500 text-sm mb-4">{errorMessage}</div>}
-
-      <button 
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full bg-black text-white py-3 rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-      >
-        {isProcessing ? 'Processing...' : `Pay $${total.toFixed(2)}`}
-      </button>
+    <form ref={ref} onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement onChange={(e) => setInternalMethodType(e.value.type)} options={{ layout: "tabs" }} />
+      {internalMethodType !== 'card' && (
+        <div className="p-3 bg-blue-50 text-blue-700 text-[12px] rounded-lg border border-blue-100 italic">
+          Note: You will be briefly redirected to securely authorize this payment.
+        </div>
+      )}
     </form>
   );
-}
+});
+
+StripePaymentGateway.displayName = 'StripePaymentGateway';
+export default StripePaymentGateway;

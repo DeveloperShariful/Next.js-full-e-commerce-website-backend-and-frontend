@@ -1,4 +1,4 @@
-// File Location: app/actions/order/create-order/get-payment-methods.ts
+//File 1: app/actions/frontend/checkout/get-payment-methods.ts
 
 "use server";
 
@@ -10,15 +10,17 @@ import {
   OfflineSettingsSchema 
 } from "@/app/(backend)/admin/settings/payments/types-and-schemas";
 
+/**
+ * এই অ্যাকশনটি চেকআউট পেজে পেমেন্ট অপশন রেন্ডার করার জন্য সমস্ত এক্টিভ মেথড নিয়ে আসে।
+ * সিকিউরিটির জন্য এটি কোনো Secret Key বা এনক্রিপ্টেড ডাটা ফ্রন্টএন্ডে পাঠাবে না।
+ */
 export async function getActivePaymentMethods(): Promise<PaymentGatewayUI[]> {
   try {
-    // ১. শুধুমাত্র চালু থাকা (isEnabled: true) মেথডগুলো আনা হচ্ছে
     const gateways = await db.paymentGateway.findMany({
       where: { isEnabled: true },
       orderBy: { displayOrder: 'asc' }
     });
 
-    // ২. ডাটাগুলোকে পার্স (Parse) করে ফ্রন্টএন্ডের উপযোগী করা
     const formattedMethods: PaymentGatewayUI[] = gateways.map((g) => {
       let parsedSettings: PaymentGatewayUI["settings"] = null;
 
@@ -33,12 +35,11 @@ export async function getActivePaymentMethods(): Promise<PaymentGatewayUI[]> {
             parsedSettings = OfflineSettingsSchema.parse(g.settings);
           }
         } catch (e) {
-          console.error(`Checkout: Invalid JSON settings for ${g.identifier}`);
+          console.error(`Invalid JSON Settings for ${g.identifier}`);
           parsedSettings = null; 
         }
       }
 
-      // ৩. রিটার্ন অবজেক্ট (এখানে এনক্রিপ্টেড সিক্রেট পাঠানো হচ্ছে না নিরাপত্তার জন্য)
       return {
         id: g.id,
         identifier: g.identifier,
@@ -49,21 +50,20 @@ export async function getActivePaymentMethods(): Promise<PaymentGatewayUI[]> {
         isEnabled: g.isEnabled,
         isConnected: g.isConnected,
         mode: g.mode,
-        publicKey: g.publicKey, // যেমন: Stripe Publishable Key বা PayPal Client ID
+        publicKey: g.publicKey, // যেমন: Stripe-এর Publishable Key
         webhookUrl: g.webhookUrl,
-        webhookSecret: null,    // সিকিউরিটির জন্য চেকআউট পেজে এটি পাঠানো নিষেধ
+        webhookSecret: null,    // নিরাপত্তার জন্য এটি গোপন রাখা হয়েছে
         minOrderAmount: g.minOrderAmount ? Number(g.minOrderAmount) : null,
         maxOrderAmount: g.maxOrderAmount ? Number(g.maxOrderAmount) : null,
         surchargeEnabled: g.surchargeEnabled,
         surchargeAmount: Number(g.surchargeAmount),
-        settings: parsedSettings // এতে থাকবে Apple Pay, Klarna, PayPal Button Color ইত্যাদি সেটিংস
+        settings: parsedSettings 
       };
     });
 
     return formattedMethods;
-
   } catch (error) {
-    console.error("GET_ACTIVE_PAYMENT_METHODS_ERROR:", error);
-    return []; // কোনো এরর হলে খালি অ্যারে পাঠাবে যাতে চেকআউট পেজ ক্র্যাশ না করে
+    console.error("GET_PAYMENT_METHODS_ERROR:", error);
+    return [];
   }
 }

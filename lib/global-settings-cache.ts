@@ -67,26 +67,18 @@ export const getCachedMarketingConfig = unstable_cache(
 // 4. PAYMENT METHODS CACHE
 // ট্যাগ: 'payment-methods'
 // ============================================================================
-export const getCachedPaymentMethods = unstable_cache(
-  async () => {
-    try {
-      return await db.paymentMethodConfig.findMany({
-        where: { isEnabled: true },
-        orderBy: { displayOrder: "asc" },
-        include: {
-          stripeConfig: true,
-          paypalConfig: true,
-          offlineConfig: true,
-        },
-      });
-    } catch (error) {
-      console.error("⚠️ Cache Error (PaymentMethods):", error);
-      return [];
-    }
-  },
-  ["payment-methods-cache-key"],
-  { tags: ["payment-methods"], revalidate: 86400 }
-);
+export const getCachedPaymentMethods = async () => {
+  try {
+    return await db.paymentGateway.findMany({ // ✅ Change model name here
+      where: { isEnabled: true },
+      orderBy: { displayOrder: "asc" },
+      // include: { ... } // ❌ 'include' ফেলে দিন, কারণ এখন আর রিলেশনাল টেবিল নেই, সব JSON এ আছে।
+    });
+  } catch (error) {
+    console.error("Cache Error (PaymentMethods):", error);
+    return [];
+  }
+};
 
 // ============================================================================
 // 5. PICKUP LOCATIONS CACHE

@@ -46,8 +46,9 @@ async function generatePayPalAccessToken() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        // 🛡️ Added 'shippingRates' in destructuring to receive live Transdirect options
-        const { cartItems, customerInfo, shippingInfo, selectedShipping, shippingRates, appliedCoupons } = body as {
+        // 🛡️ Added 'orderId' and 'shippingRates' to preserve all original calculations safely
+        const { orderId, cartItems, customerInfo, shippingInfo, selectedShipping, shippingRates, appliedCoupons } = body as {
+            orderId: string;
             cartItems: CartItemDTO[];
             customerInfo: AddressDTO;
             shippingInfo: AddressDTO;
@@ -57,10 +58,11 @@ export async function POST(request: Request) {
         };
 
         // 🛡️ 1. Validation
+        if (!orderId) return NextResponse.json({ error: "Store Order ID is required." }, { status: 400 });
         if (!cartItems || cartItems.length === 0) return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
         if (!customerInfo?.email || !customerInfo?.firstName) return NextResponse.json({ error: "Missing billing details." }, { status: 400 });
 
-        // 🛡️ 2. SERVER-SIDE CALCULATION (SECURITY HACK PREVENTION)
+        // 🛡️ 2. SERVER-SIDE CALCULATION (SECURITY HACK PREVENTION - 100% UNTOUCHED)
         let subtotal = 0;
         const validOrderItems = [];
 
@@ -81,20 +83,16 @@ export async function POST(request: Request) {
             });
         }
 
-        // Fetch Shipping Cost
+        // Fetch Shipping Cost (Handles both Transdirect and DB rates)
         let shippingCost = 0;
         let shippingMethodLabel = "Standard Shipping";
-        
-        // 🛡️ FIX: Handles both dynamic Transdirect rates and static DB rates
         if (selectedShipping) {
             const matchedRate = shippingRates?.find((r) => r.id === selectedShipping);
             
             if (matchedRate) {
-                // Live Transdirect quote calculation
                 shippingCost = Number(matchedRate.cost);
                 shippingMethodLabel = matchedRate.label;
             } else {
-                // Fallback to database for static rates
                 const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
                 if (!shippingRate) throw new Error("Invalid shipping method selected.");
                 shippingCost = Number(shippingRate.price);
@@ -118,12 +116,11 @@ export async function POST(request: Request) {
         const secureOrderTotal = (subtotal - discountTotal) + shippingCost;
         if (secureOrderTotal <= 0) throw new Error("Order total is zero. Invalid for PayPal.");
 
-        // 🛡️ 3. CREATE DRAFT ORDER IN PRISMA DB
-        const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-        
-        const newOrder = await db.order.create({
+        // 🛡️ 3. UPDATE THE EXISTING DRAFT ORDER (Preventing Duplicate Orders!)
+        // Instead of creating a new order, we update the one already generated sequentially by the checkout form
+        const updatedOrder = await db.order.update({
+            where: { id: orderId },
             data: {
-                orderNumber,
                 status: OrderStatus.PENDING,
                 paymentStatus: PaymentStatus.UNPAID,
                 currency: 'AUD',
@@ -139,21 +136,23 @@ export async function POST(request: Request) {
                 paymentGateway: 'paypal',
                 discountId,
                 items: {
+                    deleteMany: {}, // Clear previous temporary draft items to avoid duplication
                     create: validOrderItems
                 }
             }
         });
 
-        // 🛡️ 4. CREATE PAYPAL ORDER INTENT
+        // 🛡️ 4. CREATE PAYPAL ORDER INTENT (Using the updated sequential order)
         const { token, apiUrl } = await generatePayPalAccessToken();
         
         const paypalPayload = {
             intent: 'CAPTURE',
             purchase_units: [{
-                reference_id: newOrder.id, // Using Prisma Order ID
-                custom_id: newOrder.id,
-                invoice_id: newOrder.orderNumber,
-                description: `Order ${newOrder.orderNumber} from GoBike`,
+                reference_id: updatedOrder.id, 
+                custom_id: updatedOrder.id,
+                // Append dynamic timestamp to prevent Sandbox duplicate blocks
+                invoice_id: `${updatedOrder.orderNumber}-${Date.now().toString().slice(-4)}`,
+                description: `Order ${updatedOrder.orderNumber} from GoBike`,
                 amount: {
                     currency_code: 'AUD',
                     value: secureOrderTotal.toFixed(2), 
@@ -166,7 +165,7 @@ export async function POST(request: Request) {
             headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`,
-                'PayPal-Request-Id': `create_order_${newOrder.id}` 
+                'PayPal-Request-Id': `create_order_${updatedOrder.id}` 
             },
             body: JSON.stringify(paypalPayload),
         });
@@ -174,15 +173,15 @@ export async function POST(request: Request) {
         const paypalOrder = await paypalResponse.json();
         
         if (!paypalResponse.ok) {
-            await db.order.update({ where: { id: newOrder.id }, data: { status: OrderStatus.FAILED } });
+            await db.order.update({ where: { id: updatedOrder.id }, data: { status: OrderStatus.FAILED } });
             throw new Error(paypalOrder.message || "PayPal rejected the order initialization.");
         }
 
         // 🛡️ 5. RETURN SUCCESS
         return NextResponse.json({ 
             id: paypalOrder.id, 
-            wcOrderId: newOrder.id, // Sending Prisma UUID
-            wcOrderKey: newOrder.orderNumber // Using Order Number as Key
+            wcOrderId: updatedOrder.id, // Sends the correct verified Prisma UUID
+            wcOrderKey: updatedOrder.orderNumber // Sends the sequential order number (#1000, #1001)
         });
 
     } catch (error: unknown) {

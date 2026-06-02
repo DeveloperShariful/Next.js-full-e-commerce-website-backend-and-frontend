@@ -15,13 +15,12 @@ interface MetaDataDTO { key: string; value: string; }
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // 🛡️ Added 'shippingRates' in destructuring to receive live Transdirect options
     const { 
       cartItems, 
       customerInfo, 
       shippingInfo, 
       selectedShipping, 
-      shippingRates, // 👈 Added shippingRates array
+      shippingRates,
       appliedCoupons, 
       orderNotes,
       selectedPaymentMethod, 
@@ -31,7 +30,7 @@ export async function POST(request: Request) {
         customerInfo: AddressDTO;
         shippingInfo: AddressDTO;
         selectedShipping: string;
-        shippingRates: { id: string; label: string; cost: number }[]; // 👈 Strictly typed
+        shippingRates: { id: string; label: string; cost: number }[];
         appliedCoupons: CouponDTO[];
         orderNotes: string;
         selectedPaymentMethod: string;
@@ -83,17 +82,13 @@ export async function POST(request: Request) {
     // Fetch Shipping Cost dynamically
     let shippingCost = 0;
     let shippingMethodLabel = "Standard Shipping";
-    
-    // 🛡️ FIX: Handles both dynamic Transdirect rates and static DB rates
     if (selectedShipping) {
         const matchedRate = shippingRates?.find((r) => r.id === selectedShipping);
         
         if (matchedRate) {
-            // Live Transdirect quote calculation
             shippingCost = Number(matchedRate.cost);
             shippingMethodLabel = matchedRate.label;
         } else {
-            // Fallback to database for static rates
             const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
             if (shippingRate) {
                 shippingCost = Number(shippingRate.price);
@@ -123,12 +118,27 @@ export async function POST(request: Request) {
     metaDataArray.push({ key: '_stripe_payment_method', value: selectedPaymentMethod || 'stripe' });
     metaDataArray.push({ key: '_created_via', value: 'Headless_Stripe_Create_Order_API' });
 
-    // 🛡️ 5. Create the Order in Prisma DB
-    const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+    // 🛡️ 5. Sequential Order Number Generator (Starting from #1000)
+    const lastOrder = await db.order.findFirst({
+        orderBy: { createdAt: 'desc' },
+        select: { orderNumber: true }
+    });
 
+    let nextOrderNumber = "#1000"; // Fallback starting number
+
+    if (lastOrder && lastOrder.orderNumber) {
+        // Extracts digits from last orderNumber (e.g. "#1005" -> 1005)
+        const numericPart = lastOrder.orderNumber.replace(/[^0-9]/g, '');
+        if (numericPart) {
+            const nextNumeric = parseInt(numericPart, 10) + 1;
+            nextOrderNumber = `#${nextNumeric}`;
+        }
+    }
+
+    // 🛡️ 6. Create the Order in Prisma DB
     const newOrder = await db.order.create({
         data: {
-            orderNumber,
+            orderNumber: nextOrderNumber, // 👈 Used sequential ordering
             status: OrderStatus.PENDING,
             paymentStatus: PaymentStatus.UNPAID,
             currency: 'AUD',
@@ -155,13 +165,12 @@ export async function POST(request: Request) {
       throw new Error("Failed to create pending order in Database.");
     }
 
-    console.log(`✅ [Stripe Create Order] Pending Order Created. Order ID: ${newOrder.id}`);
+    console.log(`✅ [Stripe Create Order] Pending Order Created. Order ID: ${newOrder.id} | Order Number: ${newOrder.orderNumber}`);
       
-    // 🛡️ 6. Return Data to Frontend
     return NextResponse.json({
       success: true,
       wcOrderId: newOrder.id, // Prisma UUID
-      wcOrderKey: newOrder.orderNumber, // Secure key mapping
+      wcOrderKey: newOrder.orderNumber, // Sequential Number
       status: newOrder.status 
     });
 

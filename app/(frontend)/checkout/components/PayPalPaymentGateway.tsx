@@ -4,7 +4,9 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { PayPalButtons } from '@paypal/react-paypal-js';
+import { useCart } from '@/context/CartContext'; // 🛡️ Step 1: Imported useCart Context
 import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 export interface CartItemDTO { 
   id: string; 
@@ -39,7 +41,7 @@ export interface CouponDTO {
 interface PayPalGatewayProps {
   total: number;
   isPlacingOrder: boolean;
-  onPlaceOrder: (paymentData?: { paymentMethodId: string }) => void;
+  onPlaceOrder: (paymentData?: { paymentMethodId: string }) => Promise<{ orderId: string; orderKey: string } | void | null>;
   isShippingSelected: boolean;
   cartItems: CartItemDTO[];
   customerInfo: Partial<AddressDTO>;
@@ -52,6 +54,7 @@ interface PayPalGatewayProps {
 const PayPalPaymentGatewayComponent = ({ 
     total, 
     isPlacingOrder, 
+    onPlaceOrder,
     isShippingSelected, 
     cartItems, 
     customerInfo, 
@@ -61,41 +64,30 @@ const PayPalPaymentGatewayComponent = ({
     appliedCoupons 
 }: PayPalGatewayProps) => {
   
+  const router = useRouter();
+  const { clearCart } = useCart(); // 🛡️ Step 2: Extract clearCart function
   const wcOrderIdRef = useRef<string | null>(null); 
   const wcOrderKeyRef = useRef<string | null>(null);
 
   const [canRender, setCanRender] = useState(false);
 
-  console.log("%c🔍 [PayPal Gateway Debug] Gateway Component Rendered.", "color: #ff0099; font-weight: bold;");
-
   useEffect(() => {
-    console.log("🔍 [PayPal Gateway Debug] Mounting Interval Checker...");
-
-    // 🛡️ Direct window monitoring logs with strict TypeScript safe check
     const interval = setInterval(() => {
       const paypalExists = typeof window !== 'undefined' && window.paypal !== undefined && window.paypal !== null;
-      const buttonsExists = typeof window !== 'undefined' && !!window.paypal?.Buttons; // 👈 FIXED: Optional chaining (?.) solves the TS error!
-
-      console.log(`🔍 [PayPal Polling] window.paypal exists: ${paypalExists} | window.paypal.Buttons exists: ${buttonsExists}`);
+      const buttonsExists = typeof window !== 'undefined' && !!window.paypal?.Buttons;
 
       if (paypalExists && buttonsExists) {
-        console.log("%c🔍 [PayPal Gateway Debug] SUCCESS! window.paypal.Buttons found on Window object!", "color: #00ff00; font-weight: bold;");
         setCanRender(true);
         clearInterval(interval);
       }
     }, 100);
-    return () => {
-      console.log("🔍 [PayPal Gateway Debug] Cleaning up Interval Checker...");
-      clearInterval(interval);
-    };
+
+    return () => clearInterval(interval);
   }, []);
 
   if (!canRender) {
-    console.log("%c🔍 [PayPal Gateway Debug] render BLOCKED. Script is still downloading. Showing Skeleton...", "color: #ff3300;");
     return <div className="w-full h-12 bg-gray-200 animate-pulse rounded-md flex justify-center items-center text-xs text-gray-500">Connecting to PayPal API...</div>;
   }
-
-  console.log("%c🎉 [PayPal Gateway Debug] render ALLOWED! Rendering PayPalButtons now!", "color: #00ff00; font-weight: bold;");
 
   return (
       <PayPalButtons
@@ -112,10 +104,18 @@ const PayPalPaymentGatewayComponent = ({
           toast.loading("Initializing secure payment...", { id: 'paypal-init' });
           
           try {
+              const orderDetails = await onPlaceOrder({ paymentMethodId: 'paypal' });
+
+              if (!orderDetails) throw new Error("Failed to initialize store order.");
+              
+              wcOrderIdRef.current = orderDetails.orderId;
+              wcOrderKeyRef.current = orderDetails.orderKey;
+
               const res = await fetch('/api/paypal/create-order', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
+                      orderId: orderDetails.orderId,
                       total, 
                       cartItems, 
                       customerInfo, 
@@ -130,9 +130,6 @@ const PayPalPaymentGatewayComponent = ({
               toast.dismiss('paypal-init');
 
               if (!res.ok) throw new Error(data.error || "Failed to create order");
-              
-              wcOrderIdRef.current = data.wcOrderId;
-              wcOrderKeyRef.current = data.wcOrderKey;
               
               return data.id; 
           } catch (err: unknown) {
@@ -160,7 +157,14 @@ const PayPalPaymentGatewayComponent = ({
 
               if (captureData.success) {
                   toast.success('Payment successful!');
-                  window.location.href = `/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}&clear_cart=true`;
+                  
+                  // 🛡️ Step 3: Clear the Cart dynamically before redirecting
+                  if (typeof clearCart === 'function') {
+                      await clearCart();
+                  }
+
+                  // Smooth Redirect to success page
+                  router.push(`/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}`);
               } else {
                   toast.error(captureData.message || "Payment could not be verified automatically.");
               }

@@ -116,8 +116,6 @@ export async function POST(request: Request) {
         const secureOrderTotal = (subtotal - discountTotal) + shippingCost;
         if (secureOrderTotal <= 0) throw new Error("Order total is zero. Invalid for PayPal.");
 
-        // 🛡️ 3. UPDATE THE EXISTING DRAFT ORDER (Preventing Duplicate Orders!)
-        // Instead of creating a new order, we update the one already generated sequentially by the checkout form
         const updatedOrder = await db.order.update({
             where: { id: orderId },
             data: {
@@ -136,7 +134,7 @@ export async function POST(request: Request) {
                 paymentGateway: 'paypal',
                 discountId,
                 items: {
-                    deleteMany: {}, // Clear previous temporary draft items to avoid duplication
+                    deleteMany: {}, 
                     create: validOrderItems
                 }
             }
@@ -177,11 +175,10 @@ export async function POST(request: Request) {
             throw new Error(paypalOrder.message || "PayPal rejected the order initialization.");
         }
 
-        // 🛡️ 5. RETURN SUCCESS
         return NextResponse.json({ 
             id: paypalOrder.id, 
-            wcOrderId: updatedOrder.id, // Sends the correct verified Prisma UUID
-            wcOrderKey: updatedOrder.orderNumber // Sends the sequential order number (#1000, #1001)
+            wcOrderId: updatedOrder.id, 
+            wcOrderKey: updatedOrder.orderNumber 
         });
 
     } catch (error: unknown) {

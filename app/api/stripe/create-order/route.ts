@@ -113,32 +113,29 @@ export async function POST(request: Request) {
     const secureOrderTotal = (subtotal - discountTotal) + shippingCost;
     if (secureOrderTotal <= 0) throw new Error("Order total must be greater than zero.");
 
-    // 🛡️ 4. Build Metadata safely
     const metaDataArray = Array.isArray(affiliateMetaData) ? [...affiliateMetaData] : [];
     metaDataArray.push({ key: '_stripe_payment_method', value: selectedPaymentMethod || 'stripe' });
     metaDataArray.push({ key: '_created_via', value: 'Headless_Stripe_Create_Order_API' });
 
-    // 🛡️ 5. Sequential Order Number Generator (Starting from #1000)
     const lastOrder = await db.order.findFirst({
         orderBy: { createdAt: 'desc' },
         select: { orderNumber: true }
     });
 
-    let nextOrderNumber = "#1000"; // Fallback starting number
+    let nextOrderNumber = "1000"; 
 
     if (lastOrder && lastOrder.orderNumber) {
-        // Extracts digits from last orderNumber (e.g. "#1005" -> 1005)
         const numericPart = lastOrder.orderNumber.replace(/[^0-9]/g, '');
         if (numericPart) {
             const nextNumeric = parseInt(numericPart, 10) + 1;
-            nextOrderNumber = `#${nextNumeric}`;
+            nextOrderNumber = String(nextNumeric);
         }
     }
 
     // 🛡️ 6. Create the Order in Prisma DB
     const newOrder = await db.order.create({
         data: {
-            orderNumber: nextOrderNumber, // 👈 Used sequential ordering
+            orderNumber: nextOrderNumber,
             status: OrderStatus.PENDING,
             paymentStatus: PaymentStatus.UNPAID,
             currency: 'AUD',

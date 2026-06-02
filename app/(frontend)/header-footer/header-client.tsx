@@ -9,6 +9,7 @@ import { useSession, signOut } from "next-auth/react"; // NextAuth Import
 import SearchOverlay from '@/components/SearchOverlay'; // পাথ ঠিক করে নিবেন
 import MiniCart from '@/components/MiniCart'; // পাথ ঠিক করে নিবেন
 import Image from 'next/image';
+import { searchProductsAction } from '@/app/actions/frontend/home/searchProductsAction'; // 🛡️ Search action imported directly
 import { 
   IoSearch, 
   IoMenu, 
@@ -33,6 +34,15 @@ type NavItem = {
   label: string;
   subItems?: SubNavItem[]; 
 };
+
+interface SearchResult {
+  id: string;
+  slug: string;
+  name: string;
+  image?: {
+    sourceUrl: string;
+  };
+}
 
 const navItems: NavItem[] = [
   { path: '/', label: 'Home' },
@@ -65,35 +75,71 @@ const navItems: NavItem[] = [
 
 interface HeaderClientProps {
   isAffiliate: boolean;
+  userRole?: string | null;
 }
 
-export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
+export default function HeaderClient({ isAffiliate, userRole }: HeaderClientProps) {
   const { cartItems, isMiniCartOpen, openMiniCart, closeMiniCart } = useCart();
-  const { data: session } = useSession(); // NextAuth Session
+  const { data: session } = useSession(); 
   
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthDropdownOpen, setIsAuthDropdownOpen] = useState(false);
   const [openMobileMenus, setOpenMobileMenus] = useState<Record<string, boolean>>({});
   
+  // 🛡️ Live Inline Search States (Desktop)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null); // 🛡️ Ref for closing search dropdown outside
   const pathname = usePathname();
   
-  // Real-time Cart Count
   const totalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
-  
   const user = session?.user;
+
+  const normalizedRole = userRole?.toUpperCase() || '';
+  const isAdminRole = normalizedRole === 'ADMIN' || normalizedRole === 'MANAGER' || normalizedRole === 'SUPER_ADMIN';
 
   const closeAllOverlays = () => {
     setIsMenuOpen(false);
     setIsSearchOpen(false);
     setIsAuthDropdownOpen(false);
+    setIsSearchFocused(false);
   }
 
+  // 🛡️ Debounced Live Search API Call inside Header
+  useEffect(() => {
+    if (searchTerm.length < 3) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const data = await searchProductsAction(searchTerm);
+        setSearchResults(data);
+      } catch (err) {
+        console.error("Search failed:", err);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300); // 300ms Debounce limit to protect server
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  // Click Outside Event Listeners
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsAuthDropdownOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false); // 🛡️ Closes the live search dropdown when clicked outside
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -113,7 +159,6 @@ export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
     setOpenMobileMenus(prev => ({ ...prev, [path]: !prev[path] }));
   };
 
-  // ★★★ SEO ENHANCEMENT 1: Organization Schema (Brand Logo & Details) ★★★
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -122,7 +167,6 @@ export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
     "logo": "https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids-1.webp"
   };
 
-  // ★★★ SEO ENHANCEMENT 2: Site Navigation Schema (For Google Sitelinks) ★★★
   const siteNavigationSchema = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -139,9 +183,10 @@ export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteNavigationSchema) }} />
 
-      <header className="bg-white border-b border-[#eaeaea] py-1.3 sticky top-[55px] z-50 transition-[top] duration-300 ease-in-out md:top-[48px] shadow-md">
+      <header className="bg-white border-b border-[#eaeaea] sticky top-[55px] z-50 transition-[top] duration-300 ease-in-out md:top-[48px] shadow-md">
         
-        <div className="max-w-[1400px] mx-auto px-6 flex pb-3 pt-3 lg:grid lg:grid-cols-3 items-center justify-between relative ">
+        {/* Top Main Bar (Logo, Nav, Icons) */}
+        <div className="max-w-[1400px] mx-auto px-6 flex pb-2 pt-3 lg:grid lg:grid-cols-3 items-center justify-between relative ">
           
           <div className="flex flex-1 lg:flex-none items-center justify-start">
             <button 
@@ -214,96 +259,99 @@ export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
 
           {/* Right Icons */}
           <div className="flex flex-1 lg:flex-none items-center justify-end gap-2 justify-self-end">
-            <button 
-                className="hidden lg:flex items-center gap-2 bg-transparent border-b border-[#d8d8d8] cursor-pointer px-2 pb-0.5 text-[#333] hover:border-black transition-colors" 
-                onClick={() => setIsSearchOpen(true)} 
-                aria-label="Open Search Bar"
-            >
-              <IoSearch size={22} aria-hidden="true" />
-              <span className="text-sm font-medium">Search</span>
-            </button>
             
-            <div className="relative" ref={dropdownRef}>
-                <button 
-                    onClick={toggleDropdown}
-                    className="hidden lg:flex bg-transparent border-none cursor-pointer p-2 text-[#333] items-center gap-2 hover:text-black transition-colors font-medium text-sm whitespace-nowrap"
-                    aria-label="My Account Menu"
-                    aria-haspopup="true" 
-                    aria-expanded={isAuthDropdownOpen} 
+            {user && isAdminRole ? (
+                <Link 
+                    href="/admin" 
+                    className="hidden lg:flex items-center gap-2 bg-transparent border-none cursor-pointer p-2 text-red-600 hover:text-red-700 transition-colors font-bold text-sm no-underline whitespace-nowrap"
+                    aria-label="Admin Dashboard"
                 >
-                  <IoPersonOutline size={24} aria-hidden="true" />
-                  {user && <span>My Account</span>}
-                </button>
+                  <IoSpeedometerOutline size={24} aria-hidden="true" />
+                  <span>Admin Panel</span>
+                </Link>
+            ) : (
+                <div className="relative" ref={dropdownRef}>
+                    <button 
+                        onClick={toggleDropdown}
+                        className="hidden lg:flex bg-transparent border-none cursor-pointer p-2 text-[#333] items-center gap-2 hover:text-black transition-colors font-medium text-sm whitespace-nowrap"
+                        aria-label="My Account Menu"
+                        aria-haspopup="true" 
+                        aria-expanded={isAuthDropdownOpen} 
+                    >
+                      <IoPersonOutline size={24} aria-hidden="true" />
+                      {user && <span>My Account</span>}
+                    </button>
 
-                {isAuthDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-[#e0e0e0] rounded-lg shadow-lg z-50 overflow-hidden animate-fadeIn">
+                    {isAuthDropdownOpen && (
+                        <div className="absolute right-0 top-full mt-2 w-60 bg-white border border-[#e0e0e0] rounded-lg shadow-lg z-50 overflow-hidden animate-fadeIn">
 
-                        {!user && (
-                            <>
-                                <Link 
-                                    href="/sign-in" 
-                                    className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa] border-b border-[#f0f0f0]"
-                                    onClick={closeAllOverlays}
-                                >
-                                    <IoPersonCircleOutline size={20} />
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold">Login / Register</span>
-                                        <span className="text-xs text-gray-500">Access your orders</span>
-                                    </div>
-                                </Link>
-                                <Link 
-                                    href="/affiliate-portal" 
-                                    className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa]"
-                                    onClick={closeAllOverlays}
-                                >
-                                    <IoTrendingUpOutline size={20} />
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold">Affiliate Portal</span>
-                                        <span className="text-xs text-gray-500">Earn commissions</span>
-                                    </div>
-                                </Link>
-                            </>
-                        )}
-
-                        {user && (
-                            <>
-                                <div className="px-4 py-3 bg-gray-50 border-b border-[#f0f0f0]">
-                                    <p className="text-xs text-gray-500">Signed in as</p>
-                                    <p className="text-sm font-bold text-[#333] truncate">{user.name || user.email}</p>
-                                </div>
-                                
-                                <Link 
-                                    href="/account" 
-                                    className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa] border-b border-[#f0f0f0]"
-                                    onClick={closeAllOverlays}
-                                >
-                                    <IoPersonOutline size={18} />
-                                    My Account
-                                </Link>
-
-                                {isAffiliate && (
+                            {!user && (
+                                <>
                                     <Link 
-                                        href="/affiliate/dashboard" 
-                                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f0f8ff] border-b border-[#f0f0f0]"
+                                        href="/sign-in" 
+                                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa] border-b border-[#f0f0f0]"
                                         onClick={closeAllOverlays}
                                     >
-                                        <IoSpeedometerOutline size={18} className="text-blue-600"/>
-                                        <span className="font-semibold text-blue-600">Affiliate Dashboard</span>
+                                        <IoPersonCircleOutline size={20} />
+                                        <div className="flex flex-col">
+                                            <span className="font-semibold">Login / Register</span>
+                                            <span className="text-xs text-gray-500">Access your orders</span>
+                                        </div>
                                     </Link>
-                                )}
+                                    <Link 
+                                        href="/affiliate-portal" 
+                                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa]"
+                                        onClick={closeAllOverlays}
+                                    >
+                                        <IoTrendingUpOutline size={20} />
+                                        <div className="flex flex-col">
+                                            <span className="font-semibold">Affiliate Portal</span>
+                                            <span className="text-xs text-gray-500">Earn commissions</span>
+                                        </div>
+                                    </Link>
+                                </>
+                            )}
 
-                                <button 
-                                    onClick={handleLogout}
-                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 text-left transition-colors"
-                                >
-                                    <IoLogOutOutline size={18} />
-                                    Logout
-                                </button>
-                            </>
-                        )}
-                    </div>
-                )}
-            </div>
+                            {user && (
+                                <>
+                                    <div className="px-4 py-3 bg-gray-50 border-b border-[#f0f0f0]">
+                                        <p className="text-xs text-gray-500">Signed in as</p>
+                                        <p className="text-sm font-bold text-[#333] truncate">{user.name || user.email}</p>
+                                    </div>
+                                    
+                                    <Link 
+                                        href="/account" 
+                                        className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa] border-b border-[#f0f0f0]"
+                                        onClick={closeAllOverlays}
+                                    >
+                                        <IoPersonOutline size={18} />
+                                        My Account
+                                    </Link>
+
+                                    {isAffiliate && (
+                                        <Link 
+                                            href="/affiliate/dashboard" 
+                                            className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f0f8ff] border-b border-[#f0f0f0]"
+                                            onClick={closeAllOverlays}
+                                        >
+                                            <IoSpeedometerOutline size={18} className="text-blue-600"/>
+                                            <span className="font-semibold text-blue-600">Affiliate Dashboard</span>
+                                        </Link>
+                                    )}
+
+                                    <button 
+                                        onClick={handleLogout}
+                                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 text-left transition-colors"
+                                    >
+                                        <IoLogOutOutline size={18} />
+                                        Logout
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
             
             {/* Cart Icon */}
             <button 
@@ -320,6 +368,78 @@ export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
             </button>
           </div>
         </div>
+
+        {/* 🛡️ NEW INLINE SEARCH BAR (100% Client-Side Live Search Dropdown, no overlay!) */}
+        <div className="hidden lg:flex justify-center w-full max-w-[1400px] mx-auto px-6 pb-4 pt-1 relative" ref={searchRef}>
+          <div className="w-full max-w-[700px] relative">
+            <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus-within:border-gray-400 focus-within:bg-white transition-all text-sm font-medium">
+              <IoSearch size={18} className="text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search high-performance electric bikes, spare parts, apparel..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)} // Opens inline dropdown on focus
+                className="w-full bg-transparent border-none outline-none text-[#333] placeholder-gray-400 font-semibold"
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')} 
+                  className="bg-transparent border-none cursor-pointer text-gray-400 hover:text-black transition-colors flex items-center"
+                >
+                  <IoClose size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* 🛡️ absolute-positioned Dropdown for live results */}
+            {isSearchFocused && searchTerm.length >= 3 && (
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden max-h-[400px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
+                {searchLoading && (
+                  <div className="p-5 text-center text-sm text-gray-500 flex items-center justify-center gap-3">
+                     <svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                     </svg>
+                     <span>Searching high-performance database...</span>
+                  </div>
+                )}
+                
+                {!searchLoading && searchResults.length > 0 && (
+                  <div className="flex flex-col py-1">
+                    {searchResults.map((product) => (
+                      <Link
+                        key={product.id}
+                        href={`/product/${product.slug}`}
+                        onClick={() => {
+                          setSearchTerm('');
+                          setIsSearchFocused(false);
+                        }}
+                        className="flex items-center gap-4 px-4 py-3.5 hover:bg-gray-50 transition-colors no-underline text-gray-800 border-b border-gray-100 last:border-0"
+                      >
+                        <Image 
+                          src={product.image?.sourceUrl || '/placeholder.png'} 
+                          alt={product.name} 
+                          width={40} 
+                          height={40}  
+                          className="w-[40px] h-[40px] object-cover rounded"
+                        />
+                        <span className="font-bold text-[15px]">{product.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {!searchLoading && searchResults.length === 0 && (
+                  <div className="p-5 text-center text-sm text-gray-500 font-medium">
+                    No products found for “{searchTerm}”
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
       </header>
 
       {/* MOBILE MENU */}
@@ -399,14 +519,26 @@ export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
 
             {user ? (
                 <>
-                 <Link 
-                    href="/account"
-                    className="text-[1.2rem] font-medium text-[#333] no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-black hover:font-bold mb-4"
-                    onClick={closeAllOverlays}
-                 >
-                    <IoPersonOutline aria-hidden="true" />
-                    <span>My Account</span>
-                 </Link>
+                 {/* Mobile Menu Single-click Admin Panel Redirect */}
+                 {isAdminRole ? (
+                     <Link 
+                        href="/admin"
+                        className="text-[1.2rem] font-bold text-red-600 no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-red-800 hover:font-bold mb-4"
+                        onClick={closeAllOverlays}
+                     >
+                        <IoSpeedometerOutline aria-hidden="true" />
+                        <span>Admin Panel</span>
+                     </Link>
+                 ) : (
+                     <Link 
+                        href="/account"
+                        className="text-[1.2rem] font-medium text-[#333] no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-black hover:font-bold mb-4"
+                        onClick={closeAllOverlays}
+                     >
+                        <IoPersonOutline aria-hidden="true" />
+                        <span>My Account</span>
+                     </Link>
+                 )}
                  
                  {isAffiliate && (
                     <Link 
@@ -458,8 +590,8 @@ export default function HeaderClient({ isAffiliate }: HeaderClientProps) {
         ></div>
       )}
       
-      {/* Search Overlay & Mini Cart */}
-      {isSearchOpen && <SearchOverlay onClose={() => setIsSearchOpen(false)} aria-label="Close searchber"/>}
+      {/* 🛡️ Search Overlay: Only loaded on Mobile drawer trigger now! */}
+      {isSearchOpen && <SearchOverlay onClose={() => setIsSearchOpen(false)} />}
       <MiniCart isOpen={isMiniCartOpen} onClose={closeMiniCart} />
     </>
   );

@@ -160,7 +160,7 @@ const PayPalPaymentGatewayComponent = ({
 
               if (captureData.success) {
                   toast.success('Payment successful!');
-                  window.location.href = `/checkout/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}&clear_cart=true`;
+                  window.location.href = `/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}&clear_cart=true`;
               } else {
                   toast.error(captureData.message || "Payment could not be verified automatically.");
               }

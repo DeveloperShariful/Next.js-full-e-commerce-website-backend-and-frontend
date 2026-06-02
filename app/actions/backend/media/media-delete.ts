@@ -31,7 +31,6 @@ export async function bulkDeleteMedia(ids: string[], force: boolean = false): Pr
         categories: { select: { name: true } },
         brands: { select: { name: true } },
         products: { select: { name: true } }, // Featured Image
-        blogPosts: { select: { title: true } },
         storeLogos: true,
         storeFavicons: true,
         
@@ -50,7 +49,6 @@ export async function bulkDeleteMedia(ids: string[], force: boolean = false): Pr
         if (file.products.length > 0) usage.push(`Product Featured (${file.products[0].name})`);
         if (file.categories.length > 0) usage.push(`Category (${file.categories[0].name})`);
         if (file.brands.length > 0) usage.push(`Brand Logo (${file.brands[0].name})`);
-        if (file.blogPosts.length > 0) usage.push(`Blog Post (${file.blogPosts[0].title})`);
         if (file.storeLogos.length > 0) usage.push(`Store Logo`);
 
         // If force is TRUE, we ignore usage (Admin Override)

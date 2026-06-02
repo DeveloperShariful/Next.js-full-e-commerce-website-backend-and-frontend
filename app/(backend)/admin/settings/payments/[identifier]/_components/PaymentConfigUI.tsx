@@ -6,7 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { PaymentGatewayUI } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
-import { ArrowLeft, CreditCard, Sliders, Activity, Webhook, Palette, MessageSquare, Briefcase } from "lucide-react"
+import { ArrowLeft, CreditCard, Sliders, Activity, Webhook, Palette, Briefcase, Info } from "lucide-react"
 
 // Import Stripe Components
 import { Stripe_General_Form } from "./Stripe/Stripe_General_Form"
@@ -41,6 +41,7 @@ const STRIPE_MAIN_TABS: TabItem[] = [
   { id: "webhooks", label: "Webhooks", icon: Webhook },
 ]
 
+// ★ FIX: Isolated Sub-Methods. They only get the General configuration tab.
 const STRIPE_SUB_TABS: TabItem[] = [
   { id: "general", label: "Configuration", icon: Sliders },
 ]
@@ -62,6 +63,7 @@ export const PaymentConfigUI = ({ method }: Props) => {
   let titleColor = "text-gray-900"
   let tabs: TabItem[] = OFFLINE_TABS
 
+  // Check if it's Klarna, Afterpay, or Zip
   const isStripeSubMethod = method.provider === "STRIPE" && method.identifier !== "stripe"
 
   if (method.provider === "STRIPE") {
@@ -103,11 +105,7 @@ export const PaymentConfigUI = ({ method }: Props) => {
   return (
     <div className="w-full bg-[#f0f0f1] h-full font-sans text-[13px] text-[#3c434a]">
       
-      {/* 
-        ✅ FIX: Header and Content are now aligned to the left (no mx-auto or max-w) 
-        and take up the full available width.
-      */}
-      <div className="w-full ">
+      <div className="w-full">
         
         {/* WordPress / WooCommerce Style Clean Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -123,9 +121,6 @@ export const PaymentConfigUI = ({ method }: Props) => {
           </h1>
         </div>
 
-        {/* 
-          ✅ FIX: The layout is now fully stretched. Sidebar is fixed width, content takes the rest. 
-        */}
         <div className="flex flex-col md:flex-row items-start gap-6">
           
           {/* Left Sidebar Tabs */}
@@ -152,9 +147,17 @@ export const PaymentConfigUI = ({ method }: Props) => {
           {/* Right Content Area (Takes full remaining width) */}
           <main className="flex-1 w-full min-w-0">
             
+            {/* ★ FIX: Clearer Notice for Sub-methods */}
             {isStripeSubMethod && (
-               <div className="mb-6 p-3 bg-white border-l-4 border-[#2271b1] shadow-sm text-[13px] text-[#3c434a]">
-                 <strong>Note:</strong> This payment method uses the API keys and Webhooks from your main <em>Credit / Debit Card (Stripe)</em> configuration. You only need to configure the display settings below.
+               <div className="mb-6 p-4 bg-blue-50 border-l-4 border-[#2271b1] shadow-sm flex items-start gap-3">
+                 <Info className="h-5 w-5 text-[#2271b1] flex-shrink-0 mt-0.5" />
+                 <div className="text-[13px] text-[#3c434a]">
+                   <p className="m-0 font-semibold mb-1">Inherited Credentials Mode</p>
+                   <p className="m-0">
+                     This payment method uses the API keys and Webhooks securely inherited from your main <strong>Credit / Debit Card (Stripe)</strong> configuration. 
+                     You only need to configure the title, description, and visibility settings below.
+                   </p>
+                 </div>
                </div>
             )}
             

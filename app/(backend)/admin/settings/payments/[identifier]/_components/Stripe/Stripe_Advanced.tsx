@@ -9,23 +9,32 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { PaymentGatewayUI, StripeSettingsSchema, SharedGatewaySchema, StripeSettingsType } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
 import { updateStripeSettings } from "@/app/actions/backend/settings/payments/stripe-actions"
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, Info } from "lucide-react"
+
+// 1. Define Schema mapping
+const FormSchema = z.object({
+  shared: SharedGatewaySchema,
+  settings: StripeSettingsSchema
+})
+
+// 2. Extract Types
+type FormInput = z.input<typeof FormSchema>
+type FormOutput = z.output<typeof FormSchema>
 
 export const Stripe_Advanced = ({ method }: { method: PaymentGatewayUI }) => {
   const [isPending, startTransition] = useTransition()
   
   const settings = (method.settings || {}) as StripeSettingsType;
 
-  const form = useForm({
-    resolver: zodResolver(z.object({
-      shared: SharedGatewaySchema,
-      settings: StripeSettingsSchema
-    })),
+  // 3. Strict Typed Form Configuration
+  // ★ FIX: Removed klarnaEnabled, afterpayEnabled, and zipEnabled from defaultValues
+  const form = useForm<FormInput, undefined, FormOutput>({
+    resolver: zodResolver(FormSchema),
     defaultValues: {
       shared: {
         name: method.name,
@@ -33,10 +42,10 @@ export const Stripe_Advanced = ({ method }: { method: PaymentGatewayUI }) => {
         description: method.description || "",
         isEnabled: method.isEnabled,
         mode: method.mode,
-        minOrderAmount: method.minOrderAmount,
-        maxOrderAmount: method.maxOrderAmount,
+        minOrderAmount: method.minOrderAmount ?? null,
+        maxOrderAmount: method.maxOrderAmount ?? null,
         surchargeEnabled: method.surchargeEnabled,
-        surchargeAmount: method.surchargeAmount
+        surchargeAmount: method.surchargeAmount ?? 0
       },
       settings: {
         paymentAction: settings.paymentAction || "CAPTURE",
@@ -48,16 +57,14 @@ export const Stripe_Advanced = ({ method }: { method: PaymentGatewayUI }) => {
         applePayEnabled: settings.applePayEnabled ?? true,
         googlePayEnabled: settings.googlePayEnabled ?? true,
         paymentRequestButtons: settings.paymentRequestButtons ?? true,
-        klarnaEnabled: settings.klarnaEnabled ?? false,
-        afterpayEnabled: settings.afterpayEnabled ?? false,
-        zipEnabled: settings.zipEnabled ?? false,
         buttonTheme: settings.buttonTheme || "dark",
         debugLog: settings.debugLog || false
       }
     }
   })
 
-  const onSubmit = (values: any) => {
+  // 4. Submit Handler
+  const onSubmit = (values: FormOutput) => {
     startTransition(() => {
       updateStripeSettings(method.id, values.shared, values.settings)
         .then((data) => {
@@ -135,32 +142,18 @@ export const Stripe_Advanced = ({ method }: { method: PaymentGatewayUI }) => {
           </div>
         </FormRow>
 
-        {/* BNPL Options */}
+        {/* BNPL Options (Notice Only) */}
         <div className="bg-gray-50/50 px-6 py-3 border-y border-gray-200 font-semibold text-gray-800 mt-4">Buy Now, Pay Later (BNPL)</div>
 
         <FormRow label="Supported BNPL Methods" isLast>
-          <div className="space-y-3">
-            <FormField control={form.control} name="settings.afterpayEnabled" render={({ field }) => (
-              <FormItem className="flex items-start space-x-2 space-y-0">
-                <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                <div className="leading-none">
-                  <label className="text-sm font-normal text-gray-700 cursor-pointer">Afterpay / Clearpay</label>
-                  <p className="text-xs text-gray-500 mt-1">Make sure it is activated in your Stripe Dashboard.</p>
-                </div>
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="settings.klarnaEnabled" render={({ field }) => (
-              <FormItem className="flex items-start space-x-2 space-y-0">
-                <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                <label className="text-sm font-normal text-gray-700 cursor-pointer">Klarna</label>
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="settings.zipEnabled" render={({ field }) => (
-              <FormItem className="flex items-start space-x-2 space-y-0">
-                <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-                <label className="text-sm font-normal text-gray-700 cursor-pointer">Zip Pay</label>
-              </FormItem>
-            )} />
+          {/* ★ FIX: Replaced the checkboxes with a clean notice informing the admin of the new architecture */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm flex items-start gap-3 max-w-md">
+            <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-[13px] text-blue-800 leading-relaxed">
+              <strong>Notice:</strong> To provide a better checkout experience, Klarna, Afterpay, and Zip Pay are now managed as standalone payment methods. 
+              <br /><br />
+              Please return to the main <a href="/admin/settings/payments" className="font-semibold underline hover:text-blue-900">Payment Settings list</a> to enable or disable them independently.
+            </div>
           </div>
         </FormRow>
 

@@ -9,7 +9,6 @@ export type MediaUsage = {
   inProducts: number;
   inCategories: number;
   inBrands: number;
-  inBlogs: number;
   inStoreSettings: number;
   inCollections: number;
   details: string[]; 
@@ -106,7 +105,6 @@ export async function getAllMedia(
           brands: { select: { name: true } },
           products: { select: { name: true } }, // Featured Image of Product
           variants: { select: { name: true } },
-          blogPosts: { select: { title: true } },
           storeLogos: { select: { storeName: true } },
           storeFavicons: { select: { storeName: true } },
           collections: { select: { name: true } },
@@ -125,14 +123,12 @@ export async function getAllMedia(
         m.categories.forEach(c => details.push(`Category: ${c.name}`));
         m.brands.forEach(b => details.push(`Brand Logo: ${b.name}`));
         m.products.forEach(p => details.push(`Product Featured: ${p.name}`));
-        m.blogPosts.forEach(b => details.push(`Blog: ${b.title}`));
         if(m.storeLogos.length > 0) details.push("Store Logo");
         
         const usageStats: MediaUsage = {
             inProducts: m.productImages.length + m.products.length + m.variants.length,
             inCategories: m.categories.length,
             inBrands: m.brands.length,
-            inBlogs: m.blogPosts.length,
             inStoreSettings: m.storeLogos.length + m.storeFavicons.length + m.seoConfigs.length,
             inCollections: m.collections.length,
             details: details.slice(0, 5) // Limit details to 5 items to keep payload light

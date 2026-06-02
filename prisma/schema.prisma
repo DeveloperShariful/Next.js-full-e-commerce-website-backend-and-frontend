@@ -349,7 +349,6 @@ model User {
   paymentSessions       PaymentSession[]
 
   activityLogs          ActivityLog[]
-  blogPosts             BlogPost[]
   notifications         Notification[]
 
   createdTickets        SupportTicket[] @relation("UserCreatedTickets")
@@ -1333,6 +1332,9 @@ model Cart {
   user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionId      String?
   items          CartItem[]
+  shippingHash   String?   // এখানে "2570-CAMDEN-32kg" সেভ থাকবে
+  shippingQuotes Json?     // এখানে Transdirect থেকে আসা রেটগুলো সেভ থাকবে
+  appliedCoupons Json?
   paymentSession PaymentSession?
   reservations   InventoryReservation[]
   reminderSentAt DateTime?
@@ -1471,36 +1473,6 @@ model Newsletter {
   createdAt DateTime @default(now())
 
   @@index([isActive])
-}
-
-// ==========================================
-// 10. BLOG 
-// ==========================================
-
-model BlogPost {
-  id              String   @id @default(uuid())
-  title           String
-  slug            String   @unique
-  content         String   @db.Text
-  excerpt         String?
-  image           String?
-  featuredMediaId String?
-  featuredMedia   Media?   @relation(fields: [featuredMediaId], references: [id])
-  authorId        String
-  author          User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  isPublished     Boolean  @default(false)
-  tags            String[]
-  metaTitle       String?
-  metaDesc        String?
-  
-  contentEmbedding Unsupported("vector(1536)")?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([slug])
-  @@index([isPublished, createdAt(sort: Desc)])
-  @@index([authorId])
 }
 
 model Review {
@@ -1901,7 +1873,6 @@ model Media {
   brands         Brand[]
   products       Product[]
   variants       ProductVariant[]
-  blogPosts      BlogPost[]
   
   storeLogos     StoreSettings[]      @relation("StoreLogo")
   storeFavicons  StoreSettings[]      @relation("StoreFavicon")

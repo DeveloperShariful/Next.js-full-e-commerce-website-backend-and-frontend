@@ -55,9 +55,6 @@ export const Stripe_General_Form = ({ method }: { method: PaymentGatewayUI }) =>
         applePayEnabled: settings.applePayEnabled ?? true,
         googlePayEnabled: settings.googlePayEnabled ?? true,
         paymentRequestButtons: settings.paymentRequestButtons ?? true,
-        klarnaEnabled: settings.klarnaEnabled ?? false,
-        afterpayEnabled: settings.afterpayEnabled ?? false,
-        zipEnabled: settings.zipEnabled ?? false,
         buttonTheme: settings.buttonTheme || "dark",
         debugLog: settings.debugLog || false
       }
@@ -83,6 +80,8 @@ export const Stripe_General_Form = ({ method }: { method: PaymentGatewayUI }) =>
     </div>
   )
 
+  const isStripeSubMethod = method.provider === "STRIPE" && method.identifier !== "stripe";
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -91,24 +90,27 @@ export const Stripe_General_Form = ({ method }: { method: PaymentGatewayUI }) =>
           <FormField control={form.control} name="shared.isEnabled" render={({ field }) => (
             <FormItem className="flex items-center space-x-2 space-y-0">
               <FormControl><Checkbox checked={!!field.value} onCheckedChange={field.onChange} /></FormControl>
-              <label className="text-sm font-normal text-gray-700 cursor-pointer">Enable this payment method</label>
+              <label className="text-sm font-normal text-gray-700 cursor-pointer">Enable {method.name} at Checkout</label>
             </FormItem>
           )} />
         </FormRow>
 
-        <FormRow label="Test Mode">
-          <FormField control={form.control} name="shared.mode" render={({ field }) => (
-            <FormItem className="flex items-start space-x-2 space-y-0">
-              <FormControl>
-                <Checkbox checked={field.value === "TEST"} onCheckedChange={(c) => field.onChange(c ? "TEST" : "LIVE")} />
-              </FormControl>
-              <div className="leading-none">
-                <label className="text-sm font-normal text-gray-700 cursor-pointer">Enable Test Mode</label>
-                <p className="text-xs text-gray-500 mt-1">Use Stripe test keys to simulate transactions without real money.</p>
-              </div>
-            </FormItem>
-          )} />
-        </FormRow>
+        {/* If it's a sub-method, hide Test Mode toggle, because it inherits it from Main Stripe */}
+        {!isStripeSubMethod && (
+            <FormRow label="Test Mode">
+            <FormField control={form.control} name="shared.mode" render={({ field }) => (
+                <FormItem className="flex items-start space-x-2 space-y-0">
+                <FormControl>
+                    <Checkbox checked={field.value === "TEST"} onCheckedChange={(c) => field.onChange(c ? "TEST" : "LIVE")} />
+                </FormControl>
+                <div className="leading-none">
+                    <label className="text-sm font-normal text-gray-700 cursor-pointer">Enable Test Mode</label>
+                    <p className="text-xs text-gray-500 mt-1">Use Stripe test keys to simulate transactions without real money.</p>
+                </div>
+                </FormItem>
+            )} />
+            </FormRow>
+        )}
 
         <FormRow label="Title">
           <FormField control={form.control} name="shared.title" render={({ field }) => (

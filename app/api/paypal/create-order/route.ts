@@ -1,76 +1,180 @@
 // app/api/paypal/create-order/route.ts
 
 import { NextResponse } from 'next/server';
-import { db } from "@/lib/prisma";
-import { decrypt } from "@/app/actions/backend/settings/payments/crypto";
+import { db } from '@/lib/prisma';
+import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 
-// ১. পেপ্যাল এক্সেস টোকেন জেনারেট করার ফাংশন
-async function generateAccessToken(clientId: string, clientSecret: string, isSandbox: boolean) {
-  const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
-  const auth = Buffer.from(clientId + ":" + clientSecret).toString("base64");
-  
-  const response = await fetch(`${baseUrl}/v1/oauth2/token`, {
-    method: "POST",
-    body: "grant_type=client_credentials",
-    headers: { Authorization: `Basic ${auth}` },
-  });
+// ==========================================
+// STRICT INTERFACES
+// ==========================================
+interface CartItemDTO { id: string; databaseId: number; name: string; quantity: number; price: number; }
+interface AddressDTO { firstName: string; lastName: string; address1: string; city: string; state: string; postcode: string; email: string; phone: string; }
+interface CouponDTO { code: string; amount: number; }
+interface ShippingRateDTO { id: string; label: string; cost: number; }
 
-  const data = await response.json();
-  return data.access_token;
+// ==========================================
+// DYNAMIC PAYPAL CREDENTIALS FROM DB
+// ==========================================
+async function getPayPalCredentials() {
+    const gateway = await db.paymentGateway.findUnique({ where: { identifier: 'paypal' } });
+    if (!gateway || !gateway.isEnabled || !gateway.publicKey || !gateway.encryptedSecret) {
+        throw new Error("PayPal is not configured or disabled in the admin panel.");
+    }
+    const secret = decrypt(gateway.encryptedSecret);
+    const apiUrl = gateway.mode === 'TEST' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+    return { clientId: gateway.publicKey, secret, apiUrl };
 }
 
+async function generatePayPalAccessToken() {
+    const { clientId, secret, apiUrl } = await getPayPalCredentials();
+    const auth = Buffer.from(`${clientId}:${secret}`).toString('base64');
+    const response = await fetch(`${apiUrl}/v1/oauth2/token`, {
+        method: 'POST',
+        body: 'grant_type=client_credentials',
+        headers: { Authorization: `Basic ${auth}` },
+    });
+    
+    if (!response.ok) throw new Error("Failed to authenticate with PayPal API.");
+    const data = await response.json();
+    return { token: String(data.access_token), apiUrl };
+}
+
+// ==========================================
+// MAIN POST REQUEST
+// ==========================================
 export async function POST(request: Request) {
-  try {
-    const { orderId } = await request.json();
-    if (!orderId) return NextResponse.json({ error: "Order ID is missing" }, { status: 400 });
+    try {
+        const body = await request.json();
+        const { cartItems, customerInfo, shippingInfo, selectedShipping, appliedCoupons } = body as {
+            cartItems: CartItemDTO[];
+            customerInfo: AddressDTO;
+            shippingInfo: AddressDTO;
+            selectedShipping: string;
+            appliedCoupons: CouponDTO[];
+        };
 
-    // ২. ডাটাবেজ থেকে অর্ডার এবং পেপ্যাল কনফিগ আনা
-    const [order, gateway] = await Promise.all([
-      db.order.findUnique({ where: { id: orderId } }),
-      db.paymentGateway.findUnique({ where: { identifier: "paypal" } })
-    ]);
+        // 🛡️ 1. Validation
+        if (!cartItems || cartItems.length === 0) return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
+        if (!customerInfo?.email || !customerInfo?.firstName) return NextResponse.json({ error: "Missing billing details." }, { status: 400 });
 
-    if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    if (!gateway?.encryptedSecret || !gateway?.publicKey) throw new Error("PayPal not configured.");
+        // 🛡️ 2. SERVER-SIDE CALCULATION (SECURITY HACK PREVENTION)
+        let subtotal = 0;
+        const validOrderItems = [];
 
-    // ৩. কি ডিক্রিপ্ট করা এবং টোকেন আনা
-    const clientSecret = decrypt(gateway.encryptedSecret);
-    const isSandbox = gateway.mode === "TEST";
-    const accessToken = await generateAccessToken(gateway.publicKey, clientSecret!, isSandbox);
-    const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+        // Fetch exact product prices from DB
+        for (const item of cartItems) {
+            const product = await db.product.findUnique({ where: { id: item.id } });
+            if (!product) throw new Error(`Product ${item.name} no longer exists.`);
+            
+            const price = Number(product.price);
+            subtotal += (price * item.quantity);
+            
+            validOrderItems.push({
+                productId: product.id,
+                productName: product.name,
+                price: price,
+                quantity: item.quantity,
+                total: price * item.quantity
+            });
+        }
 
-    // ৪. পেপ্যাল সার্ভারে অর্ডার তৈরি করা
-    const response = await fetch(`${baseUrl}/v2/checkout/orders`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        intent: "CAPTURE",
-        purchase_units: [{
-          reference_id: order.id,
-          amount: {
-            currency_code: "AUD",
-            value: order.total.toString(),
-          },
-          description: `Order #${order.orderNumber} from GOBIKE`,
-        }],
-      }),
-    });
+        // Fetch Shipping Cost
+        let shippingCost = 0;
+        let shippingMethodLabel = "Standard Shipping";
+        if (selectedShipping) {
+            const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
+            if (!shippingRate) throw new Error("Invalid shipping method selected.");
+            shippingCost = Number(shippingRate.price);
+            shippingMethodLabel = shippingRate.name;
+        }
 
-    const paypalOrder = await response.json();
+        // Fetch Discount
+        let discountTotal = 0;
+        let discountId: string | undefined = undefined;
+        if (appliedCoupons && appliedCoupons.length > 0) {
+            const discount = await db.discount.findUnique({ where: { code: appliedCoupons[0].code } });
+            if (discount && discount.isActive) {
+                discountId = discount.id;
+                if (discount.type === "FIXED_CART") discountTotal = Number(discount.value);
+                else if (discount.type === "PERCENTAGE") discountTotal = (subtotal * Number(discount.value)) / 100;
+                if (discountTotal > subtotal) discountTotal = subtotal;
+            }
+        }
 
-    // ৫. লোকাল অর্ডারে পেপ্যাল আইডি সেভ করা
-    await db.order.update({
-      where: { id: order.id },
-      data: { paymentId: paypalOrder.id }
-    });
+        const secureOrderTotal = (subtotal - discountTotal) + shippingCost;
+        if (secureOrderTotal <= 0) throw new Error("Order total is zero. Invalid for PayPal.");
 
-    return NextResponse.json({ id: paypalOrder.id });
+        // 🛡️ 3. CREATE DRAFT ORDER IN PRISMA DB
+        const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        
+        const newOrder = await db.order.create({
+            data: {
+                orderNumber,
+                status: OrderStatus.PENDING,
+                paymentStatus: PaymentStatus.UNPAID,
+                currency: 'AUD',
+                subtotal,
+                discountTotal,
+                shippingTotal: shippingCost,
+                total: secureOrderTotal,
+                totalDue: secureOrderTotal,
+                guestEmail: customerInfo.email,
+                billingAddress: customerInfo as any,
+                shippingAddress: shippingInfo as any,
+                shippingMethod: shippingMethodLabel,
+                paymentGateway: 'paypal',
+                discountId,
+                items: {
+                    create: validOrderItems
+                }
+            }
+        });
 
-  } catch (error: any) {
-    console.error("PAYPAL_CREATE_ORDER_ERROR:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+        // 🛡️ 4. CREATE PAYPAL ORDER INTENT
+        const { token, apiUrl } = await generatePayPalAccessToken();
+        
+        const paypalPayload = {
+            intent: 'CAPTURE',
+            purchase_units: [{
+                reference_id: newOrder.id, // Using Prisma Order ID
+                custom_id: newOrder.id,
+                invoice_id: newOrder.orderNumber,
+                description: `Order ${newOrder.orderNumber} from GoBike`,
+                amount: {
+                    currency_code: 'AUD',
+                    value: secureOrderTotal.toFixed(2), 
+                },
+            }],
+        };
+
+        const paypalResponse = await fetch(`${apiUrl}/v2/checkout/orders`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                'PayPal-Request-Id': `create_order_${newOrder.id}` 
+            },
+            body: JSON.stringify(paypalPayload),
+        });
+
+        const paypalOrder = await paypalResponse.json();
+        
+        if (!paypalResponse.ok) {
+            await db.order.update({ where: { id: newOrder.id }, data: { status: OrderStatus.FAILED } });
+            throw new Error(paypalOrder.message || "PayPal rejected the order initialization.");
+        }
+
+        // 🛡️ 5. RETURN SUCCESS
+        return NextResponse.json({ 
+            id: paypalOrder.id, 
+            wcOrderId: newOrder.id, // Sending Prisma UUID
+            wcOrderKey: newOrder.orderNumber // Using Order Number as Key
+        });
+
+    } catch (error: unknown) {
+        console.error("PayPal Create API Error:", error);
+        const msg = error instanceof Error ? error.message : "An unexpected error occurred.";
+        return NextResponse.json({ error: msg }, { status: 500 });
+    }
 }

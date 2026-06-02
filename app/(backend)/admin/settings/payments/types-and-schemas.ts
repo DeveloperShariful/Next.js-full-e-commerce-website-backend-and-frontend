@@ -4,7 +4,7 @@ import { z } from "zod"
 import { PaymentMode, PaymentProvider } from "@prisma/client"
 
 // ==========================================
-// 1. SHARED SCHEMAS
+// 1. SHARED SCHEMAS (DO NOT MODIFY)
 // ==========================================
 const booleanField = z.boolean().optional().default(false)
 const stringField = z.string().nullable().optional()
@@ -25,6 +25,8 @@ export const SharedGatewaySchema = z.object({
 // ==========================================
 // 2. STRIPE JSON SETTINGS SCHEMA
 // ==========================================
+// ★ FIX: Removed klarnaEnabled, afterpayEnabled, zipEnabled to stop dual-control conflict.
+// Now, enabling/disabling is solely controlled by the main DB row's 'isEnabled' column.
 export const StripeSettingsSchema = z.object({
   paymentAction: z.enum(["CAPTURE", "AUTHORIZE"]).default("CAPTURE"),
   statementDescriptor: z.string().max(22).optional().nullable(),
@@ -35,9 +37,6 @@ export const StripeSettingsSchema = z.object({
   applePayEnabled: z.boolean().default(true),
   googlePayEnabled: z.boolean().default(true),
   paymentRequestButtons: z.boolean().default(true),
-  klarnaEnabled: booleanField,
-  afterpayEnabled: booleanField,
-  zipEnabled: booleanField,
   buttonTheme: z.enum(["light", "dark", "flat"]).default("dark"),
   debugLog: booleanField,
 })
@@ -92,7 +91,7 @@ export const OfflineSettingsSchema = z.object({
 export type OfflineSettingsType = z.infer<typeof OfflineSettingsSchema>
 
 // ==========================================
-// 5. MASTER TYPE FOR FRONTEND
+// 5. MASTER TYPE FOR FRONTEND UI
 // ==========================================
 export interface PaymentGatewayUI {
   id: string
@@ -106,7 +105,7 @@ export interface PaymentGatewayUI {
   mode: PaymentMode
   publicKey: string | null
   webhookUrl: string | null
-  webhookSecret: string | null // ✅ NEW FIELD ADDED HERE
+  webhookSecret: string | null
   minOrderAmount: number | null
   maxOrderAmount: number | null
   surchargeEnabled: boolean

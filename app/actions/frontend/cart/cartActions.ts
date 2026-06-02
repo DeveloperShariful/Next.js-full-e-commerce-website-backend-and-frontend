@@ -3,12 +3,13 @@
 
 import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import { v4 as uuidv4 } from "uuid";
 import { auth } from "@/auth"; 
+import { Prisma } from "@prisma/client";
 
 export interface CartActionResponse {
   success: boolean;
   items?: any[]; 
+  appliedCoupons?: { code: string; amount: number }[]; 
   error?: string;
 }
 
@@ -22,7 +23,7 @@ async function getCartSessionAndUser() {
   const userId = session?.user?.id;
 
   if (!sessionId) {
-    sessionId = uuidv4();
+    sessionId = crypto.randomUUID();
     cookieStore.set("cart_session", sessionId, { maxAge: 60 * 60 * 24 * 30, httpOnly: true });
   }
 
@@ -50,6 +51,16 @@ async function getCartSessionAndUser() {
             });
           }
         }
+        
+        const guestCoupons = guestCart.appliedCoupons ? (guestCart.appliedCoupons as any[]) : [];
+        const userCoupons = cart.appliedCoupons ? (cart.appliedCoupons as any[]) : [];
+        const mergedCoupons = [...userCoupons, ...guestCoupons.filter(gc => !userCoupons.some(uc => uc.code === gc.code))];
+
+        await db.cart.update({
+            where: { id: cart.id },
+            data: { appliedCoupons: mergedCoupons.length > 0 ? mergedCoupons : Prisma.JsonNull }
+        });
+
         await db.cart.delete({ where: { id: guestCart.id } });
       } else {
         cart = await db.cart.update({
@@ -70,7 +81,7 @@ async function getCartSessionAndUser() {
 }
 
 // ============================================================================
-// 2. INVENTORY RESERVATION & STOCK VALIDATION (FLASH SALE LOGIC)
+// 2. INVENTORY VALIDATION
 // ============================================================================
 async function validateStockAndReserve(cartId: string, productId: string, variantId: string | null, requestedQuantity: number) {
   const product = await db.product.findUnique({ where: { id: productId } });
@@ -103,95 +114,52 @@ async function validateStockAndReserve(cartId: string, productId: string, varian
     const availableStock = stock - reservedStock;
 
     if (requestedQuantity > availableStock) {
-      if (availableStock <= 0) {
-        return { valid: false, error: "Sorry, this item is currently out of stock or reserved by others." };
-      } else {
-        return { valid: false, error: `Only ${availableStock} item(s) left in stock!` };
-      }
+      if (availableStock <= 0) return { valid: false, error: "Sorry, this item is currently out of stock or reserved by others." };
+      else return { valid: false, error: `Only ${availableStock} item(s) left in stock!` };
     }
   }
 
   const defaultLocation = await db.location.findFirst({ where: { isActive: true } });
   if (defaultLocation) {
-    await db.inventoryReservation.deleteMany({
-      where: { cartId, productId, variantId }
-    });
+    await db.inventoryReservation.deleteMany({ where: { cartId, productId, variantId } });
     await db.inventoryReservation.create({
       data: {
-        cartId,
-        productId,
-        variantId,
-        locationId: defaultLocation.id,
-        quantity: requestedQuantity,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000) 
+        cartId, productId, variantId, locationId: defaultLocation.id,
+        quantity: requestedQuantity, expiresAt: new Date(Date.now() + 15 * 60 * 1000) 
       }
     });
   }
-
   return { valid: true };
 }
 
 // ============================================================================
-// 3. UI POSITION FIXER & ADVANCED DATA FORMATTER (DECIMAL FIX)
+// 3. CART FORMATTING
 // ============================================================================
 async function getFormattedCartItems(cartId: string) {
-  await db.inventoryReservation.deleteMany({
-    where: { expiresAt: { lt: new Date() } }
-  });
-
+  await db.inventoryReservation.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   const cart = await db.cart.findUnique({
     where: { id: cartId },
-    include: {
-      items: {
-        orderBy: { id: 'asc' }, 
-        include: {
-          product: { 
-            include: { attributes: true } 
-          },
-          variant: true,
-        },
-      },
-    },
+    include: { items: { orderBy: { id: 'asc' }, include: { product: { include: { attributes: true } }, variant: true } } },
   });
-
   if (!cart) return [];
 
   return cart.items.map((item) => {
     const isVariant = !!item.variant;
     const priceNum = isVariant ? Number(item.variant!.price) : Number(item.product.price);
     const totalNum = priceNum * item.quantity;
-
-    const formatPrice = (amount: number) =>
-      new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2 }).format(amount);
-
-    // ★ Decimal Fix: Prisma Decimal কে Number এ কনভার্ট করা হয়েছে
+    const formatPrice = (amount: number) => new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2 }).format(amount);
     const rawWeight = isVariant ? item.variant?.weight : item.product.weight;
     const weightNum = rawWeight ? Number(rawWeight.toString()) : 0;
 
     return {
-      id: item.product.id,
-      databaseId: item.product.productCode,
+      id: item.product.id, databaseId: item.product.productCode,
       name: isVariant ? `${item.product.name} - ${item.variant!.name}` : item.product.name,
-      slug: item.product.slug,
-      price: formatPrice(priceNum),
+      slug: item.product.slug, price: formatPrice(priceNum), rawPrice: priceNum, // ✅ Added rawPrice for accurate backend math
       image: isVariant && item.variant!.image ? item.variant!.image : item.product.featuredImage,
-      quantity: item.quantity,
-      key: item.id, 
-      total: formatPrice(totalNum),
-      
-      // Advanced Data for Checkout (All Serializable)
-      weight: weightNum,
+      quantity: item.quantity, key: item.id, total: formatPrice(totalNum), weight: weightNum,
       isPreOrder: isVariant ? item.variant!.isPreOrder : item.product.isPreOrder,
-      isVirtual: item.product.isVirtual,
-      taxStatus: item.product.taxStatus,
-      shippingClassId: item.product.shippingClassId || null,
-
-      attributes: item.product.attributes.map((attr) => ({
-        id: attr.id,
-        name: attr.name,
-        label: attr.name,
-        value: attr.values.join(", "),
-      })),
+      isVirtual: item.product.isVirtual, taxStatus: item.product.taxStatus, shippingClassId: item.product.shippingClassId || null,
+      attributes: item.product.attributes.map((attr) => ({ id: attr.id, name: attr.name, label: attr.name, value: attr.values.join(", ") })),
     };
   });
 }
@@ -199,13 +167,52 @@ async function getFormattedCartItems(cartId: string) {
 // ============================================================================
 // 4. MAIN EXPORTED ACTIONS
 // ============================================================================
+
+// ✅ ENTERPRISE FIX: Re-validating and Re-calculating Coupon on every load
 export async function getCartAction(): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
     const items = await getFormattedCartItems(cart.id);
-    return { success: true, items };
+    
+    let validCoupons: { code: string; amount: number }[] = [];
+    const savedCoupons = cart.appliedCoupons ? (cart.appliedCoupons as any[]) : [];
+
+    // If there is a coupon, verify it again dynamically
+    if (savedCoupons.length > 0) {
+      const code = savedCoupons[0].code;
+      const subtotal = items.reduce((acc, item) => acc + (item.rawPrice * item.quantity), 0);
+      
+      const discount = await db.discount.findUnique({ where: { code } });
+      const now = new Date();
+
+      if (
+        discount && discount.isActive && 
+        discount.startDate <= now && 
+        (!discount.endDate || discount.endDate >= now) &&
+        (!discount.minSpend || subtotal >= Number(discount.minSpend))
+      ) {
+        // Recalculate amount dynamically
+        let amount = 0;
+        if (discount.type === "FIXED_CART" || discount.type === "FIXED_AMOUNT") amount = Number(discount.value);
+        else if (discount.type === "PERCENTAGE") amount = (subtotal * Number(discount.value)) / 100;
+        
+        if (amount > subtotal) amount = subtotal;
+
+        validCoupons.push({ code: discount.code, amount });
+
+        // Update DB with fresh calculated amount
+        await db.cart.update({
+          where: { id: cart.id },
+          data: { appliedCoupons: validCoupons }
+        });
+      } else {
+        // Auto-remove invalid/expired coupon
+        await db.cart.update({ where: { id: cart.id }, data: { appliedCoupons: Prisma.JsonNull } });
+      }
+    }
+
+    return { success: true, items, appliedCoupons: validCoupons };
   } catch (error) {
-    console.error("[getCartAction] Error:", error);
     return { success: false, items: [], error: "Failed to fetch cart. Please try again." };
   }
 }
@@ -213,78 +220,44 @@ export async function getCartAction(): Promise<CartActionResponse> {
 export async function addToCartAction(productId: string, quantity: number, variantId?: string): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
-
-    const existingItem = await db.cartItem.findFirst({
-      where: { cartId: cart.id, productId, variantId: variantId || null },
-    });
-
+    const existingItem = await db.cartItem.findFirst({ where: { cartId: cart.id, productId, variantId: variantId || null } });
     const newQuantity = existingItem ? existingItem.quantity + quantity : quantity;
     
-    // ★ Real-time Stock Check
     const stockCheck = await validateStockAndReserve(cart.id, productId, variantId || null, newQuantity);
-    if (!stockCheck.valid) {
-      return { success: false, error: stockCheck.error }; 
-    }
+    if (!stockCheck.valid) return { success: false, error: stockCheck.error }; 
 
-    if (existingItem) {
-      await db.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: newQuantity },
-      });
-    } else {
-      await db.cartItem.create({
-        data: { cartId: cart.id, productId, variantId: variantId || null, quantity: newQuantity },
-      });
-    }
+    if (existingItem) await db.cartItem.update({ where: { id: existingItem.id }, data: { quantity: newQuantity } });
+    else await db.cartItem.create({ data: { cartId: cart.id, productId, variantId: variantId || null, quantity: newQuantity } });
 
-    const items = await getFormattedCartItems(cart.id);
-    return { success: true, items };
-  } catch (error) {
-    console.error("[addToCartAction] Error:", error);
-    return { success: false, error: "An unexpected error occurred while adding to cart." };
-  }
+    // Re-fetch to trigger dynamic coupon calculation
+    return await getCartAction();
+  } catch (error) { return { success: false, error: "An unexpected error occurred while adding to cart." }; }
 }
 
 export async function updateCartItemQuantityAction(cartItemId: string, quantity: number): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
-    
     const cartItem = await db.cartItem.findUnique({ where: { id: cartItemId } });
     if (!cartItem) return { success: false, error: "Cart item not found." };
 
     const stockCheck = await validateStockAndReserve(cart.id, cartItem.productId, cartItem.variantId, quantity);
-    if (!stockCheck.valid) {
-      return { success: false, error: stockCheck.error };
-    }
+    if (!stockCheck.valid) return { success: false, error: stockCheck.error };
 
     await db.cartItem.update({ where: { id: cartItemId }, data: { quantity } });
-    
-    const items = await getFormattedCartItems(cart.id);
-    return { success: true, items };
-  } catch (error) {
-    console.error("[updateCartItemQuantityAction] Error:", error);
-    return { success: false, error: "Failed to update quantity." };
-  }
+    return await getCartAction();
+  } catch (error) { return { success: false, error: "Failed to update quantity." }; }
 }
 
 export async function removeFromCartAction(cartItemId: string): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
-    
     const cartItem = await db.cartItem.findUnique({ where: { id: cartItemId } });
     if (cartItem) {
-      await db.inventoryReservation.deleteMany({
-        where: { cartId: cart.id, productId: cartItem.productId, variantId: cartItem.variantId }
-      });
+      await db.inventoryReservation.deleteMany({ where: { cartId: cart.id, productId: cartItem.productId, variantId: cartItem.variantId } });
       await db.cartItem.delete({ where: { id: cartItemId } });
     }
-    
-    const items = await getFormattedCartItems(cart.id);
-    return { success: true, items };
-  } catch (error) {
-    console.error("[removeFromCartAction] Error:", error);
-    return { success: false, error: "Failed to remove item." };
-  }
+    return await getCartAction();
+  } catch (error) { return { success: false, error: "Failed to remove item." }; }
 }
 
 export async function clearCartAction(): Promise<CartActionResponse> {
@@ -292,10 +265,72 @@ export async function clearCartAction(): Promise<CartActionResponse> {
     const { cart } = await getCartSessionAndUser();
     await db.inventoryReservation.deleteMany({ where: { cartId: cart.id } });
     await db.cartItem.deleteMany({ where: { cartId: cart.id } });
-    
-    return { success: true, items: [] };
+    await db.cart.update({ where: { id: cart.id }, data: { appliedCoupons: Prisma.JsonNull } });
+
+    return { success: true, items: [], appliedCoupons: [] };
   } catch (error) {
-    console.error("[clearCartAction] Error:", error);
     return { success: false, error: "Failed to clear cart." };
+  }
+}
+
+// ✅ ENTERPRISE FIX: Advanced Coupon Logic Added
+export async function applyCouponAction(code: string): Promise<CartActionResponse> {
+  try {
+    const { cart } = await getCartSessionAndUser();
+    const items = await getFormattedCartItems(cart.id);
+    
+    const subtotal = items.reduce((acc, item) => acc + (item.rawPrice * item.quantity), 0);
+
+    const discount = await db.discount.findUnique({ 
+        where: { code: code.trim().toUpperCase() } 
+    });
+
+    if (!discount || !discount.isActive || discount.deletedAt) return { success: false, error: "Invalid or expired coupon code." };
+
+    const now = new Date();
+    if (discount.startDate > now) return { success: false, error: "This coupon is not active yet." };
+    if (discount.endDate && discount.endDate < now) return { success: false, error: "This coupon has expired." };
+    
+    // Enterprise Check: Usage Limit
+    if (discount.usageLimit && discount.usedCount >= discount.usageLimit) {
+        return { success: false, error: "This coupon's usage limit has been reached." };
+    }
+
+    if (discount.minSpend && subtotal < Number(discount.minSpend)) return { success: false, error: `Minimum spend of $${discount.minSpend} required.` };
+    if (discount.maxSpend && subtotal > Number(discount.maxSpend)) return { success: false, error: `Maximum spend limit exceeded for this coupon.` };
+
+    let discountAmount = 0;
+    if (discount.type === "FIXED_CART" || discount.type === "FIXED_AMOUNT") discountAmount = Number(discount.value);
+    else if (discount.type === "PERCENTAGE") discountAmount = (subtotal * Number(discount.value)) / 100;
+
+    if (discountAmount > subtotal) discountAmount = subtotal;
+
+    const newCoupon = { code: discount.code, amount: discountAmount };
+    
+    await db.cart.update({
+        where: { id: cart.id },
+        data: { appliedCoupons: [newCoupon] } 
+    });
+
+    return { success: true, items, appliedCoupons: [newCoupon] };
+  } catch (error) {
+    console.error("APPLY_COUPON_ERROR:", error);
+    return { success: false, error: "Failed to apply coupon." };
+  }
+}
+
+export async function removeCouponAction(code: string): Promise<CartActionResponse> {
+  try {
+    const { cart } = await getCartSessionAndUser();
+    const items = await getFormattedCartItems(cart.id);
+    
+    await db.cart.update({
+        where: { id: cart.id },
+        data: { appliedCoupons: Prisma.JsonNull } // Removing all coupons
+    });
+
+    return { success: true, items, appliedCoupons: [] };
+  } catch (error) {
+    return { success: false, error: "Failed to remove coupon." };
   }
 }

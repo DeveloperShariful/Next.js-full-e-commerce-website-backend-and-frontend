@@ -2,100 +2,121 @@
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { db } from "@/lib/prisma";
-import { decrypt } from "@/app/actions/backend/settings/payments/crypto";
+import { db } from '@/lib/prisma';
+import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
+import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+
+// ==========================================
+// DYNAMIC STRIPE CREDENTIALS FROM DB
+// ==========================================
+async function getStripeInstance() {
+    // Note: All Stripe methods (klarna, afterpay) use the main 'stripe' gateway keys
+    const gateway = await db.paymentGateway.findUnique({ where: { identifier: 'stripe' } });
+    if (!gateway || !gateway.encryptedSecret) {
+        throw new Error("Stripe is not configured in the Admin Panel.");
+    }
+    const secret = decrypt(gateway.encryptedSecret);
+    return new Stripe(secret, { apiVersion: "2025-01-27.acacia" as any, typescript: true });
+}
 
 export async function POST(request: Request) {
   try {
-    const { orderId, paymentIntentId } = await request.json();
+    const body = await request.json();
+    const { orderId, paymentIntentId } = body as { orderId: string; paymentIntentId: string };
 
     if (!orderId || !paymentIntentId) {
-      return NextResponse.json({ error: 'Missing required parameters.' }, { status: 400 });
+      console.error('❌ [Stripe Capture Order] Missing parameters:', body);
+      return NextResponse.json({ success: false, message: 'Missing required parameters.' }, { status: 400 });
     }
 
-    // ১. Stripe কনফিগ এবং কি আনা
-    const gateway = await db.paymentGateway.findUnique({ where: { identifier: "stripe" } });
-    if (!gateway?.encryptedSecret) throw new Error("Stripe config missing.");
+    console.log(`🔍 [Stripe Capture Order] Verifying Payment Intent: ${paymentIntentId} for Order: ${orderId}`);
 
-    const secretKey = decrypt(gateway.encryptedSecret);
-    const stripe = new Stripe(secretKey!, { apiVersion: "2025-01-27.acacia" as any });
+    // 🛡️ 1. Fetch Dynamic Stripe Instance
+    const stripe = await getStripeInstance();
 
-    // ২. Stripe থেকে পেমেন্টের লেটেস্ট স্ট্যাটাস ভেরিফাই করা
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    // 🛡️ 2. Retrieve Payment Intent Status from Stripe
+    let paymentIntent: Stripe.PaymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    } catch (stripeError: unknown) {
+      const msg = stripeError instanceof Error ? stripeError.message : "Failed to fetch intent";
+      console.error(`❌ [Stripe Error] Failed to retrieve Payment Intent: ${msg}`);
+      return NextResponse.json({ success: false, message: `Stripe Error: ${msg}` }, { status: 400 });
+    }
 
     if (paymentIntent.status !== 'succeeded') {
-      return NextResponse.json({ success: false, message: `Payment status: ${paymentIntent.status}` }, { status: 400 });
+      console.error(`❌ [Stripe Capture Order] Payment not successful. Current Status: ${paymentIntent.status}`);
+      return NextResponse.json({ success: false, message: `Payment was not successful. Status is '${paymentIntent.status}'.` }, { status: 402 });
+    }
+    
+    // 🛡️ 3. Security Check: Validate Metadata Order ID
+    const metadataOrderId = paymentIntent.metadata?.order_id;
+    if (metadataOrderId && String(metadataOrderId) !== String(orderId)) {
+        console.error(`🚨 [SECURITY ALERT] Order ID mismatch! Requested: ${orderId}, Metadata: ${metadataOrderId}`);
+        return NextResponse.json({ success: false, message: 'Security check failed: Order ID mismatch.' }, { status: 403 });
     }
 
-    // ৩. অর্ডারের বর্তমান অবস্থা চেক করা (ডাবল আপডেট ঠেকাতে)
-    const order = await db.order.findUnique({
-      where: { id: orderId },
-      include: { items: true }
-    });
+    // 🛡️ 4. Check Current Order in Prisma Database
+    const currentOrder = await db.order.findUnique({ where: { id: orderId } });
+    
+    if (!currentOrder) {
+        console.error(`❌ [Database Error] Could not find Order ${orderId}`);
+        return NextResponse.json({ success: false, message: 'Order not found in the database.' }, { status: 404 });
+    }
 
-    if (!order) return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
-    if (order.paymentStatus === 'PAID') return NextResponse.json({ success: true, message: 'Already processed' });
+    // Race Condition Check
+    if (currentOrder.status === OrderStatus.PROCESSING || currentOrder.status === OrderStatus.DELIVERED) {
+        console.log(`✅ [Stripe Capture Order] Order ${orderId} is already marked as ${currentOrder.status}. Skipping update.`);
+        return NextResponse.json({ success: true, orderId: currentOrder.id, message: 'Already processed' });
+    }
 
-    // ৪. 최종 (Final) ধাপ: ডাটাবেজ ট্রানজেকশন (অর্ডার আপডেট + স্টক কমানো)
+    // 🛡️ 5. DATABASE TRANSACTION: Update Order & Log Transaction
+    const capturedAmount = paymentIntent.amount_received / 100; // Stripe amounts are in cents
+
     await db.$transaction(async (tx) => {
-      // A. আপডেট অর্ডার
-      await tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: 'PROCESSING',
-          paymentStatus: 'PAID',
-          totalPaid: order.total,
-          paymentId: paymentIntent.id,
-          capturedAt: new Date(),
-          version: { increment: 1 }
-        }
-      });
-
-      // B. লগ ট্রানজেকশন
-      await tx.orderTransaction.create({
-        data: {
-          orderId: orderId,
-          gateway: "stripe",
-          type: "CAPTURE",
-          amount: order.total,
-          transactionId: paymentIntent.id,
-          status: "COMPLETED",
-          rawResponse: paymentIntent as any
-        }
-      });
-
-      // C. স্টক আপডেট (Decrement Stock)
-      for (const item of order.items) {
-        if (item.productId) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { 
-              stock: { decrement: item.quantity },
-              soldCount: { increment: item.quantity }
+        // A. Update Master Order
+        await tx.order.update({
+            where: { id: orderId },
+            data: {
+                status: OrderStatus.PROCESSING,
+                paymentStatus: PaymentStatus.PAID,
+                paymentId: paymentIntent.id,
+                totalPaid: capturedAmount,
+                totalDue: 0,
+                isCaptured: true,
+                capturedAt: new Date(),
             }
-          });
-        }
-      }
+        });
 
-      // D. ক্লিয়ার ইনভেন্টরি রিজার্ভেশন (যদি থাকে)
-      await tx.inventoryReservation.deleteMany({
-        where: { cartId: orderId }
-      });
+        // B. Record Transaction Ledger
+        await tx.orderTransaction.create({
+            data: {
+                orderId: orderId,
+                gateway: 'stripe',
+                type: TransactionType.SALE,
+                amount: capturedAmount,
+                transactionId: paymentIntent.id,
+                status: paymentIntent.status,
+                rawResponse: paymentIntent as any
+            }
+        });
 
-      // E. অর্ডার নোট অ্যাড করা
-      await tx.orderNote.create({
-        data: {
-          orderId: orderId,
-          content: `Payment successfully captured via Stripe. Transaction ID: ${paymentIntent.id}`,
-          isSystem: true
-        }
-      });
+        // C. Add Order Note
+        await tx.orderNote.create({
+            data: {
+                orderId: orderId,
+                content: `✅ Stripe payment successful. Transaction ID: ${paymentIntent.id}. Amount: $${capturedAmount}.`,
+                isSystem: true
+            }
+        });
     });
 
-    return NextResponse.json({ success: true, orderId: order.id });
+    console.log(`🎉 [Stripe Capture Order] Success! Order ${orderId} is now 'processing'.`);
+    return NextResponse.json({ success: true, orderId: orderId });
 
-  } catch (error: any) {
-    console.error('🔥 [STRIPE_CAPTURE_ERROR]:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('🔥 [Stripe Capture Order Critical Error]:', error);
+    const message = error instanceof Error ? error.message : 'An internal server error occurred while capturing the order.';
+    return NextResponse.json({ success: false, message: message }, { status: 500 });
   }
 }

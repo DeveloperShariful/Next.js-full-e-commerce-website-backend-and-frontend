@@ -1,4 +1,4 @@
-//app/(frontend)/checkout/order-success/affiliate-pixel-renderer.tsx
+//app/(frontend)/order-success/affiliate-pixel-renderer.tsx
 
 "use client";
 

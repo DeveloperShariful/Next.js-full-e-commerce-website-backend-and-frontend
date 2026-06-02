@@ -1,4 +1,4 @@
-//app/(frontend)/checkout/order-success/page.tsx
+//app/(frontend)/order-success/page.tsx
 
 import Link from 'next/link';
 import { CheckCircle2, Package } from 'lucide-react';

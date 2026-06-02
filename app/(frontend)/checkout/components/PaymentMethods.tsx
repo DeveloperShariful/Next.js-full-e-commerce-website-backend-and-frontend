@@ -200,12 +200,38 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
   
   const availableGateways = gateways.filter(gateway => {
     if (!gateway.isEnabled) return false;
+
+    // 🛡️ HARD SAFETY SHIELD FOR AFTERPAY LIMIT ($4,000 AUD)
+    if (gateway.identifier === 'stripe_afterpay' && total > 4000) {
+        return false; 
+    }
+
     if (gateway.minOrderAmount && total < gateway.minOrderAmount) return false;
     if (gateway.maxOrderAmount && total > gateway.maxOrderAmount) return false;
     return true;
   });
 
-  return (
+  const gatewaySortOrder = [
+    'paypal', 
+    'stripe', 
+    'stripe_afterpay', 
+    'stripe_zip', 
+    'stripe_klarna', 
+    'bank_transfer', 
+    'cod'
+  ];
+
+  availableGateways.sort((a, b) => {
+    const indexA = gatewaySortOrder.indexOf(a.identifier);
+    const indexB = gatewaySortOrder.indexOf(b.identifier);
+    
+    const finalA = indexA === -1 ? 999 : indexA;
+    const finalB = indexB === -1 ? 999 : indexB;
+    
+    return finalA - finalB;
+  });
+
+  const content = (
     <div className="w-full flex flex-col gap-2.5">
       <div className="w-full">
         <ExpressCheckouts 
@@ -221,14 +247,14 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
         />
       </div>
       
-      {/* 🛡️ Message checks internally and renders safely only when PayPal script is active */}
+      {/* 🛡️ Message renders safely inside the global script provider context */}
       {isPaypalEnabled && <PayPalMessage total={total} />}
       
       <div className="border border-[#e0e0e0] rounded-lg overflow-hidden flex flex-col">
         {availableGateways.map(gateway => (
           <div key={gateway.identifier} className="border-b border-[#e0e0e0] last:border-b-0">
             <div 
-                className="flex items-center p-[18px_8px] cursor-pointer bg-[#f9f9f9] transition-colors duration-200 hover:bg-[#f0f0f0]" 
+                className={`flex items-center p-[18px_8px] cursor-pointer transition-colors duration-200 ${selectedPaymentMethod === gateway.identifier ? 'bg-blue-50/10' : 'bg-[#f9f9f9] hover:bg-[#f0f0f0]'}`} 
                 onClick={() => onPaymentMethodChange(gateway.identifier)}
             >
               <input 
@@ -240,7 +266,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
                 readOnly 
                 className="w-[18px] h-[18px] mr-[15px] shrink-0 accent-[#ff0000]" 
               />
-              <label htmlFor={gateway.identifier} className="font-semibold text-base grow cursor-pointer">
+              <label htmlFor={gateway.identifier} className="font-semibold text-base grow cursor-pointer text-gray-800">
                 {gateway.title}
               </label>
               <div className="ml-[15px]">
@@ -248,6 +274,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
               </div>
             </div>
             
+            {/* 🛡️ ONLY load Stripe Form if "stripe" (Credit Card) is selected */}
             {selectedPaymentMethod === gateway.identifier && gateway.identifier === 'stripe' && (
               <div className="p-[10px_5px_5px_5px] bg-[#f9f9f9] border-t border-[#e0e0e0]">
                 <StripePaymentGateway 
@@ -266,6 +293,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
               </div>
             )}
 
+            {/* Load description dynamically */}
             {selectedPaymentMethod === gateway.identifier && gateway.identifier !== 'stripe' && gateway.description && (
                <div className="p-[15px] bg-[#f9f9f9] border-t border-[#e0e0e0]">
                    <div className="w-full text-sm text-[#555] leading-normal" dangerouslySetInnerHTML={{ __html: gateway.description }} />
@@ -310,4 +338,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
       </div>
     </div>
   );
+
+  // 🛡️ FIX: Removed duplicate PayPalScriptProvider wrapper to stop context nesting clash!
+  return content;
 }

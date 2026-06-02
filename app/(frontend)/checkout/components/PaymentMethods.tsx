@@ -7,9 +7,8 @@ import ExpressCheckouts from './ExpressCheckouts';
 import PayPalPaymentGateway from './PayPalPaymentGateway';
 import StripePaymentGateway from './StripePaymentGateway'; 
 import PayPalMessage from './PayPalMessage';
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import toast from 'react-hot-toast';
-import { loadStripe } from '@stripe/stripe-js'; // Added for Redirect Flow
+import { loadStripe } from '@stripe/stripe-js';
 
 // ==========================================
 // 1. STRICT INTERFACES
@@ -77,18 +76,11 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
   } = props;
 
   const stripeFormRef = useRef<HTMLFormElement>(null);
-  const [isRedirecting, setIsRedirecting] = useState(false); // New state for BNPL loading
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const paypalGateway = gateways.find(g => g.identifier === 'paypal');
-  const paypalClientId = paypalGateway?.publicKey || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test";
   const mainStripeKey = gateways.find(g => g.identifier === 'stripe')?.publicKey || "";
-
-  const initialOptions = {
-    clientId: paypalClientId,
-    currency: "AUD",
-    intent: "capture",
-    components: "buttons,googlepay",
-  };
+  const paypalGateway = gateways.find(g => g.identifier === 'paypal');
+  const isPaypalEnabled = !!paypalGateway?.isEnabled;
 
   const getGatewayIcon = (identifier: string): React.ReactNode => {
     if (identifier === 'paypal') return <Image src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" width={80} height={20} className="h-6 w-auto" unoptimized />;
@@ -99,15 +91,12 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     return null;
   };
 
-  // 🛡_ Handles normal Place Order, and BNPL Redirects
   const handlePlaceOrderClick = async () => {
-    // 1. If it's pure Credit Card (stripe), let the nested component handle it
     if (selectedPaymentMethod === 'stripe' && stripeFormRef.current) {
       stripeFormRef.current.requestSubmit();
       return;
     } 
     
-    // 2. If it's a BNPL (Klarna, Afterpay, Zip) - We handle the redirect flow here
     if (selectedPaymentMethod.startsWith('stripe_')) {
       setIsRedirecting(true);
       toast.loading('Preparing secure redirect...', { id: 'bnpl-redirect' });
@@ -122,10 +111,9 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
             throw new Error("Could not create order. Please try again.");
         }
 
-        // 🛡️ FIX: Map 'afterpay' to the official 'afterpay_clearpay' expected by Stripe
-        let paymentMethodType = selectedPaymentMethod.replace('stripe_', ''); // 'klarna', 'afterpay', 'zip'
+        let paymentMethodType = selectedPaymentMethod.replace('stripe_', '');
         if (paymentMethodType === 'afterpay') {
-            paymentMethodType = 'afterpay_clearpay'; // 👈 Enforce official Stripe name
+            paymentMethodType = 'afterpay_clearpay'; 
         }
 
         const selectedRate = shippingRates.find(rate => rate.id === selectedShipping);
@@ -135,13 +123,12 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
             shipping_cost: String(selectedRate?.cost || '0')
         };
 
-        // Create Payment Intent on Server
         const res = await fetch('/api/stripe/create-payment-intent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 amount: Math.round(total * 100),
-                payment_method_types: [paymentMethodType], // Sends "afterpay_clearpay" to prevent API error
+                payment_method_types: [paymentMethodType], 
                 metadata: { order_id: orderDetails.orderId, ...shippingMetadata },
                 orderId: orderDetails.orderId,
                 customerInfo, 
@@ -154,7 +141,6 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
         const { clientSecret, error: piError } = await res.json();
         if (piError || !clientSecret) throw new Error(piError?.message || "Could not initialize payment.");
 
-        // Load Stripe and execute redirect
         const stripe = await loadStripe(mainStripeKey);
         if (!stripe) throw new Error("Stripe failed to load.");
 
@@ -173,7 +159,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
               postal_code: customerInfo.postcode || undefined,
               country: 'AU', 
             }
-        } as any; // Using 'any' here locally just to pass it to Stripe's raw API safely
+        } as any; 
 
         let confirmationResult;
         
@@ -182,7 +168,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
                 payment_method: { billing_details: billingDetails },
                 return_url: returnUrl,
             });
-        } else if (paymentMethodType === 'afterpay_clearpay') { // 👈 Checked against correctly mapped type
+        } else if (paymentMethodType === 'afterpay_clearpay') { 
             confirmationResult = await stripe.confirmAfterpayClearpayPayment(clientSecret, {
                 payment_method: { billing_details: billingDetails },
                 return_url: returnUrl,
@@ -207,7 +193,6 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
       return;
     }
 
-    // 3. For Offline methods (Bank Transfer, COD)
     onPlaceOrder();
   };
 
@@ -221,8 +206,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
   });
 
   return (
-    <PayPalScriptProvider options={initialOptions}>
-      <div className="w-full flex flex-col gap-2.5">
+    <div className="w-full flex flex-col gap-2.5">
       <div className="w-full">
         <ExpressCheckouts 
             publicKey={mainStripeKey}
@@ -237,7 +221,8 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
         />
       </div>
       
-      <PayPalMessage total={total} />
+      {/* 🛡️ Message checks internally and renders safely only when PayPal script is active */}
+      {isPaypalEnabled && <PayPalMessage total={total} />}
       
       <div className="border border-[#e0e0e0] rounded-lg overflow-hidden flex flex-col">
         {availableGateways.map(gateway => (
@@ -263,7 +248,6 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
               </div>
             </div>
             
-            {/* 🛡️ ONLY load Stripe Form if "stripe" (Credit Card) is selected */}
             {selectedPaymentMethod === gateway.identifier && gateway.identifier === 'stripe' && (
               <div className="p-[10px_5px_5px_5px] bg-[#f9f9f9] border-t border-[#e0e0e0]">
                 <StripePaymentGateway 
@@ -282,7 +266,6 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
               </div>
             )}
 
-            {/* 🛡️ Load the Database Description for BNPL or Offline Methods */}
             {selectedPaymentMethod === gateway.identifier && gateway.identifier !== 'stripe' && gateway.description && (
                <div className="p-[15px] bg-[#f9f9f9] border-t border-[#e0e0e0]">
                    <div className="w-full text-sm text-[#555] leading-normal" dangerouslySetInnerHTML={{ __html: gateway.description }} />
@@ -326,6 +309,5 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
         )}
       </div>
     </div>
-    </PayPalScriptProvider>
   );
 }

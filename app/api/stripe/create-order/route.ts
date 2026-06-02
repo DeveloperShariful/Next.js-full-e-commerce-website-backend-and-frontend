@@ -1,7 +1,5 @@
 // app/api/stripe/create-order/route.ts
 
-// app/api/stripe/create-order/route.ts
-
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
@@ -17,11 +15,13 @@ interface MetaDataDTO { key: string; value: string; }
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    // 🛡️ Added 'shippingRates' in destructuring to receive live Transdirect options
     const { 
       cartItems, 
       customerInfo, 
       shippingInfo, 
       selectedShipping, 
+      shippingRates, // 👈 Added shippingRates array
       appliedCoupons, 
       orderNotes,
       selectedPaymentMethod, 
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
         customerInfo: AddressDTO;
         shippingInfo: AddressDTO;
         selectedShipping: string;
+        shippingRates: { id: string; label: string; cost: number }[]; // 👈 Strictly typed
         appliedCoupons: CouponDTO[];
         orderNotes: string;
         selectedPaymentMethod: string;
@@ -79,14 +80,25 @@ export async function POST(request: Request) {
         });
     }
 
-    // Fetch Shipping Cost dynamically from DB
+    // Fetch Shipping Cost dynamically
     let shippingCost = 0;
     let shippingMethodLabel = "Standard Shipping";
+    
+    // 🛡️ FIX: Handles both dynamic Transdirect rates and static DB rates
     if (selectedShipping) {
-        const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
-        if (shippingRate) {
-            shippingCost = Number(shippingRate.price);
-            shippingMethodLabel = shippingRate.name;
+        const matchedRate = shippingRates?.find((r) => r.id === selectedShipping);
+        
+        if (matchedRate) {
+            // Live Transdirect quote calculation
+            shippingCost = Number(matchedRate.cost);
+            shippingMethodLabel = matchedRate.label;
+        } else {
+            // Fallback to database for static rates
+            const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
+            if (shippingRate) {
+                shippingCost = Number(shippingRate.price);
+                shippingMethodLabel = shippingRate.name;
+            }
         }
     }
 

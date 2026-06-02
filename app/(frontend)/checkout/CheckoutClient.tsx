@@ -2,7 +2,10 @@
 
 'use client';
 
-import { useEffect, useCallback, useReducer, useRef, useState } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js'; // 🛡️ PayPal Script Provider Imported globally
+import { useEffect, useCallback, useReducer, useRef, useState, useMemo } from 'react';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -115,10 +118,10 @@ const formatCurrency = (amount: number): string => {
 };
 
 // ============================================================================
-// 2. MAIN COMPONENT
+// 2. MAIN COMPONENT (Checkout Forms & Layout)
 // ============================================================================
 
-export default function CheckoutClient({ paymentGateways }: { paymentGateways: PaymentGateway[] }) {
+function CheckoutClientComponent({ paymentGateways }: { paymentGateways: PaymentGateway[] }) {
   const router = useRouter();
   const { cartItems, loading: isCartContextLoading } = useCart();
   const [state, dispatch] = useReducer(checkoutReducer, initialState);
@@ -131,7 +134,6 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
   
   const [orderPlacementInProgress, setOrderPlacementInProgress] = useState<boolean>(false);
   
-  // 🛡️ REFS: Prevents infinite loops and unnecessary calls
   const customerInfoRef = useRef(customerInfo);
   useEffect(() => { customerInfoRef.current = customerInfo; }, [customerInfo]);
 
@@ -144,10 +146,8 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
   const selectedShippingRef = useRef(selectedShipping);
   useEffect(() => { selectedShippingRef.current = selectedShipping; }, [selectedShipping]);
 
-  // 🛡️ MEMORY KEY: Remembers the last fetched address to block duplicate calls from the browser
   const lastFetchedAddressKey = useRef<string>('');
 
-  // ★ ENTERPRISE FETCH DATA: 100% Server Calculated 
   const refetchCartData = useCallback(async (customShippingId?: string, overrideAddress?: Partial<AddressDTO>) => { 
     dispatch({ type: 'SET_LOADING', key: 'cart', payload: true }); 
     
@@ -158,7 +158,6 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
 
       const addressKey = `${addressToUse.postcode}-${addressToUse.city}-${addressToUse.state}`;
 
-      // Server will calculate total. (Server uses cache, so Transdirect API is NOT hit repeatedly)
       const response = await getCheckoutDataAction(addressToUse as AddressDTO, rateIdToUse); 
       
       if (response.success && response.totals && response.availableShippingRates) { 
@@ -210,11 +209,10 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
     if (!isCartContextLoading && cartItems.length === 0 && !orderPlacementInProgress) {
       router.push('/cart'); 
     } else if (cartItems.length > 0 && !totals) {
-      refetchCartData(); // Initial load only
+      refetchCartData(); 
     }
   }, [isCartContextLoading, cartItems.length, router, refetchCartData, orderPlacementInProgress, totals]);
   
-  // --- Address Change Handlers ---
   const handleAddressChange = useCallback(async (address: Partial<AddressDTO>) => { 
     dispatch({ type: 'SET_CUSTOMER_INFO', payload: address });
     
@@ -359,7 +357,6 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
     } 
   };
   
-  // --- Order Placement ---
   const handlePlaceOrder = async (paymentData?: { 
     transaction_id?: string; 
     shippingAddress?: Partial<AddressDTO>; 
@@ -535,7 +532,7 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
           isApplyingCoupon={loading.applyingCoupon}
           rates={shippingRates}
           selectedRateId={selectedShipping}
-          onRateSelect={handleShippingSelect} // 👈 100% SERVER CALCULATION!
+          onRateSelect={handleShippingSelect} 
           isLoadingShipping={loading.shipping}
           addressEntered={addressInputStarted}
         />
@@ -558,4 +555,63 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// 3. GLOBAL ROUTE WRAPPERS (PRO-LEVEL SECURE FIX)
+// ============================================================================
+export default function CheckoutClient({ paymentGateways }: { paymentGateways: PaymentGateway[] }) {
+    
+    // 🛡️ 1. Find Main Stripe Gateway Key
+    const stripeGateway = paymentGateways.find(g => g.identifier === 'stripe');
+    const stripePublicKey = stripeGateway?.publicKey || null;
+
+    // 🛡️ 2. Find Main PayPal Gateway Client ID
+    const paypalGateway = paymentGateways.find(g => g.identifier === 'paypal');
+    const paypalClientId = paypalGateway?.publicKey || null;
+
+    // Initialize Stripe securely
+    const [stripePromise] = useState(() => 
+        stripePublicKey ? loadStripe(stripePublicKey) : null
+    );
+
+    // 🛡️ 3. Initialize PayPal options strictly at the root
+    // It uses standard "buttons,messages" to completely avoid Stripe HMR conflicts
+    const paypalOptions = useMemo(() => ({
+        clientId: paypalClientId || "test",
+        currency: "AUD",
+        intent: "capture",
+        components: "buttons,messages", 
+    }), [paypalClientId]);
+
+    const stripeOptions = {
+        mode: 'payment' as const,
+        amount: 100, 
+        currency: 'aud',
+        appearance: { theme: 'stripe' as const },
+    };
+
+    // Render logic wrapping the provider securely at the ROOT.
+    // PayPalScriptProvider will NEVER unmount, stopping the "window.paypal is undefined" loop!
+    const renderCheckoutTree = () => {
+        if (!stripePromise) {
+            return <CheckoutClientComponent paymentGateways={paymentGateways} />;
+        }
+        return (
+            <Elements stripe={stripePromise} options={stripeOptions}>
+                <CheckoutClientComponent paymentGateways={paymentGateways} />
+            </Elements>
+        );
+    };
+
+    // If PayPal is configured, we wrap the tree. Otherwise, we render Stripe Elements directly.
+    if (paypalClientId) {
+        return (
+            <PayPalScriptProvider options={paypalOptions}>
+                {renderCheckoutTree()}
+            </PayPalScriptProvider>
+        );
+    }
+
+    return renderCheckoutTree();
 }

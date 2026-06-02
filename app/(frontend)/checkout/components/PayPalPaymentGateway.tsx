@@ -1,16 +1,11 @@
 // app/(frontend)/checkout/components/PayPalPaymentGateway.tsx
 
-// app/(frontend)/checkout/components/PayPalPaymentGateway.tsx
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+import { PayPalButtons } from '@paypal/react-paypal-js';
 import toast from 'react-hot-toast';
 
-// ==========================================
-// 1. STRICT INTERFACES
-// ==========================================
 export interface CartItemDTO { 
   id: string; 
   databaseId: number; 
@@ -54,9 +49,6 @@ interface PayPalGatewayProps {
   appliedCoupons: CouponDTO[];
 }
 
-// ==========================================
-// 2. MAIN COMPONENT
-// ==========================================
 const PayPalPaymentGatewayComponent = ({ 
     total, 
     isPlacingOrder, 
@@ -69,29 +61,41 @@ const PayPalPaymentGatewayComponent = ({
     appliedCoupons 
 }: PayPalGatewayProps) => {
   
-  const wcOrderIdRef = useRef<string | null>(null);
+  const wcOrderIdRef = useRef<string | null>(null); 
   const wcOrderKeyRef = useRef<string | null>(null);
 
-  // 🛡️ THE FIX: Wait for PayPal script to load completely
-  const [{ isPending, isResolved, isRejected }] = usePayPalScriptReducer();
   const [canRender, setCanRender] = useState(false);
 
+  console.log("%c🔍 [PayPal Gateway Debug] Gateway Component Rendered.", "color: #ff0099; font-weight: bold;");
+
   useEffect(() => {
-    // Check if script is loaded and the Buttons object is attached to the window
-    if (isResolved && window.paypal && window.paypal.Buttons) {
-      setCanRender(true);
-    }
-  }, [isResolved]);
+    console.log("🔍 [PayPal Gateway Debug] Mounting Interval Checker...");
 
-  // If script failed to load (e.g. invalid client ID or network error)
-  if (isRejected) {
-    return <div className="p-4 text-center text-red-500 bg-red-50 rounded-lg border border-red-200">Failed to load PayPal. Please check your internet connection or API keys.</div>;
+    // 🛡️ Direct window monitoring logs with strict TypeScript safe check
+    const interval = setInterval(() => {
+      const paypalExists = typeof window !== 'undefined' && window.paypal !== undefined && window.paypal !== null;
+      const buttonsExists = typeof window !== 'undefined' && !!window.paypal?.Buttons; // 👈 FIXED: Optional chaining (?.) solves the TS error!
+
+      console.log(`🔍 [PayPal Polling] window.paypal exists: ${paypalExists} | window.paypal.Buttons exists: ${buttonsExists}`);
+
+      if (paypalExists && buttonsExists) {
+        console.log("%c🔍 [PayPal Gateway Debug] SUCCESS! window.paypal.Buttons found on Window object!", "color: #00ff00; font-weight: bold;");
+        setCanRender(true);
+        clearInterval(interval);
+      }
+    }, 100);
+    return () => {
+      console.log("🔍 [PayPal Gateway Debug] Cleaning up Interval Checker...");
+      clearInterval(interval);
+    };
+  }, []);
+
+  if (!canRender) {
+    console.log("%c🔍 [PayPal Gateway Debug] render BLOCKED. Script is still downloading. Showing Skeleton...", "color: #ff3300;");
+    return <div className="w-full h-12 bg-gray-200 animate-pulse rounded-md flex justify-center items-center text-xs text-gray-500">Connecting to PayPal API...</div>;
   }
 
-  // Show a loading skeleton while PayPal script is downloading
-  if (isPending || !canRender) {
-    return <div className="w-full h-12 bg-gray-200 animate-pulse rounded-md"></div>;
-  }
+  console.log("%c🎉 [PayPal Gateway Debug] render ALLOWED! Rendering PayPalButtons now!", "color: #00ff00; font-weight: bold;");
 
   return (
       <PayPalButtons
@@ -156,13 +160,13 @@ const PayPalPaymentGatewayComponent = ({
 
               if (captureData.success) {
                   toast.success('Payment successful!');
-                  window.location.href = `/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}&clear_cart=true`;
+                  window.location.href = `/checkout/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}&clear_cart=true`;
               } else {
-                  toast.error(captureData.message || "Payment could not be verified automatically. Check your email.");
+                  toast.error(captureData.message || "Payment could not be verified automatically.");
               }
           } catch (err) {
               toast.dismiss('paypal-capture');
-              toast.error("Network error during verification. We are checking the status.");
+              toast.error("Network error during verification.");
               console.error("Capture Catch Error:", err);
           }
         }}

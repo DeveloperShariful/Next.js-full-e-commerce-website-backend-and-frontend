@@ -2,22 +2,24 @@
 
 'use client';
 import React, { useEffect, useState } from 'react';
-import { PayPalMessages, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+import { PayPalMessages } from '@paypal/react-paypal-js';
 
 interface PayPalMessageProps { total: number; }
 
 export default function PayPalMessage({ total }: PayPalMessageProps) {
-  const [{ isResolved, options }] = usePayPalScriptReducer();
   const [canRender, setCanRender] = useState(false);
 
   useEffect(() => {
-    // 🛡️ Security Check: Only render if PayPal script is fully loaded AND Messages component exists in window
-    if (isResolved && window.paypal && window.paypal.Messages) {
-      setCanRender(true);
-    } else {
-      setCanRender(false);
-    }
-  }, [isResolved, options]);
+    // 🛡️ Direct Vanilla JS Polling: Checks the browser window directly every 50ms
+    const interval = setInterval(() => {
+      if (typeof window !== 'undefined' && window.paypal && window.paypal.Messages) {
+        setCanRender(true);
+        clearInterval(interval);
+      }
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (total <= 0 || !canRender) return null;
 

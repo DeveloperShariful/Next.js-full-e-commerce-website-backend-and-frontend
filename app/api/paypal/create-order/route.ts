@@ -46,11 +46,13 @@ async function generatePayPalAccessToken() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { cartItems, customerInfo, shippingInfo, selectedShipping, appliedCoupons } = body as {
+        // 🛡️ Added 'shippingRates' in destructuring to receive live Transdirect options
+        const { cartItems, customerInfo, shippingInfo, selectedShipping, shippingRates, appliedCoupons } = body as {
             cartItems: CartItemDTO[];
             customerInfo: AddressDTO;
             shippingInfo: AddressDTO;
             selectedShipping: string;
+            shippingRates: ShippingRateDTO[];
             appliedCoupons: CouponDTO[];
         };
 
@@ -82,11 +84,22 @@ export async function POST(request: Request) {
         // Fetch Shipping Cost
         let shippingCost = 0;
         let shippingMethodLabel = "Standard Shipping";
+        
+        // 🛡️ FIX: Handles both dynamic Transdirect rates and static DB rates
         if (selectedShipping) {
-            const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
-            if (!shippingRate) throw new Error("Invalid shipping method selected.");
-            shippingCost = Number(shippingRate.price);
-            shippingMethodLabel = shippingRate.name;
+            const matchedRate = shippingRates?.find((r) => r.id === selectedShipping);
+            
+            if (matchedRate) {
+                // Live Transdirect quote calculation
+                shippingCost = Number(matchedRate.cost);
+                shippingMethodLabel = matchedRate.label;
+            } else {
+                // Fallback to database for static rates
+                const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
+                if (!shippingRate) throw new Error("Invalid shipping method selected.");
+                shippingCost = Number(shippingRate.price);
+                shippingMethodLabel = shippingRate.name;
+            }
         }
 
         // Fetch Discount

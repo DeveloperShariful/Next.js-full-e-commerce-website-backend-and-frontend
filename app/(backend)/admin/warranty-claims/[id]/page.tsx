@@ -1,4 +1,4 @@
-//app/(backend)/admin/warranty-claims/[id]/page.tsx
+// File: app/(backend)/admin/warranty-claims/[id]/page.tsx
 
 import { db } from '@/lib/prisma';
 import Link from 'next/link';
@@ -21,12 +21,13 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
 
   const cleanOrderNumber = claim.orderNumber.replace('#', '').trim();
 
-  // ১. Prisma দিয়ে সরাসরি ডাটাবেজ থেকে স্পেয়ার পার্টস আনা (No Apollo/GraphQL needed)
+  // ১. Prisma দিয়ে সরাসরি ডাটাবেজ থেকে স্পেয়ার পার্টস আনা
   let spareParts: any[] = [];
   try {
     const sparePartsData = await db.product.findMany({
       where: {
-        category: { slug: 'spare-parts' }, // Assuming category slug is 'spare-parts'
+        // ✅ FIX: Changed 'category' to 'categories: { some: ... }'
+        categories: { some: { slug: 'spare-parts' } }, 
         status: 'ACTIVE'
       },
       select: {
@@ -57,7 +58,7 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
     console.error("Failed to fetch spare parts from database", error);
   }
 
-  // ২. Prisma Order থেকে অর্ডারের ফুল ডিটেইলস আনা (No WooCommerce REST API needed)
+  // ২. Prisma Order থেকে অর্ডারের ফুল ডিটেইলস আনা
   let localOrder: any = null;
   let billingDetails: any = {};
   let shippingDetails: any = {};

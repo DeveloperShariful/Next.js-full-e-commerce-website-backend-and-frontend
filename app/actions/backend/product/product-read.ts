@@ -1,4 +1,4 @@
-// File: app/actions/admin/product/product-read.ts
+// File: app/actions/backend/product/product-read.ts
 
 "use server";
 

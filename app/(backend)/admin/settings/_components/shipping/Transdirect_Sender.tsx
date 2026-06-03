@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { saveTransdirectSender } from "@/app/actions/backend/settings/shipping/transdirect-sender";
 import { TransdirectConfig } from "@prisma/client";
-import { Save, Loader2, Building, User } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Props {
@@ -31,96 +31,176 @@ export default function Transdirect_Sender({ config, refreshData }: Props) {
         setLoading(false);
     };
 
+    // WP Responsive Form Classes
+    const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none w-full md:w-[25em] max-w-full box-border bg-white";
+    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-4 md:pb-0 mb-4 md:mb-0 align-top";
+    const thResponsiveClass = "block md:table-cell w-full md:w-[250px] pt-[5px] md:py-[15px] pr-[10px] text-[13px] font-medium text-[#1d2327] mb-1 md:mb-0 align-top";
+    const tdResponsiveClass = "block md:table-cell py-[5px] md:py-[15px] align-top";
+
     return (
-        <form onSubmit={handleSubmit} className="max-w-3xl animate-in fade-in space-y-6">
-            <div>
-                <h3 className="text-lg font-bold text-slate-800">Sender Information</h3>
-                <p className="text-sm text-slate-500">This address is used as the pickup location for couriers.</p>
-            </div>
+        <div className="w-full animate-in fade-in">
+            <h2 className="text-[14px] font-semibold text-[#1d2327] mb-0 pb-0 border-none">Sender Information</h2>
+            <p className="text-[13px] text-[#646970] mt-1 mb-[15px]">This address is used as the pickup location for couriers when calculating quotes and generating shipping labels.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Left Col */}
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Sender Type</label>
-                        <div className="flex gap-4 mt-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="senderType" value="business" defaultChecked={!config?.senderType || config.senderType === 'business'} className="w-4 h-4 text-[#2271b1] focus:ring-[#2271b1]" />
-                                <span className="text-sm font-medium text-slate-700 flex items-center gap-1"><Building size={14}/> Business</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="senderType" value="residential" defaultChecked={config?.senderType === 'residential'} className="w-4 h-4 text-[#2271b1] focus:ring-[#2271b1]" />
-                                <span className="text-sm font-medium text-slate-700 flex items-center gap-1"><User size={14}/> Residential</span>
-                            </label>
-                        </div>
-                    </div>
+            <form onSubmit={handleSubmit}>
+                <table className="w-full text-left border-collapse block md:table mb-[20px] mt-[10px]">
+                    <tbody className="block md:table-row-group">
+                        
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Sender Type</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <div className="flex items-center gap-[15px]">
+                                    <label className="flex items-center gap-2 cursor-pointer w-fit">
+                                        <input 
+                                            type="radio" 
+                                            name="senderType" 
+                                            value="business" 
+                                            defaultChecked={!config?.senderType || config.senderType === 'business'} 
+                                            className="border-[#8c8f94] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                        />
+                                        <span className="text-[13px] text-[#3c434a]">Business</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer w-fit">
+                                        <input 
+                                            type="radio" 
+                                            name="senderType" 
+                                            value="residential" 
+                                            defaultChecked={config?.senderType === 'residential'} 
+                                            className="border-[#8c8f94] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                        />
+                                        <span className="text-[13px] text-[#3c434a]">Residential</span>
+                                    </label>
+                                </div>
+                            </td>
+                        </tr>
 
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Company Name</label>
-                        <input name="senderCompany" defaultValue={config?.senderCompany || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                    </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Company Name</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="senderCompany" 
+                                    defaultValue={config?.senderCompany || ""} 
+                                    className={wpInputClass} 
+                                />
+                            </td>
+                        </tr>
 
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Contact Name <span className="text-red-500">*</span></label>
-                        <input name="senderName" required defaultValue={config?.senderName || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                    </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Contact Name <span className="text-[#d63638]">*</span></label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="senderName" 
+                                    required 
+                                    defaultValue={config?.senderName || ""} 
+                                    className={wpInputClass} 
+                                />
+                            </td>
+                        </tr>
 
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Phone Number <span className="text-red-500">*</span></label>
-                        <input name="senderPhone" required defaultValue={config?.senderPhone || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                    </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Phone Number <span className="text-[#d63638]">*</span></label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="senderPhone" 
+                                    required 
+                                    defaultValue={config?.senderPhone || ""} 
+                                    className={wpInputClass} 
+                                />
+                            </td>
+                        </tr>
+
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Street Address <span className="text-[#d63638]">*</span></label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="senderAddress" 
+                                    required 
+                                    defaultValue={config?.senderAddress || ""} 
+                                    className={`${wpInputClass} !w-full md:!w-[35em]`} 
+                                />
+                            </td>
+                        </tr>
+
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Suburb <span className="text-[#d63638]">*</span></label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="senderSuburb" 
+                                    required 
+                                    defaultValue={config?.senderSuburb || ""} 
+                                    className={wpInputClass} 
+                                />
+                            </td>
+                        </tr>
+
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">State <span className="text-[#d63638]">*</span></label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <select 
+                                    name="senderState" 
+                                    defaultValue={config?.senderState || ""} 
+                                    className={wpInputClass}
+                                >
+                                    <option value="">Select State</option>
+                                    <option value="NSW">New South Wales (NSW)</option>
+                                    <option value="VIC">Victoria (VIC)</option>
+                                    <option value="QLD">Queensland (QLD)</option>
+                                    <option value="WA">Western Australia (WA)</option>
+                                    <option value="SA">South Australia (SA)</option>
+                                    <option value="TAS">Tasmania (TAS)</option>
+                                    <option value="ACT">ACT</option>
+                                    <option value="NT">Northern Territory (NT)</option>
+                                </select>
+                            </td>
+                        </tr>
+
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Postcode <span className="text-[#d63638]">*</span></label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="senderPostcode" 
+                                    required 
+                                    defaultValue={config?.senderPostcode || ""} 
+                                    className={`${wpInputClass} !w-[100px]`} 
+                                />
+                            </td>
+                        </tr>
+
+                    </tbody>
+                </table>
+
+                {/* WP Style Notice */}
+                <div className="bg-[#fff8e5] border-l-[4px] border-[#f56e28] p-[12px] text-[13px] text-[#3c434a] mb-[20px] max-w-[800px] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
+                    <p className="m-0"><strong>Note:</strong> Currently Transdirect integration is optimized for Australian pickups.</p>
                 </div>
 
-                {/* Right Col */}
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Street Address <span className="text-red-500">*</span></label>
-                        <input name="senderAddress" required defaultValue={config?.senderAddress || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Suburb <span className="text-red-500">*</span></label>
-                            <input name="senderSuburb" required defaultValue={config?.senderSuburb || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Postcode <span className="text-red-500">*</span></label>
-                            <input name="senderPostcode" required defaultValue={config?.senderPostcode || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">State <span className="text-red-500">*</span></label>
-                        <select name="senderState" defaultValue={config?.senderState || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1] bg-white">
-                            <option value="">Select State</option>
-                            <option value="NSW">New South Wales (NSW)</option>
-                            <option value="VIC">Victoria (VIC)</option>
-                            <option value="QLD">Queensland (QLD)</option>
-                            <option value="WA">Western Australia (WA)</option>
-                            <option value="SA">South Australia (SA)</option>
-                            <option value="TAS">Tasmania (TAS)</option>
-                            <option value="ACT">ACT</option>
-                            <option value="NT">Northern Territory (NT)</option>
-                        </select>
-                    </div>
-                    
-                    <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded border border-blue-100 mt-4">
-                        <strong>Note:</strong> Currently Transdirect integration is optimized for Australian pickups.
-                    </div>
-                </div>
-            </div>
-
-            <div className="pt-4 border-t">
-                <button 
-                    type="submit" 
-                    disabled={loading} 
-                    className="flex items-center gap-2 px-6 py-2.5 bg-[#2271b1] text-white font-bold rounded hover:bg-[#135e96] disabled:opacity-50 transition-colors shadow-sm"
-                >
-                    {loading ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
-                    Update Sender Details
-                </button>
-            </div>
-        </form>
+                <p className="mt-[20px] mb-[30px]">
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-60 flex items-center gap-2 min-h-[30px] w-fit"
+                    >
+                        {loading && <Loader2 className="animate-spin" size={14}/>}
+                        Update Sender Details
+                    </button>
+                </p>
+            </form>
+        </div>
     );
 }

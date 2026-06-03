@@ -1,4 +1,4 @@
-// app/actions/admin/product/product-category.ts
+// app/actions/backend/product/product-category.ts
 "use server";
 
 import { db } from "@/lib/prisma";

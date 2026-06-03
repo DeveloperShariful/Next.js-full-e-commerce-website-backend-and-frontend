@@ -5,13 +5,12 @@
 import { useState, useMemo } from "react";
 import { createShippingZone, deleteShippingZone } from "@/app/actions/backend/settings/shipping/local";
 import { ComponentProps, ShippingZone } from "./types";
-import { Plus, Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getCountryAndStatesList } from "@/app/actions/backend/settings/general/location-helpers"; 
 import Shipping_Method from "./Shipping_Method";
 import { TransdirectConfig, CarrierService } from "@prisma/client";
 
-// ✅ Update Interface
 interface Props extends ComponentProps {
     transdirectConfig: TransdirectConfig | null;
     carriers: CarrierService[];
@@ -64,61 +63,86 @@ export default function Shipping_Zones({ zones, options, refreshData, transdirec
                 zone={zoneData} 
                 onBack={() => setView('list')} 
                 refreshData={refreshData} 
-                // ✅ Pass the new props here
                 transdirectConfig={transdirectConfig}
                 carriers={carriers}
             />
         );
     }
 
+    // WP Input Class Helper for Modal
+    const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none w-full box-border bg-white";
+
     // View: List Zones
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-sm border border-slate-200 shadow-sm">
-                <div>
-                    <h2 className="text-lg font-bold text-slate-800">Shipping Zones</h2>
-                    <p className="text-sm text-slate-500">A shipping zone is a geographic region where a certain set of shipping methods apply.</p>
-                </div>
-                <button onClick={() => setIsZoneModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-[#2271b1] text-white font-bold rounded hover:bg-[#135e96] text-sm">
-                    <Plus size={16} /> Add shipping zone
+        <div className="w-full text-[13px] text-[#3c434a] animate-in fade-in mb-[30px]">
+            
+            {/* WP Page Title & Action */}
+            <div className="flex items-center gap-3 mb-[15px]">
+                <h2 className="text-xl font-bold text-slate-800">Shipping Zones</h2>
+                <button 
+                    onClick={() => setIsZoneModalOpen(true)} 
+                    className="bg-[#f6f7f7] border border-[#2271b1] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[10px] py-[2px] text-[13px] font-semibold cursor-pointer"
+                >
+                    Add shipping zone
                 </button>
             </div>
+            <p className="text-[13px] text-[#646970] mt-0 mb-[15px]">A shipping zone is a geographic region where a certain set of shipping methods and rates apply. Customers only see the methods available for their address.</p>
 
-            <div className="bg-white rounded-sm border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
-                <table className="w-full text-left text-sm min-w-[600px]">
-                    <thead className="bg-slate-50 border-b">
-                        <tr>
-                            <th className="p-4 font-bold text-slate-700 w-1/4">Zone Name</th>
-                            <th className="p-4 font-bold text-slate-700 w-1/4">Regions</th>
-                            <th className="p-4 font-bold text-slate-700 w-1/3">Shipping Methods</th>
-                            <th className="p-4 font-bold text-slate-700 text-right">Actions</th>
+            {/* WP List Table */}
+            <div className="w-full overflow-x-auto bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] box-border">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                        <tr className="border-b border-[#c3c4c7] bg-[#f6f7f7]">
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338] w-[25%]">Zone Name</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338] w-[25%]">Regions</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338] w-[35%]">Shipping Methods</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {zones.map((zone) => (
-                            <tr key={zone.id} className="hover:bg-slate-50 group">
-                                <td className="p-4 font-bold text-[#2271b1] cursor-pointer" onClick={() => { setSelectedZone(zone); setView('manage'); }}>
-                                    {zone.name}
+                    <tbody>
+                        {zones.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} className="px-[10px] py-[20px] text-center text-[#646970] italic">
+                                    No shipping zones found. Please add a shipping zone.
                                 </td>
-                                <td className="p-4 text-slate-600">
+                            </tr>
+                        ) : zones.map((zone, index) => (
+                            <tr key={zone.id} className={`border-b border-[#f0f0f1] last:border-none hover:bg-[#f6f7f7] group ${index % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f9]'}`}>
+                                <td className="px-[10px] py-[10px] align-top">
+                                    <strong 
+                                        className="text-[#2271b1] cursor-pointer hover:underline block text-[13px]"
+                                        onClick={() => { setSelectedZone(zone); setView('manage'); }}
+                                    >
+                                        {zone.name}
+                                    </strong>
+                                    
+                                    {/* WP Row Actions (Hover to reveal) */}
+                                    <div className="text-[12px] mt-1 ">
+                                        <button 
+                                            onClick={() => { setSelectedZone(zone); setView('manage'); }}
+                                            className="bg-transparent border-none text-[#2271b1] hover:underline cursor-pointer p-0"
+                                        >
+                                            Edit
+                                        </button>
+                                        <span className="text-[#c3c4c7] mx-1">|</span>
+                                        <button 
+                                            onClick={() => handleDeleteZone(zone.id)}
+                                            className="bg-transparent border-none text-[#d63638] hover:underline cursor-pointer p-0"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </td>
+                                <td className="px-[10px] py-[10px] text-[#3c434a] align-top leading-relaxed">
                                     {zone.countries.length > 0 
-                                        ? <span className="line-clamp-2" title={zone.countries.join(", ")}>
-                                            {zone.countries.join(", ")}
-                                          </span>
-                                        : <span className="text-slate-400 italic">Everywhere else</span>
+                                        ? zone.countries.join(", ")
+                                        : <span className="text-[#646970] italic">Everywhere else</span>
                                     }
                                 </td>
-                                <td className="p-4 text-slate-600">
+                                <td className="px-[10px] py-[10px] text-[#3c434a] align-top">
                                     {zone.rates.length > 0 
                                         ? zone.rates.map(r => r.name).join(", ") 
-                                        : <span className="text-slate-400 italic">No methods</span>
+                                        : <span className="text-[#d63638]">No methods added. Customers in this zone will not be able to checkout.</span>
                                     }
-                                </td>
-                                <td className="p-4 text-right">
-                                    <div className="flex justify-end gap-3">
-                                        <button onClick={() => { setSelectedZone(zone); setView('manage'); }} className="text-[#2271b1] font-medium hover:underline text-xs md:text-sm">Manage</button>
-                                        <button onClick={() => handleDeleteZone(zone.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16}/></button>
-                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -126,36 +150,56 @@ export default function Shipping_Zones({ zones, options, refreshData, transdirec
                 </table>
             </div>
 
-            {/* --- MODAL: CREATE ZONE --- */}
+            {/* --- WP STYLE MODAL: CREATE ZONE --- */}
             {isZoneModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold">Add Shipping Zone</h3>
-                            <button onClick={() => setIsZoneModalOpen(false)}><X size={20} className="text-slate-400"/></button>
+                <div className="fixed inset-0 bg-[#000000b3] z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#f0f0f1] shadow-md w-full max-w-lg flex flex-col font-sans text-[13px] text-[#3c434a]">
+                        
+                        <div className="flex justify-between items-center px-[20px] py-[15px] border-b border-[#c3c4c7] bg-white shrink-0">
+                            <h3 className="text-[18px] font-normal text-[#1d2327] m-0 leading-tight">
+                                Add Shipping Zone
+                            </h3>
+                            <button type="button" onClick={() => setIsZoneModalOpen(false)} className="text-[#646970] hover:text-[#d63638] bg-transparent border-none cursor-pointer p-1">
+                                <X size={20} />
+                            </button>
                         </div>
-                        <form onSubmit={handleCreateZone} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Zone Name</label>
-                                <input name="name" required placeholder="e.g. Australia" className="w-full border p-2 rounded outline-none focus:border-[#2271b1]" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">Zone Region</label>
-                                <select name="countries" className="w-full border p-2 rounded outline-none focus:border-[#2271b1] bg-white text-sm h-64" multiple>
-                                    {availableRegions.map(region => (
-                                        <option key={region.value} value={JSON.stringify([region.value])}>
-                                            {region.label}
-                                        </option> 
-                                    ))}
-                                    {availableRegions.length === 0 && <option disabled>No regions available</option>}
-                                </select>
-                                <p className="text-xs text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple.</p>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-2 border-t mt-4">
-                                <button type="button" onClick={() => setIsZoneModalOpen(false)} className="px-4 py-2 border rounded text-sm font-bold">Cancel</button>
-                                <button type="submit" className="px-4 py-2 bg-[#2271b1] text-white rounded text-sm font-bold">Create Zone</button>
-                            </div>
-                        </form>
+                        
+                        <div className="bg-white p-[20px] overflow-y-auto flex-1">
+                            <form id="zone-form" onSubmit={handleCreateZone} className="space-y-[15px]">
+                                <div>
+                                    <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Zone Name</label>
+                                    <input name="name" required placeholder="e.g. Australia" className={wpInputClass} />
+                                </div>
+                                <div>
+                                    <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Zone Regions</label>
+                                    <select name="countries" className={`${wpInputClass} !h-[200px]`} multiple>
+                                        {availableRegions.map(region => (
+                                            <option key={region.value} value={JSON.stringify([region.value])}>
+                                                {region.label}
+                                            </option> 
+                                        ))}
+                                        {availableRegions.length === 0 && <option disabled>No regions available</option>}
+                                    </select>
+                                    <p className="text-[11px] text-[#646970] mt-1 mb-0">Hold Ctrl (Windows) or Cmd (Mac) to select multiple regions.</p>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div className="p-[15px] border-t border-[#c3c4c7] bg-[#f6f7f7] flex justify-end gap-2 shrink-0">
+                            <button 
+                                type="button" onClick={() => setIsZoneModalOpen(false)} 
+                                className="bg-[#f6f7f7] border border-[#8c8f94] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer min-h-[30px]"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit" form="zone-form" 
+                                className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm min-h-[30px]"
+                            >
+                                Save changes
+                            </button>
+                        </div>
+
                     </div>
                 </div>
             )}

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { saveTransdirectCredentials } from "@/app/actions/backend/settings/shipping/transdirect-config";
 import { testTransdirectConnection } from "@/app/actions/backend/settings/shipping/transdirect-service";
 import { TransdirectConfig } from "@prisma/client";
-import { Save, Loader2, Wifi, WifiOff, CheckCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Props {
@@ -23,7 +23,6 @@ export default function Transdirect_Credentials({ config, refreshData }: Props) 
         setLoading(true);
         const formData = new FormData(e.target as HTMLFormElement);
         
-        // Checkbox value fix
         const isEnabled = (e.target as HTMLFormElement)['isEnabled'].checked;
         formData.set('isEnabled', String(isEnabled));
 
@@ -49,57 +48,104 @@ export default function Transdirect_Credentials({ config, refreshData }: Props) 
         setTesting(false);
     };
 
+    // WP Responsive Form Classes
+    const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none w-full md:w-[25em] max-w-full box-border bg-white";
+    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-4 md:pb-0 mb-4 md:mb-0 align-top";
+    const thResponsiveClass = "block md:table-cell w-full md:w-[250px] pt-[5px] md:py-[15px] pr-[10px] text-[13px] font-medium text-[#1d2327] mb-1 md:mb-0 align-top";
+    const tdResponsiveClass = "block md:table-cell py-[5px] md:py-[15px] align-top";
+
     return (
-        <div className="space-y-6 max-w-2xl animate-in fade-in">
-            <div className="flex justify-between items-start">
-                <div>
-                    <h3 className="text-lg font-bold text-slate-800">API Credentials</h3>
-                    <p className="text-sm text-slate-500">Enter your Transdirect account details to enable real-time quoting.</p>
-                </div>
-                {config?.memberId && (
-                    <div className="text-right">
-                        <span className="text-xs text-slate-400 block uppercase">Member ID</span>
-                        <span className="text-sm font-mono font-bold text-slate-700">{config.memberId}</span>
-                    </div>
-                )}
-            </div>
+        <div className="w-full animate-in fade-in">
+            <h2 className="text-[14px] font-semibold text-[#1d2327] mb-0 pb-0 border-none">API Credentials</h2>
 
-            <form onSubmit={handleSave} className="space-y-5">
-                {/* Enable Switch */}
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded border border-slate-200">
-                    <div>
-                        <span className="block font-bold text-slate-700">Enable Transdirect</span>
-                        <span className="text-xs text-slate-500">Activate to calculate shipping rates at checkout.</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" name="isEnabled" defaultChecked={config?.isEnabled ?? false} className="sr-only peer" />
-                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2271b1]"></div>
-                    </label>
-                </div>
+            <form onSubmit={handleSave}>
+                <table className="w-full text-left border-collapse block md:table mb-[20px] mt-[10px]">
+                    <tbody className="block md:table-row-group">
+                        
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Enable Transdirect</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <label className="flex items-center gap-2 cursor-pointer w-fit">
+                                    <input 
+                                        type="checkbox" 
+                                        name="isEnabled" 
+                                        defaultChecked={config?.isEnabled ?? false} 
+                                        className="border-[#8c8f94] rounded-[3px] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                    />
+                                    <span className="text-[13px] text-[#3c434a]">Activate to calculate shipping rates at checkout</span>
+                                </label>
+                            </td>
+                        </tr>
 
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Account Email <span className="text-red-500">*</span></label>
-                    <input name="email" type="email" required defaultValue={config?.email || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Account Email</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="email" 
+                                    type="email" 
+                                    required 
+                                    defaultValue={config?.email || ""} 
+                                    className={wpInputClass} 
+                                />
+                            </td>
+                        </tr>
 
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Password <span className="text-red-500">*</span></label>
-                    <input name="password" type="password" required defaultValue={config?.password || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]" />
-                </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Password</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="password" 
+                                    type="password" 
+                                    required 
+                                    defaultValue={config?.password || ""} 
+                                    className={wpInputClass} 
+                                />
+                            </td>
+                        </tr>
 
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">API Key</label>
-                    <input name="apiKey" type="text" defaultValue={config?.apiKey || ""} className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1] font-mono text-sm" />
-                    <p className="text-xs text-slate-500 mt-1">Found in your Transdirect Member Area &gt; API Settings.</p>
-                </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">API Key</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <input 
+                                    name="apiKey" 
+                                    type="text" 
+                                    defaultValue={config?.apiKey || ""} 
+                                    className={`${wpInputClass} font-mono text-[12px]`} 
+                                />
+                                <p className="text-[12px] text-[#646970] mt-1 mb-0">Found in your Transdirect Member Area &gt; API Settings.</p>
+                            </td>
+                        </tr>
 
-                <div className="pt-4 flex items-center gap-4">
+                        {config?.memberId && (
+                            <tr className={trResponsiveClass}>
+                                <th scope="row" className={thResponsiveClass}>
+                                    <label className="cursor-pointer">Member ID</label>
+                                </th>
+                                <td className={tdResponsiveClass}>
+                                    <span className="text-[13px] font-mono font-semibold text-[#1d2327] bg-[#f0f0f1] px-2 py-1 rounded-[3px] border border-[#dcdcde]">{config.memberId}</span>
+                                    <p className="text-[12px] text-[#646970] mt-1 mb-0">Auto-fetched from API upon successful connection.</p>
+                                </td>
+                            </tr>
+                        )}
+
+                    </tbody>
+                </table>
+
+                <div className="mt-[20px] mb-[30px] flex items-center gap-3 flex-wrap">
                     <button 
                         type="submit" 
-                        disabled={loading} 
-                        className="flex items-center gap-2 px-6 py-2.5 bg-[#2271b1] text-white font-bold rounded hover:bg-[#135e96] disabled:opacity-50 transition-colors shadow-sm"
+                        disabled={loading}
+                        className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-60 flex items-center gap-2 min-h-[30px]"
                     >
-                        {loading ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
+                        {loading && <Loader2 className="animate-spin" size={14}/>}
                         Save Credentials
                     </button>
 
@@ -107,11 +153,15 @@ export default function Transdirect_Credentials({ config, refreshData }: Props) 
                         type="button"
                         onClick={handleTestConnection}
                         disabled={testing || !config?.id}
-                        className="flex items-center gap-2 px-4 py-2.5 border border-slate-300 text-slate-700 font-bold rounded hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                        className="bg-[#f6f7f7] border border-[#8c8f94] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer min-h-[30px] flex items-center gap-2 disabled:opacity-60"
                     >
-                        {testing ? <Loader2 size={16} className="animate-spin"/> : (config?.accountStatus === 'active' ? <CheckCircle size={16} className="text-green-600"/> : <Wifi size={16}/>)}
-                        Test Connection
+                        {testing && <Loader2 className="animate-spin" size={14}/>}
+                        {testing ? "Testing..." : "Test Connection"}
                     </button>
+                    
+                    {config?.accountStatus === 'active' && !testing && (
+                        <span className="text-[#007017] text-[13px] font-semibold flex items-center gap-1">✓ Connection Successful</span>
+                    )}
                 </div>
             </form>
         </div>

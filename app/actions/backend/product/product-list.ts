@@ -1,4 +1,4 @@
-// File: app/actions/admin/product/product-list-and-delete.ts
+// File: app/actions/backend/product/product-list-and-delete.ts
 
 "use server";
 

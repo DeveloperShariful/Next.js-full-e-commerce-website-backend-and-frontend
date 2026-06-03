@@ -1,4 +1,4 @@
-// File: app/admin/settings/general/_components/tax_and_coupons.tsx
+// File: app/(backend)/admin/settings/_components/general/tax_and_coupons.tsx
 
 import { GeneralSettingsData } from "../GeneralTab";
 

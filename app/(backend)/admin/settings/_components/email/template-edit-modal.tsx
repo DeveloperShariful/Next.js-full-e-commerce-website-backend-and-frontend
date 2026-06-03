@@ -1,16 +1,12 @@
-// File: app/admin/settings/email/_components/template-edit-modal.tsx
+// File: app/(backend)/admin/settings/_components/email/template-edit-modal.tsx
 "use client";
 
 import { useState } from "react";
 import { EmailTemplate } from "@prisma/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch"; // Shadcn Switch (Optional, using checkbox logic here for simplicity)
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { updateEmailTemplate } from "@/app/actions/backend/settings/email/email-templates";
 import { toast } from "sonner";
-import { Loader2, Save, Copy, Check, Info, X } from "lucide-react";
+import { Loader2, Copy, Check, X } from "lucide-react";
 import RichTextEditor from "./rich-text-editor";
 
 interface Props {
@@ -41,10 +37,8 @@ export const TemplateEditModal = ({ template, open, onClose }: Props) => {
     setLoading(true);
     const formData = new FormData(e.target as HTMLFormElement);
     
-    // Rich Text Content
     formData.set("content", content);
 
-    // Checkbox Manual Handle
     const form = e.target as HTMLFormElement;
     const isEnabledInput = form.querySelector('input[name="isEnabled"]') as HTMLInputElement;
     formData.set("isEnabled", String(isEnabledInput?.checked || false));
@@ -66,117 +60,125 @@ export const TemplateEditModal = ({ template, open, onClose }: Props) => {
       setTimeout(() => setCopiedVar(null), 1500);
   };
 
+  // WP Responsive Form Classes
+  const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none w-full box-border";
+  const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-4 md:pb-0 mb-4 md:mb-0 align-top";
+  const thResponsiveClass = "block md:table-cell w-full md:w-[200px] pt-[5px] md:py-[15px] pr-[10px] text-[13px] font-medium text-[#1d2327] mb-1 md:mb-0";
+  const tdResponsiveClass = "block md:table-cell py-[5px] md:py-[15px]";
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      {/* 🔥 FIX: বড় এবং রেসপন্সিভ মডাল */}
-      <DialogContent className="max-w-[95vw] w-full md:max-w-7xl h-[90vh] p-0 gap-0 flex flex-col overflow-hidden bg-slate-50">
+      <DialogContent className="max-w-[95vw] w-full md:max-w-[1000px] h-[90vh] p-0 gap-0 flex flex-col overflow-hidden bg-[#f0f0f1] font-sans text-[13px]">
         
-        {/* === HEADER (FIXED) === */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-white flex justify-between items-center shrink-0">
+        {/* === HEADER === */}
+        <div className="px-[20px] py-[15px] border-b border-[#c3c4c7] bg-white flex justify-between items-center shrink-0">
             <div>
-                <DialogTitle className="text-xl font-bold text-slate-800">Edit Template: {template.name}</DialogTitle>
-                <DialogDescription className="text-sm text-slate-500 mt-1">
-                    Trigger Event: <span className="font-mono text-xs bg-slate-100 px-1 rounded text-orange-600">{template.triggerEvent}</span>
+                <DialogTitle className="text-[18px] font-normal text-[#1d2327] m-0 leading-tight">Edit Template: {template.name}</DialogTitle>
+                <DialogDescription className="text-[12px] text-[#646970] mt-1">
+                    Trigger Event: <span className="font-mono bg-[#f0f0f1] px-1">{template.triggerEvent}</span>
                 </DialogDescription>
             </div>
-            <Button variant="ghost" onClick={onClose} className="h-8 w-8 p-0 rounded-full"><X size={20}/></Button>
+            <button onClick={onClose} className="text-[#646970] hover:text-[#d63638] bg-transparent border-none cursor-pointer p-1">
+                <X size={20}/>
+            </button>
         </div>
         
-        {/* === BODY (SCROLLABLE) === */}
+        {/* === BODY === */}
         <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
             
             {/* --- LEFT: FORM EDITOR --- */}
-            <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
-                <form id="template-form" onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto">
+            <div className="flex-1 overflow-y-auto p-[20px] bg-white">
+                <form id="template-form" onSubmit={handleSubmit}>
                     <input type="hidden" name="id" value={template.id} />
                     
-                    {/* Enable Switch */}
-                    <div className="flex items-center justify-between p-4 bg-blue-50/50 border border-blue-100 rounded-lg">
-                        <div>
-                            <label htmlFor="isEnabled" className="text-sm font-bold text-slate-800 cursor-pointer block">Active Status</label>
-                            <p className="text-xs text-slate-500">Enable or disable this automated email.</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="isEnabled" id="isEnabled" defaultChecked={template.isEnabled} className="sr-only peer"/>
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-
-                    {/* Subject & Heading */}
-                    <div className="grid gap-5">
-                        <div className="grid gap-2">
-                            <Label className="text-slate-700">Email Subject Line</Label>
-                            <Input name="subject" defaultValue={template.subject} className="font-medium h-10 border-slate-300 focus:border-blue-500" placeholder="e.g. Your Order #{order_number} is Confirmed" />
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label className="text-slate-700">Email Heading (H1 inside email)</Label>
-                            <Input name="heading" defaultValue={template.heading || ""} className="h-10 border-slate-300" placeholder="e.g. Thanks for your order!" />
-                        </div>
-                    </div>
-
-                    {/* CC / BCC */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="grid gap-2">
-                            <Label className="text-xs uppercase text-slate-500 font-bold">CC</Label>
-                            <Input name="cc" defaultValue={template.cc?.join(", ") || ""} placeholder="manager@store.com" className="text-xs bg-slate-50" />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label className="text-xs uppercase text-slate-500 font-bold">BCC</Label>
-                            <Input name="bcc" defaultValue={template.bcc?.join(", ") || ""} placeholder="admin@store.com" className="text-xs bg-slate-50" />
-                        </div>
-                    </div>
-
-                    {/* Rich Text Editor */}
-                    <div className="space-y-2">
-                        <Label className="text-slate-700">Email Body Content</Label>
-                        <div className="h-[400px] border border-slate-300 rounded-md overflow-hidden shadow-sm">
-                            <RichTextEditor 
-                                value={content} 
-                                onChange={setContent} 
-                                label="Design Email"
-                            />
-                        </div>
-                        <p className="text-xs text-slate-400 flex items-center gap-1">
-                            <Info size={12}/> Supported HTML tags allowed. Use variables from the sidebar.
-                        </p>
-                    </div>
+                    <table className="w-full text-left border-collapse block md:table">
+                        <tbody className="block md:table-row-group">
+                            <tr className={trResponsiveClass}>
+                                <th scope="row" className={thResponsiveClass}>Enable/Disable</th>
+                                <td className={tdResponsiveClass}>
+                                    <label className="flex items-center gap-2 cursor-pointer w-fit">
+                                        <input type="checkbox" name="isEnabled" id="isEnabled" defaultChecked={template.isEnabled} className="border-[#8c8f94] rounded-[3px] focus:ring-[#2271b1] text-[#2271b1]"/>
+                                        <span className="text-[#3c434a]">Enable this email notification</span>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr className={trResponsiveClass}>
+                                <th scope="row" className={thResponsiveClass}>Email Subject</th>
+                                <td className={tdResponsiveClass}>
+                                    <input type="text" name="subject" defaultValue={template.subject} className={wpInputClass} />
+                                </td>
+                            </tr>
+                            <tr className={trResponsiveClass}>
+                                <th scope="row" className={thResponsiveClass}>Email Heading</th>
+                                <td className={tdResponsiveClass}>
+                                    <input type="text" name="heading" defaultValue={template.heading || ""} className={wpInputClass} />
+                                </td>
+                            </tr>
+                            <tr className={trResponsiveClass}>
+                                <th scope="row" className={thResponsiveClass}>CC Emails</th>
+                                <td className={tdResponsiveClass}>
+                                    <input type="text" name="cc" defaultValue={template.cc?.join(", ") || ""} className={wpInputClass} placeholder="Comma separated" />
+                                </td>
+                            </tr>
+                            <tr className={trResponsiveClass}>
+                                <th scope="row" className={thResponsiveClass}>BCC Emails</th>
+                                <td className={tdResponsiveClass}>
+                                    <input type="text" name="bcc" defaultValue={template.bcc?.join(", ") || ""} className={wpInputClass} placeholder="Comma separated" />
+                                </td>
+                            </tr>
+                            <tr className={trResponsiveClass}>
+                                <th scope="row" className={thResponsiveClass}>Email Content</th>
+                                <td className={tdResponsiveClass}>
+                                    <div className="border border-[#c3c4c7] rounded-[3px] min-h-[300px]">
+                                        {/* Rich Text Editor inherits styles, leaving it to function normally */}
+                                        <RichTextEditor value={content} onChange={setContent} />
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </form>
             </div>
 
-            {/* --- RIGHT: VARIABLES SIDEBAR --- */}
-            <div className="w-full lg:w-80 bg-slate-50 border-t lg:border-t-0 lg:border-l border-gray-200 overflow-y-auto flex-shrink-0 p-5 custom-scrollbar">
-                <div className="sticky top-0 bg-slate-50 pb-2 z-10">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Dynamic Variables</h4>
-                    <p className="text-[10px] text-slate-400 mb-4">Click to copy & paste into editor.</p>
-                </div>
-
-                <div className="space-y-2">
-                    {AVAILABLE_VARIABLES.map((v) => (
-                        <div 
-                            key={v.key} 
-                            onClick={() => handleCopy(v.key)}
-                            className="p-3 bg-white border border-slate-200 rounded-md cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group active:scale-95"
-                        >
-                            <div className="flex justify-between items-center mb-1">
-                                <code className="text-xs font-bold text-blue-700 font-mono bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{v.key}</code>
-                                {copiedVar === v.key ? <Check size={14} className="text-green-600 animate-in zoom-in"/> : <Copy size={14} className="text-slate-300 group-hover:text-blue-500"/>}
-                            </div>
-                            <p className="text-[11px] text-slate-500 leading-tight">{v.desc}</p>
-                        </div>
-                    ))}
+            {/* --- RIGHT: VARIABLES (WP Meta Box Style) --- */}
+            <div className="w-full lg:w-[300px] shrink-0 bg-[#f0f0f1] border-t lg:border-t-0 lg:border-l border-[#c3c4c7] p-[15px] overflow-y-auto">
+                <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] box-border">
+                    <h2 className="text-[14px] font-semibold text-[#1d2327] m-0 px-[12px] py-[8px] border-b border-[#c3c4c7]">
+                        Dynamic Variables
+                    </h2>
+                    <div className="p-[12px]">
+                        <p className="text-[12px] text-[#646970] mt-0 mb-[15px]">Click to copy & paste into editor.</p>
+                        
+                        <ul className="m-0 p-0 list-none space-y-2">
+                            {AVAILABLE_VARIABLES.map((v) => (
+                                <li 
+                                    key={v.key} 
+                                    onClick={() => handleCopy(v.key)}
+                                    className="p-[8px] bg-[#f6f7f7] border border-[#dcdcde] rounded-[3px] cursor-pointer hover:border-[#2271b1] transition-colors group flex justify-between items-center"
+                                >
+                                    <div>
+                                        <code className="text-[11px] font-bold text-[#2271b1] block">{v.key}</code>
+                                        <span className="text-[11px] text-[#646970]">{v.desc}</span>
+                                    </div>
+                                    {copiedVar === v.key ? <Check size={14} className="text-[#007017] shrink-0"/> : <Copy size={14} className="text-[#c3c4c7] group-hover:text-[#2271b1] shrink-0"/>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
             </div>
 
         </div>
 
-        {/* === FOOTER (FIXED) === */}
-        <div className="p-4 border-t border-gray-200 bg-white flex justify-end gap-3 shrink-0">
-            <Button type="button" variant="outline" onClick={onClose} className="border-slate-300">Cancel</Button>
-            <Button type="submit" form="template-form" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 shadow-sm px-6">
-                {loading ? <Loader2 className="animate-spin h-4 w-4"/> : <Save className="h-4 w-4"/>}
+        {/* === FOOTER === */}
+        <div className="p-[15px] border-t border-[#c3c4c7] bg-[#f6f7f7] flex justify-end gap-2 shrink-0">
+            <button type="button" onClick={onClose} className="bg-white border border-[#8c8f94] text-[#2c3338] hover:bg-[#f0f0f1] hover:border-[#8c8f94] hover:text-[#2c3338] rounded-[3px] px-[12px] py-[4px] text-[13px] cursor-pointer min-h-[30px]">
+                Cancel
+            </button>
+            <button type="submit" form="template-form" disabled={loading} className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 min-h-[30px]">
+                {loading ? <Loader2 className="animate-spin" size={14}/> : null}
                 Save Template
-            </Button>
+            </button>
         </div>
 
       </DialogContent>

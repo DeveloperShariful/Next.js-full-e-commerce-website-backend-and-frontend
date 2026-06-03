@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { saveTransdirectPreferences } from "@/app/actions/backend/settings/shipping/transdirect-config";
 import { TransdirectConfig } from "@prisma/client";
-import { Save, Loader2, Info } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface Props {
@@ -21,7 +21,6 @@ export default function Transdirect_Controls({ config, refreshData }: Props) {
         setLoading(true);
         const formData = new FormData(e.target as HTMLFormElement);
         
-        // Manual checkbox handling
         const form = e.target as HTMLFormElement;
         formData.set("defaultTailgatePickup", String(form['defaultTailgatePickup'].checked));
         formData.set("defaultTailgateDelivery", String(form['defaultTailgateDelivery'].checked));
@@ -38,86 +37,107 @@ export default function Transdirect_Controls({ config, refreshData }: Props) {
         setLoading(false);
     };
 
+    // WP Responsive Form Classes
+    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-4 md:pb-0 mb-4 md:mb-0 align-top";
+    const thResponsiveClass = "block md:table-cell w-full md:w-[250px] pt-[5px] md:py-[15px] pr-[10px] text-[13px] font-medium text-[#1d2327] mb-1 md:mb-0 align-top";
+    const tdResponsiveClass = "block md:table-cell py-[5px] md:py-[15px] align-top";
+
     return (
-        <form onSubmit={handleSubmit} className="max-w-2xl animate-in fade-in space-y-6">
-            <div>
-                <h3 className="text-lg font-bold text-slate-800">Shipping Preferences</h3>
-                <p className="text-sm text-slate-500">Set default behaviors for quotes and bookings.</p>
-            </div>
+        <div className="w-full animate-in fade-in">
+            <h2 className="text-[14px] font-semibold text-[#1d2327] mb-0 pb-0 border-none">Shipping Preferences</h2>
 
-            <div className="space-y-4">
-                {/* Tailgate Pickup */}
-                <div className="flex items-start gap-3 p-4 border border-slate-200 rounded-md bg-white hover:border-[#2271b1] transition-colors">
-                    <input 
-                        type="checkbox" 
-                        name="defaultTailgatePickup" 
-                        defaultChecked={config?.defaultTailgatePickup ?? false} 
-                        className="mt-1 w-4 h-4 text-[#2271b1] border-slate-300 rounded focus:ring-[#2271b1]"
-                    />
-                    <div>
-                        <label className="block text-sm font-bold text-slate-800">Requires Tailgate at Pickup</label>
-                        <p className="text-xs text-slate-500 mt-1">Check this if your warehouse does not have a forklift or loading dock.</p>
-                    </div>
-                </div>
+            <form onSubmit={handleSubmit}>
+                <table className="w-full text-left border-collapse block md:table mb-[20px] mt-[10px]">
+                    <tbody className="block md:table-row-group">
+                        
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Tailgate Options</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <div className="space-y-[10px]">
+                                    <label className="flex items-start gap-2 cursor-pointer w-fit">
+                                        <input 
+                                            type="checkbox" 
+                                            name="defaultTailgatePickup" 
+                                            defaultChecked={config?.defaultTailgatePickup ?? false} 
+                                            className="border-[#8c8f94] rounded-[3px] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                        />
+                                        <div>
+                                            <span className="text-[13px] text-[#3c434a] font-semibold block">Requires Tailgate at Pickup</span>
+                                            <span className="text-[12px] text-[#646970] mt-1 block">Check this if your warehouse does not have a forklift or loading dock.</span>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-start gap-2 cursor-pointer w-fit">
+                                        <input 
+                                            type="checkbox" 
+                                            name="defaultTailgateDelivery" 
+                                            defaultChecked={config?.defaultTailgateDelivery ?? false} 
+                                            className="border-[#8c8f94] rounded-[3px] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                        />
+                                        <div>
+                                            <span className="text-[13px] text-[#3c434a] font-semibold block">Requires Tailgate at Delivery (Default)</span>
+                                            <span className="text-[12px] text-[#646970] mt-1 block">If most of your customers are residential or lack forklifts, enable this.</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </td>
+                        </tr>
 
-                {/* Tailgate Delivery */}
-                <div className="flex items-start gap-3 p-4 border border-slate-200 rounded-md bg-white hover:border-[#2271b1] transition-colors">
-                    <input 
-                        type="checkbox" 
-                        name="defaultTailgateDelivery" 
-                        defaultChecked={config?.defaultTailgateDelivery ?? false} 
-                        className="mt-1 w-4 h-4 text-[#2271b1] border-slate-300 rounded focus:ring-[#2271b1]"
-                    />
-                    <div>
-                        <label className="block text-sm font-bold text-slate-800">Requires Tailgate at Delivery (Default)</label>
-                        <p className="text-xs text-slate-500 mt-1">If most of your customers are residential or lack forklifts, enable this.</p>
-                    </div>
-                </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Insurance</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <label className="flex items-start gap-2 cursor-pointer w-fit">
+                                    <input 
+                                        type="checkbox" 
+                                        name="defaultDeclaredValue" 
+                                        defaultChecked={config?.defaultDeclaredValue ?? true} 
+                                        className="border-[#8c8f94] rounded-[3px] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                    />
+                                    <div>
+                                        <span className="text-[13px] text-[#3c434a] font-semibold block">Declare Value for Insurance</span>
+                                        <span className="text-[12px] text-[#646970] mt-1 block">Automatically declare item value for insurance coverage on quotes.</span>
+                                    </div>
+                                </label>
+                            </td>
+                        </tr>
 
-                {/* Insurance */}
-                <div className="flex items-start gap-3 p-4 border border-slate-200 rounded-md bg-white hover:border-[#2271b1] transition-colors">
-                    <input 
-                        type="checkbox" 
-                        name="defaultDeclaredValue" 
-                        defaultChecked={config?.defaultDeclaredValue ?? true} 
-                        className="mt-1 w-4 h-4 text-[#2271b1] border-slate-300 rounded focus:ring-[#2271b1]"
-                    />
-                    <div>
-                        <label className="block text-sm font-bold text-slate-800">Declare Value for Insurance</label>
-                        <p className="text-xs text-slate-500 mt-1">Automatically declare item value for insurance coverage on quotes.</p>
-                    </div>
-                </div>
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label className="cursor-pointer">Smart Boxing</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <label className="flex items-start gap-2 cursor-pointer w-fit">
+                                    <input 
+                                        type="checkbox" 
+                                        name="enableOrderBoxing" 
+                                        defaultChecked={config?.enableOrderBoxing ?? false} 
+                                        className="border-[#8c8f94] rounded-[3px] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                    />
+                                    <div>
+                                        <span className="text-[13px] text-[#3c434a] font-semibold block">Enable Smart Boxing Calculation</span>
+                                        <span className="text-[12px] text-[#646970] mt-1 block max-w-[400px] leading-relaxed">If enabled, the system will try to fit cart items into your defined "Packaging Boxes" to get a more accurate quote, rather than shipping individual items.</span>
+                                    </div>
+                                </label>
+                            </td>
+                        </tr>
 
-                {/* Smart Boxing */}
-                <div className="flex items-start gap-3 p-4 border border-slate-200 rounded-md bg-blue-50 border-blue-100">
-                    <input 
-                        type="checkbox" 
-                        name="enableOrderBoxing" 
-                        defaultChecked={config?.enableOrderBoxing ?? false} 
-                        className="mt-1 w-4 h-4 text-[#2271b1] border-slate-300 rounded focus:ring-[#2271b1]"
-                    />
-                    <div>
-                        <label className="block text-sm font-bold text-slate-800 flex items-center gap-2">
-                            Enable Smart Boxing Calculation <Info size={14} className="text-[#2271b1]"/>
-                        </label>
-                        <p className="text-xs text-slate-600 mt-1">
-                            If enabled, the system will try to fit cart items into your defined "Packaging Boxes" 
-                            to get a more accurate quote, rather than shipping individual items.
-                        </p>
-                    </div>
-                </div>
-            </div>
+                    </tbody>
+                </table>
 
-            <div className="pt-4 border-t">
-                <button 
-                    type="submit" 
-                    disabled={loading} 
-                    className="flex items-center gap-2 px-6 py-2.5 bg-[#2271b1] text-white font-bold rounded hover:bg-[#135e96] disabled:opacity-50 transition-colors shadow-sm"
-                >
-                    {loading ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
-                    Save Preferences
-                </button>
-            </div>
-        </form>
+                <p className="mt-[20px] mb-[30px]">
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-60 flex items-center gap-2 min-h-[30px] w-fit"
+                    >
+                        {loading && <Loader2 className="animate-spin" size={14}/>}
+                        Save Preferences
+                    </button>
+                </p>
+            </form>
+        </div>
     );
 }

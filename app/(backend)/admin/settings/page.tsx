@@ -30,29 +30,31 @@ function SettingsContent() {
 
   return (
     <div 
-      className="w-full bg-[#f0f0f1] min-h-screen text-[#3c434a] antialiased pb-20"
+      className="w-full min-h-screen bg-[#f0f0f1] text-[#3c434a] antialiased"
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif'
       }}
     >
-      {/* WordPress Admin Settings Header */}
-      <div className=" w-full">
-        <h1 className="text-[23px] font-normal text-[#1d2327] m-0  leading-tight">
+      {/* WordPress ".wrap" standard spacing (No extra paddings/margins at the bottom) */}
+      <div className="w-full">
+        
+        {/* WordPress Admin Settings Header */}
+        <h1 className="text-[23px] font-normal text-[#1d2327] m-0 mb-[15px] leading-tight">
           Settings
         </h1>
         
         {/* WooCommerce Navigation Tabs */}
-        <nav className="flex flex-wrap gap-[4px] -mb-[1px]">
+        <nav className="flex flex-wrap gap-[4px] border-b border-[#c3c4c7] mb-[20px]">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`text-[14px] px-[15px] pb-[12px] pt-[6px] font-semibold transition-all duration-150 border-b-2 outline-none ${
+                className={`text-[14px] px-[15px] py-[8px] font-semibold transition-all duration-150 border border-b-0 rounded-t-[3px] outline-none ${
                   isActive
-                    ? "border-[#2271b1] text-[#000] font-bold"
-                    : "border-transparent text-[#2271b1] hover:text-[#135e96]"
+                    ? "border-[#c3c4c7] bg-[#f0f0f1] text-[#1d2327] -mb-[1px] pb-[9px]" 
+                    : "border-transparent bg-transparent text-[#2271b1] hover:text-[#135e96]"
                 }`}
                 style={{
                   lineHeight: '1.71428571'
@@ -63,16 +65,17 @@ function SettingsContent() {
             );
           })}
         </nav>
-      </div>
 
-      {/* Main Render Area (কোনো max-w বা mx-auto নেই, এটি স্ক্রিনের শেষ মাথা পর্যন্ত ১০০% ছড়াবে) */}
-      <div className="w-full ">
-        <div className="animate-in fade-in duration-150 w-full">
-          {activeTab === "general" && <GeneralTab />}
-          {activeTab === "shipping" && <ShippingTab />}
-          {activeTab === "payments" && <PaymentsTab />}
-          {activeTab === "email" && <EmailTab />}
+        {/* Main Render Area (কোনো max-w বা mx-auto নেই, এটি স্ক্রিনের শেষ মাথা পর্যন্ত ১০০% ছড়াবে) */}
+        <div className="w-full">
+          <div className="animate-in fade-in duration-150 w-full">
+            {activeTab === "general" && <GeneralTab />}
+            {activeTab === "shipping" && <ShippingTab />}
+            {activeTab === "payments" && <PaymentsTab />}
+            {activeTab === "email" && <EmailTab />}
+          </div>
         </div>
+
       </div>
     </div>
   );

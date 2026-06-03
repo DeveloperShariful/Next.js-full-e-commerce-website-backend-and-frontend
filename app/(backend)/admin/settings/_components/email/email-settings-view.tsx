@@ -1,22 +1,21 @@
-// File: app/admin/settings/email/_components/email-settings-view.tsx
+// File: app/(backend)/admin/settings/_components/email/email-settings-view.tsx
 
 "use client";
 
 import { useState } from "react";
 import { EmailConfiguration, EmailTemplate, EmailLog } from "@prisma/client";
-import { Settings, Mail, FileText } from "lucide-react";
 
 import { ConfigForm } from "./config-form";
 import { TemplateList } from "./template-list";
-import { EmailLogsTable } from "./email-logs-table"; // Ensure this import is correct
+import { EmailLogsTable } from "./email-logs-table"; 
 
 interface Props {
   config: EmailConfiguration | null;
   templates: EmailTemplate[];
   logs: EmailLog[];
   logsMeta: { total: number; pages: number };
-  currentLogPage: number;          // ✅ Added
-  onLogPageChange: (page: number) => void; // ✅ Added
+  currentLogPage: number;          
+  onLogPageChange: (page: number) => void; 
   refreshData: () => void;
 }
 
@@ -32,33 +31,35 @@ export const EmailSettingsView = ({
   const [activeTab, setActiveTab] = useState("config");
 
   const tabs = [
-    { id: "config", label: "Configuration & SMTP", icon: Settings },
-    { id: "templates", label: "Email Templates", icon: Mail },
-    { id: "logs", label: "Email Logs", icon: FileText },
+    { id: "config", label: "Configuration & SMTP" },
+    { id: "templates", label: "Email Templates" },
+    { id: "logs", label: "Email Logs" },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Tabs */}
-      <div className="border-b border-slate-200 flex space-x-1 overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === tab.id
-                ? "border-[#2271b1] text-[#2271b1] bg-blue-50/50"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <tab.icon size={16} />
-            {tab.label}
-          </button>
+    <div className="w-full text-[13px] text-[#3c434a]">
+      
+      {/* WordPress subsubsub style tabs - Fully Responsive flex-wrap */}
+      <ul className="list-none p-0 m-0 mb-6 text-[13px] text-[#646970] flex flex-wrap items-center gap-y-2">
+        {tabs.map((tab, index) => (
+          <li key={tab.id} className="inline-block m-0 p-0">
+            <button
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-block p-0 bg-transparent border-none cursor-pointer hover:text-[#135e96] transition-colors ${
+                activeTab === tab.id
+                  ? "text-[#000] font-semibold"
+                  : "text-[#2271b1]"
+              }`}
+            >
+              {tab.label}
+            </button>
+            {index < tabs.length - 1 && <span className="mx-2 text-[#c3c4c7]">|</span>}
+          </li>
         ))}
-      </div>
+      </ul>
 
-      {/* Content */}
-      <div className="animate-in fade-in">
+      {/* Content Area */}
+      <div className="animate-in fade-in duration-150 w-full">
         {activeTab === "config" && <ConfigForm config={config} refreshData={refreshData} />}
         {activeTab === "templates" && <TemplateList templates={templates} refreshData={refreshData} />}
         {activeTab === "logs" && (

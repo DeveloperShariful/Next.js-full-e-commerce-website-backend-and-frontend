@@ -1,4 +1,4 @@
-// File: app/actions/admin/product/product-utils.ts
+// File: app/actions/backend/product/product-utils.ts
 
 import { db } from "@/lib/prisma";
 import _ from "lodash";

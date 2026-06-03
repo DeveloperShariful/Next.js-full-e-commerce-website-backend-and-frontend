@@ -5,7 +5,6 @@
 import { useState } from "react";
 import { deleteShippingBox, toggleBoxStatus } from "@/app/actions/backend/settings/shipping/packaging";
 import { ShippingBox, TransdirectBox } from "@prisma/client"; 
-import { Plus, Package, Trash2, Edit, Box, Info } from "lucide-react";
 import { toast } from "react-hot-toast";
 import Box_Form_Modal from "./Box_Form_Modal";
 
@@ -53,130 +52,117 @@ export default function Packaging_List({ shippingBoxes, transdirectBoxes, refres
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-sm border border-slate-200 shadow-sm">
-                <div>
-                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <Package size={20} className="text-[#2271b1]" />
-                        Packaging & Boxes
-                    </h2>
-                    <p className="text-sm text-slate-500 mt-1">
-                        Define the boxes you use to ship products. These dimensions are used to calculate accurate shipping rates.
-                    </p>
-                </div>
+        <div className="w-full text-[13px] text-[#3c434a] animate-in fade-in mb-[30px]">
+            
+            {/* Header & Add Button */}
+            <div className="flex items-center gap-3 mb-[15px]">
+                <h2 className="text-[23px] font-normal text-[#1d2327] m-0">Packaging & Boxes</h2>
                 <button 
                     onClick={handleAddNew} 
-                    className="w-full md:w-auto flex justify-center items-center gap-2 px-4 py-2 bg-[#2271b1] text-white font-bold rounded hover:bg-[#135e96] text-sm transition-colors shadow-sm"
+                    className="bg-[#f6f7f7] border border-[#2271b1] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[10px] py-[2px] text-[13px] font-semibold cursor-pointer"
                 >
-                    <Plus size={16} /> Add New Box
+                    Add New Box
                 </button>
             </div>
+            <p className="text-[13px] text-[#646970] mt-0 mb-[15px]">Define the boxes you use to ship products. These dimensions are used to calculate accurate shipping rates.</p>
 
-            {/* Custom Boxes Table */}
-            <div className="bg-white rounded-sm border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 border-b bg-slate-50 font-bold text-slate-700 text-sm">
-                    My Custom Boxes
-                </div>
-                
-                <div className="overflow-x-auto w-full">
-                    <table className="w-full text-left text-sm min-w-[700px]">
-                        <thead className="bg-white border-b text-slate-500">
+            {/* Title for Custom Boxes */}
+            <h3 className="text-[14px] font-semibold text-[#1d2327] mb-[10px] pb-0 border-none">My Custom Boxes</h3>
+            
+            {/* WP List Table for Custom Boxes */}
+            <div className="w-full overflow-x-auto bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] box-border mb-[30px]">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                        <tr className="border-b border-[#c3c4c7] bg-[#f6f7f7]">
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338] w-[30%]">Name / Description</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Dimensions (L×W×H)</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Max Weight</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Box Weight</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {shippingBoxes.length === 0 ? (
                             <tr>
-                                <th className="p-4 font-semibold w-1/3">Name / Description</th>
-                                <th className="p-4 font-semibold">Dimensions (LxWxH)</th>
-                                <th className="p-4 font-semibold">Max Weight</th>
-                                <th className="p-4 font-semibold">Box Weight</th>
-                                <th className="p-4 font-semibold text-center">Status</th>
-                                <th className="p-4 font-semibold text-right">Actions</th>
+                                <td colSpan={5} className="px-[10px] py-[20px] text-center text-[#646970] italic">
+                                    No custom boxes added yet. Create one to get accurate shipping rates.
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {shippingBoxes.map((box) => (
-                                <tr key={box.id} className="hover:bg-slate-50 group transition-colors">
-                                    <td className="p-4">
-                                        <div className="font-bold text-slate-800">{box.name}</div>
-                                        <div className="text-xs text-slate-400 font-mono mt-0.5 hidden sm:block">ID: {box.id.slice(0, 8)}...</div>
-                                    </td>
-                                    <td className="p-4 text-slate-600">
-                                        <div className="flex items-center gap-2">
-                                            <Box size={14} className="text-slate-400"/>
-                                            {/* ✅ FIX: Convert Decimal to string/number for rendering */}
-                                            {Number(box.length)} x {Number(box.width)} x {Number(box.height)} cm
-                                        </div>
-                                    </td>
-                                    <td className="p-4 text-slate-600">
-                                        {/* ✅ FIX: Handle nullable Decimal */}
-                                        {box.maxWeight ? `${Number(box.maxWeight)} kg` : <span className="text-slate-300">-</span>}
-                                    </td>
-                                    <td className="p-4 text-slate-600">
-                                        {/* ✅ FIX: Handle nullable Decimal */}
-                                        {box.weight ? `${Number(box.weight)} kg` : <span className="text-slate-300">-</span>}
-                                    </td>
-                                    <td className="p-4 text-center">
+                        ) : shippingBoxes.map((box, index) => (
+                            <tr key={box.id} className={`border-b border-[#f0f0f1] last:border-none hover:bg-[#f6f7f7] group ${index % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f9]'}`}>
+                                <td className="px-[10px] py-[10px]">
+                                    <strong className="text-[#2271b1] block">{box.name}</strong>
+                                    
+                                    {/* WP Row Actions (Hover to reveal) */}
+                                    <div className="text-[12px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button 
-                                            onClick={() => handleToggle(box.id, box.isEnabled)}
-                                            className={`px-2 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap ${
-                                                box.isEnabled 
-                                                ? "bg-green-100 text-green-700 hover:bg-green-200" 
-                                                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                            }`}
+                                            onClick={() => handleEdit(box)}
+                                            className="bg-transparent border-none text-[#2271b1] hover:underline cursor-pointer p-0"
                                         >
-                                            {box.isEnabled ? "Active" : "Disabled"}
+                                            Edit
                                         </button>
-                                    </td>
-                                    <td className="p-4 text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <button onClick={() => handleEdit(box)} className="p-2 text-slate-400 hover:text-[#2271b1] hover:bg-blue-50 rounded transition-all">
-                                                <Edit size={16}/>
-                                            </button>
-                                            <button onClick={() => handleDelete(box.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all">
-                                                <Trash2 size={16}/>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                            {shippingBoxes.length === 0 && (
-                                <tr>
-                                    <td colSpan={6} className="p-8 text-center text-slate-500 italic bg-slate-50/50">
-                                        No custom boxes added yet. Create one to get accurate shipping rates.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                        <span className="text-[#c3c4c7] mx-1">|</span>
+                                        <button 
+                                            onClick={() => handleDelete(box.id)}
+                                            className="bg-transparent border-none text-[#d63638] hover:underline cursor-pointer p-0"
+                                        >
+                                            Trash
+                                        </button>
+                                    </div>
+                                </td>
+                                <td className="px-[10px] py-[10px] text-[#3c434a]">
+                                    {Number(box.length)} × {Number(box.width)} × {Number(box.height)} cm
+                                </td>
+                                <td className="px-[10px] py-[10px] text-[#3c434a]">
+                                    {box.maxWeight ? `${Number(box.maxWeight)} kg` : <span className="text-[#a7aaad]">—</span>}
+                                </td>
+                                <td className="px-[10px] py-[10px] text-[#3c434a]">
+                                    {box.weight ? `${Number(box.weight)} kg` : <span className="text-[#a7aaad]">—</span>}
+                                </td>
+                                <td className="px-[10px] py-[10px]">
+                                    {box.isEnabled ? (
+                                        <button onClick={() => handleToggle(box.id, box.isEnabled)} className="bg-transparent border-none text-[#007017] hover:underline cursor-pointer p-0 font-semibold">Active</button>
+                                    ) : (
+                                        <button onClick={() => handleToggle(box.id, box.isEnabled)} className="bg-transparent border-none text-[#646970] hover:underline cursor-pointer p-0">Disabled</button>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
 
-            {/* Transdirect Boxes Section */}
+            {/* Title for Transdirect Default Boxes */}
             {transdirectBoxes && transdirectBoxes.length > 0 && (
-                 <div className="mt-8 bg-white rounded-sm border border-slate-200 shadow-sm overflow-hidden opacity-80">
-                    <div className="p-4 border-b bg-slate-50 font-bold text-slate-700 text-sm flex items-center gap-2">
-                        <Info size={16} /> Transdirect Default Boxes
-                    </div>
-                    <div className="overflow-x-auto w-full">
-                         <table className="w-full text-left text-sm min-w-[600px]">
-                            <thead className="bg-white border-b text-slate-500">
-                                <tr>
-                                    <th className="p-3 font-semibold">Type / Code</th>
-                                    <th className="p-3 font-semibold">Dimensions</th>
-                                    <th className="p-3 font-semibold">Max Weight</th>
+                <>
+                    <h3 className="text-[14px] font-semibold text-[#1d2327] mb-[10px] pb-0 border-none">Transdirect Default Boxes</h3>
+                    <div className="w-full overflow-x-auto bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] box-border">
+                        <table className="w-full text-left border-collapse min-w-[600px]">
+                            <thead>
+                                <tr className="border-b border-[#c3c4c7] bg-[#f6f7f7]">
+                                    <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Type / Code</th>
+                                    <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Dimensions (L×W×H)</th>
+                                    <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Max Weight</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {transdirectBoxes.map((tb) => (
-                                    <tr key={tb.id} className="hover:bg-slate-50">
-                                        <td className="p-3 font-medium text-slate-600">{tb.description || tb.code}</td>
-                                        {/* ✅ FIX: Convert Decimal to number for Transdirect boxes too */}
-                                        <td className="p-3 text-slate-500">{Number(tb.length)} x {Number(tb.width)} x {Number(tb.height)} cm</td>
-                                        <td className="p-3 text-slate-500">{tb.maxWeight ? `${Number(tb.maxWeight)} kg` : "-"}</td>
+                            <tbody>
+                                {transdirectBoxes.map((tb, index) => (
+                                    <tr key={tb.id} className={`border-b border-[#f0f0f1] last:border-none ${index % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f9]'}`}>
+                                        <td className="px-[10px] py-[10px] font-medium text-[#3c434a]">
+                                            {tb.description || tb.code}
+                                        </td>
+                                        <td className="px-[10px] py-[10px] text-[#646970]">
+                                            {Number(tb.length)} × {Number(tb.width)} × {Number(tb.height)} cm
+                                        </td>
+                                        <td className="px-[10px] py-[10px] text-[#646970]">
+                                            {tb.maxWeight ? `${Number(tb.maxWeight)} kg` : "—"}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
-                         </table>
+                        </table>
                     </div>
-                 </div>
+                </>
             )}
 
             {/* Modal */}

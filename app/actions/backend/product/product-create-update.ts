@@ -1,4 +1,4 @@
-// File: app/actions/admin/product/product-create-update.ts
+// File: app/actions/backend/product/product-create-update.ts
 
 "use server";
 

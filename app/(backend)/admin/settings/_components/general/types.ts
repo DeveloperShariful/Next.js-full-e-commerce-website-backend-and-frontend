@@ -1,4 +1,4 @@
-// File: app/admin/settings/general/types.ts
+// File: app/(backend)/admin/settings/_components/general/types.ts
 
 export interface GeneralSettingsData {
     storeName: string;

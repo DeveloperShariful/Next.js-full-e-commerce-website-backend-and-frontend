@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { saveShippingBox } from "@/app/actions/backend/settings/shipping/packaging";
 import { ShippingBox } from "@prisma/client";
-import { X, Loader2, Save } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface BoxFormProps {
@@ -38,128 +38,134 @@ export default function Box_Form_Modal({ box, onClose, refreshData }: BoxFormPro
         setLoading(false);
     };
 
+    // WP Standard Input Class
+    const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none w-full box-border bg-white";
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-[#000000b3] z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            {/* WP Style Flat Modal */}
+            <div className="bg-[#f0f0f1] shadow-md w-full max-w-lg max-h-[90vh] flex flex-col font-sans text-[13px] text-[#3c434a]">
                 
-                <div className="flex justify-between items-center p-5 border-b sticky top-0 bg-white z-10">
-                    <h3 className="text-lg font-bold text-slate-800">
+                {/* Header */}
+                <div className="flex justify-between items-center px-[20px] py-[15px] border-b border-[#c3c4c7] bg-white shrink-0">
+                    <h3 className="text-[18px] font-normal text-[#1d2327] m-0 leading-tight">
                         {box ? "Edit Box" : "Add New Box"}
                     </h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition-colors p-1">
-                        <X size={24} />
+                    <button type="button" onClick={onClose} className="text-[#646970] hover:text-[#d63638] bg-transparent border-none cursor-pointer p-1">
+                        <X size={20} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">
-                            Box Name / Reference <span className="text-red-500">*</span>
-                        </label>
-                        <input 
-                            name="name" 
-                            required 
-                            defaultValue={box?.name || ""}
-                            placeholder="e.g. Small Parcel Box, Satchel 500g" 
-                            className="w-full border border-slate-300 p-2.5 rounded-md outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] transition-all"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Body */}
+                <div className="overflow-y-auto bg-white p-[20px] flex-1">
+                    <form id="box-form" onSubmit={handleSubmit} className="space-y-[15px]">
+                        
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Length (cm) *</label>
-                            <input 
-                                name="length" 
-                                type="number" 
-                                step="0.1" 
-                                required 
-                                // ✅ FIX: Convert Decimal to string/number
-                                defaultValue={box?.length ? Number(box.length) : ""}
-                                placeholder="0.0" 
-                                className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Width (cm) *</label>
-                            <input 
-                                name="width" 
-                                type="number" 
-                                step="0.1" 
-                                required 
-                                // ✅ FIX: Convert Decimal to string/number
-                                defaultValue={box?.width ? Number(box.width) : ""}
-                                placeholder="0.0" 
-                                className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">Height (cm) *</label>
-                            <input 
-                                name="height" 
-                                type="number" 
-                                step="0.1" 
-                                required 
-                                // ✅ FIX: Convert Decimal to string/number
-                                defaultValue={box?.height ? Number(box.height) : ""}
-                                placeholder="0.0" 
-                                className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">
-                                Max Weight (kg)
+                            <label className="block text-[13px] font-medium text-[#1d2327] mb-1">
+                                Box Name / Reference <span className="text-[#d63638]">*</span>
                             </label>
                             <input 
-                                name="maxWeight" 
-                                type="number" 
-                                step="0.001" 
-                                // ✅ FIX: Convert Decimal to string/number
-                                defaultValue={box?.maxWeight ? Number(box.maxWeight) : ""}
-                                placeholder="Optional" 
-                                className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
+                                name="name" 
+                                required 
+                                defaultValue={box?.name || ""}
+                                placeholder="e.g. Small Parcel Box, Satchel 500g" 
+                                className={wpInputClass}
                             />
-                            <p className="text-xs text-slate-500 mt-1">Maximum load this box can handle.</p>
                         </div>
-                        <div>
-                            <label className="block text-sm font-bold text-slate-700 mb-1">
-                                Empty Box Weight (kg)
-                            </label>
-                            <input 
-                                name="weight" 
-                                type="number" 
-                                step="0.001" 
-                                // ✅ FIX: Convert Decimal to string/number
-                                defaultValue={box?.weight ? Number(box.weight) : 0}
-                                placeholder="0.0" 
-                                className="w-full border border-slate-300 p-2 rounded outline-none focus:border-[#2271b1]"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Weight of the packaging material itself.</p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-[15px]">
+                            <div>
+                                <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Length (cm) <span className="text-[#d63638]">*</span></label>
+                                <input 
+                                    name="length" 
+                                    type="number" 
+                                    step="0.1" 
+                                    required 
+                                    defaultValue={box?.length ? Number(box.length) : ""}
+                                    placeholder="0.0" 
+                                    className={wpInputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Width (cm) <span className="text-[#d63638]">*</span></label>
+                                <input 
+                                    name="width" 
+                                    type="number" 
+                                    step="0.1" 
+                                    required 
+                                    defaultValue={box?.width ? Number(box.width) : ""}
+                                    placeholder="0.0" 
+                                    className={wpInputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Height (cm) <span className="text-[#d63638]">*</span></label>
+                                <input 
+                                    name="height" 
+                                    type="number" 
+                                    step="0.1" 
+                                    required 
+                                    defaultValue={box?.height ? Number(box.height) : ""}
+                                    placeholder="0.0" 
+                                    className={wpInputClass}
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="pt-4 flex items-center justify-end gap-3 border-t mt-4">
-                        <button 
-                            type="button" 
-                            onClick={onClose} 
-                            className="px-5 py-2.5 border border-slate-300 rounded-md text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            type="submit" 
-                            disabled={loading}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-[#2271b1] text-white rounded-md text-sm font-bold hover:bg-[#135e96] disabled:opacity-50 transition-colors shadow-sm"
-                        >
-                            {loading ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
-                            {box ? "Save Changes" : "Add Box"}
-                        </button>
-                    </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[15px]">
+                            <div>
+                                <label className="block text-[13px] font-medium text-[#1d2327] mb-1">
+                                    Max Weight (kg)
+                                </label>
+                                <input 
+                                    name="maxWeight" 
+                                    type="number" 
+                                    step="0.001" 
+                                    defaultValue={box?.maxWeight ? Number(box.maxWeight) : ""}
+                                    placeholder="Optional" 
+                                    className={wpInputClass}
+                                />
+                                <p className="text-[12px] text-[#646970] m-0 mt-1">Maximum load this box can handle.</p>
+                            </div>
+                            <div>
+                                <label className="block text-[13px] font-medium text-[#1d2327] mb-1">
+                                    Empty Box Weight (kg)
+                                </label>
+                                <input 
+                                    name="weight" 
+                                    type="number" 
+                                    step="0.001" 
+                                    defaultValue={box?.weight ? Number(box.weight) : 0}
+                                    placeholder="0.0" 
+                                    className={wpInputClass}
+                                />
+                                <p className="text-[12px] text-[#646970] m-0 mt-1">Weight of the packaging material itself.</p>
+                            </div>
+                        </div>
 
-                </form>
+                    </form>
+                </div>
+
+                {/* Footer */}
+                <div className="p-[15px] border-t border-[#c3c4c7] bg-[#f6f7f7] flex justify-end gap-2 shrink-0">
+                    <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="bg-[#f6f7f7] border border-[#8c8f94] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer min-h-[30px]"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="submit" 
+                        form="box-form"
+                        disabled={loading}
+                        className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 min-h-[30px]"
+                    >
+                        {loading && <Loader2 size={14} className="animate-spin"/>}
+                        {box ? "Save Changes" : "Add Box"}
+                    </button>
+                </div>
+
             </div>
         </div>
     );

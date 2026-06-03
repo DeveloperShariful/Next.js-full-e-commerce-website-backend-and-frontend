@@ -187,7 +187,13 @@ export default function GeneralTab() {
     setSaving(false);
   };
 
-  if (loading) return <div className="h-[250px] flex items-center justify-center bg-white border border-[#ccd0d4]"><Loader2 className="animate-spin text-slate-400" /></div>;
+  if (loading) {
+      return (
+          <div className="w-full h-[200px] flex items-center justify-center">
+              <Loader2 className="animate-spin text-[#2271b1]" size={28} />
+          </div>
+      );
+  }
 
   const subTabs = [
     { id: "general", label: "General & Store", icon: Store },
@@ -196,57 +202,60 @@ export default function GeneralTab() {
   ];
 
   return (
-    <div className="bg-white border border-[#ccd0d4] p-[30px] rounded-none shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 pb-4 border-b border-slate-100">
-            <div>
-                <h2 className="text-xl font-bold text-slate-800">General Settings</h2>
-                <p className="text-slate-500 text-xs">Manage store details, address, and regional settings.</p>
-            </div>
-            <button 
-              onClick={handleSubmit} 
-              disabled={saving} 
-              className="flex items-center gap-2 px-5 py-2 bg-[#2271b1] text-white font-bold rounded shadow hover:bg-[#135e96] disabled:opacity-50 text-xs transition-all"
-            >
-                {saving ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>}
-                {saving ? "Saving Changes..." : "Save Changes"}
-            </button>
-        </div>
-
-        <div className="flex space-x-1 mb-6 border-b border-slate-200 overflow-x-auto">
-            {subTabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    onClick={() => setActiveSubTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
-                        activeSubTab === tab.id
-                        ? "border-[#2271b1] text-[#2271b1] bg-blue-50/50"
-                        : "border-transparent text-slate-500 hover:text-slate-700"
-                    }`}
-                >
-                    <tab.icon size={14} />
-                    {tab.label}
-                </button>
+    <div className="w-full text-[13px] text-[#3c434a] animate-in fade-in">
+        <h2 className="text-xl font-bold text-slate-800">General & Store Settings</h2>
+        {/* WP subsubsub style tabs */}
+        <ul className="list-none pt-3 m-0 mb-[20px] text-[13px] text-[#646970] flex flex-wrap items-center">
+            {subTabs.map((tab, index) => (
+                <li key={tab.id} className="inline-block m-0 p-0">
+                    <button
+                        onClick={() => setActiveSubTab(tab.id)}
+                        className={`inline-block p-0 bg-transparent border-none cursor-pointer hover:text-[#135e96] transition-colors ${
+                            activeSubTab === tab.id
+                            ? "text-[#000] font-semibold"
+                            : "text-[#2271b1]"
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                    {index < subTabs.length - 1 && <span className="mx-2 text-[#c3c4c7]">|</span>}
+                </li>
             ))}
-        </div>
+        </ul>
 
-        <div className="space-y-6">
-            {activeSubTab === "general" && (
-                <>
-                    <Store_Info data={data} handleChange={handleChange} updateNestedData={updateNestedData} />
-                    <Store_Address data={data} updateNestedData={updateNestedData} />
-                    <Measurement_Maintenance data={data} handleChange={handleChange} updateNestedData={updateNestedData} />
-                </>
-            )}
-            {activeSubTab === "regional" && (
-                <>
-                    <General_Options data={data} updateNestedData={updateNestedData} />
-                    <Currency_options data={data} updateNestedData={updateNestedData} />
-                    <Taxes_and_coupons data={data} updateNestedData={updateNestedData} />
-                </>
-            )}
-            {activeSubTab === "social" && (
-                <Social_Links data={data} updateNestedData={updateNestedData} />
-            )}
+        {/* Form Container */}
+        <div >
+            <div className="space-y-[30px]">
+                {activeSubTab === "general" && (
+                    <>
+                        <Store_Info data={data} handleChange={handleChange} updateNestedData={updateNestedData} />
+                        <Store_Address data={data} updateNestedData={updateNestedData} />
+                        <Measurement_Maintenance data={data} handleChange={handleChange} updateNestedData={updateNestedData} />
+                    </>
+                )}
+                {activeSubTab === "regional" && (
+                    <>
+                        <General_Options data={data} updateNestedData={updateNestedData} />
+                        <Currency_options data={data} updateNestedData={updateNestedData} />
+                        <Taxes_and_coupons data={data} updateNestedData={updateNestedData} />
+                    </>
+                )}
+                {activeSubTab === "social" && (
+                    <Social_Links data={data} updateNestedData={updateNestedData} />
+                )}
+            </div>
+
+            {/* WP Style Submit Button (At the bottom) */}
+            <div className="mt-[30px] pt-[20px] border-t border-[#f0f0f1]">
+                <button 
+                    onClick={handleSubmit} 
+                    disabled={saving} 
+                    className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 min-h-[30px] w-fit"
+                >
+                    {saving && <Loader2 size={14} className="animate-spin"/>}
+                    {saving ? "Saving Changes..." : "Save changes"}
+                </button>
+            </div>
         </div>
     </div>
   );

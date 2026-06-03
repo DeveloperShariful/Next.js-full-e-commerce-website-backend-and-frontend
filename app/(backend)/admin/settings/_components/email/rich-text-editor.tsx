@@ -1,4 +1,4 @@
-//app/admin/settings/email/_components/rich-text-editor.tsx
+//app/(backend)/admin/settings/_components/email/rich-text-editor.tsx
 
 "use client";
 

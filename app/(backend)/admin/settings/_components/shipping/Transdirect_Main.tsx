@@ -4,8 +4,7 @@
 
 import { useState } from "react";
 import { TransdirectConfig } from "@prisma/client";
-import { Truck } from "lucide-react";
-import Transdirect_Credentials from "../shipping/Transdirect_Credentials";
+import Transdirect_Credentials from "./Transdirect_Credentials";
 import Transdirect_Sender from "./Transdirect_Sender";
 import Transdirect_Controls from "./Transdirect_Controls";
 
@@ -18,49 +17,51 @@ export default function Transdirect_Main({ config, refreshData }: Props) {
     const [activeSection, setActiveSection] = useState<'creds' | 'sender' | 'controls'>('creds');
 
     return (
-        <div className="space-y-6 animate-in fade-in">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-white p-4 rounded-sm border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-50 text-[#2271b1] rounded-lg">
-                        <Truck size={24} />
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-800">Transdirect Integration</h2>
-                        <p className="text-sm text-slate-500">Manage API keys, sender address, and shipping preferences.</p>
-                    </div>
-                </div>
-                
-                {/* Status Badge */}
-                <div className={`px-3 py-1 rounded-full text-xs font-bold border ${config?.isEnabled ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                    {config?.isEnabled ? "INTEGRATION ACTIVE" : "DISABLED"}
-                </div>
+        <div className="w-full text-[13px] text-[#3c434a] animate-in fade-in mb-[30px]">
+            
+            {/* WP Page Title & Status */}
+            <div className="flex items-center gap-3 mb-[15px]">
+                <h2 className="text-[23px] font-normal text-[#1d2327] m-0">Transdirect Integration</h2>
+                {config?.isEnabled ? (
+                    <span className="bg-[#f0f0f1] border border-[#dcdcde] text-[#007017] px-[8px] py-[2px] rounded-[3px] text-[11px] font-semibold uppercase">Integration Active</span>
+                ) : (
+                    <span className="bg-[#f0f0f1] border border-[#dcdcde] text-[#646970] px-[8px] py-[2px] rounded-[3px] text-[11px] font-semibold uppercase">Disabled</span>
+                )}
             </div>
+            <p className="text-[13px] text-[#646970] mt-0 mb-[15px]">Manage your Transdirect API keys, default sender address, and live shipping quote preferences.</p>
 
-            {/* Sub-Navigation Tabs */}
-            <div className="flex border-b border-slate-200 bg-white px-4 rounded-t-sm">
-                <button 
-                    onClick={() => setActiveSection('creds')}
-                    className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors ${activeSection === 'creds' ? 'border-[#2271b1] text-[#2271b1]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                >
-                    API & Credentials
-                </button>
-                <button 
-                    onClick={() => setActiveSection('sender')}
-                    className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors ${activeSection === 'sender' ? 'border-[#2271b1] text-[#2271b1]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                >
-                    Sender Address
-                </button>
-                <button 
-                    onClick={() => setActiveSection('controls')}
-                    className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors ${activeSection === 'controls' ? 'border-[#2271b1] text-[#2271b1]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                >
-                    Preferences
-                </button>
-            </div>
+            {/* WP subsubsub style tabs */}
+            <ul className="list-none p-0 m-0 mb-[20px] text-[13px] text-[#646970] flex flex-wrap items-center">
+                <li className="inline-block m-0 p-0">
+                    <button
+                        onClick={() => setActiveSection('creds')}
+                        className={`inline-block p-0 bg-transparent border-none cursor-pointer hover:text-[#135e96] ${activeSection === 'creds' ? "text-[#000] font-semibold" : "text-[#2271b1]"}`}
+                    >
+                        API & Credentials
+                    </button>
+                    <span className="mx-2 text-[#c3c4c7]">|</span>
+                </li>
+                <li className="inline-block m-0 p-0">
+                    <button
+                        onClick={() => setActiveSection('sender')}
+                        className={`inline-block p-0 bg-transparent border-none cursor-pointer hover:text-[#135e96] ${activeSection === 'sender' ? "text-[#000] font-semibold" : "text-[#2271b1]"}`}
+                    >
+                        Sender Address
+                    </button>
+                    <span className="mx-2 text-[#c3c4c7]">|</span>
+                </li>
+                <li className="inline-block m-0 p-0">
+                    <button
+                        onClick={() => setActiveSection('controls')}
+                        className={`inline-block p-0 bg-transparent border-none cursor-pointer hover:text-[#135e96] ${activeSection === 'controls' ? "text-[#000] font-semibold" : "text-[#2271b1]"}`}
+                    >
+                        Preferences
+                    </button>
+                </li>
+            </ul>
 
             {/* Content Area */}
-            <div className="bg-white p-6 rounded-b-sm border border-t-0 border-slate-200 shadow-sm">
+            <div className="w-full">
                 {activeSection === 'creds' && (
                     <Transdirect_Credentials config={config} refreshData={refreshData} />
                 )}

@@ -1,4 +1,4 @@
-// File: app/actions/admin/product/product-services.ts
+// File: app/actions/backend/product/product-services.ts
 
 import { db } from "@/lib/prisma";
 import { cleanPrice } from "@/app/actions/backend/product/product-utils";

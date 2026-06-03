@@ -6,7 +6,7 @@ import { useState } from "react";
 import { addShippingRate, deleteShippingRate, updateShippingRate } from "@/app/actions/backend/settings/shipping/local";
 import { ShippingZone, ShippingRate } from "./types"; 
 import { TransdirectConfig, CarrierService } from "@prisma/client";
-import { Plus, MapPin, Truck, ArrowRight, X, ChevronRight, HelpCircle, Pencil, Globe, Gift } from "lucide-react";
+import { X, HelpCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 interface ShippingMethodProps {
@@ -22,42 +22,33 @@ export default function Shipping_Method({ zone, onBack, refreshData, transdirect
     
     // Rate Logic
     const [rateStep, setRateStep] = useState(1);
-    
-    // ✅ FIX: এখানে <string> টাইপ বলে দেওয়া হয়েছে যেন কাস্টম স্ট্রিং (যেমন: TRANSDIRECT) সাপোর্ট করে
     const [selectedMethodType, setSelectedMethodType] = useState<string>("FLAT_RATE");
-    
     const [freeShipRequirement, setFreeShipRequirement] = useState("none");
-    
-    // Editing State
     const [editingRate, setEditingRate] = useState<ShippingRate | null>(null);
 
     // --- DYNAMIC METHODS GENERATOR ---
     const getAvailableMethods = () => {
         const methods = [
-            { id: "FLAT_RATE", name: "Flat rate", desc: "Lets you charge a fixed rate for shipping.", icon: Truck },
-            { id: "FREE_SHIPPING", name: "Free shipping", desc: "Special method triggered with coupons or minimum spend.", icon: Gift },
-            { id: "LOCAL_PICKUP", name: "Local pickup", desc: "Allow customers to pick up orders themselves.", icon: MapPin }
+            { id: "FLAT_RATE", name: "Flat rate", desc: "Lets you charge a fixed rate for shipping." },
+            { id: "FREE_SHIPPING", name: "Free shipping", desc: "Special method triggered with coupons or minimum spend." },
+            { id: "LOCAL_PICKUP", name: "Local pickup", desc: "Allow customers to pick up orders themselves." }
         ];
 
-        // 1. Add Transdirect if enabled
         if (transdirectConfig?.isEnabled) {
             methods.push({
                 id: "TRANSDIRECT",
                 name: "Transdirect Shipping",
-                desc: "Real-time quotes from multiple couriers via Transdirect API.",
-                icon: Globe
+                desc: "Real-time quotes from multiple couriers via Transdirect API."
             });
         }
 
-        // 2. Add Custom Carriers
         if (carriers && carriers.length > 0) {
             carriers.forEach(carrier => {
                 if (carrier.isEnabled) {
                     methods.push({
                         id: `CARRIER_${carrier.id}`,
                         name: carrier.name,
-                        desc: `Calculated rates via ${carrier.name} API.`,
-                        icon: Truck
+                        desc: `Calculated rates via ${carrier.name} API.`
                     });
                 }
             });
@@ -71,10 +62,8 @@ export default function Shipping_Method({ zone, onBack, refreshData, transdirect
         e.preventDefault();
         const formData = new FormData(e.target as HTMLFormElement);
         
-        // Handle Dynamic Types Logic
         if (selectedMethodType === 'TRANSDIRECT') {
             formData.set("type", "CARRIER_CALCULATED");
-            // Note: Transdirect এর জন্য carrierServiceId নাল থাকবে, বা আপনি চাইলে স্পেশাল ফ্ল্যাগ ইউজ করতে পারেন
         } else if (selectedMethodType.startsWith('CARRIER_')) {
             formData.set("type", "CARRIER_CALCULATED");
             const carrierId = selectedMethodType.replace('CARRIER_', '');
@@ -120,17 +109,11 @@ export default function Shipping_Method({ zone, onBack, refreshData, transdirect
 
     const openEditRateModal = (rate: ShippingRate) => {
         setEditingRate(rate);
-        
-        // Determine type for editing view
-        let type = rate.type as string; // Cast to string to avoid Enum conflict
+        let type = rate.type as string; 
         
         if (type === 'CARRIER_CALCULATED') {
-            if (rate.carrierServiceId) {
-                type = `CARRIER_${rate.carrierServiceId}`;
-            } else {
-                // Assuming no carrier ID means Transdirect
-                type = 'TRANSDIRECT'; 
-            }
+            if (rate.carrierServiceId) type = `CARRIER_${rate.carrierServiceId}`;
+            else type = 'TRANSDIRECT'; 
         }
         
         setSelectedMethodType(type);
@@ -139,152 +122,180 @@ export default function Shipping_Method({ zone, onBack, refreshData, transdirect
         setIsRateModalOpen(true);
     };
 
+    // WP Class Helpers
+    const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none w-full box-border bg-white";
+
     return (
-        <div className="animate-in fade-in">
-            <button onClick={onBack} className="flex items-center gap-1 text-sm text-[#2271b1] hover:underline mb-4 font-medium">
-                <ArrowRight className="rotate-180" size={14}/> Back to zones
+        <div className="w-full text-[13px] text-[#3c434a] animate-in fade-in mb-[30px]">
+            
+            <button 
+                onClick={onBack} 
+                className="bg-transparent border-none text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer p-0 mb-[15px] font-semibold text-[13px]"
+            >
+                &larr; Back to Zones
             </button>
 
-            <div className="bg-white p-6 rounded-sm border border-slate-200 shadow-sm mb-6">
-                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <MapPin size={20} className="text-slate-400"/> {zone.name}
-                        </h2>
-                        <p className="text-sm text-slate-500 mt-1">Manage shipping methods for this zone.</p>
-                    </div>
-                    <button onClick={openAddRateModal} className="px-4 py-2 bg-[#2271b1] text-white font-bold rounded hover:bg-[#135e96] text-sm flex items-center gap-2">
-                        <Plus size={16} /> Add shipping method
-                    </button>
-                </div>
+            <h2 className="text-[23px] font-normal text-[#1d2327] m-0 mb-[10px]">Zone: {zone.name}</h2>
+            <p className="text-[13px] text-[#646970] mt-0 mb-[20px]">Regions: {zone.countries.join(", ") || "Everywhere else"}</p>
 
-                {/* Methods List */}
-                <div className="space-y-3">
-                    {zone.rates.map((rate) => (
-                        <div key={rate.id} className="flex justify-between items-center p-4 bg-slate-50 border border-slate-200 rounded-lg group hover:border-[#2271b1] transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white rounded border border-slate-200">
-                                    <Truck size={20} className="text-[#2271b1]"/>
-                                </div>
-                                <div className="cursor-pointer" onClick={() => openEditRateModal(rate)}>
-                                    <h4 className="font-bold text-slate-800 group-hover:text-[#2271b1]">{rate.name}</h4>
-                                    <div className="text-xs text-slate-500 flex gap-2 flex-wrap">
-                                        <span className="uppercase bg-slate-200 px-1 rounded font-mono">{(rate.type as string).replace('_', ' ')}</span>
-                                        {rate.type === 'FREE_SHIPPING' && rate.freeShippingRequirement && (
-                                                <span className="text-green-600 font-medium">
-                                                (Requires: {rate.freeShippingRequirement.replace('_', ' ')})
-                                                </span>
-                                        )}
-                                        {/* Display Cost for Flat Rate or Local Pickup */}
-                                        {(rate.type === 'FLAT_RATE' || rate.type === 'LOCAL_PICKUP') && (
-                                                <span>Cost: {rate.price} {rate.taxStatus === 'none' ? '(No Tax)' : ''}</span>
-                                        )}
-                                        {/* Display Carrier Info */}
-                                        {rate.type === 'CARRIER_CALCULATED' && (
-                                            <span className="text-blue-600 font-medium">
-                                                (API Calculated: {rate.carrierServiceId ? 'Custom Carrier' : 'Transdirect'})
-                                            </span>
-                                        )}
+            <h3 className="text-[14px] font-semibold text-[#1d2327] mb-[10px] pb-0 border-none">Shipping Methods</h3>
+            <p className="text-[13px] text-[#646970] mt-0 mb-[15px]">You can add multiple shipping methods within this zone. Customers will see them as options at checkout.</p>
+
+            {/* WP List Table for Methods */}
+            <div className="w-full overflow-x-auto bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] box-border mb-[15px]">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                        <tr className="border-b border-[#c3c4c7] bg-[#f6f7f7]">
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338] w-[30%]">Title</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Status</th>
+                            <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {zone.rates.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} className="px-[10px] py-[20px] text-center text-[#646970] italic">
+                                    No shipping methods found.
+                                </td>
+                            </tr>
+                        ) : zone.rates.map((rate, index) => (
+                            <tr key={rate.id} className={`border-b border-[#f0f0f1] last:border-none hover:bg-[#f6f7f7] group ${index % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f9]'}`}>
+                                <td className="px-[10px] py-[10px] align-top">
+                                    <strong 
+                                        className="text-[#2271b1] cursor-pointer hover:underline block text-[13px]"
+                                        onClick={() => openEditRateModal(rate)}
+                                    >
+                                        {rate.name}
+                                    </strong>
+                                    
+                                    <div className="text-[12px] mt-1 ">
+                                        <button 
+                                            onClick={() => openEditRateModal(rate)}
+                                            className="bg-transparent border-none text-[#2271b1] hover:underline cursor-pointer p-0"
+                                        >
+                                            Edit
+                                        </button>
+                                        <span className="text-[#c3c4c7] mx-1">|</span>
+                                        <button 
+                                            onClick={() => handleDeleteRate(rate.id)}
+                                            className="bg-transparent border-none text-[#d63638] hover:underline cursor-pointer p-0"
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => openEditRateModal(rate)} className="text-slate-400 hover:text-[#2271b1] p-2" title="Edit">
-                                    <Pencil size={18}/>
-                                </button>
-                                <button onClick={() => handleDeleteRate(rate.id)} className="text-slate-400 hover:text-red-500 p-2" title="Delete">
-                                    <X size={18}/>
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                    {zone.rates.length === 0 && (
-                        <p className="text-center text-slate-500 italic py-4">No shipping methods found.</p>
-                    )}
-                </div>
+                                </td>
+                                <td className="px-[10px] py-[10px] text-[#646970] align-top">
+                                    Enabled
+                                </td>
+                                <td className="px-[10px] py-[10px] text-[#3c434a] align-top leading-relaxed">
+                                    <span className="capitalize block mb-1">{(rate.type as string).replace('_', ' ').toLowerCase()}</span>
+                                    
+                                    {rate.type === 'FREE_SHIPPING' && rate.freeShippingRequirement && (
+                                        <span className="text-[#646970] text-[12px] italic block">
+                                            Requires: {rate.freeShippingRequirement.replace('_', ' ')}
+                                        </span>
+                                    )}
+                                    {(rate.type === 'FLAT_RATE' || rate.type === 'LOCAL_PICKUP') && (
+                                        <span className="text-[#646970] text-[12px] italic block">
+                                            Cost: {rate.price} {rate.taxStatus === 'none' ? '(No Tax)' : ''}
+                                        </span>
+                                    )}
+                                    {rate.type === 'CARRIER_CALCULATED' && (
+                                        <span className="text-[#646970] text-[12px] italic block">
+                                            API Calculated: {rate.carrierServiceId ? 'Custom Carrier' : 'Transdirect'}
+                                        </span>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
 
-            {/* --- MODAL: ADD/EDIT RATE --- */}
+            <button 
+                onClick={openAddRateModal} 
+                className="bg-[#f6f7f7] border border-[#8c8f94] text-[#2c3338] hover:bg-[#f0f0f1] hover:border-[#8c8f94] hover:text-[#2c3338] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer min-h-[30px]"
+            >
+                Add shipping method
+            </button>
+
+            {/* --- WP STYLE MODAL: ADD/EDIT RATE --- */}
             {isRateModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
+                <div className="fixed inset-0 bg-[#000000b3] z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#f0f0f1] shadow-md w-full max-w-lg flex flex-col font-sans text-[13px] text-[#3c434a] max-h-[90vh]">
                         
-                        {/* Header */}
-                        <div className="p-4 border-b flex justify-between items-center bg-slate-50 sticky top-0 z-10">
-                            <h3 className="text-lg font-bold text-slate-800">
-                                {rateStep === 1 
-                                    ? "Add shipping method" 
-                                    : `${editingRate ? 'Edit' : 'Set up'} method`
-                                }
+                        <div className="flex justify-between items-center px-[20px] py-[15px] border-b border-[#c3c4c7] bg-white shrink-0">
+                            <h3 className="text-[18px] font-normal text-[#1d2327] m-0 leading-tight">
+                                {rateStep === 1 ? "Add shipping method" : `${editingRate ? 'Edit' : 'Set up'} method`}
                             </h3>
-                            <button onClick={() => setIsRateModalOpen(false)}><X size={20} className="text-slate-400"/></button>
+                            <button type="button" onClick={() => setIsRateModalOpen(false)} className="text-[#646970] hover:text-[#d63638] bg-transparent border-none cursor-pointer p-1">
+                                <X size={20} />
+                            </button>
                         </div>
 
-                        <div className="p-6 overflow-y-auto">
-                            {/* STEP 1: SELECT TYPE */}
+                        <div className="bg-white p-[20px] overflow-y-auto flex-1">
+                            
+                            {/* STEP 1 */}
                             {rateStep === 1 && !editingRate && (
-                                <div className="space-y-2">
-                                    <p className="text-sm text-slate-500 mb-4">Choose the shipping method you wish to add.</p>
+                                <div className="space-y-[15px]">
+                                    <p className="text-[13px] text-[#646970] mt-0 mb-[15px]">Choose the shipping method you wish to add. Only shipping methods which support zones are listed.</p>
                                     
-                                    {getAvailableMethods().map((method) => (
-                                        <label key={method.id} className={`flex items-start gap-4 p-4 border rounded cursor-pointer transition-all ${selectedMethodType === method.id ? 'border-[#2271b1] bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                                            <input 
-                                                type="radio" 
-                                                name="method_type" 
-                                                value={method.id} 
-                                                checked={selectedMethodType === method.id} 
-                                                onChange={() => setSelectedMethodType(method.id)} 
-                                                className="mt-1 w-4 h-4 text-[#2271b1] focus:ring-[#2271b1]" 
-                                            />
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <method.icon size={16} className="text-slate-700" />
-                                                    <span className="block font-bold text-slate-800">{method.name}</span>
+                                    <div className="border border-[#c3c4c7] rounded-[3px] bg-white overflow-hidden">
+                                        {getAvailableMethods().map((method, index) => (
+                                            <label 
+                                                key={method.id} 
+                                                className={`flex items-start gap-3 p-[12px] cursor-pointer hover:bg-[#f6f7f7] transition-colors ${index !== 0 ? 'border-t border-[#f0f0f1]' : ''}`}
+                                            >
+                                                <input 
+                                                    type="radio" 
+                                                    name="method_type" 
+                                                    value={method.id} 
+                                                    checked={selectedMethodType === method.id} 
+                                                    onChange={() => setSelectedMethodType(method.id)} 
+                                                    className="mt-1 w-4 h-4 border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]" 
+                                                />
+                                                <div>
+                                                    <span className="block font-semibold text-[#1d2327]">{method.name}</span>
+                                                    <span className="text-[12px] text-[#646970] mt-1 block">{method.desc}</span>
                                                 </div>
-                                                <span className="text-sm text-slate-500">{method.desc}</span>
-                                            </div>
-                                        </label>
-                                    ))}
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
-                            {/* STEP 2: CONFIGURE DETAILS */}
+                            {/* STEP 2 */}
                             {rateStep === 2 && (
-                                <form id="rateForm" onSubmit={handleSaveRate} className="space-y-5">
-                                    {/* Name Field */}
+                                <form id="rateForm" onSubmit={handleSaveRate} className="space-y-[15px]">
+                                    
                                     <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-1">Name</label>
+                                        <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Method Title</label>
                                         <input 
                                             name="name" 
                                             required 
                                             defaultValue={editingRate ? editingRate.name : getAvailableMethods().find(m => m.id === selectedMethodType)?.name} 
-                                            className="w-full border p-2 rounded outline-none focus:border-[#2271b1]" 
+                                            className={wpInputClass} 
                                         />
+                                        <p className="text-[11px] text-[#646970] mt-1 mb-0">This controls the title which the user sees during checkout.</p>
                                     </div>
 
-                                    {/* CARRIER / TRANSDIRECT INFO */}
                                     {(selectedMethodType === 'TRANSDIRECT' || selectedMethodType.startsWith('CARRIER_')) && (
-                                        <div className="p-4 bg-blue-50 text-blue-800 text-sm rounded border border-blue-100 flex gap-2">
-                                            <Globe size={16} className="mt-0.5 shrink-0"/>
-                                            <div>
-                                                <strong>Note:</strong> Rates will be calculated automatically at checkout based on the customer's address and item weight.
-                                                <br/><span className="text-xs opacity-75 mt-1 block">Ensure your products have weights and dimensions set.</span>
-                                            </div>
+                                        <div className="p-[12px] bg-[#f0f0f1] text-[#3c434a] text-[13px] rounded-[3px] border border-[#c3c4c7]">
+                                            <strong>Note:</strong> Rates will be calculated automatically at checkout based on the customer's address and item weight. Ensure your products have weights and dimensions set.
                                         </div>
                                     )}
 
-                                    {/* FREE SHIPPING CONFIG */}
                                     {selectedMethodType === 'FREE_SHIPPING' && (
                                         <>
                                             <div>
-                                                <label className="block text-sm font-bold text-slate-700 mb-1">Free shipping requires...</label>
+                                                <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Free shipping requires...</label>
                                                 <select 
                                                     name="freeShippingRequirement" 
-                                                    className="w-full border p-2 rounded outline-none focus:border-[#2271b1] bg-white text-sm"
+                                                    className={wpInputClass}
                                                     value={freeShipRequirement}
                                                     onChange={(e) => setFreeShipRequirement(e.target.value)}
                                                 >
-                                                    <option value="none">No requirement</option>
+                                                    <option value="none">N/A</option>
                                                     <option value="coupon">A valid free shipping coupon</option>
                                                     <option value="min_amount">A minimum order amount</option>
                                                     <option value="either">A minimum order amount OR a coupon</option>
@@ -294,29 +305,28 @@ export default function Shipping_Method({ zone, onBack, refreshData, transdirect
 
                                             {['min_amount', 'either', 'both'].includes(freeShipRequirement) && (
                                                 <div className="animate-in fade-in slide-in-from-top-1">
-                                                    <label className="block text-sm font-bold text-slate-700 mb-1">Minimum Order Amount</label>
+                                                    <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Minimum order amount</label>
                                                     <input 
                                                         name="minPrice" 
                                                         type="number" 
                                                         step="0.01" 
                                                         defaultValue={editingRate?.minPrice || ""}
                                                         placeholder="0.00" 
-                                                        className="w-full border p-2 rounded outline-none focus:border-[#2271b1]" 
+                                                        className={wpInputClass} 
                                                     />
                                                 </div>
                                             )}
                                         </>
                                     )}
 
-                                    {/* FLAT RATE & LOCAL PICKUP CONFIG */}
                                     {(selectedMethodType === 'FLAT_RATE' || selectedMethodType === 'LOCAL_PICKUP') && (
                                         <>
                                             <div>
-                                                <label className="block text-sm font-bold text-slate-700 mb-1">Tax status</label>
+                                                <label className="block text-[13px] font-medium text-[#1d2327] mb-1">Tax status</label>
                                                 <select 
                                                     name="taxStatus" 
                                                     defaultValue={editingRate?.taxStatus || "taxable"}
-                                                    className="w-full border p-2 rounded outline-none focus:border-[#2271b1] bg-white text-sm"
+                                                    className={wpInputClass}
                                                 >
                                                     <option value="taxable">Taxable</option>
                                                     <option value="none">None</option>
@@ -324,17 +334,17 @@ export default function Shipping_Method({ zone, onBack, refreshData, transdirect
                                             </div>
 
                                             <div>
-                                                <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-1">
-                                                    Cost <HelpCircle size={14} className="text-slate-400"/>
+                                                <label className="flex items-center gap-1 text-[13px] font-medium text-[#1d2327] mb-1">
+                                                    Cost <HelpCircle size={14} className="text-[#a7aaad]"/>
                                                 </label>
                                                 <input 
                                                     name="price" 
                                                     type="number" 
                                                     step="0.01" 
                                                     defaultValue={editingRate?.price || "0"} 
-                                                    className="w-full border p-2 rounded outline-none focus:border-[#2271b1]" 
+                                                    className={wpInputClass} 
                                                 />
-                                                <p className="text-xs text-slate-500 mt-1">Enter a cost (excl. tax) or sum, e.g. <code>10.00</code>.</p>
+                                                <p className="text-[11px] text-[#646970] mt-1 mb-0">Enter a cost (excl. tax) or sum, e.g. 10.00.</p>
                                             </div>
                                         </>
                                     )}
@@ -342,23 +352,35 @@ export default function Shipping_Method({ zone, onBack, refreshData, transdirect
                             )}
                         </div>
 
-                        {/* Footer Buttons */}
-                        <div className="p-4 border-t bg-slate-50 flex justify-end gap-2 sticky bottom-0">
+                        {/* Footer */}
+                        <div className="p-[15px] border-t border-[#c3c4c7] bg-[#f6f7f7] flex justify-end gap-2 shrink-0">
                             {rateStep === 1 && !editingRate ? (
-                                <button onClick={() => setRateStep(2)} className="px-6 py-2 bg-[#2271b1] text-white rounded text-sm font-bold hover:bg-[#135e96] flex items-center gap-2">
-                                    Continue <ChevronRight size={16}/>
+                                <button 
+                                    type="button" onClick={() => setRateStep(2)} 
+                                    className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm min-h-[30px]"
+                                >
+                                    Continue
                                 </button>
                             ) : (
                                 <>
                                     {!editingRate && (
-                                        <button type="button" onClick={() => setRateStep(1)} className="px-4 py-2 border rounded text-sm font-bold hover:bg-white">Back</button>
+                                        <button 
+                                            type="button" onClick={() => setRateStep(1)} 
+                                            className="bg-[#f6f7f7] border border-[#8c8f94] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer min-h-[30px]"
+                                        >
+                                            Back
+                                        </button>
                                     )}
-                                    <button form="rateForm" type="submit" className="px-6 py-2 bg-[#2271b1] text-white rounded text-sm font-bold hover:bg-[#135e96]">
-                                        {editingRate ? "Save changes" : "Create and save"}
+                                    <button 
+                                        form="rateForm" type="submit" 
+                                        className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm min-h-[30px]"
+                                    >
+                                        {editingRate ? "Save changes" : "Add shipping method"}
                                     </button>
                                 </>
                             )}
                         </div>
+
                     </div>
                 </div>
             )}

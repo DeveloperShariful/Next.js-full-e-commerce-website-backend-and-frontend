@@ -1,4 +1,4 @@
-// File: app/admin/settings/email/_components/email-log-table.tsx
+// File: app/(backend)/admin/settings/_components/email/email-log-table.tsx
 
 "use client";
 

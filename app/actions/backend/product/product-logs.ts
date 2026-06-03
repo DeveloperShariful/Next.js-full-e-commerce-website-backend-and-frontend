@@ -1,4 +1,4 @@
-// File: app/actions/admin/product/product-logs.ts
+// File: app/actions/backend/product/product-logs.ts
 
 "use server";
 

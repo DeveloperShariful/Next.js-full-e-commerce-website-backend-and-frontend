@@ -45,7 +45,7 @@ export default function PaymentsTab() {
       
       {/* Page Header */}
       <div className="px-4 md:px-1 py-1">
-        <h1 className="text-[23px] font-normal text-[#1d2327] mb-2">Payment Settings</h1>
+        <h1 className="text-xl font-bold text-slate-800">Payment Settings</h1>
         <p className="text-[#3c434a] m-0 text-[14px]">
           Manage how your customers pay at checkout. Turn methods on/off and configure credentials.
         </p>

@@ -66,7 +66,7 @@ export const parseProductFormData = (formData: FormData) => {
         height: formData.get("height") ? parseFloat(formData.get("height") as string) : null,
 
         categoryName: formData.get("category") as string,
-        categoryId: formData.get("categoryId") as string || null,
+        categoryIds: parseJSON<string[]>(formData.get("categoryIds") as string, []),
         
         vendorName: formData.get("vendor") as string,
         brandId: formData.get("brandId") as string || null,

@@ -1,5 +1,7 @@
 // File: app/admin/products/page.tsx
 
+// File: app/admin/products/page.tsx
+
 import Link from 'next/link';
 import { db } from '@/lib/prisma';
 import { ProductType, ProductStatus, Prisma } from '@prisma/client';
@@ -47,11 +49,12 @@ export default async function ProductListPage(props: ProductsPageProps) {
       { status: { not: ProductStatus.ARCHIVED } },
 
       typeFilter ? { productType: typeFilter.toUpperCase() as ProductType } : {},
-      categoryFilter ? { category: { name: categoryFilter } } : {},
+      
+      // ✅ FIX: Updated from 'category' to 'categories: { some: ... }'
+      categoryFilter ? { categories: { some: { name: categoryFilter } } } : {},
     ]
   };
 
-  // 🚀 Fetching Brands as well for the new Filter
   const [products, totalProducts, categories, brands, statusCounts] = await Promise.all([
     db.product.findMany({
       where: whereCondition,
@@ -63,14 +66,15 @@ export default async function ProductListPage(props: ProductsPageProps) {
         sku: true,
         price: true,
         salePrice: true,
-        costPerItem: true, // 🚀 Added Cost
+        costPerItem: true, 
         status: true,
         productType: true,
         trackQuantity: true,
         featuredImage: true,
         isFeatured: true,
         updatedAt: true,
-        category: { select: { name: true } },
+        // ✅ FIX: Updated to fetch multiple categories
+        categories: { select: { id: true, name: true } }, 
         brand: { select: { name: true } },
         tags: { select: { name: true } },
         images: { take: 1, select: { url: true }, orderBy: { position: 'asc' } },
@@ -82,7 +86,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
     }),
     db.product.count({ where: whereCondition }),
     db.category.findMany({ select: { name: true }, orderBy: { name: 'asc' } }),
-    db.brand.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }), // 🚀 Brand Filter Support
+    db.brand.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }), 
     db.product.groupBy({
       by: ['status'],
       _count: { status: true }
@@ -102,8 +106,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
   return (
     <div className="font-sans text-[#3c434a] max-w-full">
       
-      {/* 🚀 WP Style Header Row (Matched with your screenshot) */}
-      {/* 🚀 WP Style Header Row */}
+      {/* WP Style Header Row */}
       <div className="mb-4 flex justify-between items-start md:items-center">
         
         {/* Left Side: Title and Buttons */}
@@ -125,7 +128,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
         </div>
         <div className="mt-1 sm:mt-0">
            <ProductLogViewer />
-          </div>
+        </div>
       </div>
 
       {/* Main Table Component */}
@@ -133,7 +136,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
         <ProductTable 
           products={serializedProducts}
           categories={categories}
-          brands={brands} // 🚀 Passing brands for the new filter
+          brands={brands} 
           counts={counts}
           statusFilter={statusFilter}
           totalProducts={totalProducts}

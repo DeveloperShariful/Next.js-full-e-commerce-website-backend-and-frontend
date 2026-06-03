@@ -11,6 +11,7 @@ import { ProductFormValues } from "../schema";
 export default function Brand() {
     const { setValue, watch } = useFormContext<ProductFormValues>();
     const currentVendor = watch("vendor"); 
+    const currentBrandId = watch("brandId"); 
 
     const [dbBrands, setDbBrands] = useState<{id: string, name: string}[]>([]);
     const [input, setInput] = useState("");
@@ -32,20 +33,26 @@ export default function Brand() {
         setFilteredBrands(filtered);
     };
 
-    const handleSelect = (brandName: string) => {
-        if (currentVendor === brandName) {
+    const handleSelect = (brand: {id: string, name: string}) => {
+        // ✅ FIX: Toggle logic with ID included
+        if (currentBrandId === brand.id || currentVendor === brand.name) {
             setValue('vendor', "", { shouldDirty: true });
+            setValue('brandId', null, { shouldDirty: true });
         } else {
-            setValue('vendor', brandName, { shouldDirty: true });
+            setValue('vendor', brand.name, { shouldDirty: true });
+            setValue('brandId', brand.id, { shouldDirty: true });
         }
     };
 
     const addNewBrand = () => {
         if(!input.trim()) return;
         
-        setValue('vendor', input.trim(), { shouldDirty: true });
-
         const newBrand = { id: `temp_${Date.now()}`, name: input.trim() };
+        
+        // ✅ FIX: Set both Name and ID
+        setValue('vendor', newBrand.name, { shouldDirty: true });
+        setValue('brandId', newBrand.id, { shouldDirty: true });
+
         setDbBrands([...dbBrands, newBrand]);
         setFilteredBrands([...filteredBrands, newBrand]); 
         
@@ -87,8 +94,9 @@ export default function Brand() {
                                         <label className="flex items-start gap-2 select-none text-[13px] text-[#3c434a] cursor-pointer hover:text-[#2271b1]">
                                             <input 
                                                 type="radio" 
-                                                checked={currentVendor === brand.name} 
-                                                onChange={() => handleSelect(brand.name)}
+                                                // ✅ FIX: ID অথবা Name যেকোনো একটা ম্যাচ করলেই সিলেক্টেড দেখাবে
+                                                checked={currentBrandId === brand.id || currentVendor === brand.name} 
+                                                onChange={() => handleSelect(brand)}
                                                 className="mt-0.5 w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]"
                                             />
                                             <span className="leading-tight">{brand.name}</span>

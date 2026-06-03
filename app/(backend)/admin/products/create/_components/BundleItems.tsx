@@ -1,8 +1,10 @@
 // app/admin/products/create/_components/BundleItems.tsx
 
+// File: app/admin/products/create/_components/BundleItems.tsx
+
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
-import { X, Search, Loader2, Plus, Package } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { searchProducts } from "@/app/actions/backend/product/product-read";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { BundleItem, ProductFormData } from "../types";
@@ -60,99 +62,96 @@ export default function BundleItems() {
         setValue("bundleItems", newItems);
     };
 
+    // WP Input Class
+    const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none bg-white box-border";
+
     return (
-        <div className="space-y-6 max-w-2xl">
-            <div className="bg-blue-50 p-4 border border-blue-200 rounded-sm text-sm text-blue-800 mb-4 flex gap-3 items-start">
-                <Package className="shrink-0 mt-0.5" size={18}/>
-                <div>
-                    <strong>Bundle Product Logic:</strong> Search and add existing products to create a bundle. 
-                    <ul className="list-disc ml-4 mt-1 space-y-1 text-xs">
-                        <li>The "Price" in General tab will be the total price of this bundle.</li>
-                        <li>Inventory will be deducted from each child product automatically when sold.</li>
-                    </ul>
-                </div>
+        <div className="w-full text-[13px] text-[#3c434a]">
+            
+            {/* WP Style Notice */}
+            <div className="bg-[#fff8e5] border-l-[4px] border-[#f56e28] p-[12px] mb-[20px] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
+                <p className="m-0 font-semibold mb-1 text-[#1d2327]">Bundle Product Logic:</p>
+                <ul className="m-0 pl-[20px] list-disc text-[#646970]">
+                    <li>Search and add existing products to create a bundle.</li>
+                    <li>The "Price" in General tab will be the total price of this bundle.</li>
+                    <li>Inventory will be deducted from each child product automatically when sold.</li>
+                </ul>
             </div>
 
-            <div className="space-y-2 relative">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Search Products to Add</label>
-                
+            {/* WP Search Box */}
+            <div className="mb-[20px] relative max-w-[500px]">
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[5px]">Search Products to Add</label>
                 <div className="relative">
                     <input 
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        className="w-full border border-gray-400 pl-9 pr-2 py-2 rounded-sm focus:border-[#2271b1] outline-none text-sm shadow-sm"
+                        className={`${wpInputClass} w-full`}
                         placeholder="Type product name or SKU..."
                     />
-                    {loading ? (
-                        <Loader2 size={16} className="absolute left-3 top-3 text-gray-400 animate-spin"/>
-                    ) : (
-                        <Search size={16} className="absolute left-3 top-3 text-gray-400"/>
+                    {loading && (
+                        <div className="absolute right-2 top-2">
+                            <Loader2 size={16} className="text-[#8c8f94] animate-spin"/>
+                        </div>
                     )}
                 </div>
 
+                {/* WP Style Dropdown Results */}
                 {results.length > 0 && (
-                    <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-sm shadow-xl max-h-60 overflow-y-auto mt-1">
+                    <ul className="absolute z-20 w-full bg-white border border-[#c3c4c7] shadow-md max-h-[250px] overflow-y-auto mt-[1px] m-0 p-0 list-none rounded-[3px]">
                         {results.map((prod) => (
                             <li 
                                 key={prod.id} 
                                 onClick={() => addProduct(prod)}
-                                className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-xs flex items-center gap-3 border-b border-gray-100 last:border-0 transition"
+                                className="px-[12px] py-[8px] hover:bg-[#2271b1] hover:text-white cursor-pointer flex items-center gap-[10px] border-b border-[#f0f0f1] last:border-none group"
                             >
-                                <div className="w-10 h-10 bg-gray-100 rounded border border-gray-200 overflow-hidden shrink-0">
-                                    <img src={prod.featuredImage || prod.images?.[0]?.url || "/placeholder.jpg"} className="w-full h-full object-cover" alt="" />
-                                </div>
+                                <div className="w-[30px] h-[30px] bg-[#f0f0f1] border border-[#dcdcde] shrink-0 bg-center bg-cover bg-no-repeat" style={{ backgroundImage: `url(${prod.featuredImage || prod.images?.[0]?.url || "/placeholder.jpg"})` }}></div>
                                 <div className="flex flex-col">
-                                    <span className="font-semibold text-gray-800 text-sm">{prod.name}</span>
-                                    <span className="text-[11px] text-gray-500">
-                                        SKU: {prod.sku || 'N/A'} | Price: {formatPrice(prod.price)}
+                                    <span className="font-semibold text-[#1d2327] group-hover:text-white leading-tight">{prod.name}</span>
+                                    <span className="text-[11px] text-[#646970] group-hover:text-blue-100">
+                                        SKU: {prod.sku || 'N/A'} &mdash; {formatPrice(prod.price)}
                                     </span>
                                 </div>
-                                <Plus size={16} className="ml-auto text-[#2271b1]"/>
                             </li>
                         ))}
                     </ul>
                 )}
             </div>
 
+            {/* WP List Table for Selected Items */}
             {bundleItems.length > 0 ? (
-                <div className="border border-gray-300 rounded-sm overflow-hidden shadow-sm mt-4">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50 border-b border-gray-300 font-semibold text-gray-700 text-xs uppercase">
-                            <tr>
-                                <th className="p-3">Product</th>
-                                <th className="p-3 w-24 text-center">Quantity</th>
-                                <th className="p-3 w-12"></th>
+                <div className="w-full overflow-x-auto bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] box-border">
+                    <table className="w-full text-left border-collapse min-w-[500px]">
+                        <thead>
+                            <tr className="border-b border-[#c3c4c7] bg-[#f6f7f7]">
+                                <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338]">Product Name</th>
+                                <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338] w-[100px] text-center">Quantity</th>
+                                <th scope="col" className="px-[10px] py-[8px] font-normal text-[#2c3338] w-[50px] text-center">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 bg-white">
-                            {bundleItems.map((item) => (
-                                <tr key={item.childProductId} className="hover:bg-gray-50 transition">
-                                    <td className="p-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-gray-100 rounded border border-gray-200 overflow-hidden shrink-0">
-                                                {item.childProductImage && (
-                                                    <img src={item.childProductImage} className="w-full h-full object-cover" alt=""/>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-gray-800 line-clamp-1">{item.childProductName || "Product ID: " + item.childProductId}</p>
-                                            </div>
+                        <tbody>
+                            {bundleItems.map((item, index) => (
+                                <tr key={item.childProductId} className={`border-b border-[#f0f0f1] last:border-none ${index % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f9]'}`}>
+                                    <td className="px-[10px] py-[8px]">
+                                        <div className="flex items-center gap-[10px]">
+                                            <div className="w-[30px] h-[30px] bg-[#f0f0f1] border border-[#dcdcde] shrink-0 bg-center bg-cover bg-no-repeat" style={{ backgroundImage: `url(${item.childProductImage || "/placeholder.jpg"})` }}></div>
+                                            <strong className="text-[#2271b1] text-[13px]">{item.childProductName || "Product ID: " + item.childProductId}</strong>
                                         </div>
                                     </td>
-                                    <td className="p-3 text-center">
+                                    <td className="px-[10px] py-[8px] text-center">
                                         <input 
                                             type="number" 
                                             min="1"
                                             value={item.quantity}
                                             onChange={(e) => updateQuantity(item.childProductId, parseInt(e.target.value))}
-                                            className="w-16 border border-gray-300 rounded px-2 py-1 outline-none focus:border-[#2271b1] text-center font-semibold"
+                                            className={`${wpInputClass} !w-[60px] text-center`}
                                         />
                                     </td>
-                                    <td className="p-3 text-center">
+                                    <td className="px-[10px] py-[8px] text-center">
                                         <button 
                                             type="button" 
                                             onClick={() => removeProduct(item.childProductId)} 
-                                            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-400 hover:text-red-600 transition"
+                                            className="bg-transparent border-none text-[#d63638] hover:text-[#b32d2e] cursor-pointer p-1"
+                                            title="Remove item"
                                         >
                                             <X size={16}/>
                                         </button>
@@ -163,8 +162,8 @@ export default function BundleItems() {
                     </table>
                 </div>
             ) : (
-                <div className="text-center py-10 border-2 border-dashed border-gray-300 rounded bg-gray-50 text-gray-500 text-sm">
-                    No products added to this bundle yet. <br/> Search above to start adding items.
+                <div className="text-center py-[40px] px-[20px] bg-[#f9f9f9] border border-dashed border-[#c3c4c7] text-[#646970] italic rounded-[3px]">
+                    No products added to this bundle yet. Search above to start adding items.
                 </div>
             )}
         </div>

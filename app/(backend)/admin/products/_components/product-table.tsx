@@ -1,5 +1,7 @@
 // File: app/admin/products/_components/product-table.tsx
 
+// File: app/admin/products/_components/product-table.tsx
+
 "use client";
 
 import { useState, useTransition } from "react";
@@ -151,7 +153,7 @@ export default function ProductTable({
   return (
     <div className="w-full animate-in fade-in duration-300">
       
-      {/* 🚀 WP Style Top Row: Status Links & Search (100% Responsive) */}
+      {/* 🚀 WP Style Top Row: Status Links & Search */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-3">
         
         {/* Left: Status Links */}
@@ -235,7 +237,7 @@ export default function ProductTable({
                </button>
            </div>
            
-           {/* Filters (🚀 FIXED ALL KEYS) */}
+           {/* Filters */}
            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="flex-1 sm:flex-none px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none">
               <option value="">Select a category</option>
               {categories?.map((c, index) => (<option key={c.id || `cat-${index}`} value={c.name}>{c.name}</option>))}
@@ -387,8 +389,11 @@ export default function ProductTable({
                          {product.costPerItem ? formatPrice(product.costPerItem) : "—"}
                       </td>
                       
+                      {/* ✅ FIX: Display multiple categories as comma separated */}
                       <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
-                         {product.category?.name || "—"}
+                         {product.categories && product.categories.length > 0 
+                            ? product.categories.map((c:any) => c.name).join(', ') 
+                            : "—"}
                       </td>
                       
                       <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
@@ -439,7 +444,7 @@ export default function ProductTable({
         </div>
       </div>
 
-      {/* 🚀 WP Style Pagination (Bottom) */}
+      {/* WP Style Pagination (Bottom) */}
       {totalProducts > 0 && (
         <div className="mt-2 flex justify-end">
           <PaginationControls total={totalProducts} totalPages={totalPages} currentPage={currentPage} perPage={limit} />

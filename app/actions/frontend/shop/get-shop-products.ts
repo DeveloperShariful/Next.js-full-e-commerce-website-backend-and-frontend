@@ -1,4 +1,5 @@
 // app/actions/storefront/shop/get-shop-products.ts
+// File: app/actions/storefront/shop/get-shop-products.ts
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -42,8 +43,10 @@ export async function getProductsAndCategoriesAction(
       status: "ACTIVE",
       deletedAt: null,
     };
+    
+    // ✅ FIX: Updated to 'categories: { some: ... }' due to Many-to-Many relation
     if (categorySlug) {
-      where.category = { slug: categorySlug };
+      where.categories = { some: { slug: categorySlug } };
     }
 
     // 3. Count Total Products for Pagination

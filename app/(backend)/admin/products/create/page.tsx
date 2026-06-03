@@ -1,5 +1,7 @@
 // app/admin/products/create/page.tsx
 
+// File: app/admin/products/create/page.tsx
+
 import { db } from "@/lib/prisma";
 import { ProductForm } from "./_components/ProductForm";
 import { ProductFormValues } from "./schema";
@@ -27,6 +29,7 @@ export default async function CreateProductPage(props: PageProps) {
     galleryImages: [], 
     tags: [],
     collectionIds: [],
+    categoryIds: [], // ✅ FIX: Added initial empty array for Categories
     digitalFiles: [],
     bundleItems: [],
     upsells: [],
@@ -43,7 +46,6 @@ export default async function CreateProductPage(props: PageProps) {
     soldIndividually: false,
     isPreOrder: false,
     
-    // 🔥 New Fields Defaults
     metafields: [],
     giftCardAmounts: [],
     version: 1,
@@ -61,7 +63,7 @@ export default async function CreateProductPage(props: PageProps) {
         tags: true,
         collections: true,
         brand: true,
-        category: true,
+        categories: true, // ✅ FIX: Include new Array Relation
         downloadFiles: true,
         bundleItems: {
           include: {
@@ -75,7 +77,7 @@ export default async function CreateProductPage(props: PageProps) {
 
     if (!product) return notFound();
 
-    // 🔥 Transform DB JSON to Metafields Array UI format
+    // Transform DB JSON to Metafields Array UI format
     let parsedMetafields: { key: string; value: string }[] = [];
     if (product.metafields && typeof product.metafields === 'object') {
         if (Array.isArray(product.metafields)) {
@@ -89,15 +91,14 @@ export default async function CreateProductPage(props: PageProps) {
         }
     }
 
-    // ✅ Transform DB data to Form Schema
+    // Transform DB data to Form Schema
     initialData = {
       ...product,
       id: product.id,
-      version: product.version, // 🔥 Optimistic Locking
+      version: product.version, 
       description: product.description || "",
       shortDescription: product.shortDescription || "",
       
-      // ✅ Decimal Fields Conversion
       price: Number(product.price),
       salePrice: product.salePrice ? Number(product.salePrice) : null,
       costPerItem: product.costPerItem ? Number(product.costPerItem) : null,
@@ -107,13 +108,12 @@ export default async function CreateProductPage(props: PageProps) {
       height: product.height ? Number(product.height) : null,
       rating: Number(product.rating),
       
-      // Relations
-      category: product.category?.name,
+      // ✅ FIX: Multiple Categories & Relations mapping
+      categoryIds: product.categories.map((c) => c.id), // Array of IDs
       vendor: product.brand?.name,
       tags: product.tags.map((t) => t.name),
       collectionIds: product.collections.map((c) => c.id),
       
-      // Media
       featuredImage: product.featuredImage,
       featuredMediaId: product.featuredMediaId,
       
@@ -126,11 +126,9 @@ export default async function CreateProductPage(props: PageProps) {
             id: img.id
         })),
       
-      // 🔥 New UI Compatible Data
       metafields: parsedMetafields,
       seoSchema: product.seoSchema ? product.seoSchema : { ogTitle: "", ogDescription: "", robots: "", ogImage: "" },
       
-      // Dates & Pre-order
       saleStart: product.saleStart ? product.saleStart.toISOString().split("T")[0] : null,
       saleEnd: product.saleEnd ? product.saleEnd.toISOString().split("T")[0] : null,
       
@@ -142,9 +140,8 @@ export default async function CreateProductPage(props: PageProps) {
       downloadLimit: product.downloadLimit ?? null,
       downloadExpiry: product.downloadExpiry ?? null,
 
-      // Nested Data
       digitalFiles: product.downloadFiles.map(d => ({ 
-        id: d.id, name: d.name, url: d.url, isSecure: false // Default to false for legacy
+        id: d.id, name: d.name, url: d.url, isSecure: false 
       })),
       
       attributes: product.attributes.map((a) => ({
@@ -154,7 +151,7 @@ export default async function CreateProductPage(props: PageProps) {
         visible: a.visible,
         variation: a.variation,
         position: a.position,
-        saveGlobally: false // Default false
+        saveGlobally: false
       })),
 
       variations: product.variants.map((v) => ({
@@ -189,12 +186,11 @@ export default async function CreateProductPage(props: PageProps) {
       upsells: product.upsellIds,
       crossSells: product.crossSellIds,
       
-      // Note: If you don't have a column for this in DB yet, keep empty
       giftCardAmounts: [] 
     } as any;
   }
 
-  // ✅ DOUBLE SAFETY: Serialize entire object to handle Dates/Decimals for Client Component
+  // DOUBLE SAFETY: Serialize entire object to handle Dates/Decimals for Client Component
   const sanitizedInitialData = JSON.parse(JSON.stringify(initialData));
 
   return <ProductForm initialData={sanitizedInitialData as ProductFormValues} isEdit={!!productId} />;

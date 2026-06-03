@@ -92,8 +92,7 @@ export const productSchema = z.object({
   downloadLimit: emptyToNumber,
   downloadExpiry: emptyToNumber,
 
-  category: z.string().optional(),
-  categoryId: z.string().optional().nullable(),
+  categoryIds: z.array(z.string()).default([]),
   vendor: z.string().optional(),
   brandId: z.string().optional().nullable(),
   

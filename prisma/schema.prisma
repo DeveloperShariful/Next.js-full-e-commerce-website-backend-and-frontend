@@ -503,7 +503,7 @@ model Category {
   parentId                String?
   parent                  Category?             @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
   children                Category[]            @relation("CategoryToCategory")
-  products                Product[]
+  products                Product[]             @relation("ProductToCategory") 
   translations            CategoryTranslation[]
   metafields              Json?
   metaTitle               String?
@@ -614,8 +614,7 @@ model Product {
   productType              ProductType            @default(SIMPLE)
   status                   ProductStatus          @default(DRAFT)
   isFeatured               Boolean                @default(false)
-  categoryId               String?
-  category                 Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categories               Category[]             @relation("ProductToCategory")
   brandId                  String?
   brand                    Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
   tags                     Tag[]
@@ -713,7 +712,6 @@ model Product {
   updatedAt                DateTime               @updatedAt
 
   @@index([slug])
-  @@index([categoryId, status])
   @@index([brandId, status])
   @@index([status, isFeatured])
   @@index([price(sort: Asc)])
@@ -721,7 +719,7 @@ model Product {
   @@index([createdAt(sort: Desc)])
   @@index([stock(sort: Asc), status])
   @@index([metafields(ops: JsonbPathOps)], type: Gin)
-  @@index([categoryId, status, price])
+  @@index([status, price])
   @@index([brandId, status, isFeatured])
   @@index([status, price, createdAt])
   @@index([isPreOrder])

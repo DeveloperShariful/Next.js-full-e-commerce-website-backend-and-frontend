@@ -1,5 +1,7 @@
 //app/actions/admin/categories/actions.ts
 
+// File: app/actions/backend/categories/actions.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -10,13 +12,11 @@ import { revalidatePath } from "next/cache";
 // ==========================================
 export async function getCategories(filter: "active" | "trash" = "active") {
   try {
-    // 🚀 Get counts for WP style headers: All (x) | Trash (y)
     const [activeCount, trashCount] = await Promise.all([
       db.category.count({ where: { deletedAt: null } }),
       db.category.count({ where: { deletedAt: { not: null } } })
     ]);
 
-    // Determine where clause based on filter
     const whereClause = filter === "trash" 
       ? { deletedAt: { not: null } } 
       : { deletedAt: null };
@@ -36,7 +36,7 @@ export async function getCategories(filter: "active" | "trash" = "active") {
       counts: {
         active: activeCount,
         trash: trashCount,
-        all: activeCount // In WP, "All" usually means all active/published
+        all: activeCount 
       }
     };
   } catch (error) {
@@ -74,6 +74,8 @@ export async function createCategory(formData: FormData) {
         slug,
         description: (formData.get("description") as string) || null,
         image: (formData.get("image") as string) || null,
+        // ✅ FIX: mediaId added from form
+        mediaId: (formData.get("mediaId") as string) || null, 
         parentId: (parentId && parentId !== "none") ? parentId : null,
         isActive: formData.get("isActive") === "true",
         menuOrder: parseInt(formData.get("menuOrder") as string) || 0, 
@@ -111,6 +113,8 @@ export async function updateCategory(formData: FormData) {
         slug: formData.get("slug") as string,
         description: (formData.get("description") as string) || null,
         image: (formData.get("image") as string) || null,
+        // ✅ FIX: mediaId updated from form
+        mediaId: (formData.get("mediaId") as string) || null,
         parentId: (parentId && parentId !== "none") ? parentId : null,
         isActive: formData.get("isActive") === "true",
         menuOrder: parseInt(formData.get("menuOrder") as string) || 0, 
@@ -132,8 +136,12 @@ export async function updateCategory(formData: FormData) {
 // ==========================================
 export async function deleteCategory(id: string) {
   try {
+    // ✅ FIX: Updated from categoryId to 'categories: { some: { id } }' due to Many-to-Many relation
     const productCount = await db.product.count({
-      where: { categoryId: id, deletedAt: null }
+      where: { 
+        categories: { some: { id: id } }, 
+        deletedAt: null 
+      }
     });
 
     if (productCount > 0) {
@@ -162,13 +170,13 @@ export async function deleteCategory(id: string) {
 }
 
 // ==========================================
-// 5. RESTORE CATEGORY (NEW)
+// 5. RESTORE CATEGORY
 // ==========================================
 export async function restoreCategory(id: string) {
   try {
     await db.category.update({
       where: { id },
-      data: { deletedAt: null } // 🚀 Setting deletedAt to null restores it
+      data: { deletedAt: null }
     });
     
     revalidatePath("/admin/categories");
@@ -180,11 +188,10 @@ export async function restoreCategory(id: string) {
 }
 
 // ==========================================
-// 6. FORCE DELETE (PERMANENT) (NEW)
+// 6. FORCE DELETE (PERMANENT)
 // ==========================================
 export async function forceDeleteCategory(id: string) {
   try {
-    // 🚀 Permanently remove from database
     await db.category.delete({
       where: { id }
     });

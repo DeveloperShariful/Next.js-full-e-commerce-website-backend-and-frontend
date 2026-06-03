@@ -43,6 +43,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState("general");
   const [hasDraft, setHasDraft] = useState(false);
+  
+  // ✅ FIX: Hydration Error State for Origin
+  const [origin, setOrigin] = useState("");
 
   const methods = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
@@ -55,6 +58,11 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const productType = watch("productType");
   const isVirtual = watch("isVirtual");
   const formValues = watch();
+
+  // ✅ FIX: Set Origin only on Client Side to prevent Hydration Mismatch
+  useEffect(() => {
+      setOrigin(window.location.origin);
+  }, []);
 
   // --- 1. Auto-Save Logic (Local Storage) ---
   useEffect(() => {
@@ -116,7 +124,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     Object.keys(data).forEach((key) => {
         const value = (data as any)[key];
         
-        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'digitalFiles', 'bundleItems', 'inventoryData', 'metafields', 'seoSchema', 'giftCardAmounts'].includes(key)) {
+        // ✅ FIX: Changed 'categoryIds' serialization based on new schema
+        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'categoryIds', 'digitalFiles', 'bundleItems', 'inventoryData', 'metafields', 'seoSchema', 'giftCardAmounts'].includes(key)) {
             formData.append(key, JSON.stringify(value));
         } 
         else if (value !== null && value !== undefined) {
@@ -126,17 +135,13 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
 
     try {
         const action = isEdit ? updateProduct : createProduct;
-        // 🚀 FIXED: Removed unstable startTransition for async operations
         const result = await action(formData);
 
         if (result.success) {
             localStorage.removeItem(STORAGE_KEY); 
-            
-            // 🚀 FIXED: Shows exact message from server (e.g. "No changes detected" or "Updated")
             toast.success(result.message || (isEdit ? "Updated successfully!" : "Product published!"), { id: toastId });
-            
-            router.refresh(); // Refresh first to get new data
-            router.push("/admin/products"); // Then redirect
+            router.refresh(); 
+            router.push("/admin/products"); 
         } else {
             toast.error(result.message || "Error saving product", { id: toastId });
         }
@@ -148,11 +153,9 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
 
   return (
     <FormProvider {...methods}>
-        {/* 🚀 WP Style Background & Font Base */}
         <div className="min-h-screen bg-[#f0f0f1] font-sans text-[13px] text-[#3c434a] relative pb-1">
             <input type="hidden" {...methods.register("version")} />
             
-            {/* 🚀 WP Style Notice / Alert Box */}
             {hasDraft && (
                 <div className="bg-white border-l-4 border-[#d63638] px-4 py-3 shadow-sm mx-4 md:mx-1 mt-4 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-[#1d2327]">
@@ -170,7 +173,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 </div>
             )}
 
-            {/* 🚀 Simple Page Title (No Save Buttons here in WP) */}
             <Header 
                 loading={isSubmitting || isPending} 
                 onSubmit={handleSubmit(onSubmit)} 
@@ -178,7 +180,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 isEdit={isEdit} 
             />
             
-            {/* 🚀 WP Style Two-Column Layout */}
             <div className="w-full px-1 md:px-1 py-1 flex flex-col lg:flex-row gap-5 items-start">
                 
                 {/* =======================================
@@ -186,7 +187,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 ======================================= */}
                 <div className="flex-1 w-full min-w-0 space-y-4">
                     
-                    {/* 🚀 Product Title & Permalink */}
                     <div className="space-y-1">
                         <input 
                             {...methods.register("name")}
@@ -197,7 +197,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                             <div className="text-[12px] flex flex-wrap items-center gap-1 text-[#646970] mt-1 ml-1">
                                 <span className="font-semibold text-[#50575e]">Permalink:</span>
                                 <span className="text-[#2271b1]">
-                                    {typeof window !== 'undefined' ? window.location.origin : ''}/product/
+                                    {/* ✅ FIX: Hydration safe origin */}
+                                    {origin ? `${origin}/product/` : '/product/'}
                                 </span>
                                 <input 
                                     {...methods.register("slug", {
@@ -212,13 +213,10 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                         )}
                     </div>
                     
-                    {/* Main Description */}
                     <Description />
 
-                    {/* 🚀 WooCommerce "Product Data" Meta Box */}
                     <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px]">
                         
-                        {/* Box Header */}
                         <div className="flex flex-col sm:flex-row sm:items-center px-3 py-2 border-b border-[#c3c4c7] bg-white gap-3 sm:gap-4">
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold text-[#1d2327] text-[14px]">Product data</span>
@@ -243,9 +241,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                             </div>
                         </div>
 
-                        {/* 🚀 WooCommerce Style Vertical Tabs */}
                         <div className="flex flex-col md:flex-row min-h-[400px]">
-                            {/* Left Side: Tabs */}
                             <ul className="w-full md:w-[150px] bg-[#f6f7f7] border-b md:border-b-0 md:border-r border-[#c3c4c7] shrink-0 flex md:flex-col overflow-x-auto md:overflow-visible no-scrollbar">
                                 {[
                                     {id: 'general', label: 'General', show: productType !== 'BUNDLE'}, 
@@ -268,7 +264,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                 ))}
                             </ul>
 
-                            {/* Right Side: Tab Content */}
                             <div className="flex-1 p-4 bg-white relative z-0">
                                 {activeTab === 'general' && <General />}
                                 {activeTab === 'inventory' && <Inventory />}
@@ -282,7 +277,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                         </div>
                     </div>
 
-                    {/* Short Description */}
                     <ShortDescription />
 
                 </div>
@@ -292,10 +286,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 ======================================= */}
                 <div className="w-full lg:w-[280px] xl:w-[320px] shrink-0 space-y-4">
                     
-                    {/* 🚀 WP Publish Box (Save/Update button is inside here) */}
                     <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
                     
-                    {/* Sub Widgets */}
                     <Categories />
                     <Collections />
                     <Brand /> 

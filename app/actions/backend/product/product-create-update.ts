@@ -1,5 +1,7 @@
 // File: app/actions/backend/product/product-create-update.ts
 
+// File: app/actions/backend/product/product-create-update.ts
+
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -171,7 +173,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                     images: true,
                     attributes: true,
                     collections: true,
-                    category: true, 
+                    categories: true, // ✅ FIX: Changed to categories array
                     brand: true,    
                     downloadFiles: true, 
                     bundleItems: true,
@@ -220,7 +222,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 oldProductData.productType !== data.productType ||
                 oldProductData.trackQuantity !== data.trackQuantity ||
                 oldProductData.isFeatured !== data.isFeatured ||
-                oldProductData.categoryId !== (data.categoryId || null) ||
                 oldProductData.brandId !== (data.brandId || null) ||
                 oldProductData.taxRateId !== (data.taxRateId || null) ||
                 oldProductData.shippingClassId !== (data.shippingClassId || null) ||
@@ -232,6 +233,12 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 oldProductData.preOrderLimit !== (data.preOrderLimit || null) ||
                 oldProductData.preOrderMessage !== (data.preOrderMessage || null) ||
                 oldProductData.featuredImage !== (data.featuredImage || null);
+
+            // ✅ FIX: Multiple Categories Change Detection
+            const categoriesChanged = !oldProductData || !arraysHaveSameContent(
+                oldProductData.categories.map((c: any) => c.id),
+                data.categoryIds || []
+            );
 
             const tagsChanged = !oldProductData || !arraysHaveSameContent(
                 oldProductData.tags.map((t: any) => t.name),
@@ -271,7 +278,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 data.bundleItems.map((b: any) => b.childProductId).sort()
             ));
 
-            const anyChanges = scalarsChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged;
+            // ✅ FIX: Added categoriesChanged to main checking flag
+            const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged;
 
             if (type === "UPDATE" && !anyChanges) {
                 return { success: true, message: "No changes detected.", productId: data.id };
@@ -291,12 +299,10 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 ? (type === "CREATE" ? { connect: data.collectionIds.map(cid => ({ id: cid })) } : { set: data.collectionIds.map(cid => ({ id: cid })) })
                 : undefined;
 
-            const categoryConnect = data.categoryName ? {
-                connectOrCreate: {
-                    where: { slug: data.categoryName.toLowerCase().replace(/\s+/g, '-') },
-                    create: { name: data.categoryName, slug: data.categoryName.toLowerCase().replace(/\s+/g, '-') }
-                }
-            } : undefined;
+            // ✅ FIX: Categories Relation Setup
+            const categoriesRelation = categoriesChanged || type === "CREATE"
+                ? (type === "CREATE" ? { connect: (data.categoryIds || []).map((cid: string) => ({ id: cid })) } : { set: (data.categoryIds || []).map((cid: string) => ({ id: cid })) })
+                : undefined;
 
             const brandConnect = data.vendorName ? {
                 connectOrCreate: {
@@ -372,13 +378,12 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 upsellIds: data.upsells,
                 crossSellIds: data.crossSells,
 
-                category: categoryConnect,
                 brand: brandConnect,
                 
-                ...(collectionsChanged || type === "CREATE" ? { collections: collectionsRelation } : {})
+                // ✅ FIX: Inject Multiple Categories & Collections
+                ...(collectionsChanged || type === "CREATE" ? { collections: collectionsRelation } : {}),
+                ...(categoriesChanged || type === "CREATE" ? { categories: categoriesRelation } : {})
             };
-
-            delete (productData as any).featuredMediaId;
 
             let product;
             
@@ -390,7 +395,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                      };
                  }
 
-                 if (scalarsChanged || tagsChanged || collectionsChanged || type === "UPDATE") {
+                 if (scalarsChanged || tagsChanged || collectionsChanged || categoriesChanged || type === "UPDATE") {
                      product = await tx.product.update({
                         where: { id: data.id },
                         data: productData
@@ -451,7 +456,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
             return serializeData(product);
 
-        }, { maxWait: 20000, timeout: 120000 }); // 🔥 Timeout Increased to 120s (2 mins)
+        }, { maxWait: 20000, timeout: 120000 });
 
         if ("success" in savedProduct) {
             return savedProduct;
@@ -477,7 +482,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             return { success: false, message: "Duplicate value found (Tags, SKU, or Name)." };
         }
 
-        // Prisma Transaction Error Handling
         if (error.code === 'P2028') {
              return { success: false, message: "Operation timed out due to too many variations. Please try saving fewer variations at once." };
         }

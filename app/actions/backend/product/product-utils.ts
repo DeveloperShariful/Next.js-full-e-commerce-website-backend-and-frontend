@@ -1,5 +1,7 @@
 // File: app/actions/backend/product/product-utils.ts
 
+// File: app/actions/backend/product/product-utils.ts
+
 import { db } from "@/lib/prisma";
 import _ from "lodash";
 import { Prisma } from "@prisma/client";
@@ -162,6 +164,16 @@ export function arraysHaveSameContent(arr1: any[], arr2: any[], keySelector?: (i
 export function generateDiff(oldData: any, newData: any) {
   const diffs: Record<string, { old: any; new: any }> = {};
   
+  // ✅ FIX: Moved compareArrays up so it can be used by everything below
+  const compareArrays = (label: string, oldArr: any[], newArr: any[]) => {
+      const oldSorted = [...(oldArr || [])].sort().join(", ");
+      const newSorted = [...(newArr || [])].sort().join(", ");
+      
+      if (oldSorted !== newSorted) {
+          diffs[label] = { old: oldSorted || "Empty", new: newSorted || "Empty" };
+      }
+  };
+
   const basicFields = [
     "name", "price", "salePrice", "status", "stock", "sku", 
     "isPreOrder", "isFeatured", "isVirtual", "isDownloadable",
@@ -213,9 +225,9 @@ export function generateDiff(oldData: any, newData: any) {
       }
   });
 
-  if (oldData?.categoryId !== (newData.categoryId || null)) {
-      diffs["Category"] = { old: oldData?.category?.name || "None", new: newData.categoryName || "None" };
-  }
+  // ✅ FIX: Categories array diff calculation
+  const oldCategories = oldData?.categories?.map((c: any) => c.id) || [];
+  compareArrays("Categories", oldCategories, newData.categoryIds);
   
   if (oldData?.brandId !== (newData.brandId || null)) {
       diffs["Brand"] = { old: oldData?.brand?.name || "None", new: newData.vendorName || "None" };
@@ -228,15 +240,6 @@ export function generateDiff(oldData: any, newData: any) {
   if (oldData?.shippingClassId !== (newData.shippingClassId || null)) {
       diffs["Shipping Class"] = { old: oldData?.shippingClassId || "None", new: newData.shippingClassId || "None" };
   }
-
-  const compareArrays = (label: string, oldArr: any[], newArr: any[]) => {
-      const oldSorted = [...(oldArr || [])].sort().join(", ");
-      const newSorted = [...(newArr || [])].sort().join(", ");
-      
-      if (oldSorted !== newSorted) {
-          diffs[label] = { old: oldSorted || "Empty", new: newSorted || "Empty" };
-      }
-  };
 
   const oldTags = oldData?.tags?.map((t: any) => t.name) || [];
   compareArrays("Tags", oldTags, newData.tagsList);

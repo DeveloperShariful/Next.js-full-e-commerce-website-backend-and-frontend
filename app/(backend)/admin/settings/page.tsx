@@ -1,126 +1,93 @@
 // File: app/(backend)/admin/settings/page.tsx
 
-// File: app/(backend)/admin/settings/page.tsx
+"use client";
 
-import Link from "next/link";
-import { 
-  Store, 
-  Truck, 
-  CreditCard, 
-  ChevronRight,
-  Settings,
-  ShieldCheck,
-  Globe,
-  Mail,
-  Megaphone,
-  Users // ✅ ADDED USERS ICON FOR AFFILIATE
-} from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
 
-export default function SettingsDashboard() {
-  const settingsModules = [
-    {
-      title: "General Settings",
-      description: "Store details, currency, social links, and system configurations.",
-      icon: Store,
-      href: "/admin/settings/general",
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-    },
-    {
-      title: "Shipping & Delivery",
-      description: "Manage shipping zones, rates, and delivery methods.",
-      icon: Truck,
-      href: "/admin/settings/shipping",
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
-    },
-    {
-      title: "Payments",
-      description: "Configure payment gateways (Stripe, PayPal, COD, bKash).",
-      icon: CreditCard,
-      href: "/admin/settings/payments",
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-    },
-    {
-      title: "Email & Notifications",
-      description: "Configure SMTP, customize email templates, and view logs.",
-      icon: Mail,
-      href: "/admin/settings/email",
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-    },
-    {
-      title: "Integrations & Marketing",
-      description: "Connect Google GTM, Facebook Pixel, and Klaviyo settings.",
-      icon: Megaphone,
-      href: "/admin/settings/marketing-settings",
-      color: "text-pink-600",
-      bgColor: "bg-pink-50",
-    },
-   
+// ট্যাব কম্পোনেন্ট ইমপোর্ট
+import GeneralTab from "./_components/GeneralTab";
+import ShippingTab from "./_components/ShippingTab";
+import PaymentsTab from "./_components/PaymentsTab";
+import EmailTab from "./_components/EmailTab";
+
+function SettingsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") || "general";
+
+  const tabs = [
+    { id: "general", label: "General" },
+    { id: "shipping", label: "Shipping" },
+    { id: "payments", label: "Payments" },
+    { id: "email", label: "Emails" },
   ];
 
+  const handleTabChange = (tabId: string) => {
+    router.push(`/admin/settings?tab=${tabId}`);
+  };
+
   return (
-    <div className="p-8 max-w-6xl mx-auto min-h-screen font-sans text-slate-800">
-      
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-          <Settings className="h-8 w-8 text-slate-700" /> 
+    <div 
+      className="w-full bg-[#f0f0f1] min-h-screen text-[#3c434a] antialiased pb-20"
+      style={{
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif'
+      }}
+    >
+      {/* WordPress Admin Settings Header */}
+      <div className=" w-full">
+        <h1 className="text-[23px] font-normal text-[#1d2327] m-0  leading-tight">
           Settings
         </h1>
-        <p className="text-slate-500 mt-2 text-lg">
-          Manage your store's configuration and preferences.
-        </p>
+        
+        {/* WooCommerce Navigation Tabs */}
+        <nav className="flex flex-wrap gap-[4px] -mb-[1px]">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`text-[14px] px-[15px] pb-[12px] pt-[6px] font-semibold transition-all duration-150 border-b-2 outline-none ${
+                  isActive
+                    ? "border-[#2271b1] text-[#000] font-bold"
+                    : "border-transparent text-[#2271b1] hover:text-[#135e96]"
+                }`}
+                style={{
+                  lineHeight: '1.71428571'
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {settingsModules.map((module) => (
-          <Link key={module.href} href={module.href} className="group">
-            <Card className="h-full border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 hover:border-slate-300 cursor-pointer">
-              <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                <div className={`p-3 rounded-xl ${module.bgColor} ${module.color} transition-transform group-hover:scale-110`}>
-                  <module.icon size={24} />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-bold text-slate-800 group-hover:text-slate-900">
-                    {module.title}
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-sm text-slate-500 mb-4 line-clamp-2">
-                  {module.description}
-                </CardDescription>
-                <div className="flex items-center text-sm font-semibold text-slate-600 group-hover:text-slate-900 group-hover:underline decoration-2 underline-offset-4">
-                  Manage Settings <ChevronRight size={16} className="ml-1" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {/* Optional: Quick Stats or System Status at the bottom */}
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 opacity-70">
-        <div className="p-4 border rounded-lg bg-slate-50 flex items-center gap-4">
-            <Globe className="text-slate-400" />
-            <div>
-                <p className="text-xs font-bold uppercase text-slate-500">Store Status</p>
-                <p className="text-sm font-medium text-green-600 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Live
-                </p>
-            </div>
-        </div>
-        <div className="p-4 border rounded-lg bg-slate-50 flex items-center gap-4">
-            <ShieldCheck className="text-slate-400" />
-            <div>
-                <p className="text-xs font-bold uppercase text-slate-500">System Version</p>
-                <p className="text-sm font-medium text-slate-700">v1.0.2 (Beta)</p>
-            </div>
+      {/* Main Render Area (কোনো max-w বা mx-auto নেই, এটি স্ক্রিনের শেষ মাথা পর্যন্ত ১০০% ছড়াবে) */}
+      <div className="w-full ">
+        <div className="animate-in fade-in duration-150 w-full">
+          {activeTab === "general" && <GeneralTab />}
+          {activeTab === "shipping" && <ShippingTab />}
+          {activeTab === "payments" && <PaymentsTab />}
+          {activeTab === "email" && <EmailTab />}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsDashboard() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-full flex items-center justify-center bg-[#f0f0f1]">
+          <Loader2 className="animate-spin text-[#2271b1]" size={36} />
+        </div>
+      }
+    >
+      <SettingsContent />
+    </Suspense>
   );
 }

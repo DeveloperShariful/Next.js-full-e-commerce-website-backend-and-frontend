@@ -1,4 +1,5 @@
-// File: app/(backend)/admin/settings/marketing-settings/page.tsx
+//// File: app/(backend)/admin/settings/marketing/page.tsx
+
 import { Metadata } from "next";
 import { getMarketingConfig } from "@/app/actions/backend/settings/marketing-settings/get-marketing-config";
 import MarketingFormWrapper from "./_components/marketing-form-wrapper";

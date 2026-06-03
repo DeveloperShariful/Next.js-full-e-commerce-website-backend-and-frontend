@@ -1,5 +1,3 @@
-// File: app/admin/settings/email/page.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,11 +5,11 @@ import { Loader2 } from "lucide-react";
 import { EmailConfiguration, EmailTemplate, EmailLog } from "@prisma/client";
 
 import { getEmailConfiguration } from "@/app/actions/backend/settings/email/email-config";
-// 🚨 FIX: sync এর বদলে শুধু get ইমপোর্ট করছি (Read Only)
 import { getEmailTemplates } from "@/app/actions/backend/settings/email/email-templates"; 
 import { getEmailLogs } from "@/app/actions/backend/settings/email/email-logs";
 
-import { EmailSettingsView } from "./_components/email-settings-view";
+// সাব-কম্পোনেন্ট ইমপোর্ট (আগের email/ ফোল্ডারের ভেতরের রিলেটিভ পাথ বজায় রাখা হয়েছে)
+import { EmailSettingsView } from "./email/email-settings-view";
 
 interface EmailPageData {
   config: EmailConfiguration | null;
@@ -20,7 +18,7 @@ interface EmailPageData {
   logsMeta: { total: number; pages: number };
 }
 
-export default function EmailSettingsPage() {
+export default function EmailTab() {
   const [loading, setLoading] = useState(true);
   
   const [data, setData] = useState<EmailPageData>({
@@ -36,8 +34,6 @@ export default function EmailSettingsPage() {
     try {
       const [configRes, templatesRes, logsRes] = await Promise.all([
         getEmailConfiguration(),
-        // 🚨 FIX: এখানে আর sync হবে না, শুধু ডাটাবেস থেকে আনবে।
-        // ফলে লগ রিফ্রেশ করলে টেমপ্লেট সিঙ্ক হবে না।
         getEmailTemplates(), 
         getEmailLogs(logPage),
       ]);
@@ -65,15 +61,20 @@ export default function EmailSettingsPage() {
 
   if (loading) {
     return (
-      <div className="h-[80vh] flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600" size={32} />
+      <div className="h-[250px] flex items-center justify-center">
+        <Loader2 className="animate-spin text-[#2271b1]" size={28} />
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto pb-32">
-      <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-6">Email Settings & Notifications</h1>
+    <div>
+      <div className="mb-6 pb-4 border-b border-slate-100">
+        <h2 className="text-xl font-bold text-slate-800">Email Settings & Notifications</h2>
+        <p className="text-slate-500 text-xs mt-1">
+          Configure SMTP, customize email templates, and view system email logs.
+        </p>
+      </div>
       
       <EmailSettingsView 
         config={data.config}

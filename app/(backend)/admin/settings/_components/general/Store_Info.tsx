@@ -1,6 +1,6 @@
 // File: app/admin/settings/general/_components/Store_Info.tsx
 
-import { GeneralSettingsData } from "../page";
+import { GeneralSettingsData } from "../GeneralTab";
 
 interface Props {
     data: GeneralSettingsData;

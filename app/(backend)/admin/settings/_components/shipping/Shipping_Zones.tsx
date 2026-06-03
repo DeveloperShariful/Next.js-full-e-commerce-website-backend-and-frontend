@@ -4,7 +4,7 @@
 
 import { useState, useMemo } from "react";
 import { createShippingZone, deleteShippingZone } from "@/app/actions/backend/settings/shipping/local";
-import { ComponentProps, ShippingZone } from "../../types";
+import { ComponentProps, ShippingZone } from "./types";
 import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getCountryAndStatesList } from "@/app/actions/backend/settings/general/location-helpers"; 

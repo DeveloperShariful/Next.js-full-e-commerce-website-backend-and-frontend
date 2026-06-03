@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { TransdirectConfig } from "@prisma/client";
 import { Truck } from "lucide-react";
-import Transdirect_Credentials from "./Transdirect_Credentials";
+import Transdirect_Credentials from "../shipping/Transdirect_Credentials";
 import Transdirect_Sender from "./Transdirect_Sender";
 import Transdirect_Controls from "./Transdirect_Controls";
 

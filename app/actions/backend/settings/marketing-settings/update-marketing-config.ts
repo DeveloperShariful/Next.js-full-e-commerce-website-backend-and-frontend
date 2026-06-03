@@ -3,7 +3,7 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { MarketingSettingsSchema, MarketingSettingsValues } from "@/app/(backend)/admin/settings/marketing-settings/_schema/marketing-validation";
+import { MarketingSettingsSchema, MarketingSettingsValues } from "@/app/(backend)/admin/marketing/_schema/marketing-validation";
 
 // --- Verification Helper Functions ---
 

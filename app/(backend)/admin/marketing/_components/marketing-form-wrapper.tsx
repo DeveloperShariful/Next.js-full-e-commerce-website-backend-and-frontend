@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Loader2, Save } from "lucide-react"; // Icon added
 
-import { MarketingSettingsSchema, MarketingSettingsValues } from "@/app/(backend)/admin/settings/marketing-settings/_schema/marketing-validation";
+import { MarketingSettingsSchema, MarketingSettingsValues } from "@/app/(backend)/admin/marketing/_schema/marketing-validation";
 import { updateMarketingConfig } from "@/app/actions/backend/settings/marketing-settings/update-marketing-config";
 
 import { GtmIntegrationCard } from "./gtm/gtm-integration-card";

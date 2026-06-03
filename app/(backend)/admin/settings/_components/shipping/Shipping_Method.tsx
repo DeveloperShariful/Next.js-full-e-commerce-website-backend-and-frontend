@@ -4,8 +4,7 @@
 
 import { useState } from "react";
 import { addShippingRate, deleteShippingRate, updateShippingRate } from "@/app/actions/backend/settings/shipping/local";
-// ✅ আমরা Local Types ব্যবহার করছি যাতে String vs Enum কনফ্লিক্ট না হয়
-import { ShippingZone, ShippingRate } from "../../types"; 
+import { ShippingZone, ShippingRate } from "./types"; 
 import { TransdirectConfig, CarrierService } from "@prisma/client";
 import { Plus, MapPin, Truck, ArrowRight, X, ChevronRight, HelpCircle, Pencil, Globe, Gift } from "lucide-react";
 import { toast } from "react-hot-toast";

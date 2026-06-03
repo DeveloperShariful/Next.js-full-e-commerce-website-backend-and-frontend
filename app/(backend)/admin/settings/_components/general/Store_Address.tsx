@@ -1,7 +1,7 @@
 // File: app/admin/settings/general/_components/Store_Address.tsx
 
 import { getCountryStateOptions } from "@/app/actions/backend/settings/general/location-helpers";
-import { GeneralSettingsData } from "../page";
+import { GeneralSettingsData } from "../GeneralTab";
 
 interface Props {
     data: GeneralSettingsData;

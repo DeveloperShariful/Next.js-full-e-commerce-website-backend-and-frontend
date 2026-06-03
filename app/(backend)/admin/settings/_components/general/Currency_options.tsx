@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { HelpCircle } from "lucide-react";
 import { getAllCurrencies } from "@/app/actions/backend/settings/general/location-helpers";
-import { GeneralSettingsData } from "../page";
+import { GeneralSettingsData } from "../GeneralTab";
 
 interface Props {
     data: GeneralSettingsData;

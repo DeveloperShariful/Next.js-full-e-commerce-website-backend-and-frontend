@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { HelpCircle, X, Check, Star, User } from "lucide-react";
 import { getAllCountries } from "@/app/actions/backend/settings/general/location-helpers";
-import { GeneralSettingsData } from "../page";
+import { GeneralSettingsData } from "../GeneralTab";
 
 interface Props {
     data: GeneralSettingsData;

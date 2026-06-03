@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { createShippingClass, deleteShippingClass } from "@/app/actions/backend/settings/shipping/local";
-import { ComponentProps } from "../../types";
+import { ComponentProps } from "./types";
 import { Plus, Trash2, Package, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 

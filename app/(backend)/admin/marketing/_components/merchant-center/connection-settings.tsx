@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { testMerchantConnection } from "@/app/actions/backend/settings/marketing-settings/merchant_center/test-connection";
 import { updateMarketingConfig } from "@/app/actions/backend/settings/marketing-settings/update-marketing-config";
 // ✅ Import the Type
-import { MarketingSettingsValues } from "@/app/(backend)/admin/settings/marketing-settings/_schema/marketing-validation";
+import { MarketingSettingsValues } from "@/app/(backend)/admin/marketing/_schema/marketing-validation";
 
 export function MerchantConnectionSettings() {
   const form = useFormContext();

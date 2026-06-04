@@ -25,7 +25,7 @@ export function ActionAlerts({ alerts, claims }: ActionAlertsProps) {
   return (
     // 🚀 WP Style: Minimal grid, white background, standard borders, WooCommerce "Store Status" vibe
     <div className="bg-white border border-[#c3c4c7] shadow-sm mb-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-[#c3c4c7]">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-[#c3c4c7]">
         
         {/* 1. READY TO SHIP */}
         <Link href="/admin/orders?status=unfulfilled&payment=paid" className="p-4 hover:bg-[#f6f7f7] transition group flex flex-col items-center text-center">

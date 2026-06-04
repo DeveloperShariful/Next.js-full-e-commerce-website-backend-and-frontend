@@ -6,7 +6,6 @@ import { useState } from "react";
 import { ActionAlerts } from "./action-alerts";
 import { BusinessPulse } from "./business-pulse";
 import { RecentOrders } from "./recent-orders";
-import { ActivityFeed } from "./activity-feed";
 import { Overview } from "./overview";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { CalendarDays } from "lucide-react";
@@ -72,34 +71,7 @@ export function DashboardView({ data }: DashboardViewProps) {
       <h2 className="text-[14px] font-semibold text-[#1d2327] mb-3">At a Glance</h2>
       <ActionAlerts alerts={data.alerts} claims={data.claims} />
 
-      {/* 4. WordPress Style Meta Boxes Grid (2 Columns) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-6">
-        
-        {/* Left Column - 2/3 width */}
-        <div className="lg:col-span-2 space-y-5">
-           
-           {/* Business Pulse Meta Box */}
-           <BusinessPulse data={currentStats} label={labels[activeRange]} />
-           
-           {/* Overview Chart Meta Box */}
-           <div className="bg-white border border-[#c3c4c7] shadow-sm">
-             <h2 className="px-4 py-2 border-b border-[#c3c4c7] text-[14px] font-semibold text-[#1d2327] bg-[#f6f7f7]">
-               Sales Overview ({labels[activeRange]})
-             </h2>
-             <div className="p-4 h-[350px]">
-               <Overview data={data.graphData} currencySymbol={data.currencySymbol} />
-             </div>
-           </div>
-
-           {/* Recent Orders Meta Box */}
-           <RecentOrders orders={data.recentOrders} />
-        </div>
-
-        {/* Right Column - 1/3 width */}
-        <div className="lg:col-span-1 space-y-5">
-           
-           {/* Recent Warranty Claims Meta Box (NEW) */}
-           <div className="bg-white border border-[#c3c4c7] shadow-sm">
+      <div className="bg-white border border-[#c3c4c7] shadow-sm">
              <h2 className="px-4 py-2 border-b border-[#c3c4c7] text-[14px] font-semibold text-[#1d2327] bg-[#f6f7f7]">
                Recent Warranty Claims
              </h2>
@@ -139,8 +111,27 @@ export function DashboardView({ data }: DashboardViewProps) {
              </div>
            </div>
 
-           {/* Activity Feed Meta Box */}
-           <ActivityFeed activities={data.recentActivities} />
+      {/* 4. WordPress Style Meta Boxes Grid (2 Columns) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-6">
+        
+        {/* Left Column - 2/3 width */}
+        <div className="lg:col-span-3 space-y-5">
+           
+           {/* Business Pulse Meta Box */}
+           <BusinessPulse data={currentStats} label={labels[activeRange]} />
+           
+           {/* Overview Chart Meta Box */}
+           <div className="bg-white border border-[#c3c4c7] shadow-sm">
+             <h2 className="px-4 py-2 border-b border-[#c3c4c7] text-[14px] font-semibold text-[#1d2327] bg-[#f6f7f7]">
+               Sales Overview ({labels[activeRange]})
+             </h2>
+             <div className="p-4 h-[350px]">
+               <Overview data={data.graphData} currencySymbol={data.currencySymbol} />
+             </div>
+           </div>
+
+           {/* Recent Orders Meta Box */}
+           <RecentOrders orders={data.recentOrders} />
         </div>
       </div>
       

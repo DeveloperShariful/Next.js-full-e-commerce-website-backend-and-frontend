@@ -24,7 +24,7 @@ export default function AdminHeader({ user, storeName = "Store" }: AdminHeaderPr
         
         {/* 🚀 WP Style Site Title & Dropdown */}
         <div className="relative group h-full flex items-center ml-1 sm:ml-2">
-          <Link href="/admin" className="flex items-center gap-2 h-full px-3 hover:bg-[#2c3338] hover:text-[#72aee6] transition-colors cursor-pointer text-white">
+          <Link href="/" className="flex items-center gap-2 h-full px-3 hover:bg-[#2c3338] hover:text-[#72aee6] transition-colors cursor-pointer text-white">
             <Home size={16} />
             <span className="text-[13px] font-medium hidden sm:block">{storeName}</span>
           </Link>

@@ -27,7 +27,7 @@ export function RecentOrders({ orders }: RecentOrdersProps) {
 
   return (
     // 🚀 WP Style Meta Box
-    <div className="bg-white border border-[#c3c4c7] shadow-sm flex flex-col h-full overflow-hidden">
+    <div className="bg-white border border-[#c3c4c7] shadow-sm flex flex-col  overflow-hidden">
       
       {/* Header */}
       <div className="px-4 py-2 border-b border-[#c3c4c7] bg-[#f6f7f7] flex justify-between items-center">
@@ -39,7 +39,7 @@ export function RecentOrders({ orders }: RecentOrdersProps) {
 
       {/* 🚀 Responsive Table Wrapper */}
       <div className="flex-1 overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[600px]">
+        <table className="w-full text-left border-collapse ">
           <thead>
             <tr className="text-[12px] text-[#1d2327] border-b border-[#c3c4c7] bg-white">
               <th className="px-4 py-2 font-semibold">Order</th>

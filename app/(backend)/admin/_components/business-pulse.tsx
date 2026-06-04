@@ -53,7 +53,7 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
 
       <div className="p-4">
         {/* TOP ROW: REVENUE, ORDERS, SIGNUPS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-[#f0f0f1] pb-5 border-b border-[#f0f0f1]">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-[#f0f0f1] pb-5 border-b border-[#f0f0f1]">
           
           {/* 1. Paid Revenue */}
           <div className="px-2 first:pl-0">
@@ -66,7 +66,7 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
           </div>
 
           {/* 2. Orders (Detailed) */}
-          <div className="px-2 pt-4 md:pt-0">
+          <div className="px-2 ">
             <div className="flex items-center gap-1.5 mb-1">
                <p className="text-[#50575e] text-[12px] font-medium">Total Orders</p>
             </div>

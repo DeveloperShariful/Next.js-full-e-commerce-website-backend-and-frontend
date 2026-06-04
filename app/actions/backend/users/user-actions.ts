@@ -1,4 +1,4 @@
-// app/actions/admin/users/user-actions.ts
+// File: app/actions/admin/users/user-actions.ts
 
 'use server';
 
@@ -6,6 +6,7 @@ import { db } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Role, AddressType } from '@prisma/client'; 
 import { sendNotification } from '@/app/api/email/send-notification';
+import bcrypt from "bcryptjs"; // ✅ NEW: Password hashing library imported
 
 // Helper function to extract address data from FormData
 const extractAddress = (prefix: 'billing_' | 'shipping_', formData: FormData) => {
@@ -56,7 +57,6 @@ export async function createUser(formData: FormData) {
   const role = formData.get('role') as Role;
   const password = formData.get('password') as string; 
   
-  // 🛑 NEW: Extracting all the new fields
   const name = formData.get('name') as string;
   const firstName = formData.get('firstName') as string;
   const lastName = formData.get('lastName') as string;
@@ -78,7 +78,9 @@ export async function createUser(formData: FormData) {
       return { success: false, message: 'A user with this email already exists.' };
     }
 
-    // 🛑 NEW: Construct Metafields JSON
+    // ✅ FIX: Hashing password before creating database entry
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+
     const metafields = {
       firstName: firstName?.trim(),
       lastName: lastName?.trim(),
@@ -91,10 +93,10 @@ export async function createUser(formData: FormData) {
         name: name?.trim() || nickname?.trim(),
         email: email.toLowerCase().trim(),
         role: role || 'CUSTOMER',
-        password: password ? password : null, 
-        notes: bio?.trim(), // Saved as Bio
-        image: image || null, // Saved Profile Picture
-        metafields: metafields, // Saved additional fields in JSON
+        password: hashedPassword, // Saved securely as hashed string
+        notes: bio?.trim(), 
+        image: image || null, 
+        metafields: metafields, 
         isActive: true
       }
     });
@@ -132,7 +134,6 @@ export async function updateUser(formData: FormData) {
   const role = formData.get('role') as Role;
   const password = formData.get('password') as string;
 
-  // 🛑 NEW: Extracting all the new fields
   const name = formData.get('name') as string;
   const firstName = formData.get('firstName') as string;
   const lastName = formData.get('lastName') as string;
@@ -154,7 +155,6 @@ export async function updateUser(formData: FormData) {
       return { success: false, message: 'Another user is already using this email.' };
     }
 
-    // 🛑 NEW: Construct Metafields JSON (Keeping existing ones if any)
     const existingMetafields = existingUser?.metafields && typeof existingUser.metafields === 'object' 
         ? existingUser.metafields 
         : {};
@@ -171,17 +171,17 @@ export async function updateUser(formData: FormData) {
       name: name?.trim() || nickname?.trim(),
       email: email.toLowerCase().trim(),
       role: role,
-      notes: bio?.trim(), // Updated Bio
-      metafields: updatedMetafields // Updated JSON fields
+      notes: bio?.trim(), 
+      metafields: updatedMetafields 
     };
 
-    // Update image only if it's provided or explicitly removed from frontend
     if (image !== undefined) {
       updateData.image = image || null;
     }
 
+    // ✅ FIX: Hashing password before updating database entry
     if (password && password.trim() !== '') {
-      updateData.password = password; 
+      updateData.password = await bcrypt.hash(password, 10); 
     }
 
     await db.user.update({
@@ -234,7 +234,7 @@ export async function deleteUser(formData: FormData) {
     revalidatePath('/admin/users');
     return { success: true, message: 'User moved to trash successfully.' };
   } catch (error: any) {
-    console.error('User deletion failed:', error);
+    console.error('Failed to move user to trash:', error);
     return { success: false, message: 'Failed to delete user.' };
   }
 }

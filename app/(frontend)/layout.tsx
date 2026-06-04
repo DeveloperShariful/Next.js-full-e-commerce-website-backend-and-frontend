@@ -1,7 +1,7 @@
 // app/(frontend)/layout.tsx 
 
 import TopBar from "@/components/TopBar"; 
-import Header from "@/app/(frontend)/header-footer/header";
+import Header from "@/components/header";
 import Footer from "@/components/Footer";
 import FloatingCompareBar from "@/components/FloatingCompareBar"; 
 import { CartProvider } from '@/context/CartContext';

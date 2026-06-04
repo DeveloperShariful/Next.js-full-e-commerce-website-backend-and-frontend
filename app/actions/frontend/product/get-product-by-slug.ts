@@ -1,5 +1,4 @@
 // File: app/actions/storefront/product/get-product-by-slug.ts
-// File: app/actions/storefront/product/get-product-by-slug.ts
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -15,7 +14,7 @@ export async function getProductBySlugAction(slug: string) {
           where: { deletedAt: null },
         },
         categories: {
-          take: 1,
+          take: 1, 
           select: {
             products: {
               where: { status: "ACTIVE", deletedAt: null, slug: { not: slug } },
@@ -36,6 +35,7 @@ export async function getProductBySlugAction(slug: string) {
 
     if (!product) return { success: false, product: null };
 
+    // --- Decimal & Data Formatting ---
     const regularPriceNum = product.price ? Number(product.price.toString()) : 0;
     const salePriceNum = product.salePrice ? Number(product.salePrice.toString()) : null;
     const isOnSale = salePriceNum !== null && salePriceNum < regularPriceNum;
@@ -58,11 +58,8 @@ export async function getProductBySlugAction(slug: string) {
       regularPrice: formatPrice(regularPriceNum),
       salePrice: salePriceNum ? formatPrice(salePriceNum) : undefined,
       sku: product.sku || product.productCode.toString(),
-      
-      // ✅ FIX: "Track Quantity" অফ থাকলে বাই ডিফল্ট ইন-স্টক দেখাবে
       stockStatus: (!product.trackQuantity || product.stock > 0) ? "IN_STOCK" : "OUT_OF_STOCK",
-      stockQuantity: product.trackQuantity ? product.stock : null, // ট্র্যাক না করলে কোয়ান্টিটি null যাবে
-      
+      stockQuantity: product.trackQuantity ? product.stock : null,
       onSale: isOnSale,
       weight: product.weight ? Number(product.weight.toString()) : undefined,
       length: product.length ? Number(product.length.toString()) : undefined,
@@ -71,6 +68,7 @@ export async function getProductBySlugAction(slug: string) {
       averageRating: product.rating ? Number(product.rating.toString()) : 0,
       reviewCount: product.reviewCount || 0,
       
+      // Attributes
       attributes: {
         nodes: product.attributes.map(attr => ({
           name: attr.name,
@@ -78,20 +76,20 @@ export async function getProductBySlugAction(slug: string) {
         }))
       },
 
+      // Variations
       variations: {
         nodes: product.variants.map(variant => {
           const varReg = Number(variant.price.toString());
           const varSale = variant.salePrice ? Number(variant.salePrice.toString()) : null;
           return {
+            // ✅ FIX: Passed real UUID string 'id' from database
+            id: variant.id, 
             databaseId: parseInt(variant.id.replace(/\D/g, '').substring(0, 8)) || 0,
             price: formatPrice(varSale || varReg),
             regularPrice: formatPrice(varReg),
             salePrice: varSale ? formatPrice(varSale) : undefined,
-            
-            // ✅ FIX: ভ্যারিয়েশনের জন্যও একই লজিক
             stockStatus: (!variant.trackQuantity || variant.stock > 0) ? "IN_STOCK" : "OUT_OF_STOCK",
             stockQuantity: variant.trackQuantity ? variant.stock : null,
-            
             name: variant.name,
             attributes: {
               nodes: Object.entries(variant.attributes as Record<string, string>).map(([key, val]) => ({
@@ -104,6 +102,7 @@ export async function getProductBySlugAction(slug: string) {
         })
       },
 
+      // Reviews
       reviews: {
         edges: product.reviews.map(review => {
           const reviewMedia = (review.images || []).map((url) => {
@@ -126,6 +125,7 @@ export async function getProductBySlugAction(slug: string) {
         })
       },
 
+      // Related Products
       related: {
         nodes: (product.categories?.[0]?.products || []).map(related => {
           const relReg = Number(related.price.toString());

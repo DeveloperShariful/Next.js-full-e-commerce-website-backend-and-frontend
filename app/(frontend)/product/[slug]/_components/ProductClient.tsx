@@ -1,4 +1,4 @@
-// app/product/[slug]/_components/ProductClient.tsx
+// File: app/product/[slug]/_components/ProductClient.tsx
 
 'use client';
 
@@ -22,6 +22,7 @@ interface Attribute { name: string; options: string[]; label?: string; }
 interface VariationAttribute { name: string; value: string; }
 
 interface Variation {
+  id: string; // ✅ FIX: Added true UUID id to type definition
   databaseId: number;
   price?: string;
   regularPrice?: string;
@@ -226,7 +227,8 @@ export default function ProductClient({ product }: { product: Product }) {
   const productForCart = {
     id: product.id,
     databaseId: product.databaseId, 
-    variationId: currentVariation ? currentVariation.databaseId.toString() : undefined, 
+    // ✅ FIX: Passed real UUID string 'id' instead of fake 'databaseId.toString()'
+    variationId: currentVariation ? currentVariation.id : undefined, 
     name: product.name + (currentVariation && Object.keys(selectedAttributes).length > 0 ? ` - ${Object.values(selectedAttributes).join(', ')}` : ''),
     price: displayPrice,
     image: product.image?.sourceUrl,

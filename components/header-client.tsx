@@ -1,15 +1,15 @@
-// app/(frontend)/header-footer/header-client.tsx
+// components/header-client.tsx
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { useSession, signOut } from "next-auth/react"; // NextAuth Import
-import SearchOverlay from '@/components/SearchOverlay'; // পাথ ঠিক করে নিবেন
-import MiniCart from '@/components/MiniCart'; // পাথ ঠিক করে নিবেন
+import { useSession, signOut } from "next-auth/react"; 
+import SearchOverlay from '@/components/SearchOverlay'; 
+import MiniCart from '@/components/MiniCart'; 
 import Image from 'next/image';
-import { searchProductsAction } from '@/app/actions/frontend/home/searchProductsAction'; // 🛡️ Search action imported directly
+import { searchProductsAction } from '@/app/actions/frontend/home/searchProductsAction'; 
 import { 
   IoSearch, 
   IoMenu, 
@@ -70,7 +70,14 @@ const navItems: NavItem[] = [
   { path: '/about', label: 'About' },
   { path: '/contact', label: 'Contact' },
   { path: '/faq', label: 'FAQ' },
-  { path: '/blog', label: 'Blog' },
+  { 
+    path: '/kids-ebike-hub', 
+    label: 'Hub & Blog',
+    subItems: [
+      { path: '/kids-ebike-hub', label: 'The GoBike Hub', tag: 'Videos & News' },
+      { path: '/blog', label: 'Official Blog', tag: 'Guides & Tips' },
+    ]
+  },
 ];
 
 interface HeaderClientProps {

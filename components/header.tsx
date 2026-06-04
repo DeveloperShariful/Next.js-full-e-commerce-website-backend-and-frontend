@@ -1,8 +1,8 @@
-// app/(frontend)/header-footer/header.tsx
+// @/components/header.tsx
 
 import { db } from "@/lib/prisma";
 import { auth } from "@/auth"; 
-import HeaderClient from "./header-client";
+import HeaderClient from "@/components/header-client";
 
 async function getAffiliateStatus(userId?: string) {
   try {

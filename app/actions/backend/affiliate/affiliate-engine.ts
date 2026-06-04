@@ -19,7 +19,7 @@ export async function processOrder(orderId: string) {
           product: {
             select: { 
               id: true, 
-              categoryId: true, 
+              categories: { select: { id: true } },
               name: true,
               costPerItem: true,
               affiliateCommissionRate: true,
@@ -185,9 +185,18 @@ export async function processOrder(orderId: string) {
 
       if (conditions.minOrderAmount && DecimalMath.lt(orderTotal, conditions.minOrderAmount)) isMatch = false;
       
+      // ✅ FIX: Check if ANY of the product's categories match the rule's categories
       if (conditions.categoryIds && conditions.categoryIds.length > 0) {
-        if (!item.product || !item.product.categoryId || !conditions.categoryIds.includes(item.product.categoryId)) {
-          isMatch = false;
+        if (!item.product || !item.product.categories || item.product.categories.length === 0) {
+          isMatch = false; 
+        } else {
+          // Check if there is an intersection between product categories and rule categories
+          const productCategoryIds = item.product.categories.map((c: any) => c.id);
+          const hasMatchingCategory = productCategoryIds.some((id: string) => conditions.categoryIds.includes(id));
+          
+          if (!hasMatchingCategory) {
+            isMatch = false;
+          }
         }
       }
 

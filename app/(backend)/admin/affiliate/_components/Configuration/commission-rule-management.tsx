@@ -177,6 +177,9 @@ export default function CommissionRuleManagement({ initialRules }: RuleManagemen
 // PART 2: MODAL COMPONENT (MERGED)
 // ============================================================================
 
+// File: app/(backend)/admin/affiliate/_components/Configuration/commissiton-rule-manager.tsx
+// (শুধুমাত্র RuleModal অংশটুকু দেওয়া হলো, বাকি উপরের লিস্ট ভিউ ঠিক থাকবে)
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -236,7 +239,8 @@ function RuleModal({ isOpen, onClose, initialData }: ModalProps) {
         
         minOrderAmount: conditions?.minOrderAmount || undefined,
         customerType: conditions?.customerType || "ALL",
-        requiredCategoryIds: conditions?.categoryIds?.join(",") || "",
+        // ✅ FIX: Safely check if categoryIds is an array before joining
+        requiredCategoryIds: Array.isArray(conditions?.categoryIds) ? conditions.categoryIds.join(", ") : "",
       });
     } else {
       form.reset({
@@ -261,6 +265,7 @@ function RuleModal({ isOpen, onClose, initialData }: ModalProps) {
       conditions.customerType = data.customerType;
     }
     if (data.requiredCategoryIds) {
+      // String to Array conversion
       conditions.categoryIds = data.requiredCategoryIds.split(",").map(s => s.trim()).filter(Boolean);
     }
     

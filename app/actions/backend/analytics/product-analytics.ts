@@ -1,4 +1,4 @@
-// app/actions/admin/analytics/product-analytics.ts
+// File: app/actions/admin/analytics/product-analytics.ts
 
 "use server";
 
@@ -14,6 +14,7 @@ export async function getProductAnalytics(current: DateRange): Promise<{
   
   const validStatus = { notIn: [OrderStatus.CANCELLED, OrderStatus.DRAFT, OrderStatus.FAILED] as OrderStatus[] };
 
+  // 1. Top Products Calculation
   const topItems = await db.orderItem.groupBy({
     by: ['productId', 'productName'],
     where: {
@@ -31,12 +32,12 @@ export async function getProductAnalytics(current: DateRange): Promise<{
     id: item.productId || "unknown",
     name: item.productName,
     sku: null, 
-    // ✅ FIX: Decimal -> Number
     revenue: Number(item._sum.total || 0),
     quantitySold: item._sum.quantity || 0,
     trend: 0 
   }));
 
+  // 2. Inventory Health Calculation
   const inventoryAlerts = await db.product.findMany({
     where: {
       status: "ACTIVE",
@@ -67,6 +68,7 @@ export async function getProductAnalytics(current: DateRange): Promise<{
     image: p.featuredImage
   }));
 
+  // 3. Category Performance Calculation (✅ FIX: Updated for Many-to-Many categories)
   const categoryItems = await db.orderItem.findMany({
     where: {
       order: {
@@ -78,7 +80,7 @@ export async function getProductAnalytics(current: DateRange): Promise<{
       total: true,
       product: {
         select: {
-          category: {
+          categories: { // ✅ Changed from 'category' to 'categories'
             select: { id: true, name: true }
           }
         }
@@ -90,25 +92,25 @@ export async function getProductAnalytics(current: DateRange): Promise<{
   let totalRevenue = 0;
 
   for (const item of categoryItems) {
-    if (item.product?.category) {
-      const cat = item.product.category;
-      // ✅ FIX: Decimal -> Number
+    if (item.product?.categories && item.product.categories.length > 0) {
       const itemTotal = Number(item.total);
-      
       totalRevenue += itemTotal;
       
-      if (catMap.has(cat.id)) {
-        const existing = catMap.get(cat.id)!;
-        existing.revenue += itemTotal;
-        existing.orderCount += 1;
-      } else {
-        catMap.set(cat.id, {
-          id: cat.id,
-          name: cat.name,
-          orderCount: 1,
-          revenue: itemTotal,
-          percentage: 0 
-        });
+      // ✅ Iterate over all categories of the product
+      for (const cat of item.product.categories) {
+        if (catMap.has(cat.id)) {
+          const existing = catMap.get(cat.id)!;
+          existing.revenue += itemTotal;
+          existing.orderCount += 1;
+        } else {
+          catMap.set(cat.id, {
+            id: cat.id,
+            name: cat.name,
+            orderCount: 1,
+            revenue: itemTotal,
+            percentage: 0 
+          });
+        }
       }
     }
   }

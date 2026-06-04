@@ -1,4 +1,4 @@
-// app/actions/storefront/cart/getCrossSellProductsAction.ts
+// File: app/actions/storefront/cart/getCrossSellProductsAction.ts
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -6,13 +6,15 @@ import { StorefrontProduct } from "@/app/(frontend)/types";
 
 export async function getCrossSellProductsAction(): Promise<{ success: boolean; products: StorefrontProduct[] }> {
   try {
-    // ডাটাবেজ থেকে "spare-parts" ক্যাটাগরির ৪টি প্রোডাক্ট আনা হচ্ছে
     const products = await db.product.findMany({
       where: {
         status: "ACTIVE",
         deletedAt: null,
-        category: {
-          slug: "spare-parts" // আপনার আগের লজিক অনুযায়ী
+        // ✅ FIX: Updated from 'category' to 'categories: { some: ... }'
+        categories: {
+          some: {
+            slug: "spare-parts" 
+          }
         }
       },
       take: 4,

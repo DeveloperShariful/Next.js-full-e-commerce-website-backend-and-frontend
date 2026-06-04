@@ -13,7 +13,8 @@ import crypto from "crypto";
 export async function exportProductsCSV() {
   try {
     const products = await db.product.findMany({
-      include: { category: true, brand: true, variants: true, tags: true },
+      // ✅ FIX: Changed 'category' to 'categories'
+      include: { categories: true, brand: true, variants: true, tags: true },
       orderBy: { id: 'desc' }
     });
 
@@ -43,7 +44,8 @@ export async function exportProductsCSV() {
       "Height (cm)": p.height || "",
       "Allow customer reviews?": p.enableReviews ? 1 : 0,
       "Purchase note": p.purchaseNote || "",
-      Categories: p.category?.name || "",
+      // ✅ FIX: Multiple categories exported as comma separated paths
+      Categories: p.categories?.map((c: any) => c.name).join(", ") || "",
       Brands: p.brand?.name || "",
       Tags: p.tags?.map((t: any) => t.name).join(", ") || "",
       Images: [p.featuredImage, ...(p.images?.map((img:any) => img.url) || [])].filter(Boolean).join(", "),
@@ -120,43 +122,52 @@ export async function importProductsCSV(csvString: string) {
                     }
                 });
 
-                // Arrays processing
                 const upsellIds = row["Upsells"] ? row["Upsells"].split(",").map((i:string) => i.trim()) : [];
                 const crossSellIds = row["Cross-sells"] ? row["Cross-sells"].split(",").map((i:string) => i.trim()) : [];
 
-                // --- 🚀 HIERARCHICAL CATEGORY LOGIC (Fixing Parent > Child) ---
-                let categoryIdToConnect = null;
+                // --- 🚀 HIERARCHICAL CATEGORY LOGIC (Updated for Many-to-Many) ---
+                let categoryIdsToConnect: string[] = [];
+                
                 if (row["Categories"]) {
-                    const categoryPath = row["Categories"].split(",")[0].split(">").map((c: string) => c.trim()).filter(Boolean);
-                    
-                    let currentParentId = null;
+                    // Split comma-separated list of categories (e.g. "Bikes, Toys > Cars")
+                    const categoryGroups = row["Categories"].split(",").map((c: string) => c.trim()).filter(Boolean);
 
-                    for (const catName of categoryPath) {
-                        const catSlug = generateSlug(catName);
-                        
-                        // Check if category exists with this parent
-                        let cat: any = await db.category.findFirst({
-                            where: { slug: catSlug, parentId: currentParentId }
-                        });
+                    for (const group of categoryGroups) {
+                        const categoryPath = group.split(">").map((c: string) => c.trim()).filter(Boolean);
+                        let currentParentId = null;
 
-                        // Create if not exists
-                        if (!cat) {
-                            cat = await db.category.create({
-                                data: {
-                                    name: catName,
-                                    slug: catSlug + (currentParentId ? `-${Math.floor(Math.random()*1000)}` : ''), 
-                                    parentId: currentParentId
-                                }
+                        for (const catName of categoryPath) {
+                            const catSlug = generateSlug(catName);
+                            
+                            let cat: any = await db.category.findFirst({
+                                where: { slug: catSlug, parentId: currentParentId }
                             });
+
+                            if (!cat) {
+                                cat = await db.category.create({
+                                    data: {
+                                        name: catName,
+                                        slug: catSlug + (currentParentId ? `-${Math.floor(Math.random()*1000)}` : ''), 
+                                        parentId: currentParentId
+                                    }
+                                });
+                            }
+                            
+                            currentParentId = cat.id;
+                            
+                            // Only add the final child ID in the path to the product
+                            if (catName === categoryPath[categoryPath.length - 1]) {
+                                if (!categoryIdsToConnect.includes(cat.id)) {
+                                    categoryIdsToConnect.push(cat.id);
+                                }
+                            }
                         }
-                        
-                        currentParentId = cat.id;
-                        categoryIdToConnect = cat.id; // Final child ID
                     }
                 }
 
-                const categoryConnect = categoryIdToConnect ? {
-                    connect: { id: categoryIdToConnect }
+                // ✅ FIX: Changed to categories: { connect: [...] }
+                const categoriesConnect = categoryIdsToConnect.length > 0 ? {
+                    connect: categoryIdsToConnect.map(id => ({ id }))
                 } : undefined;
 
                 // --- 🚀 BRAND LOGIC FIX ---
@@ -176,7 +187,6 @@ export async function importProductsCSV(csvString: string) {
                     }
                 }
 
-                // Tags processing
                 const tagsConnect = row["Tags"] ? {
                     connectOrCreate: row["Tags"].split(",").filter(Boolean).map((t: string) => ({
                         where: { slug: generateSlug(t.trim()) },
@@ -184,7 +194,6 @@ export async function importProductsCSV(csvString: string) {
                     }))
                 } : undefined;
 
-                // Images Processing
                 const images = row["Images"] ? row["Images"].split(",").map((url: string) => url.trim()) : [];
                 const featuredImage = images.length > 0 ? images[0] : null;
 
@@ -203,7 +212,8 @@ export async function importProductsCSV(csvString: string) {
                         barcode, purchaseNote,
                         upsellIds, crossSellIds,
                         metafields, metaTitle, metaDesc,
-                        category: categoryConnect,
+                        // ✅ FIX: Multiple categories connection update
+                        categories: categoriesConnect ? { set: [], ...categoriesConnect } : undefined,
                         brand: brandConnect,
                         tags: tagsConnect,
                         featuredImage,
@@ -224,7 +234,8 @@ export async function importProductsCSV(csvString: string) {
                         barcode, purchaseNote,
                         upsellIds, crossSellIds,
                         metafields, metaTitle, metaDesc,
-                        category: categoryConnect,
+                        // ✅ FIX: Multiple categories creation
+                        categories: categoriesConnect,
                         brand: brandConnect,
                         tags: tagsConnect,
                         featuredImage,

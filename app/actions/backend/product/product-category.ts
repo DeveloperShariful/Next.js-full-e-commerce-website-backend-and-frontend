@@ -1,4 +1,4 @@
-// app/actions/backend/product/product-category.ts
+// File: app/actions/backend/product/product-category.ts
 "use server";
 
 import { db } from "@/lib/prisma";
@@ -23,13 +23,13 @@ export type CategoryWithDetails = Prisma.CategoryGetPayload<{
   };
 }>;
 
-// --- Zod Schema (Updated with mediaId) ---
+// --- Zod Schema ---
 const categorySchema = z.object({
   name: z.string().min(1, "Category name is required"),
   description: z.string().optional(),
   parentId: z.string().optional().nullable(),
   image: z.string().optional().nullable(),
-  mediaId: z.string().optional().nullable(), // 🔥 NEW: Media Relation Support
+  mediaId: z.string().optional().nullable(), 
   slug: z.string().optional(),
   metaTitle: z.string().optional(),
   metaDesc: z.string().optional(),
@@ -53,7 +53,6 @@ async function generateUniqueSlug(name: string, requestedSlug?: string, ignoreId
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-  // 🔥 Smart Check: Find all similar slugs at once
   const collisions = await db.category.findMany({
     where: { 
       slug: { startsWith: baseSlug }, 
@@ -64,11 +63,9 @@ async function generateUniqueSlug(name: string, requestedSlug?: string, ignoreId
 
   if (collisions.length === 0) return baseSlug;
 
-  // Check for exact match or suffixes
   const exactMatch = collisions.some(c => c.slug === baseSlug);
   if (!exactMatch) return baseSlug;
 
-  // Find max suffix
   const suffixes = collisions.map(c => {
     const parts = c.slug.split(`${baseSlug}-`);
     return parts.length > 1 ? parseInt(parts[1]) || 0 : 0;
@@ -84,13 +81,12 @@ export async function createCategory(formData: FormData) {
     const userId = await getDbUserId();
     if (!userId) return { success: false, error: "Unauthorized access." };
 
-    // 1. Parse Data
     const rawData = {
       name: formData.get("name"),
       description: formData.get("description"),
       parentId: formData.get("parentId") === "none" ? null : formData.get("parentId"),
       image: formData.get("image"),
-      mediaId: formData.get("mediaId"), // 🔥 Catch mediaId from form
+      mediaId: formData.get("mediaId"), 
       slug: formData.get("slug"),
       metaTitle: formData.get("metaTitle"),
       metaDesc: formData.get("metaDesc"),
@@ -103,17 +99,15 @@ export async function createCategory(formData: FormData) {
     }
     const data = validation.data;
 
-    // 2. Generate Slug
     const slug = await generateUniqueSlug(data.name, data.slug);
 
-    // 3. Create in DB
     const category = await db.category.create({
       data: {
         name: data.name,
         slug,
         description: data.description || null,
         image: data.image || null,
-        mediaId: data.mediaId || null, // 🔥 Link to Media table
+        mediaId: data.mediaId || null, 
         parentId: data.parentId || null,
         metaTitle: data.metaTitle || null,
         metaDesc: data.metaDesc || null,
@@ -121,7 +115,6 @@ export async function createCategory(formData: FormData) {
       }
     });
 
-    // 4. Log Activity
     await db.activityLog.create({
         data: {
             userId,
@@ -150,7 +143,6 @@ export async function updateCategory(formData: FormData) {
     const id = formData.get("id") as string;
     if (!id) return { success: false, error: "Category ID missing." };
 
-    // 1. Parse Data
     const rawData = {
       name: formData.get("name"),
       description: formData.get("description"),
@@ -169,22 +161,17 @@ export async function updateCategory(formData: FormData) {
     }
     const data = validation.data;
 
-    // 2. Check Self-Parenting
     if (data.parentId === id) {
       return { success: false, error: "A category cannot be its own parent." };
     }
 
-    // 3. Generate Slug (only if changed)
     let slug = undefined;
     if (data.slug || data.name) {
-       // Only regen if explicitly requested or name changed, logic handled inside generator
        slug = await generateUniqueSlug(data.name, data.slug, id);
     }
 
-    // 4. Fetch Old Data for Diff Log
     const oldData = await db.category.findUnique({ where: { id } });
 
-    // 5. Update DB
     const updatedCategory = await db.category.update({
       where: { id },
       data: {
@@ -200,7 +187,6 @@ export async function updateCategory(formData: FormData) {
       }
     });
 
-    // 6. Log Diff
     if (oldData) {
         const changes: any = {};
         if (oldData.name !== data.name) changes.name = { old: oldData.name, new: data.name };
@@ -234,7 +220,6 @@ export async function deleteCategory(id: string) {
     const userId = await getDbUserId();
     if (!userId) return { success: false, error: "Unauthorized access." };
 
-    // Fetch details before delete for logs
     const categoryToDelete = await db.category.findUnique({ 
         where: { id },
         select: { name: true } 
@@ -242,8 +227,11 @@ export async function deleteCategory(id: string) {
 
     if (!categoryToDelete) return { success: false, error: "Category not found." };
 
-    // Check constraints
-    const productCount = await db.product.count({ where: { categoryId: id } });
+    // ✅ FIX: Updated from categoryId to 'categories: { some: { id } }' due to Many-to-Many relation
+    const productCount = await db.product.count({ 
+        where: { categories: { some: { id: id } } } 
+    });
+    
     if (productCount > 0) return { success: false, error: `Contains ${productCount} products.` };
 
     const childCount = await db.category.count({ where: { parentId: id } });
@@ -251,7 +239,6 @@ export async function deleteCategory(id: string) {
 
     await db.category.delete({ where: { id } });
     
-    // Log Activity
     await db.activityLog.create({
         data: {
             userId,

@@ -1,7 +1,5 @@
 // File: app/actions/backend/product/product-create-update.ts
 
-// File: app/actions/backend/product/product-create-update.ts
-
 "use server";
 
 import { db } from "@/lib/prisma";

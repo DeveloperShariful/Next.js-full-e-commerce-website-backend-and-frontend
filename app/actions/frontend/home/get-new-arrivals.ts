@@ -15,7 +15,7 @@ export async function getNewArrivals() {
       take: 8,
       include: {
         images: { take: 1, orderBy: { position: 'asc' } },
-        category: true
+        categories: true
       }
     });
     return products;

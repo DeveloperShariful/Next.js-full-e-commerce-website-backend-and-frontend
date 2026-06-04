@@ -13,19 +13,18 @@ export async function getSingleProduct(slug: string) {
         status: ProductStatus.ACTIVE 
       },
       include: {
-        category: true,
+        // ✅ FIX 1: Changed 'category' to 'categories' due to Many-to-Many relation
+        categories: true, 
         images: { orderBy: { position: 'asc' } },
         attributes: true,
-        // ✅ ভ্যারিয়েন্ট এর সাথে ইনভেন্টরি লেভেল আনা হলো
         variants: {
-          where: { deletedAt: null }, // সফট ডিলিট চেক
+          where: { deletedAt: null }, 
           include: {
             inventoryLevels: true
           },
           orderBy: { price: 'asc' }
         },
-        brand: true, // ✅ ব্র্যান্ড লোগো দেখানোর জন্য
-        // ✅ এন্টারপ্রাইজ ফিচার: সাবস্ক্রিপশন এবং ডিজিটাল ফাইল
+        brand: true, 
         subscriptionPlans: {
             where: { isActive: true },
             orderBy: { price: 'asc' }
@@ -41,23 +40,27 @@ export async function getSingleProduct(slug: string) {
   }
 }
 
-// ... getRelatedProducts (বাকি কোড আগের মতোই থাকবে)
+// ... getRelatedProducts
 export async function getRelatedProducts(categoryId: string | null, currentProductId: string) {
-    // ... previous code
     if (!categoryId) return [];
 
     try {
       const products = await db.product.findMany({
         where: {
-          categoryId: categoryId,
+          // ✅ FIX 2: Updated from 'categoryId' to 'categories: { some: ... }'
+          categories: {
+            some: {
+              id: categoryId
+            }
+          },
           id: { not: currentProductId },
           status: ProductStatus.ACTIVE,
         },
         take: 4,
         include: {
           images: { take: 1, orderBy: { position: 'asc' } },
-          category: true,
-          // ব্র্যান্ড এবং রিভিউ রেটিং যোগ করা যেতে পারে
+          // ✅ FIX 3: Changed 'category' to 'categories'
+          categories: true, 
         },
         orderBy: { createdAt: 'desc' }
       });

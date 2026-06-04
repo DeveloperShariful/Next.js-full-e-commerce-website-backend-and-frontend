@@ -18,7 +18,7 @@ export async function duplicateProduct(id: string) {
       where: { id },
       include: {
         tags: true,
-        category: true,
+        categories: true, // ✅ FIX: Fetch Multiple Categories
         brand: true,
         images: true, 
         attributes: true,
@@ -41,8 +41,9 @@ export async function duplicateProduct(id: string) {
 
     await db.$transaction(async (tx) => {
         
-        const categoryConnect = original.categoryId 
-            ? { connect: { id: original.categoryId } } 
+        // ✅ FIX: Multiple Categories Connection
+        const categoriesConnect = original.categories.length > 0 
+            ? { connect: original.categories.map(c => ({ id: c.id })) } 
             : undefined;
 
         const brandConnect = original.brandId 
@@ -86,7 +87,7 @@ export async function duplicateProduct(id: string) {
                 upsellIds: original.upsellIds,
                 crossSellIds: original.crossSellIds,
                 
-                category: categoryConnect,
+                categories: categoriesConnect, // ✅ FIX: Applied multiple categories
                 brand: brandConnect,
                 
                 tags: {

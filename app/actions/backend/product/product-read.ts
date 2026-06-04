@@ -11,7 +11,8 @@ export async function getProductById(id: string) {
     const product = await db.product.findUnique({
       where: { id },
       include: {
-        category: true,
+        // ✅ FIX: Changed from 'category: true' to 'categories: true'
+        categories: true, 
         brand: true,
         collections: true, 
         shippingClass: true,

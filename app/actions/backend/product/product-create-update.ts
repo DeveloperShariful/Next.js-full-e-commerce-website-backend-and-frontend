@@ -389,7 +389,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                      };
                  }
 
-                 if (scalarsChanged || tagsChanged || collectionsChanged || categoriesChanged || type === "UPDATE") {
+                 // ✅ FIX: categoriesChanged অথবা variations ডিলিট হলেও যেন আপডেট কোয়েরি রান হয়
+                 if (scalarsChanged || tagsChanged || collectionsChanged || categoriesChanged || variationsChanged || type === "UPDATE") {
                      product = await tx.product.update({
                         where: { id: data.id },
                         data: productData
@@ -421,9 +422,11 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 promises.push(handleAttributes(tx, product.id, data.attributesData));
             }
             
-            // ✅ FIX: "VARIABLE" থেকে অন্য টাইপে চেঞ্জ করলেও যেন ডিলিট প্রোমিশ রান হয়
+            // ✅ ULTIMATE FIX: প্রোডাক্ট টাইপ চ্যাঞ্জ হলে, অথবা ডাটাবেসে পুরোনো অরফান ভ্যারিয়েশন থাকলে জোর করে handleVariations রান করানো হবে
             const productTypeChanged = oldProductData && oldProductData.productType !== data.productType;
-            if (variationsChanged || productTypeChanged || type === "CREATE") {
+            const hasOrphanedVariations = data.productType !== 'VARIABLE' && oldProductData?.variants?.length > 0;
+            
+            if (variationsChanged || productTypeChanged || hasOrphanedVariations || type === "CREATE") {
                 promises.push(handleVariations(tx, product.id, data.variationsData, data.productType, locationId, dbUser!.id));
             }
             if (bundleChanged || type === "CREATE") {

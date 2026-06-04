@@ -64,4 +64,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
     })
   ],
+  callbacks: {
+    // ========================================================================
+    // 🚀 REAL-TIME SESSION SYNC (ডাটাবেসের সাথে সেশন সিঙ্ক লজিক)
+    // ========================================================================
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = user.role || "CUSTOMER"; 
+        token.id = user.id as string; 
+      }
+
+      // কাস্টমার রিফ্রেশ বা পেজ চেঞ্জ করার সময় ডাটাবেস থেকে রিয়েল-টাইম নাম ও পিকচার তুলে আনা হবে
+      if (token?.id) {
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: token.id },
+            select: { name: true, role: true, image: true }
+          });
+          if (dbUser) {
+            token.name = dbUser.name;
+            token.role = dbUser.role;
+            token.picture = dbUser.image;
+          }
+        } catch (error) {
+          console.error("Failed to sync session with database:", error);
+        }
+      }
+
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.role = (token.role as string) || "CUSTOMER";
+        session.user.id = token.id as string;
+        // ✅ ডাইনামিকলি সেশনে লেটেস্ট নাম ও পিকচার পুশ করা হচ্ছে
+        session.user.name = token.name as string; 
+        session.user.image = token.picture as string; 
+      }
+      return session;
+    },
+  }
 });

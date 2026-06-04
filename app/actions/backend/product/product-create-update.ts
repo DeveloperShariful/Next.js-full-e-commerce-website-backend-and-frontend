@@ -171,7 +171,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                     images: true,
                     attributes: true,
                     collections: true,
-                    categories: true, // ✅ FIX: Changed to categories array
+                    categories: true, 
                     brand: true,    
                     downloadFiles: true, 
                     bundleItems: true,
@@ -232,7 +232,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 oldProductData.preOrderMessage !== (data.preOrderMessage || null) ||
                 oldProductData.featuredImage !== (data.featuredImage || null);
 
-            // ✅ FIX: Multiple Categories Change Detection
             const categoriesChanged = !oldProductData || !arraysHaveSameContent(
                 oldProductData.categories.map((c: any) => c.id),
                 data.categoryIds || []
@@ -276,7 +275,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 data.bundleItems.map((b: any) => b.childProductId).sort()
             ));
 
-            // ✅ FIX: Added categoriesChanged to main checking flag
             const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged;
 
             if (type === "UPDATE" && !anyChanges) {
@@ -297,7 +295,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 ? (type === "CREATE" ? { connect: data.collectionIds.map(cid => ({ id: cid })) } : { set: data.collectionIds.map(cid => ({ id: cid })) })
                 : undefined;
 
-            // ✅ FIX: Categories Relation Setup
             const categoriesRelation = categoriesChanged || type === "CREATE"
                 ? (type === "CREATE" ? { connect: (data.categoryIds || []).map((cid: string) => ({ id: cid })) } : { set: (data.categoryIds || []).map((cid: string) => ({ id: cid })) })
                 : undefined;
@@ -378,7 +375,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
                 brand: brandConnect,
                 
-                // ✅ FIX: Inject Multiple Categories & Collections
                 ...(collectionsChanged || type === "CREATE" ? { collections: collectionsRelation } : {}),
                 ...(categoriesChanged || type === "CREATE" ? { categories: categoriesRelation } : {})
             };
@@ -424,7 +420,10 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             if (attributesChanged || type === "CREATE") {
                 promises.push(handleAttributes(tx, product.id, data.attributesData));
             }
-            if (variationsChanged || type === "CREATE") {
+            
+            // ✅ FIX: "VARIABLE" থেকে অন্য টাইপে চেঞ্জ করলেও যেন ডিলিট প্রোমিশ রান হয়
+            const productTypeChanged = oldProductData && oldProductData.productType !== data.productType;
+            if (variationsChanged || productTypeChanged || type === "CREATE") {
                 promises.push(handleVariations(tx, product.id, data.variationsData, data.productType, locationId, dbUser!.id));
             }
             if (bundleChanged || type === "CREATE") {

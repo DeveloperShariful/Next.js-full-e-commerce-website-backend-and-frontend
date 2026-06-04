@@ -389,14 +389,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                      };
                  }
 
-                 // ✅ FIX: categoriesChanged অথবা variations ডিলিট হলেও যেন আপডেট কোয়েরি রান হয়
                  if (scalarsChanged || tagsChanged || collectionsChanged || categoriesChanged || variationsChanged || type === "UPDATE") {
                      product = await tx.product.update({
                         where: { id: data.id },
                         data: productData
                     });
                  } else {
-                     product = { id: data.id, name: data.name }; 
+                     product = { id: data.id, name: data.name, slug: finalSlug };
                  }
             } else {
                 productData.tags = {
@@ -422,7 +421,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 promises.push(handleAttributes(tx, product.id, data.attributesData));
             }
             
-            // ✅ ULTIMATE FIX: প্রোডাক্ট টাইপ চ্যাঞ্জ হলে, অথবা ডাটাবেসে পুরোনো অরফান ভ্যারিয়েশন থাকলে জোর করে handleVariations রান করানো হবে
             const productTypeChanged = oldProductData && oldProductData.productType !== data.productType;
             const hasOrphanedVariations = data.productType !== 'VARIABLE' && oldProductData?.variants?.length > 0;
             
@@ -462,6 +460,33 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             return savedProduct;
         }
 
+        // ====================================================================
+        // 🚀 ULTIMATE DYNAMIC REVALIDATION
+        // ====================================================================
+        if (savedProduct && savedProduct.id) {
+            // ১. প্রোডাক্ট পেজ ডাইনামিকলি রিভ্যালিডেট
+            revalidatePath(`/product/${savedProduct.slug}`);
+
+            // ২. এই প্রোডাক্টটি যেসব ক্যাটাগরি ও প্যারেন্ট ক্যাটাগরি ফাইলে কানেক্টেড, সেগুলোর ক্যাশ ডাইনামিকলি ক্লিয়ার হবে (কোনো হার্ডকোডিং ছাড়া)
+            try {
+                const connectedCategories = await db.category.findMany({
+                    where: {
+                        products: { some: { id: savedProduct.id } }
+                    },
+                    select: { slug: true }
+                });
+
+                connectedCategories.forEach((cat) => {
+                    if (cat.slug) {
+                        revalidatePath(`/${cat.slug}`); // e.g. /bikes, /apparel
+                    }
+                });
+            } catch (e) {
+                console.error("Failed to dynamically revalidate categories:", e);
+            }
+        }
+
+        // ৩. আপনার অরিজিনাল বর্ডার ও রিভ্যালিডেশন কোড হুবহু অক্ষত রাখা হয়েছে
         revalidatePath("/admin/products");
         return { success: true, productId: savedProduct.id };
 

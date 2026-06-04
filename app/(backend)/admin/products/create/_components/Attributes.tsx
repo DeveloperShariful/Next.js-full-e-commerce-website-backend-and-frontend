@@ -1,7 +1,5 @@
 // File: app/admin/products/create/_components/Attributes.tsx
 
-// File: app/admin/products/create/_components/Attributes.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";

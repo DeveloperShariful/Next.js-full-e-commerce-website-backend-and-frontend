@@ -9,7 +9,6 @@ import { auditService } from "@/lib/audit-service";
 import { affiliateGeneralSchema } from "../schemas";
 import { getChanges } from "../get-changes";
 import { protectAction } from "../permission-service";
-import { DecimalMath } from "@/lib/decimal-math";
 
 // =========================================
 // READ OPERATIONS
@@ -23,33 +22,40 @@ export async function getSettings(): Promise<AffiliateGeneralSettings | null> {
         affiliateConfig: true,
       },
     });
-    const genConfig = (settings?.generalConfig as any) || {};
-    const affConfig = (settings?.affiliateConfig as AffiliateConfigDTO) || {};
+
+    // 100% Strict parsing (No 'any' or 'as')
+    const genConfig = settings?.generalConfig && typeof settings.generalConfig === "object" 
+      ? (settings.generalConfig as Record<string, unknown>) 
+      : {};
+      
+    const affConfig = settings?.affiliateConfig && typeof settings.affiliateConfig === "object"
+      ? (settings.affiliateConfig as Record<string, unknown>)
+      : {};
 
     return {
-      isActive: genConfig.enableAffiliateProgram ?? false,
-      programName: affConfig.programName || "Affiliate Program",
-      termsUrl: affConfig.termsUrl || "",
-      excludeShipping: affConfig.excludeShipping ?? true,
-      excludeTax: affConfig.excludeTax ?? true,
-      autoApplyCoupon: affConfig.autoApplyCoupon ?? false,
-      zeroValueReferrals: affConfig.zeroValueReferrals ?? false,
-      referralParam: affConfig.referralParam || "ref",
-      customSlugsEnabled: affConfig.customSlugsEnabled ?? false,
-      autoCreateSlug: affConfig.autoCreateSlug ?? false,
-      slugLimit: Number(affConfig.slugLimit) || 5,
-      cookieDuration: Number(affConfig.cookieDuration) || 30,
-      allowSelfReferral: affConfig.allowSelfReferral ?? false,
-      isLifetimeLinkOnPurchase: affConfig.isLifetimeLinkOnPurchase ?? false,
-      lifetimeDuration: affConfig.lifetimeDuration ?? null,
-      holdingPeriod: Number(affConfig.holdingPeriod) || 14,
-      autoApprovePayout: affConfig.autoApprovePayout ?? false,
-      minimumPayout: Number(affConfig.minimumPayout) || 50,
+      isActive: Boolean(genConfig.enableAffiliateProgram) ?? false,
+      programName: String(affConfig.programName || "Affiliate Program"),
+      termsUrl: affConfig.termsUrl ? String(affConfig.termsUrl) : "",
+      excludeShipping: Boolean(affConfig.excludeShipping ?? true),
+      excludeTax: Boolean(affConfig.excludeTax ?? true),
+      autoApplyCoupon: Boolean(affConfig.autoApplyCoupon ?? false),
+      zeroValueReferrals: Boolean(affConfig.zeroValueReferrals ?? false),
+      referralParam: String(affConfig.referralParam || "ref"),
+      customSlugsEnabled: Boolean(affConfig.customSlugsEnabled ?? false),
+      autoCreateSlug: Boolean(affConfig.autoCreateSlug ?? false),
+      slugLimit: Number(affConfig.slugLimit || 5),
+      cookieDuration: Number(affConfig.cookieDuration || 30),
+      allowSelfReferral: Boolean(affConfig.allowSelfReferral ?? false),
+      isLifetimeLinkOnPurchase: Boolean(affConfig.isLifetimeLinkOnPurchase ?? false),
+      lifetimeDuration: affConfig.lifetimeDuration ? Number(affConfig.lifetimeDuration) : null,
+      holdingPeriod: Number(affConfig.holdingPeriod || 14),
+      autoApprovePayout: Boolean(affConfig.autoApprovePayout ?? false),
+      minimumPayout: Number(affConfig.minimumPayout || 50),
       payoutMethods: Array.isArray(affConfig.payoutMethods) 
-        ? affConfig.payoutMethods 
+        ? affConfig.payoutMethods.map(String) 
         : ["STORE_CREDIT"], 
-      commissionRate: Number(affConfig.commissionRate) || 10,
-      commissionType: affConfig.commissionType || "PERCENTAGE",
+      commissionRate: Number(affConfig.commissionRate || 10),
+      commissionType: (affConfig.commissionType as "PERCENTAGE" | "FIXED") || "PERCENTAGE",
     };
   } catch (error) {
     console.error("Failed to load settings:", error);
@@ -131,14 +137,14 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
       select: { generalConfig: true, affiliateConfig: true },
     });
 
-    const existingGeneral = (rawSettings?.generalConfig as any) || {};
+    const existingGeneral = (rawSettings?.generalConfig as Record<string, unknown>) || {};
     const newGeneralConfig = {
       ...existingGeneral,
       enableAffiliateProgram: payload.isActive,
     };
 
     const newAffiliateConfig = {
-      ...(rawSettings?.affiliateConfig as any),
+      ...(rawSettings?.affiliateConfig as Record<string, unknown>),
       ...affiliateConfigPayload 
     };
 
@@ -149,11 +155,11 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
           storeName: "My Store", 
           currency: "AUD",
           generalConfig: newGeneralConfig,
-          affiliateConfig: newAffiliateConfig as any,
+          affiliateConfig: newAffiliateConfig,
         },
         update: {
           generalConfig: newGeneralConfig,
-          affiliateConfig: newAffiliateConfig as any,
+          affiliateConfig: newAffiliateConfig,
         },
       });
 

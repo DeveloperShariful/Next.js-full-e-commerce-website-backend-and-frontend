@@ -2,7 +2,8 @@
 
 import { db } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
-import { cache } from "react"; // React এর ডুপ্লিকেট রিকোয়েস্ট থামানোর জন্য
+import { cache } from "react"; 
+import { z } from "zod"; // ✅ FIXED: Added Zod for strict JSON parsing
 
 // ============================================================================
 // 1. STORE SETTINGS CACHE
@@ -20,8 +21,8 @@ export const getCachedStoreSettings = unstable_cache(
       return null;
     }
   },
-  ["store-settings-cache-key"], // ইউনিক ক্যাশ কি (Key)
-  { tags: ["store-settings"], revalidate: 86400 } // 24 ঘণ্টা পর অটো আপডেট, অথবা revalidateTag কল করলে সাথে সাথে আপডেট
+  ["store-settings-cache-key"],
+  { tags: ["store-settings"], revalidate: 86400 } 
 );
 
 // ============================================================================
@@ -69,10 +70,9 @@ export const getCachedMarketingConfig = unstable_cache(
 // ============================================================================
 export const getCachedPaymentMethods = async () => {
   try {
-    return await db.paymentGateway.findMany({ // ✅ Change model name here
+    return await db.paymentGateway.findMany({ 
       where: { isEnabled: true },
       orderBy: { displayOrder: "asc" },
-      // include: { ... } // ❌ 'include' ফেলে দিন, কারণ এখন আর রিলেশনাল টেবিল নেই, সব JSON এ আছে।
     });
   } catch (error) {
     console.error("Cache Error (PaymentMethods):", error);
@@ -139,29 +139,53 @@ export const getCachedTransdirectConfig = unstable_cache(
 );
 
 // ============================================================================
-// 8. AFFILIATE MLM CONFIG CACHE
+// 8. AFFILIATE MLM CONFIG CACHE (✅ FIXED: JSON Fetching from StoreSettings)
 // ট্যাগ: 'mlm-config'
 // ============================================================================
+
+const MLMConfigZod = z.object({
+  isEnabled: z.boolean().optional().default(false),
+  maxLevels: z.number().optional().default(3),
+  commissionBasis: z.enum(["SALES_AMOUNT", "PROFIT_MARGIN", "CV"]).optional().default("SALES_AMOUNT"),
+  levelRates: z.record(z.string(), z.number()).optional().default({ "1": 10, "2": 5, "3": 2 }),
+});
+
 export const getCachedMLMConfig = unstable_cache(
   async () => {
     try {
-      return await db.affiliateMLMConfig.findUnique({
-        where: { id: "mlm_config" },
+      const settings = await db.storeSettings.findUnique({
+        where: { id: "settings" },
+        select: { mlmConfig: true },
       });
+
+      // 100% Strict parsing without 'any' or 'as'
+      const parsedData = MLMConfigZod.safeParse(settings?.mlmConfig);
+      const config = parsedData.success ? parsedData.data : MLMConfigZod.parse({});
+
+      return {
+        id: "mlm_config", // Mocking ID for backward compatibility
+        isEnabled: config.isEnabled,
+        maxLevels: config.maxLevels,
+        commissionBasis: config.commissionBasis,
+        levelRates: config.levelRates,
+      };
     } catch (error) {
       console.error("⚠️ Cache Error (MLMConfig):", error);
-      return null;
+      return {
+        id: "mlm_config",
+        isEnabled: false,
+        maxLevels: 3,
+        commissionBasis: "SALES_AMOUNT",
+        levelRates: { "1": 10, "2": 5, "3": 2 },
+      };
     }
   },
   ["mlm-config-cache-key"],
-  { tags: ["mlm-config"], revalidate: 86400 }
+  { tags: ["store-settings", "mlm-config"], revalidate: 86400 } // ✅ Tags updated to invalidate when settings change
 );
 
 // ============================================================================
 // 9. 🚀 AFFILIATE STATUS (REQUEST DEDUPLICATION)
-// এটি লং-টার্ম ক্যাশ হবে না, কারণ এটি ইউজার স্পেসিফিক।
-// কিন্তু React.cache() ব্যবহার করার ফলে এক পেজ লোডে ৩ বার কল হলেও 
-// ডাটাবেজে মাত্র ১ বারই হিট করবে।
 // ============================================================================
 export const getAffiliateStatusSafe = cache(async (userId?: string) => {
   try {

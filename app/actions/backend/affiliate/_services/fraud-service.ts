@@ -3,58 +3,72 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { Prisma, FraudRuleType, FraudAction } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/audit-service";
-import { getCachedFraudRules } from "@/lib/settings-cache";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service";
+import crypto from "crypto";
 
 // ==============================================================================
-// PART 1: FRAUD RULES CONFIGURATION (Schema & CRUD)
+// PART 1: FRAUD RULES CONFIGURATION (JSON Based Strict Types)
 // ==============================================================================
 
-const ruleSchema = z.object({
-  type: z.nativeEnum(FraudRuleType),
+const fraudRuleSchema = z.object({
+  id: z.string().optional(),
+  type: z.enum(["IP_CLICK_LIMIT", "CONVERSION_RATE_LIMIT", "ORDER_VALUE_LIMIT", "BLACKLIST_COUNTRY"]),
   value: z.string().min(1, "Threshold value is required"),
- action: z.nativeEnum(FraudAction).default(FraudAction.FLAG),
+  action: z.enum(["BLOCK", "FLAG", "SUSPEND"]).default("FLAG"),
   reason: z.string().optional(),
 });
 
-export async function getRules() {
+type FraudRuleInput = z.infer<typeof fraudRuleSchema>;
+
+export async function getRules(): Promise<FraudRuleInput[]> {
   try {
     await protectAction("MANAGE_FRAUD");
-    return await db.affiliateFraudRule.findMany({
-      orderBy: { createdAt: "desc" }
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { affiliateFraudRules: true }
     });
+
+    const parsed = z.array(fraudRuleSchema).safeParse(settings?.affiliateFraudRules);
+    return parsed.success ? parsed.data : [];
   } catch (error) {
     throw new Error("Failed to load fraud rules.");
   }
 }
 
-export async function createFraudRuleAction(data: z.infer<typeof ruleSchema>): Promise<ActionResponse> {
+export async function createFraudRuleAction(data: FraudRuleInput): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_FRAUD");
 
-    const result = ruleSchema.safeParse(data);
+    const result = fraudRuleSchema.safeParse(data);
     if (!result.success) return { success: false, message: result.error.issues[0].message };
 
-    const rule = await db.affiliateFraudRule.create({
-      data: {
-        type: result.data.type,
-        value: result.data.value,
-        action: result.data.action,
-        reason: result.data.reason || "Automated Rule Match"
-      }
+    const currentRules = await getRules();
+    
+    // Create new rule with ID
+    const newRule = {
+      ...result.data,
+      id: crypto.randomUUID(),
+      reason: result.data.reason || "Automated Rule Match"
+    };
+
+    currentRules.push(newRule);
+
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateFraudRules: currentRules }
     });
 
     await auditService.log({
       userId: actor.id,
       action: "CREATE_FRAUD_RULE",
-      entity: "AffiliateFraudRule",
-      entityId: rule.id,
-      newData: result.data
+      entity: "StoreSettings",
+      entityId: "affiliateFraudRules",
+      newData: newRule
     });
 
     revalidatePath("/admin/affiliate/fraud");
@@ -68,12 +82,18 @@ export async function deleteFraudRuleAction(id: string): Promise<ActionResponse>
   try {
     const actor = await protectAction("MANAGE_FRAUD");
 
-    await db.affiliateFraudRule.delete({ where: { id } });
+    const currentRules = await getRules();
+    const updatedRules = currentRules.filter(r => r.id !== id);
+
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateFraudRules: updatedRules }
+    });
 
     await auditService.log({
         userId: actor.id,
         action: "DELETE_FRAUD_RULE",
-        entity: "AffiliateFraudRule",
+        entity: "StoreSettings",
         entityId: id
     });
 
@@ -96,6 +116,7 @@ export async function detectSelfReferral(affiliateId: string, buyerEmail: string
 
   if (!affiliate) return false;
   if (affiliate.user.email.toLowerCase().trim() === buyerEmail.toLowerCase().trim()) return true;
+  
   const match = await db.affiliateClick.findFirst({
     where: { 
       affiliateId: affiliateId,
@@ -136,7 +157,10 @@ export async function checkDeviceFingerprint(affiliateId: string, fingerprint: s
 
 export async function updateRiskScore(affiliateId: string) {
   let score = 0;
-  const rules = await getCachedFraudRules();
+  
+  // Fetch rules strictly parsed via Zod
+  const rules = await getRules();
+  
   const [referralsCount, clickCount, flaggedCount] = await Promise.all([
     db.referral.count({ where: { affiliateId } }),
     db.affiliateClick.count({ where: { affiliateId } }),
@@ -144,6 +168,7 @@ export async function updateRiskScore(affiliateId: string) {
   ]);
 
   const conversionRate = clickCount > 0 ? (referralsCount / clickCount) * 100 : 0;
+  
   for (const rule of rules) {
     const threshold = Number(rule.value);
     
@@ -156,6 +181,7 @@ export async function updateRiskScore(affiliateId: string) {
   }
 
   score += (flaggedCount * 15);
+  
   const recentReferrals = await db.referral.findMany({
       where: { affiliateId },
       orderBy: { createdAt: "desc" },
@@ -170,11 +196,14 @@ export async function updateRiskScore(affiliateId: string) {
           await logFraudAlert(affiliateId, "RAPID_TRANSACTIONS", "5 orders in < 5 mins");
       }
   }
+  
   if (score > 100) score = 100;
+  
   await db.affiliateAccount.update({
     where: { id: affiliateId },
     data: { riskScore: score }
   });
+  
   if (score >= 80) {
     await db.affiliateAccount.update({
       where: { id: affiliateId },

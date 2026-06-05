@@ -1,4 +1,4 @@
-//app/actions/storefront/affiliates/_services/settings-service.ts
+// app/actions/storefront/affiliates/_services/settings-service.ts
 
 "use server";
 
@@ -6,7 +6,7 @@ import { db } from "@/lib/prisma";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getAuthAffiliate } from "../auth-helper";
-import { AffiliateDocumentType, AffiliateDocumentStatus } from "@prisma/client";
+import crypto from "crypto";
 
 // ==========================================
 // 1. VALIDATION SCHEMAS
@@ -21,10 +21,28 @@ const settingsSchema = z.object({
   }).optional(),
 });
 
+// Since AffiliateDocumentType Enum is deleted, we define it via Zod for the JSON
 const kycSchema = z.object({
-  type: z.nativeEnum(AffiliateDocumentType),
+  type: z.enum(["PASSPORT", "DRIVING_LICENSE", "NATIONAL_ID", "TAX_FORM"]),
   url: z.string().url("Invalid file URL"),
   number: z.string().min(3, "Document number required"),
+});
+
+const pixelJsonSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  pixelId: z.string(),
+  enabled: z.boolean(),
+  createdAt: z.string()
+});
+
+const kycJsonSchema = z.object({
+  type: z.string(),
+  url: z.string(),
+  documentNumber: z.string().optional(),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]),
+  rejectionReason: z.string().optional(),
+  verifiedAt: z.string().optional()
 });
 
 type SettingsInput = z.infer<typeof settingsSchema>;
@@ -37,45 +55,54 @@ type KYCInput = z.infer<typeof kycSchema>;
 export async function getSettings(userId: string) {
   const affiliate = await db.affiliateAccount.findUnique({
     where: { userId },
-    include: { 
-        pixels: true,
-        documents: {
-            orderBy: { createdAt: "desc" }
-        }
+    select: {
+      id: true,
+      paypalEmail: true,
+      bankDetails: true,
+      pixels: true,          // ✅ Fetching from JSON
+      kycDocuments: true,    // ✅ Fetching from JSON
+      isKyced: true,
+      kycStatus: true
     }
   });
 
   if (!affiliate) return null;
 
+  // Safe parsing for JSON Arrays
+  const parsedPixels = z.array(pixelJsonSchema).safeParse(affiliate.pixels);
+  const parsedDocs = z.array(kycJsonSchema).safeParse(affiliate.kycDocuments);
+
+  const pixels = parsedPixels.success ? parsedPixels.data : [];
+  const documents = parsedDocs.success ? parsedDocs.data : [];
+
   return {
     id: affiliate.id,
     paypalEmail: affiliate.paypalEmail,
     bankDetails: affiliate.bankDetails as any, 
-    pixels: affiliate.pixels.map(p => ({
+    pixels: pixels.map(p => ({
       id: p.id,
       provider: p.type, 
       pixelId: p.pixelId,
-      enabled: p.isEnabled 
+      enabled: p.enabled 
     })),
     
     kyc: {
-        isVerified: affiliate.isKyced, // Ensure this field exists in schema
-        documents: affiliate.documents.map(d => ({
-            id: d.id,
+        isVerified: affiliate.isKyced || affiliate.kycStatus === "VERIFIED",
+        documents: documents.map((d, index) => ({
+            id: `doc-${index}`, // JSON array doesn't have native ID, generating one for UI
             type: d.type,
             status: d.status,
-            // 👇 Mapping DB fields to Frontend Props
-            url: d.fileUrl,           
+            url: d.url,           
             number: d.documentNumber, 
             feedback: d.rejectionReason, 
-            createdAt: d.createdAt
+            createdAt: d.verifiedAt || new Date().toISOString() // Fallback date
         }))
     }
   };
 }
 
 // ==========================================
-// 3. MUTATIONS
+// 3. MUTATIONS (JSON Array Operations)
 // ==========================================
 
 export async function updateSettingsAction(data: SettingsInput) {
@@ -93,7 +120,8 @@ export async function updateSettingsAction(data: SettingsInput) {
       where: { id: affiliate.id }, 
       data: {
         paypalEmail: paypalEmail || null,
-        bankDetails: bankDetails ? JSON.stringify(bankDetails) : undefined,
+        // Prisma saves JSON directly, stringify is not strictly needed for Json fields but keeping as per your design
+        bankDetails: bankDetails as any, 
       }
     });
 
@@ -109,13 +137,29 @@ export async function updateSettingsAction(data: SettingsInput) {
 export async function addPixelAction(provider: "FACEBOOK" | "GOOGLE" | "TIKTOK", pixelId: string) {
   try {
     const affiliate = await getAuthAffiliate();
-    await db.affiliatePixel.create({
-      data: {
-        affiliateId: affiliate.id, 
-        type: provider,
-        pixelId,
-        isEnabled: true
-      }
+    
+    // 1. Fetch current pixels JSON
+    const account = await db.affiliateAccount.findUnique({
+      where: { id: affiliate.id },
+      select: { pixels: true }
+    });
+
+    const parsed = z.array(pixelJsonSchema).safeParse(account?.pixels);
+    let currentPixels = parsed.success ? parsed.data : [];
+
+    // 2. Append new pixel
+    currentPixels.push({
+      id: crypto.randomUUID(),
+      type: provider,
+      pixelId: pixelId,
+      enabled: true,
+      createdAt: new Date().toISOString()
+    });
+
+    // 3. Update DB
+    await db.affiliateAccount.update({
+      where: { id: affiliate.id },
+      data: { pixels: currentPixels as any }
     });
     
     revalidatePath("/affiliates/settings");
@@ -125,7 +169,7 @@ export async function addPixelAction(provider: "FACEBOOK" | "GOOGLE" | "TIKTOK",
   }
 }
 
-// ✅ Upload KYC Document (Fixed for Existing Schema)
+// ✅ Upload KYC Document (Fixed for JSON Array)
 export async function uploadKYCAction(data: KYCInput) {
     try {
         const affiliate = await getAuthAffiliate();
@@ -133,27 +177,38 @@ export async function uploadKYCAction(data: KYCInput) {
         const result = kycSchema.safeParse(data);
         if(!result.success) return { success: false, message: "Invalid data" };
 
-        // Check duplicate pending
-        const existing = await db.affiliateDocument.findFirst({
-            where: { 
-                affiliateId: affiliate.id, 
-                type: result.data.type, 
-                status: AffiliateDocumentStatus.PENDING 
-            }
+        // 1. Fetch current documents
+        const account = await db.affiliateAccount.findUnique({
+          where: { id: affiliate.id },
+          select: { kycDocuments: true }
         });
 
-        if(existing) {
+        const parsed = z.array(kycJsonSchema).safeParse(account?.kycDocuments);
+        let currentDocs = parsed.success ? parsed.data : [];
+
+        // 2. Check duplicate pending
+        const existingPending = currentDocs.find(
+            d => d.type === result.data.type && d.status === "PENDING"
+        );
+
+        if(existingPending) {
             return { success: false, message: "A document of this type is already under review." };
         }
 
-        await db.affiliateDocument.create({
+        // 3. Append new document to array
+        currentDocs.push({
+            type: result.data.type,
+            url: result.data.url,
+            documentNumber: result.data.number,
+            status: "PENDING"
+        });
+
+        // 4. Update DB
+        await db.affiliateAccount.update({
+            where: { id: affiliate.id },
             data: {
-                affiliateId: affiliate.id,
-                type: result.data.type,
-                status: AffiliateDocumentStatus.PENDING,
-                // 👇 Saving to your existing DB fields
-                fileUrl: result.data.url,       
-                documentNumber: result.data.number 
+                kycDocuments: currentDocs as any,
+                kycStatus: "PENDING_REVIEW" // Update global status
             }
         });
 

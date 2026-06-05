@@ -22,10 +22,11 @@ import * as analyticsService from "@/app/actions/backend/affiliate/_services/das
 import * as groupService from "@/app/actions/backend/affiliate/_services/group-service";
 import * as couponTagService from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 import * as logService from "@/app/actions/backend/affiliate/_services/log-service"; 
+import { getCachedMLMConfig } from "@/lib/settings-cache"; // ✅ FIXED: Imported JSON Cache for MLM
 import { serializePrismaData } from "@/lib/format-data"; 
 
 export const metadata = {
-  title: "Affiliate Program Management | Enterprise Admin",
+  title: "Affiliate Program | WP Admin Style",
   description: "Advanced control center for affiliate marketing, MLM, and commission management.",
 };
 
@@ -154,7 +155,8 @@ export default async function AffiliateMasterPage({
         break;
         
       case "general":
-        data.mlmConfig = await db.affiliateMLMConfig.findUnique({ where: { id: "mlm_config" } });
+        // ✅ FIXED: Fetch MLM config from JSON Cache instead of deleted Table
+        data.mlmConfig = await getCachedMLMConfig();
         break;
         
       case "tags":
@@ -185,19 +187,21 @@ export default async function AffiliateMasterPage({
     console.error("Affiliate Dashboard Error:", error);
     data.error = error.message || "Failed to load module data. Please try again.";
   }
+  
   return (
-    <div className="bg-white min-h-[calc(100vh-64px)] w-full"> 
+    // WP Background Color
+    <div className="bg-[#f0f0f1] min-h-[calc(100vh-64px)] w-full font-sans text-[13px]"> 
       <Suspense fallback={
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50/50">
-            <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mb-4" />
-            <p className="text-sm font-medium text-gray-500 animate-pulse">Loading Affiliate Control Panel...</p>
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-[#f0f0f1]">
+            <Loader2 className="w-8 h-8 animate-spin text-[#2271b1] mb-4" />
+            <p className="text-[13px] text-[#50575e]">Loading WordPress Engine...</p>
         </div>
       }>
         {data.error ? (
-          <div className="p-8 flex flex-col items-center justify-center h-[50vh] text-center">
-            <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-            <h3 className="text-lg font-bold text-gray-900">Module Error</h3>
-            <p className="text-gray-500 max-w-md mt-2">{data.error}</p>
+          <div className=" flex flex-col items-center justify-center h-[50vh] text-center">
+            <AlertTriangle className="w-12 h-12 text-[#d63638] mb-4" />
+            <h3 className="text-lg font-semibold text-[#1d2327]">Module Error</h3>
+            <p className="text-[#50575e] max-w-md mt-2">{data.error}</p>
           </div>
         ) : (
           <AffiliateMainView 

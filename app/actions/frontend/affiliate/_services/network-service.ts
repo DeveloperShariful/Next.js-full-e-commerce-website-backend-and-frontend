@@ -1,8 +1,9 @@
-//app/actions/storefront/affiliates/_services/network-service.ts
+// app/actions/storefront/affiliates/_services/network-service.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
+import { getCachedMLMConfig } from "@/lib/settings-cache"; // ✅ FIXED: Importing the cached JSON config
 
 export interface NetworkNode {
   id: string;
@@ -32,13 +33,15 @@ export async function getSponsor(affiliateId: string) {
 }
 
 export async function getNetworkTree(affiliateId: string): Promise<NetworkNode[]> {
-  const config = await db.affiliateMLMConfig.findUnique({ where: { id: "mlm_config" } });
+  // ✅ FIXED: Fetch MLM limits from JSON instead of deleted DB Table
+  const config = await getCachedMLMConfig();
   const MAX_DEPTH = config?.isEnabled ? (config.maxLevels || 3) : 0;
+  
   const fetchChildren = async (parentId: string, currentLevel: number): Promise<NetworkNode[]> => {
     if (currentLevel > MAX_DEPTH) return []; 
 
     const children = await db.affiliateAccount.findMany({
-      where: { parentId },
+      where: { parentId, deletedAt: null },
       include: {
         user: { select: { name: true, image: true } }
       }
@@ -68,8 +71,9 @@ export async function getNetworkTree(affiliateId: string): Promise<NetworkNode[]
 
 export async function getNetworkStats(affiliateId: string) {
   const directRecruits = await db.affiliateAccount.count({
-    where: { parentId: affiliateId }
+    where: { parentId: affiliateId, deletedAt: null }
   });
+  
   return {
     directRecruits,
     activePartners: directRecruits 

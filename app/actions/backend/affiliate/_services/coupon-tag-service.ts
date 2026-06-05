@@ -42,10 +42,23 @@ export async function getAllAffiliateCoupons() {
 export async function getAllTags() {
   await protectAction("MANAGE_PARTNERS");
   
-  return await db.affiliateTag.findMany({
-    select: { id: true, name: true },
-    orderBy: { name: "asc" }
+  // ✅ FIXED: AffiliateTag table is deleted. We now dynamically fetch unique tags from AffiliateAccount table.
+  const accounts = await db.affiliateAccount.findMany({
+    select: { tags: true },
+    where: { tags: { isEmpty: false } }
   });
+
+  // Extract unique tags
+  const allTags = new Set<string>();
+  accounts.forEach(acc => {
+    acc.tags.forEach(tag => allTags.add(tag));
+  });
+
+  // Return in a compatible format for frontend (id and name are same now)
+  return Array.from(allTags).sort().map(tagName => ({
+    id: tagName,
+    name: tagName
+  }));
 }
 
 // =========================================
@@ -117,50 +130,40 @@ export async function unlinkCouponAction(couponId: string): Promise<ActionRespon
 }
 
 export async function createTagAction(name: string): Promise<ActionResponse> {
-  try {
-    const actor = await protectAction("MANAGE_PARTNERS");
-
-    if (!name || name.length < 2) return { success: false, message: "Tag name too short." };
-
-    const existing = await db.affiliateTag.findUnique({ where: { name: name.trim() }});
-    if(existing) return { success: false, message: "Tag already exists." };
-
-    const tag = await db.affiliateTag.create({
-      data: { name: name.trim() }
-    });
-
-    await auditService.log({
-        userId: actor.id,
-        action: "CREATE_TAG",
-        entity: "AffiliateTag",
-        entityId: tag.id,
-        newData: { name }
-    });
-
-    revalidatePath("/admin/affiliate");
-    return { success: true, message: "Tag created." };
-  } catch (error: any) {
-    return { success: false, message: "Failed to create tag." };
-  }
+  // ✅ FIXED: Tag creation logic changed. We don't need a separate table to "create" a tag anymore.
+  // Tags will be automatically created when they are assigned to an affiliate in `bulkTagAction` or Affiliate Profile Update.
+  return { success: true, message: "Tags are dynamically created when assigned to users." };
 }
 
-export async function deleteTagAction(id: string): Promise<ActionResponse> {
+export async function deleteTagAction(tag: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
-    await db.affiliateTag.delete({
-      where: { id }
+    // ✅ FIXED: Remove this string tag from all users who have it
+    const usersWithTag = await db.affiliateAccount.findMany({
+      where: { tags: { has: tag } },
+      select: { id: true, tags: true }
     });
+
+    await db.$transaction(
+      usersWithTag.map(user => 
+        db.affiliateAccount.update({
+          where: { id: user.id },
+          data: { tags: { set: user.tags.filter(t => t !== tag) } }
+        })
+      )
+    );
 
     await auditService.log({
         userId: actor.id,
         action: "DELETE_TAG",
         entity: "AffiliateTag",
-        entityId: id
+        entityId: "GLOBAL",
+        newData: { deletedTag: tag }
     });
 
     revalidatePath("/admin/affiliate");
-    return { success: true, message: "Tag deleted." };
+    return { success: true, message: "Tag removed from all users." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete tag." };
   }

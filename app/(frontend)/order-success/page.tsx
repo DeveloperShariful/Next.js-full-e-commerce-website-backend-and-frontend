@@ -116,7 +116,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
 
         <div className="flex flex-col gap-3">
           <Link 
-            href="/account/orders" 
+            href="/my-account/orders" 
             className="w-full py-3 bg-black text-white rounded-lg font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
           >
             <Package size={18} />

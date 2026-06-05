@@ -1,4 +1,4 @@
-//app/actions/storefront/affiliates/_services/finance-service.ts
+// app/actions/storefront/affiliates/_services/finance-service.ts
 
 "use server";
 
@@ -6,8 +6,9 @@ import { db } from "@/lib/prisma";
 import { AffiliateConfigDTO } from "@/app/actions/backend/affiliate/types";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { PayoutMethod } from "@prisma/client";
+import { PayoutMethod, Prisma } from "@prisma/client";
 import { getAuthAffiliate } from "../auth-helper";
+import { DecimalMath } from "@/lib/decimal-math";
 
 // ==========================================
 // 1. VALIDATION SCHEMAS
@@ -32,7 +33,9 @@ export async function getWalletData(affiliateId: string) {
   if (!account) throw new Error("Affiliate account not found.");
 
   const settings = await db.storeSettings.findUnique({ where: { id: "settings" } });
-  const config = (settings?.affiliateConfig as AffiliateConfigDTO) || {};
+  
+  // ✅ FIXED: Safe JSON casting without 'any'
+  const config = (settings?.affiliateConfig as unknown as AffiliateConfigDTO) || {};
 
   const pendingAmount = await db.affiliatePayout.aggregate({
     where: { affiliateId, status: "PENDING" },
@@ -69,19 +72,38 @@ export async function getPayoutHistory(affiliateId: string) {
 }
 
 export async function getLedger(affiliateId: string, limit: number = 50) {
-  const ledger = await db.affiliateLedger.findMany({
-    where: { affiliateId },
+  // ✅ FIXED: Replaced deleted AffiliateLedger with WalletTransaction mapping
+  const affiliate = await db.affiliateAccount.findUnique({
+    where: { id: affiliateId },
+    select: { userId: true }
+  });
+
+  if (!affiliate) return [];
+
+  const ledger = await db.walletTransaction.findMany({
+    where: { 
+        wallet: { userId: affiliate.userId },
+        type: { in: ["AFFILIATE_COMMISSION", "MLM_BONUS", "AFFILIATE_PAYOUT", "PAYOUT_DEDUCTION", "ADJUSTMENT"] }
+    },
     orderBy: { createdAt: "desc" },
     take: limit
   });
 
-  // Convert Decimals to numbers for client safety
-  return ledger.map(l => ({
-    ...l,
-    amount: l.amount.toNumber(),
-    balanceBefore: l.balanceBefore.toNumber(),
-    balanceAfter: l.balanceAfter.toNumber()
-  }));
+  // Map WalletTransaction data perfectly to the UI expectations
+  return ledger.map(l => {
+    const refParts = l.reference?.split('|') || [];
+    return {
+      id: l.id,
+      affiliateId: affiliateId,
+      type: l.type,
+      description: l.description,
+      createdAt: l.createdAt,
+      referenceId: refParts[0] || l.reference,
+      amount: l.amount.toNumber(),
+      balanceBefore: refParts[1] ? Number(refParts[1]) : 0,
+      balanceAfter: refParts[2] ? Number(refParts[2]) : 0
+    };
+  });
 }
 
 // ==========================================
@@ -109,7 +131,7 @@ export async function requestPayoutAction(data: PayoutInput) {
 
     // 3. Fetch Settings
     const settings = await db.storeSettings.findUnique({ where: { id: "settings" } });
-    const config = (settings?.affiliateConfig as AffiliateConfigDTO) || {};
+    const config = (settings?.affiliateConfig as unknown as AffiliateConfigDTO) || {};
     const minPayout = Number(config.minimumPayout) || 50;
     const currency = settings?.currencySymbol || "$";
 
@@ -119,7 +141,6 @@ export async function requestPayoutAction(data: PayoutInput) {
       return { success: false, message: `Minimum withdrawal amount is ${currency}${minPayout}` };
     }
 
-    // ✅ FIX: Safe Balance Check (Using Number constructor instead of .toNumber())
     const currentBalance = Number(affiliate.balance);
 
     if (currentBalance < amount) {
@@ -135,6 +156,7 @@ export async function requestPayoutAction(data: PayoutInput) {
     const existingPending = await db.affiliatePayout.findFirst({
         where: { affiliateId: affiliate.id, status: "PENDING" }
     });
+    
     if (existingPending) {
         console.log(`❌ [Payout] Failed: Pending request exists`);
         return { success: false, message: "You already have a pending withdrawal request." };
@@ -149,7 +171,7 @@ export async function requestPayoutAction(data: PayoutInput) {
         const hasBankInfo = affiliate.bankDetails && 
             (typeof affiliate.bankDetails === 'string' 
                 ? affiliate.bankDetails.length > 5 
-                : Object.keys(affiliate.bankDetails).length > 0);
+                : Object.keys(affiliate.bankDetails as object).length > 0);
         
         if (!hasBankInfo) {
             console.log(`❌ [Payout] Failed: Missing Bank Details`);
@@ -161,12 +183,13 @@ export async function requestPayoutAction(data: PayoutInput) {
     console.log("🔄 [Payout] Processing Transaction...");
     
     await db.$transaction(async (tx) => {
-      // ✅ Note: tx.update returns a raw Prisma object, so .toNumber() works here
+      // ✅ Deduct Balance from Affiliate
       const updatedAffiliate = await tx.affiliateAccount.update({
         where: { id: affiliate.id },
         data: { balance: { decrement: amount } }
       });
 
+      // ✅ Create Payout Request
       const payout = await tx.affiliatePayout.create({
         data: {
           affiliateId: affiliate.id,
@@ -176,14 +199,23 @@ export async function requestPayoutAction(data: PayoutInput) {
         }
       });
 
-      await tx.affiliateLedger.create({
+      // ✅ FIXED: Replaced deleted AffiliateLedger with WalletTransaction mapping
+      const userWallet = await tx.wallet.upsert({
+          where: { userId: affiliate.userId },
+          create: { userId: affiliate.userId, balance: 0 },
+          update: {}
+      });
+
+      const balanceAfter = updatedAffiliate.balance.toNumber();
+      // Format: ID|Before|After
+      const referenceString = `${payout.id}|${currentBalance.toString()}|${balanceAfter.toString()}`;
+
+      await tx.walletTransaction.create({
         data: {
-          affiliateId: affiliate.id,
-          type: "PAYOUT",
+          walletId: userWallet.id,
+          type: "PAYOUT_DEDUCTION",
           amount: amount,
-          balanceBefore: currentBalance,
-          balanceAfter: updatedAffiliate.balance.toNumber(),
-          referenceId: payout.id,
+          reference: referenceString,
           description: `Withdrawal Request (${method.replace("_", " ")})`
         }
       });

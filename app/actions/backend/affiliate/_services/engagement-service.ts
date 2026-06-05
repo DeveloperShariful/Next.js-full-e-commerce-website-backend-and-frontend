@@ -1,18 +1,18 @@
-//File: app/actions/backend/affiliate/_services/engagement-service.ts
+// File: app/actions/backend/affiliate/_services/engagement-service.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { revalidatePath, unstable_cache } from "next/cache";
 import { DecimalMath } from "@/lib/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service"; 
 import { auditService } from "@/lib/audit-service";
+import crypto from "crypto";
 
 // =========================================
-// SECTION 1: CONTESTS (Competitions)
+// SECTION 1: CONTESTS (JSON Based Enterprise Logic)
 // =========================================
 
 const contestSchema = z.object({
@@ -34,40 +34,52 @@ type ContestInput = z.infer<typeof contestSchema>;
 
 // --- READ OPERATIONS ---
 
-export async function getContests() {
+export async function getContests(): Promise<ContestInput[]> {
   try {
     await protectAction("VIEW_ANALYTICS");
-    return await db.affiliateContest.findMany({
-      orderBy: { startDate: "desc" },
+    
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { affiliateContests: true }
     });
+
+    const parsed = z.array(contestSchema).safeParse(settings?.affiliateContests);
+    if (!parsed.success) return [];
+
+    // Sort by startDate descending (latest first)
+    return parsed.data.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   } catch (error) {
     throw new Error("Failed to fetch contests.");
   }
 }
 
 export async function getContestLeaderboard(contestId: string, limit: number = 10) {
-  // Publicly accessible via cache to reduce DB load on high traffic
   const cacheKey = `contest-leaderboard-${contestId}`;
 
   return await unstable_cache(
     async () => {
-      const contest = await db.affiliateContest.findUnique({
-        where: { id: contestId }
+      // 1. Fetch Contest from JSON
+      const settings = await db.storeSettings.findUnique({
+        where: { id: "settings" },
+        select: { affiliateContests: true }
       });
-
+      const parsed = z.array(contestSchema).safeParse(settings?.affiliateContests);
+      const contests = parsed.success ? parsed.data : [];
+      
+      const contest = contests.find(c => c.id === contestId);
       if (!contest) throw new Error("Contest not found");
 
       const isSalesMetric = contest.criteria === "sales_amount";
+      const start = new Date(contest.startDate);
+      const end = new Date(contest.endDate);
 
-      // Aggregating Referrals within Date Range
-      // Note: For Enterprise scale with millions of rows, consider a Summary Table approach.
-      // But unstable_cache with 5 min TTL makes this acceptable for < 10M rows.
+      // 2. Aggregate Referrals dynamically
       const leaderboard = await db.referral.groupBy({
         by: ['affiliateId'],
         where: {
           createdAt: {
-            gte: contest.startDate,
-            lte: contest.endDate
+            gte: start,
+            lte: end
           },
           status: { in: ["APPROVED", "PAID"] } 
         },
@@ -83,9 +95,8 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
         take: limit,
       });
 
-      const affiliateIds = leaderboard.map(l => l.affiliateId);
+      const affiliateIds = leaderboard.map(l => l.affiliateId).filter(Boolean) as string[];
       
-      // Efficiently fetch user details
       const affiliates = await db.affiliateAccount.findMany({
         where: { id: { in: affiliateIds } },
         select: {
@@ -111,7 +122,7 @@ export async function getContestLeaderboard(contestId: string, limit: number = 1
       });
     },
     [cacheKey],
-    { tags: [`contest-${contestId}`], revalidate: 300 } // 5 Minutes Cache
+    { tags: [`contest-${contestId}`], revalidate: 300 } 
   )();
 }
 
@@ -130,35 +141,34 @@ export async function upsertContestAction(data: ContestInput): Promise<ActionRes
       return { success: false, message: "End date must be after start date." };
     }
 
-    const dbPayload: Prisma.AffiliateContestCreateInput = {
-      title: payload.title,
-      description: payload.description,
-      startDate: new Date(payload.startDate),
-      endDate: new Date(payload.endDate),
-      criteria: payload.criteria,
-      isActive: payload.isActive,
-      prizes: payload.prizes, 
-    };
-
+    const currentContests = await getContests();
+    
     let recordId = payload.id;
+    let updatedContests = [...currentContests];
 
     if (payload.id) {
-      await db.affiliateContest.update({
-        where: { id: payload.id },
-        data: dbPayload,
-      });
+      // Update existing
+      const index = updatedContests.findIndex(c => c.id === payload.id);
+      if (index !== -1) {
+        updatedContests[index] = { ...payload, id: payload.id };
+      }
     } else {
-      const created = await db.affiliateContest.create({
-        data: dbPayload,
-      });
-      recordId = created.id;
+      // Create new
+      recordId = crypto.randomUUID();
+      updatedContests.push({ ...payload, id: recordId });
     }
+
+    // Save back to JSON array in StoreSettings
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateContests: updatedContests }
+    });
 
     await auditService.log({
         userId: actor.id,
         action: payload.id ? "UPDATE_CONTEST" : "CREATE_CONTEST",
-        entity: "AffiliateContest",
-        entityId: recordId!,
+        entity: "StoreSettings",
+        entityId: "affiliateContests",
         newData: payload
     });
 
@@ -173,12 +183,18 @@ export async function deleteContestAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
 
-    await db.affiliateContest.delete({ where: { id } });
+    const currentContests = await getContests();
+    const updatedContests = currentContests.filter(c => c.id !== id);
+
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateContests: updatedContests }
+    });
     
     await auditService.log({
         userId: actor.id,
         action: "DELETE_CONTEST",
-        entity: "AffiliateContest",
+        entity: "StoreSettings",
         entityId: id
     });
 
@@ -190,7 +206,7 @@ export async function deleteContestAction(id: string): Promise<ActionResponse> {
 }
 
 // =========================================
-// SECTION 2: CAMPAIGNS (Tracking)
+// SECTION 2: CAMPAIGNS (Dynamic Aggregation from Links)
 // =========================================
 
 // --- READ OPERATIONS ---
@@ -198,40 +214,49 @@ export async function deleteContestAction(id: string): Promise<ActionResponse> {
 export async function getAllCampaigns(page: number = 1, limit: number = 20, search?: string) {
   await protectAction("VIEW_ANALYTICS");
 
+  // Since AffiliateCampaign table is deleted, we dynamically build the list from AffiliateLink
   const skip = (page - 1) * limit;
 
-  const where: Prisma.AffiliateCampaignWhereInput = search ? {
-    OR: [
-      { name: { contains: search, mode: "insensitive" } },
-      { affiliate: { user: { name: { contains: search, mode: "insensitive" } } } }
-    ]
-  } : {};
+  // 1. Group by Campaign Name
+  const campaignGroups = await db.affiliateLink.groupBy({
+    by: ['campaignName', 'affiliateId'],
+    where: { 
+      campaignName: { not: null },
+      ...(search && { campaignName: { contains: search, mode: "insensitive" } }) 
+    },
+    _sum: { clickCount: true },
+    _count: { id: true },
+    orderBy: { _sum: { clickCount: "desc" } }
+  });
 
-  const [total, data] = await Promise.all([
-    db.affiliateCampaign.count({ where }),
-    db.affiliateCampaign.findMany({
-      where,
-      take: limit,
-      skip,
-      orderBy: { revenue: "desc" }, 
-      include: {
-        affiliate: {
-          select: {
-            slug: true,
-            user: { select: { name: true, image: true, email: true } }
-          }
-        },
-        _count: {
-          select: { links: true } 
+  const total = campaignGroups.length;
+  const paginatedGroups = campaignGroups.slice(skip, skip + limit);
+
+  // 2. Fetch Affiliate Details for those campaigns
+  const affiliateIds = paginatedGroups.map(g => g.affiliateId).filter(Boolean) as string[];
+  const affiliates = await db.affiliateAccount.findMany({
+    where: { id: { in: affiliateIds } },
+    select: { id: true, slug: true, user: { select: { name: true, image: true, email: true } } }
+  });
+
+  const formattedData = paginatedGroups.map(g => {
+    const aff = affiliates.find(a => a.id === g.affiliateId);
+    return {
+      id: g.campaignName || "Unknown", // Treating campaignName as the ID
+      name: g.campaignName || "Unknown",
+      clicks: g._sum.clickCount || 0,
+      revenue: 0, // Computed dynamically if needed, 0 for performance by default
+      _count: { links: g._count.id },
+      affiliate: {
+        slug: aff?.slug || "",
+        user: {
+          name: aff?.user.name || "Unknown",
+          image: aff?.user.image || null,
+          email: aff?.user.email || ""
         }
       }
-    })
-  ]);
-
-  const formattedData = data.map(c => ({
-      ...c,
-      revenue: DecimalMath.toNumber(c.revenue)
-  }));
+    };
+  });
 
   return { 
     campaigns: formattedData, 
@@ -242,32 +267,28 @@ export async function getAllCampaigns(page: number = 1, limit: number = 20, sear
 
 // --- WRITE OPERATIONS ---
 
-export async function deleteCampaignAction(id: string): Promise<ActionResponse> {
+export async function deleteCampaignAction(campaignName: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS"); 
 
-    if (!id) return { success: false, message: "Campaign ID is required." };
+    if (!campaignName) return { success: false, message: "Campaign Name is required." };
 
-    // Enterprise Integrity Check
-    const linkCount = await db.affiliateLink.count({ where: { campaignId: id } });
-    if (linkCount > 0) {
-        return { success: false, message: `Cannot delete: ${linkCount} active links use this campaign.` };
-    }
-
-    const deleted = await db.affiliateCampaign.delete({
-      where: { id }
+    // Instead of deleting a row, we unlink the links from this campaign string
+    await db.affiliateLink.updateMany({
+      where: { campaignName: campaignName },
+      data: { campaignName: null }
     });
 
     await auditService.log({
       userId: actor.id,
       action: "DELETE_CAMPAIGN",
-      entity: "AffiliateCampaign",
-      entityId: id,
-      oldData: { name: deleted.name, affiliateId: deleted.affiliateId }
+      entity: "AffiliateLink",
+      entityId: "BULK",
+      newData: { deletedCampaign: campaignName }
     });
 
     revalidatePath("/admin/affiliate/campaigns");
-    return { success: true, message: "Campaign deleted successfully." };
+    return { success: true, message: "Campaign removed from all links successfully." };
   } catch (error: any) {
     return { success: false, message: "Failed to delete campaign." };
   }

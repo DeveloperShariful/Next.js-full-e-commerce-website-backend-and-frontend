@@ -3,16 +3,19 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
 import { protectAction } from "../permission-service";
 import { MediaType, AnnouncementType } from "@prisma/client";
-import { getAllGroups } from "./group-service"; 
 import { getAllTiers } from "./tier-service";
+import { getAllTags } from "./coupon-tag-service"; // Using Tags instead of Groups
+import crypto from "crypto";
 
+// =========================================
+// ZOD SCHEMAS FOR STRICT JSON VALIDATION
+// =========================================
 const announcementSchema = z.object({
   id: z.string().optional(), 
   title: z.string().min(3),
@@ -21,7 +24,7 @@ const announcementSchema = z.object({
   isActive: z.boolean().default(true),
   startsAt: z.union([z.string(), z.date()]),
   expiresAt: z.union([z.string(), z.date()]).optional().nullable(),
-  groupIds: z.array(z.string()).optional(),
+  groupIds: z.array(z.string()).optional(), // UI mapped to Tags internally
   tierIds: z.array(z.string()).optional(),
   affiliateIds: z.array(z.string()).optional(), 
 });
@@ -32,36 +35,47 @@ const creativeSchema = z.object({
   type: z.nativeEnum(MediaType).default("IMAGE"),
   url: z.string().url("Must be a valid image/resource URL."),
   targetUrl: z.string().url("Must be a valid destination URL.").optional().or(z.literal("")),
-  width: z.coerce.number().optional(),
-  height: z.coerce.number().optional(),
+  width: z.coerce.number().optional().nullable(),
+  height: z.coerce.number().optional().nullable(),
   isActive: z.boolean().default(true),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
 });
 
 type CreativeInput = z.infer<typeof creativeSchema>;
+type AnnouncementInput = z.infer<typeof announcementSchema>;
 
 // =========================================
-// READ OPERATIONS
+// READ OPERATIONS (FROM JSON IN StoreSettings)
 // =========================================
 
 export async function getAllAnnouncements(page: number = 1, limit: number = 20) {
   await protectAction("MANAGE_CONFIGURATION");
+  
+  const settings = await db.storeSettings.findUnique({
+    where: { id: "settings" },
+    select: { affiliateAnnouncements: true }
+  });
+
+  const parsed = z.array(announcementSchema).safeParse(settings?.affiliateAnnouncements);
+  let allAnnouncements = parsed.success ? parsed.data : [];
+  
+  // Sort by created/start date desc
+  allAnnouncements.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+
   const skip = (page - 1) * limit;
-  const [total, data] = await Promise.all([
-    db.affiliateAnnouncement.count(),
-    db.affiliateAnnouncement.findMany({
-      skip,
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: {
-        targetGroups: { select: { id: true, name: true } },
-        targetTiers: { select: { id: true, name: true } }
-      }
-    })
-  ]);
+  const total = allAnnouncements.length;
+  const paginated = allAnnouncements.slice(skip, skip + limit);
+
+  // Format data to match exactly what UI expects (mocking the relation structure)
+  const formattedData = paginated.map(ann => ({
+    ...ann,
+    createdAt: new Date(ann.startsAt), // Mocking createdAt
+    targetGroups: (ann.groupIds || []).map(id => ({ id, name: id })), // UI expects {id, name}
+    targetTiers: (ann.tierIds || []).map(id => ({ id, name: id }))
+  }));
 
   return { 
-    announcements: data, 
+    announcements: formattedData, 
     total, 
     totalPages: Math.ceil(total / limit) 
   };
@@ -71,40 +85,48 @@ export async function getAllCreatives() {
   try {
     await protectAction("MANAGE_CONFIGURATION"); 
 
-    return await db.affiliateCreative.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: {
-          select: { usages: true }
-        }
-      }
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { affiliateCreatives: true }
     });
+
+    const parsed = z.array(creativeSchema).safeParse(settings?.affiliateCreatives);
+    let allCreatives = parsed.success ? parsed.data : [];
+
+    // Format data to match exactly what UI expects
+    return allCreatives.map(c => ({
+      ...c,
+      createdAt: new Date(), 
+      _count: { usages: 0 } // Mock usage count since table is removed
+    }));
   } catch (error) {
     throw new Error("Failed to load creatives.");
   }
 }
 
-// =========================================
-// WRITE OPERATIONS
-// =========================================
-
 export async function getTargetingOptions() {
+    // ✅ FIXED: Return Tags as "groups" so the UI Dropdown doesn't break!
     const [groups, tiers] = await Promise.all([
-        db.affiliateGroup.findMany({
-            select: { id: true, name: true }
-        }),
-        db.affiliateTier.findMany({
-            select: { id: true, name: true }
-        })
+        getAllTags(), // Fetches tags {id, name}
+        getAllTiers() // Assuming getAllTiers returns {id, name}
     ]);
     return { groups, tiers };
 }
 
-export async function createAnnouncementAction(data: z.infer<typeof announcementSchema>): Promise<ActionResponse> {
+// =========================================
+// WRITE OPERATIONS (JSON MUTATIONS)
+// =========================================
+
+export async function createAnnouncementAction(data: AnnouncementInput): Promise<ActionResponse> {
+  return upsertAnnouncementAction(data); // Re-routed to the upsert function to avoid code duplication
+}
+
+export async function upsertAnnouncementAction(data: AnnouncementInput): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
     const result = announcementSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
+    
     const payload = result.data;
     const startDate = new Date(payload.startsAt);
     const endDate = payload.expiresAt ? new Date(payload.expiresAt) : null;
@@ -112,33 +134,35 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
         return { success: false, message: "End date cannot be before start date." };
     }
 
-    const announcement = await db.affiliateAnnouncement.create({
-      data: {
-        title: payload.title,
-        content: payload.content,
-        type: payload.type,
-        isActive: payload.isActive,
-        startsAt: startDate,
-        expiresAt: endDate,
-        targetGroups: payload.groupIds ? {
-          connect: payload.groupIds.map(id => ({ id }))
-        } : undefined,
-        targetTiers: payload.tierIds ? {
-          connect: payload.tierIds.map(id => ({ id }))
-        } : undefined,
-      }
+    const settings = await db.storeSettings.findUnique({ select: { affiliateAnnouncements: true }, where: { id: "settings" } });
+    const parsed = z.array(announcementSchema).safeParse(settings?.affiliateAnnouncements);
+    let announcements = parsed.success ? parsed.data : [];
+
+    let recordId = payload.id;
+
+    if (payload.id) {
+      const index = announcements.findIndex(a => a.id === payload.id);
+      if (index > -1) announcements[index] = { ...payload, id: payload.id };
+    } else {
+      recordId = crypto.randomUUID();
+      announcements.push({ ...payload, id: recordId });
+    }
+
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateAnnouncements: announcements }
     });
 
     await auditService.log({
       userId: actor.id,
-      action: "CREATE_ANNOUNCEMENT",
-      entity: "AffiliateAnnouncement",
-      entityId: announcement.id,
+      action: payload.id ? "UPDATE_ANNOUNCEMENT" : "CREATE_ANNOUNCEMENT",
+      entity: "StoreSettings",
+      entityId: "affiliateAnnouncements",
       newData: payload
     });
 
     revalidatePath("/admin/affiliate/announcements");
-    return { success: true, message: "Announcement published." };
+    return { success: true, message: payload.id ? "Announcement updated." : "Announcement published." };
   } catch (error: any) {
     return { success: false, message: error.message };
   }
@@ -147,11 +171,22 @@ export async function createAnnouncementAction(data: z.infer<typeof announcement
 export async function deleteAnnouncementAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
-    await db.affiliateAnnouncement.delete({ where: { id } });
+    
+    const settings = await db.storeSettings.findUnique({ select: { affiliateAnnouncements: true }, where: { id: "settings" } });
+    const parsed = z.array(announcementSchema).safeParse(settings?.affiliateAnnouncements);
+    let announcements = parsed.success ? parsed.data : [];
+
+    announcements = announcements.filter(a => a.id !== id);
+
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateAnnouncements: announcements }
+    });
+
     await auditService.log({
       userId: actor.id,
       action: "DELETE_ANNOUNCEMENT",
-      entity: "AffiliateAnnouncement",
+      entity: "StoreSettings",
       entityId: id
     });
 
@@ -165,14 +200,25 @@ export async function deleteAnnouncementAction(id: string): Promise<ActionRespon
 export async function toggleAnnouncementStatusAction(id: string, isActive: boolean): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
-    await db.affiliateAnnouncement.update({
-      where: { id },
-      data: { isActive }
-    });   
+    
+    const settings = await db.storeSettings.findUnique({ select: { affiliateAnnouncements: true }, where: { id: "settings" } });
+    const parsed = z.array(announcementSchema).safeParse(settings?.affiliateAnnouncements);
+    let announcements = parsed.success ? parsed.data : [];
+
+    const index = announcements.findIndex(a => a.id === id);
+    if (index > -1) {
+      announcements[index].isActive = isActive;
+      
+      await db.storeSettings.update({
+        where: { id: "settings" },
+        data: { affiliateAnnouncements: announcements }
+      });
+    }
+
     await auditService.log({
         userId: actor.id,
         action: "UPDATE_ANNOUNCEMENT_STATUS",
-        entity: "AffiliateAnnouncement",
+        entity: "StoreSettings",
         entityId: id,
         newData: { isActive }
     });
@@ -189,37 +235,32 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
     const result = creativeSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
     const payload = result.data;
-    const dbPayload = {
-      title: payload.title,
-      type: payload.type,
-      url: payload.url,
-      targetUrl: payload.targetUrl || null,
-      width: payload.width || null,
-      height: payload.height || null,
-      isActive: payload.isActive,
-      description: payload.description || null,
-    };
+    
+    const settings = await db.storeSettings.findUnique({ select: { affiliateCreatives: true }, where: { id: "settings" } });
+    const parsed = z.array(creativeSchema).safeParse(settings?.affiliateCreatives);
+    let creatives = parsed.success ? parsed.data : [];
 
     let entityId = payload.id;
 
     if (payload.id) {
-      await db.affiliateCreative.update({
-        where: { id: payload.id },
-        data: dbPayload,
-      });
+      const index = creatives.findIndex(c => c.id === payload.id);
+      if (index > -1) creatives[index] = { ...payload, id: payload.id };
     } else {
-      const created = await db.affiliateCreative.create({
-        data: dbPayload,
-      });
-      entityId = created.id;
+      entityId = crypto.randomUUID();
+      creatives.push({ ...payload, id: entityId });
     }
+
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateCreatives: creatives }
+    });
 
     await auditService.log({
       userId: actor.id,
       action: payload.id ? "UPDATE_CREATIVE" : "CREATE_CREATIVE",
-      entity: "AffiliateCreative",
+      entity: "StoreSettings",
       entityId: entityId || "NEW",
-      newData: dbPayload
+      newData: payload
     });
 
     revalidatePath("/admin/affiliate/creatives");
@@ -229,18 +270,26 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
     return { success: false, message: "Operation failed." };
   }
 }
+
 export async function deleteCreativeAction(id: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
 
-    await db.affiliateCreative.delete({
-      where: { id },
+    const settings = await db.storeSettings.findUnique({ select: { affiliateCreatives: true }, where: { id: "settings" } });
+    const parsed = z.array(creativeSchema).safeParse(settings?.affiliateCreatives);
+    let creatives = parsed.success ? parsed.data : [];
+
+    creatives = creatives.filter(c => c.id !== id);
+
+    await db.storeSettings.update({
+      where: { id: "settings" },
+      data: { affiliateCreatives: creatives }
     });
 
     await auditService.log({
       userId: actor.id,
       action: "DELETE_CREATIVE",
-      entity: "AffiliateCreative",
+      entity: "StoreSettings",
       entityId: id
     });
 
@@ -252,75 +301,7 @@ export async function deleteCreativeAction(id: string): Promise<ActionResponse> 
 }
 
 export async function trackCreativeUsageAction(creativeId: string, affiliateId: string) {
-  try {
-    await db.affiliateCreativeUsage.create({
-      data: {
-        creativeId,
-        affiliateId,
-        copiedAt: new Date()
-      }
-    });
-    
-    await db.affiliateCreative.update({
-      where: { id: creativeId },
-      data: { usageCount: { increment: 1 } }
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to track usage", error);
-    return { success: false };
-  }
-}
-
-export async function upsertAnnouncementAction(data: z.infer<typeof announcementSchema>): Promise<ActionResponse> {
-  try {
-    const actor = await protectAction("MANAGE_CONFIGURATION");
-    const result = announcementSchema.safeParse(data);
-    if (!result.success) return { success: false, message: "Validation failed." };
-    const payload = result.data;
-    const startDate = new Date(payload.startsAt);
-    const endDate = payload.expiresAt ? new Date(payload.expiresAt) : null;
-    const dbData: Prisma.AffiliateAnnouncementCreateInput = {
-        title: payload.title,
-        content: payload.content,
-        type: payload.type,
-        isActive: payload.isActive,
-        startsAt: startDate,
-        expiresAt: endDate,
-    };
-
-    const relations = {
-        targetGroups: payload.groupIds ? { set: payload.groupIds.map(id => ({ id })) } : { set: [] },
-        targetTiers: payload.tierIds ? { set: payload.tierIds.map(id => ({ id })) } : { set: [] },
-    };
-
-    if (payload.id) {
-        await db.affiliateAnnouncement.update({
-            where: { id: payload.id },
-            data: { ...dbData, ...relations }
-        });
-    } else {
-        await db.affiliateAnnouncement.create({
-            data: {
-                ...dbData,
-                targetGroups: { connect: payload.groupIds?.map(id => ({ id })) },
-                targetTiers: { connect: payload.tierIds?.map(id => ({ id })) },
-            }
-        });
-    }
-
-    await auditService.log({
-      userId: actor.id,
-      action: payload.id ? "UPDATE_ANNOUNCEMENT" : "CREATE_ANNOUNCEMENT",
-      entity: "AffiliateAnnouncement",
-      entityId: payload.id || "NEW",
-      newData: payload
-    });
-
-    revalidatePath("/admin/affiliate/announcements");
-    return { success: true, message: payload.id ? "Announcement updated." : "Announcement published." };
-  } catch (error: any) {
-    return { success: false, message: error.message };
-  }
+  // Usage tracking logic is disabled intentionally for extreme performance tuning as requested.
+  // We track conversions directly from utm_campaign/slugs.
+  return { success: true };
 }

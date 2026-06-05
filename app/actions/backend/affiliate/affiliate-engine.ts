@@ -67,9 +67,10 @@ export async function processOrder(orderId: string) {
 
   if (!affiliateId) return { success: false, error: "NO_AFFILIATE" };
 
+  // ✅ FIXED: Removed 'group' inclusion because Group table was deleted
   const affiliate = await db.affiliateAccount.findFirst({
     where: { id: affiliateId, deletedAt: null },
-    include: { group: true, tier: true, user: true }
+    include: { tier: true, user: true }
   });
 
   if (!affiliate || affiliate.status !== "ACTIVE") return { success: false, error: "AFFILIATE_INACTIVE" };
@@ -99,23 +100,15 @@ export async function processOrder(orderId: string) {
 
   const productIds = order.items.map(i => i.productId).filter(Boolean) as string[];
   
-  const [userRates, groupRates] = await Promise.all([
-    db.affiliateProductRate.findMany({
+  // ✅ FIXED: Only User Rates are queried now (Group product rates are obsolete)
+  const userRates = await db.affiliateProductRate.findMany({
       where: { 
         productId: { in: productIds }, 
         affiliateId: affiliate.id
       }
-    }),
-    affiliate.groupId ? db.affiliateProductRate.findMany({
-      where: { 
-        productId: { in: productIds }, 
-        groupId: affiliate.groupId
-      }
-    }) : Promise.resolve([])
-  ]);
+  });
 
   const userRateMap = new Map(userRates.map(r => [r.productId, r]));
-  const groupRateMap = new Map(groupRates.map(r => [r.productId, r]));
 
   let totalCommission = new Prisma.Decimal(0);
   let totalProfit = new Prisma.Decimal(0);
@@ -153,14 +146,10 @@ export async function processOrder(orderId: string) {
     let isExcluded = false;
 
     const userProductRate = userRateMap.get(item.productId);
-    const groupProductRate = groupRateMap.get(item.productId);
 
     if (userProductRate && userProductRate.isDisabled) {
         isExcluded = true;
         source = "USER_OVERRIDE_DISABLED";
-    } else if (!userProductRate && groupProductRate && groupProductRate.isDisabled) {
-        isExcluded = true;
-        source = "GROUP_OVERRIDE_DISABLED";
     }
 
     if (isExcluded) {
@@ -185,12 +174,10 @@ export async function processOrder(orderId: string) {
 
       if (conditions.minOrderAmount && DecimalMath.lt(orderTotal, conditions.minOrderAmount)) isMatch = false;
       
-      // ✅ FIX: Check if ANY of the product's categories match the rule's categories
       if (conditions.categoryIds && conditions.categoryIds.length > 0) {
         if (!item.product || !item.product.categories || item.product.categories.length === 0) {
           isMatch = false; 
         } else {
-          // Check if there is an intersection between product categories and rule categories
           const productCategoryIds = item.product.categories.map((c: any) => c.id);
           const hasMatchingCategory = productCategoryIds.some((id: string) => conditions.categoryIds.includes(id));
           
@@ -211,14 +198,11 @@ export async function processOrder(orderId: string) {
       }
     }
 
+    // ✅ FIXED: Removed AffiliateGroup logic. Priority: Product Rate > Global Rule > Coupon > Tier > Global Config
     if (userProductRate) {
       rate = userProductRate.rate;
       type = userProductRate.type;
       source = "PRODUCT_USER_OVERRIDE";
-    } else if (groupProductRate) {
-      rate = groupProductRate.rate;
-      type = groupProductRate.type;
-      source = "PRODUCT_GROUP_OVERRIDE";
     } else if (matchedRule) {
       const action = matchedRule.action as any;
       rate = DecimalMath.toDecimal(action.value);
@@ -237,10 +221,6 @@ export async function processOrder(orderId: string) {
         rate = item.product.affiliateCommissionRate;
         type = item.product.affiliateCommissionType || "PERCENTAGE";
         source = "PRODUCT_DEFAULT";
-    } else if (affiliate.group?.commissionRate) {
-      rate = affiliate.group.commissionRate;
-      type = affiliate.group.commissionType;
-      source = "GROUP_DEFAULT";
     } else if (affiliate.tier?.commissionRate) {
       rate = affiliate.tier.commissionRate;
       type = affiliate.tier.commissionType;
@@ -348,7 +328,6 @@ export async function processOrder(orderId: string) {
       }
     });
 
-    // Notification
     await tx.notificationQueue.create({
       data: {
         channel: "EMAIL",
@@ -414,15 +393,20 @@ export async function processRefund(orderId: string, refundedItemIds: string[]) 
           }
         });
         
-        await tx.affiliateLedger.create({
+        // ✅ FIXED: Replaced deleted AffiliateLedger with Wallet & WalletTransaction
+        const userWallet = await tx.wallet.upsert({
+          where: { userId: affiliate.userId },
+          create: { userId: affiliate.userId, balance: 0 },
+          update: {}
+        });
+
+        await tx.walletTransaction.create({
           data: {
-            affiliateId: affiliate.id,
-            type: "REFUND_DEDUCTION",
+            walletId: userWallet.id,
+            type: "PAYOUT_DEDUCTION",
             amount: refundDeduction,
-            balanceBefore: affiliate.balance,
-            balanceAfter: DecimalMath.sub(affiliate.balance, refundDeduction),
             description: `Clawback for Refunded Items: Order #${orderId}`,
-            referenceId: orderId
+            reference: orderId
           }
         });
       }

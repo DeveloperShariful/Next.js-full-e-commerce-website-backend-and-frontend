@@ -44,7 +44,7 @@ export async function getPayouts(page: number = 1, limit: number = 20, status?: 
     method: p.method,
     status: p.status,
     requestedAt: p.createdAt,
-    bankDetails: p.affiliate?.bankDetails,
+    bankDetails: p.affiliate?.bankDetails as any,
     paypalEmail: p.affiliate?.paypalEmail,
     riskScore: p.affiliate?.riskScore || 0
   }));
@@ -71,7 +71,7 @@ async function processStoreCreditPayout(
   }
   const affiliate = await tx.affiliateAccount.findFirst({
     where: { id: affiliateId, deletedAt: null }, 
-    select: { id: true, version: true }
+    select: { id: true, version: true, balance: true }
   });
 
   if (!affiliate) throw new Error("Affiliate account not found or deleted. Payout blocked.");
@@ -88,27 +88,36 @@ async function processStoreCreditPayout(
       note: "Credited to Wallet automatically"
     }
   });
+
   let wallet = await tx.wallet.findUnique({ where: { userId } });
   if (!wallet) {
     wallet = await tx.wallet.create({
       data: { userId, balance: new Prisma.Decimal(0) }
     });
   }
+
+  // ✅ FIXED: Using balanceBefore and balanceAfter in reference to mimic Ledger functionality
+  const balanceBefore = wallet.balance;
+  const balanceAfter = DecimalMath.add(wallet.balance, creditAmount);
+  const referenceString = `PAYOUT-${payoutId}|${balanceBefore.toString()}|${balanceAfter.toString()}`;
+
   await tx.wallet.update({
     where: { userId },
     data: {
-      balance: { increment: creditAmount }
+      balance: balanceAfter
     }
   });
+
   await tx.walletTransaction.create({
     data: {
       walletId: wallet.id,
       amount: creditAmount,
       type: "AFFILIATE_PAYOUT",
       description: "Affiliate Payout Credit",
-      reference: `PAYOUT-${payoutId}`
+      reference: referenceString
     }
   });
+
   await auditService.log({
     userId: actorId,
     action: "WALLET_CREDIT",
@@ -146,6 +155,7 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
     if (!payout.affiliate) throw new Error("Affiliate account no longer exists.");
     if (payout.affiliate.riskScore > 70) throw new Error(`Blocked: Risk Score ${payout.affiliate.riskScore}/100 too high.`);
     if (payout.affiliate.kycStatus !== "VERIFIED") throw new Error(`Blocked: Affiliate KYC is ${payout.affiliate.kycStatus}. Must be VERIFIED.`);
+    
     if (payout.method === "STORE_CREDIT") {
       await processStoreCreditPayout(
         tx,
@@ -171,6 +181,7 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
         }
       });
     }
+
     await tx.notificationQueue.create({
       data: {
         channel: "EMAIL",
@@ -199,6 +210,7 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
   revalidatePath("/admin/affiliate/payouts");
   return { success: true };
 }
+
 export async function rejectPayout(payoutId: string, reason: string) {
   const actor = await protectAction("MANAGE_FINANCE");
 
@@ -215,24 +227,38 @@ export async function rejectPayout(payoutId: string, reason: string) {
       where: { id: payoutId },
       data: { status: "CANCELLED", note: reason }
     });
+
     const affiliateExists = await tx.affiliateAccount.findFirst({ where: { id: payout.affiliateId, deletedAt: null } });
     
     if (affiliateExists) {
+        // Refund back to Affiliate Balance
         const updatedAffiliate = await tx.affiliateAccount.update({
             where: { id: payout.affiliateId },
             data: { balance: { increment: payout.amount } }
         });
-        await tx.affiliateLedger.create({
+
+        // Ensure user has a wallet
+        const userWallet = await tx.wallet.upsert({
+          where: { userId: affiliateExists.userId },
+          create: { userId: affiliateExists.userId, balance: 0 },
+          update: {}
+        });
+
+        // ✅ FIXED: Replaced AffiliateLedger with WalletTransaction mapping
+        const balanceBefore = DecimalMath.sub(updatedAffiliate.balance, payout.amount);
+        const balanceAfter = updatedAffiliate.balance;
+        const referenceString = `PAYOUT_REJECT-${payout.id}|${balanceBefore.toString()}|${balanceAfter.toString()}`;
+
+        await tx.walletTransaction.create({
             data: {
-                affiliateId: payout.affiliateId,
-                type: "REFUND_DEDUCTION", 
+                walletId: userWallet.id,
+                type: "ADJUSTMENT", // Refunding the rejected payout back
                 amount: payout.amount,
-                balanceBefore: DecimalMath.sub(updatedAffiliate.balance, payout.amount),
-                balanceAfter: updatedAffiliate.balance,
                 description: `Payout Rejected: ${reason}`,
-                referenceId: payout.id
+                reference: referenceString
             }
         });
+
         await tx.notificationQueue.create({
             data: {
                 channel: "EMAIL",

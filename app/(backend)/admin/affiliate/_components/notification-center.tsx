@@ -1,4 +1,4 @@
-// File: app/(backend)/admin/affiliates/_components/notification-center.tsx
+// File: app/(backend)/admin/affiliate/_components/notification-center.tsx
 
 "use client";
 
@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Mock Data (Replace with real fetching logic using SWR/React Query later)
+// Mock Data
 const MOCK_NOTIFICATIONS = [
     { id: 1, title: "New Affiliate Signup", desc: "John Doe registered as a partner.", time: "2m ago", read: false },
     { id: 2, title: "Payout Requested", desc: "Request for $500 from Sarah.", time: "1h ago", read: false },
@@ -18,6 +18,7 @@ const MOCK_NOTIFICATIONS = [
 export function NotificationCenter() {
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
   const unreadCount = notifications.filter(n => !n.read).length;
+  
   const markAllRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
@@ -25,19 +26,24 @@ export function NotificationCenter() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-gray-500 hover:bg-gray-100 rounded-full">
-          <Bell className="w-5 h-5" />
+        {/* WP Topbar Icon Style */}
+        <button className="relative flex items-center justify-center p-2 text-[#c3c4c7] hover:text-[#72aee6] transition-colors focus:outline-none">
+          <Bell className="w-4 h-4" />
           {unreadCount > 0 && (
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+            <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#d63638] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#d63638]"></span>
+            </span>
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
       
-      <PopoverContent align="end" className="w-80 p-0 shadow-xl border-gray-200 rounded-xl overflow-hidden">
-        <div className="p-3 border-b bg-gray-50/50 flex justify-between items-center">
-            <h4 className="font-bold text-sm text-gray-800">Notifications</h4>
+      {/* WP Dropdown Menu Style */}
+      <PopoverContent align="end" className="w-[300px] p-0 shadow-lg border border-[#c3c4c7] rounded-none bg-white font-sans">
+        <div className="p-3 border-b border-[#c3c4c7] bg-[#f0f0f1] flex justify-between items-center">
+            <h4 className="font-semibold text-[13px] text-[#1d2327] m-0">Notifications</h4>
             {unreadCount > 0 && (
-                <button onClick={markAllRead} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                <button onClick={markAllRead} className="text-[12px] text-[#2271b1] hover:underline flex items-center gap-1">
                     <Check className="w-3 h-3" /> Mark all read
                 </button>
             )}
@@ -45,22 +51,24 @@ export function NotificationCenter() {
         
         <div className="max-h-[300px] overflow-y-auto">
             {notifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-xs">No new notifications</div>
+                <div className="p-4 text-center text-[#50575e] text-[13px] italic">No new notifications</div>
             ) : (
                 notifications.map((item) => (
-                    <div key={item.id} className={cn("p-3 border-b last:border-0 hover:bg-gray-50 transition-colors cursor-pointer", !item.read && "bg-blue-50/30")}>
-                        <div className="flex justify-between items-start">
-                            <span className={cn("text-xs font-bold", !item.read ? "text-gray-900" : "text-gray-600")}>{item.title}</span>
-                            <span className="text-[10px] text-gray-400">{item.time}</span>
+                    <div key={item.id} className={cn("p-3 border-b border-[#f0f0f1] last:border-0 hover:bg-[#f6f7f7] transition-colors cursor-pointer", !item.read && "bg-[#f0f6fc]")}>
+                        <div className="flex justify-between items-start mb-1">
+                            <span className={cn("text-[13px] leading-tight", !item.read ? "font-semibold text-[#1d2327]" : "font-normal text-[#2c3338]")}>{item.title}</span>
+                            <span className="text-[11px] text-[#8c8f94] whitespace-nowrap ml-2">{item.time}</span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{item.desc}</p>
+                        <p className="text-[12px] text-[#50575e] leading-snug line-clamp-2 m-0">{item.desc}</p>
                     </div>
                 ))
             )}
         </div>
         
-        <div className="p-2 border-t bg-gray-50 text-center">
-            <button className="text-xs font-medium text-gray-600 hover:text-black">View All Activity</button>
+        <div className="border-t border-[#c3c4c7] bg-[#f0f0f1]">
+            <button className="w-full py-2 text-[13px] font-semibold text-[#2271b1] hover:text-[#135e96] hover:bg-[#e6e6e6] transition-colors">
+                View All Activity
+            </button>
         </div>
       </PopoverContent>
     </Popover>

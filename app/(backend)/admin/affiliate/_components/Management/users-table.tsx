@@ -266,27 +266,6 @@ export default function AffiliateUsersTable({
             isCustom: true 
         };
     }
-    // 2. Group Override
-    if (user.groupName && user.groupName !== "No Group" && user.groupRate) {
-        return { 
-            main: user.groupType === "FIXED"
-                ? `${currencySymbol}${user.groupRate}`
-                : `${user.groupRate}%`, 
-            sub: `${user.groupName}`, 
-            isDefault: false 
-        };
-    }
-    // 3. Tier Override
-    if (user.tierName && user.tierName !== "Default" && user.tierRate) {
-        return { 
-            main: user.tierType === "FIXED" 
-                ? `${currencySymbol}${user.tierRate}` 
-                : `${user.tierRate}%`,
-            sub: `${user.tierName}`, 
-            isDefault: false 
-        };
-    }
-    // 4. Global Default (Lowest Priority)
     return {
         main: defaultType === "FIXED" 
             ? `${currencySymbol}${defaultRate}` 

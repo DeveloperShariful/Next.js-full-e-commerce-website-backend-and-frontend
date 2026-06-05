@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { AffiliateGroup } from "@prisma/client";
+import { AffiliateTier } from "@prisma/client"; // ✅ FIXED: Replaced deleted AffiliateGroup with AffiliateTier
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { 
   deleteGroupAction, 
@@ -28,12 +28,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface GroupWithDetails extends AffiliateGroup {
+// ✅ FIXED: Mapped Group Details to Tier architecture without losing any UI element
+interface GroupWithDetails extends AffiliateTier {
   _count: { 
     affiliates: number;
-    productRates: number;
-    announcements: number;
+    productRates?: number;
+    announcements?: number;
   };
+  slug?: string;
 }
 
 interface Props {
@@ -71,7 +73,6 @@ export default function GroupManager({ initialGroups }: Props) {
       const q = search.toLowerCase();
       result = result.filter(g => 
         g.name.toLowerCase().includes(q) || 
-        g.slug.toLowerCase().includes(q) ||
         (g.description && g.description.toLowerCase().includes(q))
       );
     }
@@ -136,7 +137,6 @@ export default function GroupManager({ initialGroups }: Props) {
     if(!confirm("Are you sure? Affiliates in this group will lose their group benefits.")) return;
     
     startTransition(async () => {
-        // ✅ Call Service Method Directly
         const res = await deleteGroupAction(id);
         if(res.success) {
             setGroups(prev => prev.filter(g => g.id !== id));
@@ -154,7 +154,6 @@ export default function GroupManager({ initialGroups }: Props) {
     startTransition(async () => {
         let errors = 0;
         for (const id of ids) {
-            // ✅ Call Service Method Directly
             const res = await deleteGroupAction(id);
             if (!res.success) errors++;
         }
@@ -167,66 +166,63 @@ export default function GroupManager({ initialGroups }: Props) {
   };
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in duration-500 pb-20">
+    <div className="w-full space-y-4 animate-in fade-in duration-500 pb-20 font-sans text-[#1d2327]">
       
-      {/* 1. HEADER STATS */}
+      {/* 1. HEADER STATS (WP Metabox Style) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+        <div className="bg-white p-4 border border-[#c3c4c7] shadow-sm flex items-center gap-4">
+            <div className="p-2 bg-[#f0f6fc] text-[#2271b1] border border-[#2271b1]/20">
                 <Layers className="w-6 h-6" />
             </div>
             <div>
-                <p className="text-xs text-gray-500 font-medium uppercase">Total Groups</p>
-                <h3 className="text-2xl font-bold text-gray-900">{groups.length}</h3>
+                <p className="text-[12px] text-[#50575e] font-semibold uppercase">Total Groups</p>
+                <h3 className="text-[22px] font-normal text-[#1d2327] m-0 leading-none">{groups.length}</h3>
             </div>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-lg">
+        <div className="bg-white p-4 border border-[#c3c4c7] shadow-sm flex items-center gap-4">
+            <div className="p-2 bg-[#fcf0f1] text-[#d63638] border border-[#d63638]/20">
                 <Users className="w-6 h-6" />
             </div>
             <div>
-                <p className="text-xs text-gray-500 font-medium uppercase">Assigned Affiliates</p>
-                <h3 className="text-2xl font-bold text-gray-900">
-                    {groups.reduce((acc, curr) => acc + curr._count.affiliates, 0)}
+                <p className="text-[12px] text-[#50575e] font-semibold uppercase">Assigned Affiliates</p>
+                <h3 className="text-[22px] font-normal text-[#1d2327] m-0 leading-none">
+                    {groups.reduce((acc, curr) => acc + (curr._count.affiliates || 0), 0)}
                 </h3>
             </div>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-green-50 text-green-600 rounded-lg">
+        <div className="bg-white p-4 border border-[#c3c4c7] shadow-sm flex items-center gap-4">
+            <div className="p-2 bg-[#f0f6fc] text-[#00a32a] border border-[#00a32a]/20">
                 <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-                <p className="text-xs text-gray-500 font-medium uppercase">Active Override Rules</p>
-                <h3 className="text-2xl font-bold text-gray-900">
-                    {groups.reduce((acc, curr) => acc + curr._count.productRates, 0)}
+                <p className="text-[12px] text-[#50575e] font-semibold uppercase">Active Rules</p>
+                <h3 className="text-[22px] font-normal text-[#1d2327] m-0 leading-none">
+                    {groups.reduce((acc, curr) => acc + (curr._count.productRates || 0), 0)}
                 </h3>
             </div>
         </div>
       </div>
 
-      {/* 2. TOOLBAR */}
-      <div className="bg-gray-50/50 p-3 rounded-xl border border-gray-200 flex flex-col xl:flex-row gap-4 justify-between items-center shadow-sm">
+      {/* 2. WP TOOLBAR */}
+      <div className="bg-white p-3 border border-[#c3c4c7] flex flex-col xl:flex-row gap-4 justify-between items-center shadow-sm">
         <div className="flex items-center gap-2 w-full xl:w-auto">
             <div className={cn("flex items-center gap-2 transition-all duration-300", selectedIds.size > 0 ? "opacity-100" : "opacity-50 pointer-events-none grayscale")}>
                 <button 
                     onClick={handleBulkDelete}
                     disabled={isPending || selectedIds.size === 0}
-                    className="h-9 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-2 active:scale-95"
+                    className="px-3 py-1.5 bg-[#fcf0f1] border border-[#d63638] text-[#d63638] hover:bg-[#d63638] hover:text-white rounded-sm text-[13px] transition-colors shadow-sm flex items-center gap-1.5"
                 >
                     <Trash2 className="w-3.5 h-3.5" /> Delete Selected ({selectedIds.size})
                 </button>
             </div>
-            {selectedIds.size === 0 && (
-                <span className="text-xs text-gray-400 italic pl-2 border-l ml-2">Select groups to manage</span>
-            )}
         </div>
 
-        <div className="flex items-center gap-3 w-full xl:w-auto">
-          <div className="relative w-full sm:w-72 group">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 group-focus-within:text-black transition-colors" />
+        <div className="flex items-center gap-2 w-full xl:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-2.5 top-2 h-4 w-4 text-[#8c8f94]" />
             <input 
               type="text" 
-              className="block w-full p-2 pl-10 text-xs text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-black focus:border-black outline-none shadow-sm transition-all h-9" 
+              className="block w-full pl-8 pr-2 py-1.5 text-[13px] text-[#1d2327] border border-[#8c8f94] rounded-sm bg-white focus:ring-1 focus:ring-[#2271b1] focus:border-[#2271b1] outline-none shadow-sm" 
               placeholder="Search groups..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -234,185 +230,150 @@ export default function GroupManager({ initialGroups }: Props) {
           </div>
           <button 
             onClick={handleCreate}
-            className="flex items-center gap-2 h-9 px-4 bg-black hover:bg-gray-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#2271b1] bg-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] text-white rounded-sm text-[13px] transition-colors shadow-sm whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" /> New Group
           </button>
         </div>
       </div>
 
-      {/* 3. TABLE */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ring-1 ring-black/5">
+      {/* 3. WP LIST TABLE */}
+      <div className="bg-white border border-[#c3c4c7] shadow-sm overflow-hidden">
         <div className="overflow-x-auto min-h-[400px]">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50/80 border-b border-gray-200 font-bold tracking-wider">
+          <table className="w-full text-[13px] text-left border-collapse">
+            <thead className="bg-[#f0f0f1] border-b border-[#c3c4c7] text-[#2c3338]">
               <tr>
-                <th scope="col" className="p-4 w-10">
-                  <div className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 text-black bg-white border-gray-300 rounded focus:ring-black focus:ring-2 cursor-pointer transition-all"
-                      checked={filteredGroups.length > 0 && selectedIds.size === filteredGroups.length}
-                      onChange={handleSelectAll}
-                    />
-                  </div>
+                <th scope="col" className="p-3 w-10 text-center font-normal border-r border-[#c3c4c7]/30">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded-sm border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1] cursor-pointer"
+                    checked={filteredGroups.length > 0 && selectedIds.size === filteredGroups.length}
+                    onChange={handleSelectAll}
+                  />
                 </th>
                 <SortableHeader label="Group Info" field="name" currentSort={sortField} currentDir={sortDirection} onSort={handleSort} />
                 <SortableHeader label="Commission" field="commissionRate" currentSort={sortField} currentDir={sortDirection} onSort={handleSort} />
                 <SortableHeader label="Members" field="_count.affiliates" currentSort={sortField} currentDir={sortDirection} onSort={handleSort} />
-                <th scope="col" className="px-6 py-3">Config</th>
-                <th scope="col" className="px-6 py-3">Status</th>
-                <th scope="col" className="px-6 py-3 text-center w-14">Action</th>
+                <th scope="col" className="px-4 py-2 font-semibold border-r border-[#c3c4c7]/30">Config</th>
+                <th scope="col" className="px-4 py-2 font-semibold border-r border-[#c3c4c7]/30">Status</th>
+                <th scope="col" className="px-4 py-2 font-semibold text-center w-14">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#f0f0f1]">
               {filteredGroups.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-16 text-center">
-                    <div className="flex flex-col items-center justify-center gap-3 text-gray-400">
-                      <div className="bg-gray-50 p-4 rounded-full">
-                        <Layers className="w-10 h-10 opacity-30 text-gray-500" />
-                      </div>
-                      <p className="text-sm font-medium text-gray-600">No groups found.</p>
+                  <td colSpan={7} className="p-12 text-center bg-[#f6f7f7]">
+                    <div className="flex flex-col items-center justify-center gap-2 text-[#50575e]">
+                      <Layers className="w-8 h-8 text-[#c3c4c7]" />
+                      <p className="text-[13px] font-medium">No groups found.</p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredGroups.map((group) => (
-                  <tr key={group.id} className="bg-white hover:bg-gray-50/60 transition-colors group">
-                    <td className="p-4 w-4">
-                      <div className="flex items-center">
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 text-black bg-white border-gray-300 rounded focus:ring-black focus:ring-2 cursor-pointer transition-all"
-                          checked={selectedIds.has(group.id)}
-                          onChange={() => handleSelectOne(group.id)}
-                        />
-                      </div>
-                    </td>
-                    
-                    <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => handleOpenDetails(group)} className="text-sm font-bold text-gray-900 hover:text-blue-600 hover:underline transition-colors">
-                                    {group.name}
-                                </button>
-                                {group.isDefault && (
-                                    <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-wide">
-                                        Default
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded">/{group.slug}</span>
-                            </div>
-                            {group.description && <p className="text-xs text-gray-400 mt-1 line-clamp-1">{group.description}</p>}
-                        </div>
-                    </td>
+                filteredGroups.map((group) => {
+                  const safeSlug = group.slug || group.name.toLowerCase().replace(/\s+/g, '-');
+                  const prodRatesCount = group._count.productRates || 0;
+                  const annCount = group._count.announcements || 0;
 
-                    <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
-                            <div className={cn("p-1.5 rounded-lg", group.commissionRate ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-400")}>
-                                {group.commissionType === "FIXED" ? <DollarSign className="w-3.5 h-3.5" /> : <Percent className="w-3.5 h-3.5" />}
-                            </div>
-                            <span className={cn("font-mono font-bold text-sm", group.commissionRate ? "text-gray-900" : "text-gray-400 italic")}>
-                                {group.commissionRate ? (group.commissionType === "FIXED" ? `${currency}${Number(group.commissionRate)}` : `${Number(group.commissionRate)}%`): "Global" }
-                            </span>
-                        </div>
-                    </td>
+                  return (
+                    <tr key={group.id} className="bg-white hover:bg-[#f6f7f7] transition-colors group">
+                      <td className="p-3 text-center border-r border-[#c3c4c7]/10">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded-sm border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1] cursor-pointer"
+                            checked={selectedIds.has(group.id)}
+                            onChange={() => handleSelectOne(group.id)}
+                          />
+                      </td>
+                      
+                      <td className="px-4 py-3 border-r border-[#c3c4c7]/10">
+                          <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                  <button onClick={() => handleOpenDetails(group)} className="text-[13px] font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline transition-colors m-0 p-0 text-left">
+                                      {group.name}
+                                  </button>
+                                  {group.isDefault && (
+                                      <span className="text-[10px] font-bold text-[#00a32a] bg-[#f0f6fc] border border-[#00a32a]/30 px-1.5 py-0.5 rounded-sm uppercase">
+                                          Default
+                                      </span>
+                                  )}
+                              </div>
+                              <div className="text-[11px] text-[#50575e] font-mono mt-1">/{safeSlug}</div>
+                              {group.description && <p className="text-[11px] text-[#8c8f94] mt-1 m-0 line-clamp-1 italic">{group.description}</p>}
+                          </div>
+                      </td>
 
-                    <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                            <div className="flex -space-x-2">
-                                {[...Array(Math.min(group._count.affiliates, 3))].map((_, i) => (
-                                    <div key={i} className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-[8px] font-bold text-gray-500">
-                                        <Users className="w-3 h-3" />
-                                    </div>
-                                ))}
-                                {group._count.affiliates > 3 && (
-                                    <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-gray-500">
-                                        +{group._count.affiliates - 3}
-                                    </div>
-                                )}
-                            </div>
-                            <span className="text-xs font-medium text-gray-600">
-                                {group._count.affiliates} Users
-                            </span>
-                        </div>
-                    </td>
+                      <td className="px-4 py-3 border-r border-[#c3c4c7]/10">
+                          <div className="flex items-center gap-1.5">
+                              <span className={cn("font-mono font-semibold text-[14px]", group.commissionRate ? "text-[#1d2327]" : "text-[#8c8f94] italic")}>
+                                  {group.commissionRate ? (group.commissionType === "FIXED" ? `${currency}${Number(group.commissionRate)}` : `${Number(group.commissionRate)}%`): "Global" }
+                              </span>
+                          </div>
+                      </td>
 
-                    <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                            {group._count.productRates > 0 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-purple-50 text-purple-700 text-[10px] font-medium border border-purple-100" title="Product Overrides">
-                                    <Package className="w-3 h-3" /> {group._count.productRates}
-                                </span>
-                            )}
-                            {group._count.announcements > 0 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-orange-50 text-orange-700 text-[10px] font-medium border border-orange-100" title="Active Announcements">
-                                    <Megaphone className="w-3 h-3" /> {group._count.announcements}
-                                </span>
-                            )}
-                            {group._count.productRates === 0 && group._count.announcements === 0 && (
-                                <span className="text-[10px] text-gray-300 italic">No overrides</span>
-                            )}
-                        </div>
-                    </td>
+                      <td className="px-4 py-3 border-r border-[#c3c4c7]/10">
+                          <div className="flex items-center gap-2">
+                              <span className="text-[13px] font-semibold text-[#1d2327] flex items-center gap-1">
+                                  <Users className="w-4 h-4 text-[#50575e]" /> {group._count.affiliates}
+                              </span>
+                          </div>
+                      </td>
 
-                    <td className="px-6 py-4">
-                        {group.isActive ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wide">
-                                Active
-                            </span>
-                        ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wide">
-                                Inactive
-                            </span>
-                        )}
-                    </td>
+                      <td className="px-4 py-3 border-r border-[#c3c4c7]/10">
+                          <div className="flex gap-2">
+                              {prodRatesCount > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-[#f0f0f1] text-[#1d2327] text-[11px] border border-[#c3c4c7]" title="Product Overrides">
+                                      <Package className="w-3 h-3 text-[#2271b1]" /> {prodRatesCount}
+                                  </span>
+                              )}
+                              {annCount > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-[#f0f0f1] text-[#1d2327] text-[11px] border border-[#c3c4c7]" title="Active Announcements">
+                                      <Megaphone className="w-3 h-3 text-[#d63638]" /> {annCount}
+                                  </span>
+                              )}
+                              {prodRatesCount === 0 && annCount === 0 && (
+                                  <span className="text-[11px] text-[#8c8f94] italic">None</span>
+                              )}
+                          </div>
+                      </td>
 
-                    <td className="px-6 py-4 text-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button disabled={isPending} className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-black/5">
-                            {isPending ? <Loader2 className="w-4 h-4 animate-spin"/> : <MoreVertical className="w-4 h-4" />}
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 shadow-xl border-gray-200 p-1">
-                          <DropdownMenuLabel className="text-xs font-bold text-gray-500 uppercase px-2 py-1.5">Group Options</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleOpenDetails(group)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50">
-                            <Users className="w-3.5 h-3.5 mr-2 text-gray-500" /> View Members
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(group)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50">
-                            <Edit className="w-3.5 h-3.5 mr-2 text-gray-500" /> Edit Settings
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDelete(group.id)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded text-red-700 hover:bg-red-50 focus:bg-red-50">
-                            <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete Group
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))
+                      <td className="px-4 py-3 border-r border-[#c3c4c7]/10">
+                          {/* We don't have isActive in AffiliateTier, fallback to static 'Active' or derive from logic */}
+                          <span className="text-[11px] font-semibold text-[#00a32a]">Active</span>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button disabled={isPending} className="p-1 text-[#50575e] hover:text-[#1d2327] hover:bg-[#f0f0f1] rounded-sm transition-colors outline-none focus:ring-1 focus:ring-[#2271b1]">
+                              {isPending ? <Loader2 className="w-4 h-4 animate-spin"/> : <MoreVertical className="w-4 h-4" />}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40 shadow-lg border border-[#c3c4c7] p-0 rounded-sm bg-white font-sans">
+                            <DropdownMenuItem onClick={() => handleOpenDetails(group)} className="cursor-pointer text-[12px] text-[#2c3338] px-3 py-2 hover:bg-[#f0f6fc] hover:text-[#2271b1] focus:bg-[#f0f6fc]">
+                              View Members
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(group)} className="cursor-pointer text-[12px] text-[#2c3338] px-3 py-2 hover:bg-[#f0f6fc] hover:text-[#2271b1] focus:bg-[#f0f6fc]">
+                              Edit Settings
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-[#c3c4c7] m-0" />
+                            <DropdownMenuItem onClick={() => handleDelete(group.id)} className="cursor-pointer text-[12px] text-[#d63638] px-3 py-2 hover:bg-[#fcf0f1] focus:bg-[#fcf0f1]">
+                              Delete Group
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      <GroupConfigModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        initialData={editingGroup} 
-      />
-
-      <GroupDetailDrawer 
-        isOpen={isDrawerOpen} 
-        onClose={() => setIsDrawerOpen(false)} 
-        group={selectedGroup} 
-      />
+      <GroupConfigModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={editingGroup} />
+      <GroupDetailDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} group={selectedGroup} />
 
     </div>
   );
@@ -422,12 +383,12 @@ export default function GroupManager({ initialGroups }: Props) {
 
 function SortableHeader({ label, field, currentSort, currentDir, onSort }: any) {
     return (
-        <th scope="col" className="px-6 py-3 cursor-pointer group select-none">
-            <div className="flex items-center gap-1.5" onClick={() => onSort(field)}>
+        <th scope="col" className="px-4 py-2 font-semibold border-r border-[#c3c4c7]/30 cursor-pointer group select-none hover:bg-[#e6e6e6] transition-colors" onClick={() => onSort(field)}>
+            <div className="flex items-center justify-between">
                 {label}
                 <ArrowUpDown className={cn(
                     "w-3 h-3 transition-colors",
-                    currentSort === field ? "text-black" : "text-gray-300 group-hover:text-gray-500"
+                    currentSort === field ? "text-[#1d2327]" : "text-[#c3c4c7] group-hover:text-[#8c8f94]"
                 )} />
             </div>
         </th>
@@ -439,7 +400,6 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
     const { symbol } = useGlobalStore(); 
     const currency = symbol || "$";
     
-    // ১. watch ফাংশনটি বের করে নিন
     const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm({
         defaultValues: {
             name: "",
@@ -463,13 +423,7 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
                     commissionType: initialData.commissionType || "PERCENTAGE"
                 });
             } else {
-                reset({
-                    name: "",
-                    description: "",
-                    commissionRate: "",
-                    isDefault: false,
-                    commissionType: "PERCENTAGE"
-                });
+                reset({ name: "", description: "", commissionRate: "", isDefault: false, commissionType: "PERCENTAGE" });
             }
         }
     }, [initialData, isOpen, reset]);
@@ -490,117 +444,91 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
     if(!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-sans text-[#1d2327]">
+            <div className="bg-[#f0f0f1] border border-[#c3c4c7] shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
                 
-                {/* Header */}
-                <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50/50">
-                    <h3 className="font-bold text-gray-900">{initialData ? "Edit Group" : "Create Group"}</h3>
-                    <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-black" /></button>
+                <div className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center bg-white">
+                    <h3 className="font-semibold text-[14px] text-[#1d2327] m-0">{initialData ? "Edit Group" : "Create Group"}</h3>
+                    <button onClick={onClose}><X className="w-5 h-5 text-[#50575e] hover:text-[#d63638]" /></button>
                 </div>
                 
-                {/* Body */}
-                <div className="p-6 overflow-y-auto">
-                    <form id="group-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <div className="p-4 overflow-y-auto bg-white">
+                    <form id="group-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         
-                        {/* Name */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-gray-700 uppercase">Group Name</label>
+                        <div>
+                            <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Group Name</label>
                             <input 
                                 {...register("name", { required: "Name is required" })} 
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" 
+                                className="w-full border border-[#8c8f94] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none rounded-sm" 
                                 placeholder="e.g. VIP Influencers" 
                             />
-                            {errors.name && <span className="text-red-500 text-xs font-medium">{errors.name.message as string}</span>}
+                            {errors.name && <span className="text-[#d63638] text-[11px] mt-1">{errors.name.message as string}</span>}
                         </div>
                         
-                        {/* Description */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-gray-700 uppercase">Description</label>
+                        <div>
+                            <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Description</label>
                             <textarea 
                                 {...register("description")} 
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" 
+                                className="w-full border border-[#8c8f94] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none rounded-sm" 
                                 rows={3} 
-                                placeholder="Internal notes..." 
                             />
                         </div>
 
-                        {/* Commission Structure */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-gray-700 uppercase">Commission Structure</label>
+                        <div className="border border-[#c3c4c7] p-3 bg-[#f6f7f7]">
+                            <label className="text-[13px] font-semibold text-[#1d2327] block mb-2">Commission Structure</label>
                             
-                            <div className="flex gap-3">
-                                {/* Type Selector Buttons */}
-                                <div className="flex p-1 bg-gray-100 rounded-lg border border-gray-200 shrink-0">
+                            <div className="flex gap-2">
+                                <div className="flex bg-[#f0f0f1] border border-[#c3c4c7] p-0.5 rounded-sm shrink-0">
                                     <button
                                         type="button"
                                         onClick={() => setValue("commissionType", "PERCENTAGE")}
                                         className={cn(
-                                            "px-3 py-2 text-xs font-bold rounded-md flex items-center gap-1 transition-all",
-                                            commissionType === "PERCENTAGE" 
-                                                ? "bg-white text-black shadow-sm ring-1 ring-black/5" 
-                                                : "text-gray-500 hover:text-gray-700"
+                                            "px-2 py-1 text-[12px] font-semibold rounded-sm",
+                                            commissionType === "PERCENTAGE" ? "bg-white text-[#1d2327] shadow-sm border border-[#c3c4c7]" : "text-[#50575e] hover:text-[#2c3338]"
                                         )}
                                     >
-                                        <Percent className="w-3 h-3" /> %
+                                        <Percent className="w-3 h-3 inline mr-1" /> %
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setValue("commissionType", "FIXED")}
                                         className={cn(
-                                            "px-3 py-2 text-xs font-bold rounded-md flex items-center gap-1 transition-all",
-                                            commissionType === "FIXED" 
-                                                ? "bg-white text-black shadow-sm ring-1 ring-black/5" 
-                                                : "text-gray-500 hover:text-gray-700"
+                                            "px-2 py-1 text-[12px] font-semibold rounded-sm",
+                                            commissionType === "FIXED" ? "bg-white text-[#1d2327] shadow-sm border border-[#c3c4c7]" : "text-[#50575e] hover:text-[#2c3338]"
                                         )}
                                     >
-                                        <DollarSign className="w-3 h-3" /> Fixed
+                                        <DollarSign className="w-3 h-3 inline mr-1" /> Fixed
                                     </button>
                                 </div>
 
-                                {/* Rate Input */}
                                 <div className="relative flex-1">
-                                    <div className="absolute left-3 top-2.5 text-gray-400 pointer-events-none font-bold text-xs">
-                                        {/* Dynamic Icon based on watch value */}
+                                    <div className="absolute left-2 top-1.5 text-[#50575e] font-bold text-[13px] pointer-events-none">
                                         {commissionType === "FIXED" ? currency : <Percent className="w-3.5 h-3.5" />}
                                     </div>
                                     <input 
-                                        type="number" 
-                                        step="0.01" 
+                                        type="number" step="0.01" 
                                         {...register("commissionRate")} 
-                                        className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all font-bold" 
-                                        placeholder={commissionType === "FIXED" ? "50.00" : "10"} 
+                                        className="w-full border border-[#8c8f94] pl-7 pr-2 py-1.5 text-[13px] font-bold focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none rounded-sm" 
+                                        placeholder="10" 
                                     />
                                 </div>
                             </div>
-                            <p className="text-[10px] text-gray-400 pt-1">
-                                {commissionType === "FIXED" 
-                                    ? `Affiliates will earn a flat ${currency} amount per order.` 
-                                    : "Affiliates will earn a percentage of the order subtotal."}
-                            </p>
                         </div>
 
-                        {/* Default Checkbox */}
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex items-center gap-3 hover:border-blue-200 transition-colors">
-                            <input 
-                                type="checkbox" 
-                                id="isDefault" 
-                                {...register("isDefault")} 
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                            />
-                            <label htmlFor="isDefault" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                        <div className="flex items-center gap-2 pt-2">
+                            <input type="checkbox" id="isDefault" {...register("isDefault")} className="w-4 h-4 rounded-sm border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]" />
+                            <label htmlFor="isDefault" className="text-[13px] text-[#1d2327]">
                                 Set as Default Group <br/>
-                                <span className="text-xs text-blue-600/70 font-normal">New affiliates will join this group automatically.</span>
+                                <span className="text-[11px] text-[#50575e] italic">New affiliates will join this group automatically.</span>
                             </label>
                         </div>
                     </form>
                 </div>
 
-                {/* Footer */}
-                <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                    <button type="submit" form="group-form" disabled={isPending} className="px-6 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 flex items-center gap-2 shadow-lg active:scale-95 transition-all">
-                        {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                <div className="p-3 border-t border-[#c3c4c7] bg-[#f0f0f1] flex justify-end gap-2 shrink-0">
+                    <button onClick={onClose} className="px-3 py-1.5 border border-[#8c8f94] bg-[#f0f0f1] text-[#2c3338] text-[13px] rounded-sm hover:bg-[#e6e6e6]">Cancel</button>
+                    <button type="submit" form="group-form" disabled={isPending} className="px-4 py-1.5 border border-[#2271b1] bg-[#2271b1] text-white text-[13px] rounded-sm hover:bg-[#135e96] disabled:opacity-50 flex items-center gap-1.5">
+                        {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         Save Group
                     </button>
                 </div>
@@ -611,84 +539,80 @@ function GroupConfigModal({ isOpen, onClose, initialData }: any) {
 
 function GroupDetailDrawer({ isOpen, onClose, group }: { isOpen: boolean, onClose: () => void, group: GroupWithDetails | null }) {
     if (!isOpen || !group) return null;
+    const safeSlug = group.slug || group.name.toLowerCase().replace(/\s+/g, '-');
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://your-site.com";
-    const regLink = `${siteUrl}/affiliate/register?group=${group.slug}`;
+    const regLink = `${siteUrl}/affiliate/register?group=${safeSlug}`;
+
     return (
-        <div className="fixed inset-0 z-50 flex justify-end">
-            <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] transition-opacity animate-in fade-in" onClick={onClose} />
-            <div className="relative w-full max-w-md bg-white h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col border-l border-gray-200">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
+        <div className="fixed inset-0 z-[100] flex justify-end font-sans text-[#1d2327]">
+            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+            <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l border-[#c3c4c7]">
+                
+                <div className="p-4 border-b border-[#c3c4c7] bg-[#f0f0f1] flex justify-between items-start">
                     <div>
                         <div className="flex items-center gap-2">
-                             <h2 className="text-xl font-bold text-gray-900">{group.name}</h2>
-                             {group.isDefault && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase">Default</span>}
+                             <h2 className="text-[18px] font-semibold text-[#1d2327] m-0">{group.name}</h2>
+                             {group.isDefault && <span className="px-1.5 py-0.5 bg-[#f0f6fc] border border-[#2271b1]/30 text-[#2271b1] text-[10px] font-bold rounded-sm uppercase">Default</span>}
                         </div>
-                        <p className="text-sm text-gray-500 mt-1 font-mono">/{group.slug}</p>
+                        <p className="text-[12px] text-[#50575e] mt-1 font-mono m-0">/{safeSlug}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors text-gray-400 hover:text-black"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} className="text-[#50575e] hover:text-[#d63638]"><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-white">
+                <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-white">
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Members</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1 flex items-center gap-2">
-                                <Users className="w-5 h-5 text-blue-500"/> {group._count.affiliates}
+                        <div className="p-3 bg-[#f6f7f7] border border-[#c3c4c7] rounded-sm text-center">
+                            <p className="text-[11px] text-[#50575e] font-semibold uppercase m-0">Members</p>
+                            <p className="text-[20px] font-normal text-[#1d2327] m-0 mt-1 flex items-center justify-center gap-1.5">
+                                <Users className="w-4 h-4 text-[#2271b1]"/> {group._count.affiliates || 0}
                             </p>
                         </div>
-                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Commission</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1 flex items-center gap-2">
-                                <Percent className="w-5 h-5 text-green-500"/> {group.commissionRate ? `${Number(group.commissionRate)}%` : "Global"}
+                        <div className="p-3 bg-[#f6f7f7] border border-[#c3c4c7] rounded-sm text-center">
+                            <p className="text-[11px] text-[#50575e] font-semibold uppercase m-0">Commission</p>
+                            <p className="text-[20px] font-normal text-[#1d2327] m-0 mt-1 flex items-center justify-center gap-1.5">
+                                <Percent className="w-4 h-4 text-[#00a32a]"/> {group.commissionRate ? `${Number(group.commissionRate)}%` : "Global"}
                             </p>
                         </div>
                     </div>
 
                     {group.description && (
-                        <div>
-                            <h4 className="text-xs font-bold text-gray-900 border-b pb-2 mb-2 uppercase">Description</h4>
-                            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg italic">"{group.description}"</p>
+                        <div className="border border-[#c3c4c7] p-3 bg-white">
+                            <h4 className="text-[13px] font-semibold text-[#1d2327] m-0 mb-1">Description</h4>
+                            <p className="text-[12px] text-[#50575e] m-0 italic">{group.description}</p>
                         </div>
                     )}
 
-                    <div>
-                        <h4 className="text-xs font-bold text-gray-900 border-b pb-2 mb-3 uppercase flex justify-between">
-                            Active Configurations 
-                            <span className="text-gray-400 font-normal normal-case">Linked to this group</span>
-                        </h4>
+                    <div className="border border-[#c3c4c7] p-3 bg-white">
+                        <h4 className="text-[13px] font-semibold text-[#1d2327] m-0 mb-2">Active Configurations</h4>
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-purple-50 text-purple-600 rounded">
-                                        <Package className="w-4 h-4" />
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-700">Product Overrides</span>
+                            <div className="flex items-center justify-between p-2 bg-[#f0f0f1] border border-[#c3c4c7] rounded-sm">
+                                <div className="flex items-center gap-2">
+                                    <Package className="w-4 h-4 text-[#50575e]" />
+                                    <span className="text-[12px] text-[#1d2327]">Product Overrides</span>
                                 </div>
-                                <span className="font-bold text-gray-900">{group._count.productRates} rules</span>
+                                <span className="font-semibold text-[13px] text-[#1d2327]">{group._count.productRates || 0} rules</span>
                             </div>
-                            <div className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-orange-50 text-orange-600 rounded">
-                                        <Megaphone className="w-4 h-4" />
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-700">Announcements</span>
+                            <div className="flex items-center justify-between p-2 bg-[#f0f0f1] border border-[#c3c4c7] rounded-sm">
+                                <div className="flex items-center gap-2">
+                                    <Megaphone className="w-4 h-4 text-[#50575e]" />
+                                    <span className="text-[12px] text-[#1d2327]">Announcements</span>
                                 </div>
-                                <span className="font-bold text-gray-900">{group._count.announcements} posts</span>
+                                <span className="font-semibold text-[13px] text-[#1d2327]">{group._count.announcements || 0} posts</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col gap-2">
-                        <p className="text-xs font-bold text-blue-700 uppercase">Registration Link for this Group</p>
-                        <div className="flex items-center gap-2 bg-white p-2 rounded border border-blue-200">
-                            <code className="text-xs text-gray-600 flex-1 truncate">
+                    <div className="border border-[#2271b1] bg-[#f0f6fc] p-3">
+                        <p className="text-[12px] font-semibold text-[#2271b1] m-0 mb-1">Registration Link</p>
+                        <div className="flex items-center gap-2 bg-white border border-[#c3c4c7] p-1.5 rounded-sm">
+                            <code className="text-[11px] text-[#50575e] flex-1 truncate select-all px-1">
                                 {regLink}
                             </code>
                             <button onClick={() => {
                                 navigator.clipboard.writeText(regLink);
                                 toast.success("Link copied");
-                            }} className="p-1 hover:bg-gray-100 rounded">
-                                <Copy className="w-3.5 h-3.5 text-gray-500"/>
+                            }} className="p-1 hover:bg-[#f0f0f1] border border-transparent hover:border-[#c3c4c7] rounded-sm transition-colors text-[#2c3338]">
+                                <Copy className="w-3.5 h-3.5"/>
                             </button>
                         </div>
                     </div>

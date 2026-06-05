@@ -178,7 +178,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
     <div className="flex flex-col lg:flex-row w-full min-h-screen bg-gray-50/30">
       
       {/* MOBILE HEADER */}
-      <div className="lg:hidden w-full bg-white border-b border-gray-200 h-16 px-4 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+      <div className="lg:hidden w-full bg-white border-b border-gray-200 h-16  flex justify-between items-center sticky top-0 z-20 shadow-sm">
         <span className="font-bold text-gray-800 flex items-center gap-2">
            <Settings className="w-5 h-5 text-indigo-600"/>
            Affiliate Admin
@@ -200,7 +200,7 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
         "fixed top-16 left-0 bottom-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-auto lg:top-0 lg:z-0 overflow-y-auto custom-scrollbar shadow-xl lg:shadow-none pb-20",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="p-6 border-b border-gray-100 hidden lg:flex justify-between items-center bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
+        <div className=" border-b border-gray-100 hidden lg:flex justify-between items-center bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
           <div>
             <h2 className="font-extrabold text-lg text-gray-900 tracking-tight">Affiliate Hub</h2>
             <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">Enterprise Control</p>
@@ -239,10 +239,10 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
       </aside>
 
       {/* CONTENT AREA */}
-      <main className="flex-1 w-full min-w-0 relative min-h-screen pb-10">
+      <main className="flex-1 w-full relative min-h-screen ">
         
         {/* Desktop Top Bar */}
-        <header className="hidden lg:flex h-16 bg-white border-b border-gray-200 px-8 justify-between items-center sticky top-0 z-10">
+        <header className="hidden lg:flex h-16 bg-white border-b border-gray-200 px-8 justify-between items-center ">
             <h1 className="text-xl font-bold text-gray-800">
                 {MENU_ITEMS.flatMap(s => s.items).find(m => m.id === activeTab)?.label}
             </h1>
@@ -264,8 +264,8 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
             </div>
         )}
 
-        <div className={cn("p-4 md:p-8 transition-opacity duration-300 ease-in-out", isPending ? "opacity-50" : "opacity-100")}>
-            <div className="max-w-7xl mx-auto">
+        <div className={cn(" transition-opacity duration-300 ease-in-out", isPending ? "opacity-50" : "opacity-100")}>
+            <div className="w-full">
                 <ActiveComponent />
             </div>
         </div>

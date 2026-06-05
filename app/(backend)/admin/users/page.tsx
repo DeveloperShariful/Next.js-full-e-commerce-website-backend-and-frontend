@@ -1,4 +1,4 @@
-//app/(backend)/admin/users/page.tsx
+// app/(backend)/admin/users/page.tsx
 
 import { db } from '@/lib/prisma';
 import Link from 'next/link';
@@ -17,15 +17,36 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const ITEMS_PER_PAGE = 20; 
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
-  // 🛑 FIX: Added all Role Counts including the new ones
+  // =========================================
+  // 1. DYNAMIC ROLE COUNTS
+  // =========================================
   const allCount = await db.user.count({ where: { isActive: true } });
   const superAdminCount = await db.user.count({ where: { role: 'SUPER_ADMIN', isActive: true } });
   const adminCount = await db.user.count({ where: { role: 'ADMIN', isActive: true } });
   const managerCount = await db.user.count({ where: { role: 'MANAGER', isActive: true } });
   const editorCount = await db.user.count({ where: { role: 'EDITOR', isActive: true } });
   const supportCount = await db.user.count({ where: { role: 'SUPPORT', isActive: true } });
-  const customerCount = await db.user.count({ where: { role: 'CUSTOMER', isActive: true } });
-  const affiliateCount = await db.user.count({ where: { role: 'AFFILIATE', isActive: true } });
+  
+  // ✅ FIXED: Customer count should exclude users who have an Affiliate account
+  const customerCount = await db.user.count({ 
+    where: { 
+      role: 'CUSTOMER', 
+      isActive: true,
+      affiliateAccount: null // Don't count affiliates as plain customers
+    } 
+  });
+  
+  // ✅ FIXED: Affiliate Count (Check if Role is AFFILIATE OR if they have an AffiliateAccount)
+  const affiliateCount = await db.user.count({ 
+    where: { 
+      isActive: true,
+      OR: [
+        { role: 'AFFILIATE' },
+        { affiliateAccount: { isNot: null } }
+      ]
+    } 
+  });
+  
   const subscriberCount = await db.user.count({ where: { role: 'SUBSCRIBER', isActive: true } });
 
   const counts = { 
@@ -40,21 +61,52 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     subscriber: subscriberCount 
   };
 
+  // =========================================
+  // 2. FILTERING LOGIC
+  // =========================================
   let whereCondition: any = { isActive: true }; 
 
   if (currentRole !== 'ALL') {
-    whereCondition.role = currentRole as Role;
+    if (currentRole === 'AFFILIATE') {
+      // ✅ Show users who have the Affiliate Role OR an Affiliate Account
+      whereCondition.OR = [
+        { role: 'AFFILIATE' },
+        { affiliateAccount: { isNot: null } }
+      ];
+    } else if (currentRole === 'CUSTOMER') {
+      // ✅ Hide affiliates from the Customer tab
+      whereCondition.role = 'CUSTOMER';
+      whereCondition.affiliateAccount = null;
+    } else {
+      whereCondition.role = currentRole as Role;
+    }
   }
 
+  // Search Logic (Merging with OR if it exists)
   if (searchQuery) {
-    whereCondition.OR = [
-      { name: { contains: searchQuery, mode: 'insensitive' } },
-      { email: { contains: searchQuery, mode: 'insensitive' } },
-    ];
+    if (whereCondition.OR) {
+      whereCondition.AND = [
+        { OR: whereCondition.OR },
+        { OR: [
+            { name: { contains: searchQuery, mode: 'insensitive' } },
+            { email: { contains: searchQuery, mode: 'insensitive' } }
+          ]
+        }
+      ];
+      delete whereCondition.OR;
+    } else {
+      whereCondition.OR = [
+        { name: { contains: searchQuery, mode: 'insensitive' } },
+        { email: { contains: searchQuery, mode: 'insensitive' } },
+      ];
+    }
   }
 
   const totalFilteredUsers = await db.user.count({ where: whereCondition });
   
+  // =========================================
+  // 3. FETCHING DATA
+  // =========================================
   const usersRaw = await db.user.findMany({
     where: whereCondition,
     orderBy: { createdAt: 'desc' }, 
@@ -66,19 +118,22 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       email: true,
       role: true,
       createdAt: true,
+      affiliateAccount: { select: { id: true } } // Bring relation to determine true role
     }
   });
 
   const users = usersRaw.map(user => ({
     ...user,
+    // ✅ Automatically display as 'AFFILIATE' in the UI if they have an AffiliateAccount
+    role: user.affiliateAccount ? 'AFFILIATE' : user.role,
     createdAt: user.createdAt.toISOString(),
   }));
 
   return (
-    <div className="w-full pb-10 pt-1 overflow-x-hidden">
+    <div className="w-full pb-10 pt-1 overflow-x-hidden font-sans">
       
       <div className="flex items-center gap-3 mb-3 pl-2 sm:pl-0">
-        <h1 className="text-[23px] font-normal text-[#1d2327] leading-none">Users</h1>
+        <h1 className="text-[23px] font-normal text-[#1d2327] leading-none m-0">Users</h1>
         <Link 
           href="/admin/users/add-user" 
           className="border border-[#2271b1] text-[#2271b1] px-2.5 py-0.5 text-[13px] rounded-[3px] hover:bg-[#f6f7f7] transition-colors leading-normal"
@@ -100,7 +155,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             defaultValue={searchQuery} 
             className="border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] outline-none h-[30px] w-full min-w-[100px] sm:min-w-[180px]"
           />
-          <button type="submit" className="border border-[#2271b1] text-[#2271b1] bg-[#f6f7f7] hover:bg-[#f0f0f1] px-3 h-[30px] text-[13px] rounded-[3px] transition-colors cursor-pointer font-semibold shrink-0 whitespace-nowrap">
+          <button type="submit" className="border border-[#2271b1] text-[#2271b1] bg-[#f0f6fc] hover:bg-[#f0f0f1] px-3 h-[30px] text-[13px] rounded-[3px] transition-colors cursor-pointer font-semibold shrink-0 whitespace-nowrap">
             Search Users
           </button>
         </form>

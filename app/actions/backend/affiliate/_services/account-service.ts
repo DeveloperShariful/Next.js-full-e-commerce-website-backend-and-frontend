@@ -7,7 +7,7 @@ import { AffiliateStatus, Prisma, AffiliateAccount } from "@prisma/client";
 import { DecimalMath } from "@/lib/decimal-math";
 import { auditService } from "@/lib/audit-service";
 import { revalidatePath } from "next/cache";
-import { ActionResponse, AffiliateUserTableItem } from "../types";
+import { ActionResponse, AffiliateUserTableItem, AffiliateKycDocument, AffiliatePixelData } from "../types";
 import { protectAction } from "../permission-service";
 import { getChanges } from "../get-changes";
 
@@ -20,16 +20,14 @@ export async function getAffiliates(
   limit: number = 20, 
   status?: AffiliateStatus,
   search?: string,
-  groupId?: string,
-  tagId?: string
+  tag?: string // ✅ FIXED: Changed tagId to tag (string)
 ) {
   const skip = (page - 1) * limit;
 
   const where: Prisma.AffiliateAccountWhereInput = {
     deletedAt: null, 
     ...(status && { status }),
-    ...(groupId && { groupId }),
-    ...(tagId && { tags: { some: { id: tagId } } }),
+    ...(tag && { tags: { has: tag } }), // ✅ FIXED: tags is now a String[]
     ...(search && {
       OR: [
         { user: { name: { contains: search, mode: "insensitive" } } },
@@ -49,9 +47,7 @@ export async function getAffiliates(
       include: {
         user: { select: { id: true, name: true, email: true, image: true } },
         tier: { select: { id: true, name: true, commissionRate: true, commissionType: true } },
-        group: { select: { id: true, name: true, commissionRate: true, commissionType: true } },
-        tags: { select: { id: true, name: true } },
-        coupons: { select: { code: true } },
+        coupons: { select: { code: true } }, // Removed Group inclusion
         referrals: {
           where: { status: { in: ["APPROVED", "PAID"] } },
           select: { totalOrderAmount: true, commissionAmount: true }
@@ -77,10 +73,7 @@ export async function getAffiliates(
       tierName: account.tier?.name || "Default",
       tierRate: account.tier?.commissionRate ? DecimalMath.toNumber(account.tier.commissionRate) : null,
       tierType: account.tier?.commissionType || "PERCENTAGE",
-      groupName: account.group?.name || "No Group",
-      groupRate: account.group?.commissionRate ? DecimalMath.toNumber(account.group.commissionRate) : null,
-      groupType: account.group?.commissionType || "PERCENTAGE", 
-      tags: account.tags.map(t => t.name),
+      tags: account.tags || [], // ✅ FIXED: Tags is already an array of strings
       coupons: account.coupons.map(c => c.code),
       balance: DecimalMath.toNumber(account.balance),
       totalEarnings: DecimalMath.toNumber(account.totalEarnings),
@@ -96,6 +89,8 @@ export async function getAffiliates(
       riskScore: account.riskScore || 0,
       commissionRate: account.commissionRate ? DecimalMath.toNumber(account.commissionRate) : null,
       commissionType: account.commissionType,
+      pixels: (account.pixels as unknown as AffiliatePixelData[]) || [],
+      kycDocuments: (account.kycDocuments as unknown as AffiliateKycDocument[]) || [],
     };
   });
 
@@ -112,12 +107,9 @@ export async function getAffiliateDetails(id: string) {
           }
       },
       tier: true,
-      group: true,
-      tags: true,
       coupons: true,
       parent: { include: { user: true } }, 
       downlines: { include: { user: true } }, 
-      documents: true, 
       payouts: { take: 10, orderBy: { createdAt: "desc" } },
       productRates: { include: { product: true } }
     }
@@ -287,38 +279,19 @@ export async function bulkStatusAction(ids: string[], status: AffiliateStatus): 
 }
 
 export async function bulkGroupAction(ids: string[], groupId: string): Promise<ActionResponse> {
-  try {
-    const actor = await protectAction("MANAGE_PARTNERS");
-
-    await db.affiliateAccount.updateMany({
-      where: { id: { in: ids }, deletedAt: null },
-      data: { groupId }
-    });
-
-    await auditService.log({
-      userId: actor.id,
-      action: "BULK_UPDATE",
-      entity: "AffiliateAccount",
-      entityId: "BULK",
-      newData: { groupId, count: ids.length, ids },
-      meta: { action: "BULK_GROUP_ASSIGN" }
-    });
-
-    revalidatePath("/admin/affiliate/users");
-    return { success: true, message: "Group assigned." };
-  } catch (error: any) {
-    return { success: false, message: "Bulk group assignment failed." };
-  }
+  // Removed logic as Group functionality is mapped to Tiers or Tags now
+  return { success: false, message: "Groups are deprecated. Use Tags or Tiers instead." };
 }
 
-export async function bulkTagAction(ids: string[], tagId: string): Promise<ActionResponse> {
+export async function bulkTagAction(ids: string[], tag: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
+    // ✅ FIXED: Updated to push tag string into String[] Array
     await db.$transaction(
       ids.map(id => db.affiliateAccount.update({
           where: { id, deletedAt: null }, 
-          data: { tags: { connect: { id: tagId } } }
+          data: { tags: { push: tag } } 
       }))
     );
 
@@ -327,7 +300,7 @@ export async function bulkTagAction(ids: string[], tagId: string): Promise<Actio
       action: "BULK_UPDATE",
       entity: "AffiliateAccount",
       entityId: "BULK",
-      newData: { tagId, count: ids.length, ids },
+      newData: { tag, count: ids.length, ids },
       meta: { action: "BULK_TAG_ADD" }
     });
 

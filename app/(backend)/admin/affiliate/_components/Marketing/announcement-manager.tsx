@@ -4,28 +4,36 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { AffiliateAnnouncement, AnnouncementType } from "@prisma/client";
+import { AnnouncementType } from "@prisma/client";
 import { 
   Plus, Trash2, Megaphone, Calendar, Users, Eye, EyeOff, Edit,
-  CheckCircle, AlertTriangle, Info, Loader2, Clock, X, Save, Search, User, Layers, Hash
+  CheckCircle, AlertTriangle, Info, Loader2, Clock, X, Save, Search, User, Layers, Tag
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { format, formatDistanceToNow, isFuture, isPast } from "date-fns";
+import { format, isFuture } from "date-fns";
 
 // Server Actions
 import { 
-  upsertAnnouncementAction, // Updated name
+  upsertAnnouncementAction, 
   deleteAnnouncementAction,
   toggleAnnouncementStatusAction,
-  getTargetingOptions // New helper
+  getTargetingOptions 
 } from "@/app/actions/backend/affiliate/_services/marketing-assets-service";
 import { searchAffiliatesForDropdown } from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 
-// --- TYPES ---
-interface AnnouncementWithTargets extends AffiliateAnnouncement {
-  targetGroups: { id: string; name: string }[];
-  targetTiers: { id: string; name: string }[];
+// --- TYPES (Mapped to JSON Schema from backend) ---
+interface AnnouncementWithTargets {
+  id: string;
+  title: string;
+  content: string;
+  type: AnnouncementType;
+  isActive: boolean;
+  startsAt: string | Date;
+  expiresAt?: string | Date | null;
+  targetGroups?: { id: string; name: string }[]; // Actually Tags now in backend
+  targetTiers?: { id: string; name: string }[];
+  affiliateIds?: string[];
 }
 
 interface Props {
@@ -41,25 +49,24 @@ interface AnnouncementFormData {
   startsAt: string;
   expiresAt?: string;
   targetType: "ALL" | "SEGMENTED";
-  groupIds: string[];
+  groupIds: string[]; // These are Tag IDs now
   tierIds: string[];
-  affiliateIds: string[]; // For UI state
+  affiliateIds: string[]; 
 }
 
-// --- MAIN COMPONENT ---
+// --- MAIN COMPONENT (WP STYLE) ---
 export default function AnnouncementManager({ initialData }: Props) {
   const [items, setItems] = useState<AnnouncementWithTargets[]>(initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AnnouncementWithTargets | null>(null);
 
   // Helper Data for Dropdowns
-  const [availableGroups, setAvailableGroups] = useState<{id:string, name:string}[]>([]);
+  const [availableTags, setAvailableTags] = useState<{id:string, name:string}[]>([]);
   const [availableTiers, setAvailableTiers] = useState<{id:string, name:string}[]>([]);
 
-  // Load Groups/Tiers on mount
   useEffect(() => {
     getTargetingOptions().then(data => {
-        setAvailableGroups(data.groups);
+        setAvailableTags(data.groups); // 'groups' key now returns Tags from backend
         setAvailableTiers(data.tiers);
     });
   }, []);
@@ -78,8 +85,11 @@ export default function AnnouncementManager({ initialData }: Props) {
     if(!confirm("Delete this announcement?")) return;
     setItems(prev => prev.filter(i => i.id !== id));
     const res = await deleteAnnouncementAction(id);
-    if(res.success) toast.success("Deleted");
-    else toast.error(res.message);
+    if(res.success) toast.success(res.message);
+    else {
+        toast.error(res.message);
+        window.location.reload(); // Revert on fail
+    }
   };
 
   const handleToggle = async (id: string, current: boolean) => {
@@ -94,92 +104,117 @@ export default function AnnouncementManager({ initialData }: Props) {
 
   const getTypeIcon = (type: AnnouncementType) => {
       switch(type) {
-          case 'WARNING': return <AlertTriangle className="w-5 h-5 text-orange-600" />;
-          case 'SUCCESS': return <CheckCircle className="w-5 h-5 text-green-600" />;
-          default: return <Info className="w-5 h-5 text-blue-600" />;
+          case 'WARNING': return <AlertTriangle className="w-5 h-5 text-[#d63638]" />;
+          case 'SUCCESS': return <CheckCircle className="w-5 h-5 text-[#00a32a]" />;
+          default: return <Info className="w-5 h-5 text-[#2271b1]" />;
       }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+    <div className="space-y-4 font-sans text-[#1d2327]">
+      
+      {/* WP Admin Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-4">
         <div>
-          <h3 className="font-bold text-gray-900 text-lg">Announcements</h3>
-          <p className="text-xs text-gray-500">Manage updates for groups, tiers, or specific partners.</p>
+          <h1 className="text-[22px] font-normal text-[#1d2327] m-0 flex items-center gap-2">
+             <Megaphone className="w-5 h-5 text-[#50575e]" /> Announcements
+          </h1>
+          <p className="text-[13px] text-[#50575e] m-0">Manage updates for tags, tiers, or specific partners.</p>
         </div>
-        <button onClick={handleCreate} className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-800 transition-all shadow-md active:scale-95">
-          <Plus className="w-4 h-4" /> Create New
+        <button 
+            onClick={handleCreate} 
+            className="flex items-center gap-1.5 border border-[#2271b1] bg-[#2271b1] text-white px-3 py-1 text-[13px] rounded-sm hover:bg-[#135e96] hover:border-[#135e96] transition-colors cursor-pointer shadow-sm"
+        >
+          <Plus className="w-3.5 h-3.5" /> Add New
         </button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {items.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-300">
-            <Megaphone className="w-8 h-8 text-gray-300 mx-auto mb-3"/>
-            <h4 className="text-gray-900 font-medium">No announcements</h4>
+          <div className="text-center py-12 bg-white border border-[#c3c4c7] shadow-sm flex flex-col items-center">
+            <Megaphone className="w-8 h-8 text-[#c3c4c7] mb-2"/>
+            <h4 className="text-[14px] font-semibold text-[#1d2327] m-0">No announcements</h4>
+            <p className="text-[13px] text-[#50575e] m-0 mt-1">Create your first announcement to keep affiliates engaged.</p>
           </div>
         ) : (
-          items.map(item => (
-            <div key={item.id} className={cn("group relative flex flex-col sm:flex-row gap-5 p-6 rounded-xl border transition-all bg-white hover:shadow-md", !item.isActive && "opacity-75 bg-gray-50/50")}>
-              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border shadow-sm", item.type === "INFO" ? "bg-blue-50 border-blue-100" : item.type === "WARNING" ? "bg-orange-50 border-orange-100" : "bg-green-50 border-green-100")}>
+          items.map(item => {
+            const isDraft = !item.isActive;
+            const scheduled = isFuture(new Date(item.startsAt));
+            const hasTags = item.targetGroups && item.targetGroups.length > 0;
+            const hasTiers = item.targetTiers && item.targetTiers.length > 0;
+
+            return (
+            <div key={item.id} className={cn("group relative flex flex-col sm:flex-row gap-4 p-4 bg-white border border-[#c3c4c7] shadow-sm transition-colors hover:border-[#8c8f94]", isDraft && "bg-[#f6f7f7] border-dashed")}>
+              
+              {/* Icon Box */}
+              <div className={cn("w-10 h-10 rounded-sm flex items-center justify-center flex-shrink-0 border", 
+                item.type === "INFO" ? "bg-[#f0f6fc] border-[#2271b1]/30" : 
+                item.type === "WARNING" ? "bg-[#fcf0f1] border-[#d63638]/30" : "bg-[#f0f6fc] border-[#00a32a]/30"
+              )}>
                 {getTypeIcon(item.type)}
               </div>
               
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <h4 className="font-bold text-gray-900 text-sm">{item.title}</h4>
-                  {!item.isActive && <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold uppercase border">Draft</span>}
-                  {isFuture(new Date(item.startsAt)) && <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-blue-100 flex gap-1"><Clock className="w-3 h-3"/> Scheduled</span>}
+              <div className="flex-1 min-w-0 pr-12">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h4 className={cn("font-semibold text-[14px] m-0", isDraft ? "text-[#50575e]" : "text-[#2271b1] hover:underline cursor-pointer")} onClick={() => handleEdit(item)}>
+                    {item.title}
+                  </h4>
+                  {isDraft && <span className="bg-[#f0f0f1] text-[#50575e] px-1.5 py-0.5 rounded-sm text-[10px] font-bold uppercase border border-[#c3c4c7]">Draft</span>}
+                  {scheduled && <span className="bg-[#fcf9e8] text-[#8a6d3b] px-1.5 py-0.5 rounded-sm text-[10px] font-bold uppercase border border-[#f0b849] flex items-center gap-1"><Clock className="w-3 h-3"/> Scheduled</span>}
                 </div>
-                <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">{item.content}</p>
                 
-                <div className="flex flex-wrap gap-3 text-[11px] text-gray-500 font-medium">
-                  <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded border">
-                    <Calendar className="w-3 h-3 text-gray-400" /> {format(new Date(item.startsAt), "MMM d, yyyy")}
+                <p className="text-[13px] text-[#2c3338] mb-3 whitespace-pre-wrap leading-relaxed">{item.content}</p>
+                
+                <div className="flex flex-wrap gap-2 text-[11px] text-[#50575e] font-medium">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" /> Published: {format(new Date(item.startsAt), "Y/m/d")}
                   </span>
+                  <span className="text-[#c3c4c7]">|</span>
                   
-                  {/* Target Badges */}
-                  {(item.targetGroups.length > 0 || item.targetTiers.length > 0) ? (
-                      <>
-                        {item.targetGroups.map(g => (
-                            <span key={g.id} className="flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100">
-                                <Users className="w-3 h-3" /> {g.name}
+                  {/* WP Style Target Badges */}
+                  {(hasTags || hasTiers) ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.targetGroups?.map(g => (
+                            <span key={g.id} className="flex items-center gap-1 bg-[#f0f6fc] text-[#2271b1] px-1.5 py-0.5 border border-[#2271b1]/20">
+                                <Tag className="w-3 h-3" /> {g.name}
                             </span>
                         ))}
-                        {item.targetTiers.map(t => (
-                            <span key={t.id} className="flex items-center gap-1 bg-yellow-50 text-yellow-700 px-2 py-1 rounded border border-yellow-100">
+                        {item.targetTiers?.map(t => (
+                            <span key={t.id} className="flex items-center gap-1 bg-[#fcf9e8] text-[#8a6d3b] px-1.5 py-0.5 border border-[#f0b849]/30">
                                 <Layers className="w-3 h-3" /> {t.name}
                             </span>
                         ))}
-                      </>
+                      </div>
                   ) : (
-                      <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded border">
-                        <Users className="w-3 h-3 text-gray-400" /> All Affiliates
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" /> All Affiliates
                       </span>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 absolute right-4 top-4">
-                <button onClick={() => handleEdit(item)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors" title="Edit">
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleToggle(item.id, item.isActive)} className="p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors" title={item.isActive ? "Hide" : "Publish"}>
+              {/* Actions */}
+              <div className="flex items-center gap-1 absolute right-3 top-3">
+                <button onClick={() => handleToggle(item.id, item.isActive)} className="text-[#50575e] hover:text-[#2271b1] p-1 focus:outline-none" title={item.isActive ? "Unpublish" : "Publish"}>
                   {item.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
-                <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                <button onClick={() => handleEdit(item)} className="text-[#50575e] hover:text-[#2271b1] p-1 focus:outline-none" title="Edit">
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleDelete(item.id)} className="text-[#50575e] hover:text-[#d63638] p-1 focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity" title="Delete">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
       {isModalOpen && (
         <AnnouncementFormModal 
             initialData={editingItem} 
-            groups={availableGroups} 
+            tags={availableTags} 
             tiers={availableTiers}
             onClose={() => setIsModalOpen(false)} 
             onSuccess={() => window.location.reload()} 
@@ -189,8 +224,8 @@ export default function AnnouncementManager({ initialData }: Props) {
   );
 }
 
-// --- SUB-COMPONENT: MODAL FORM ---
-function AnnouncementFormModal({ initialData, groups, tiers, onClose, onSuccess }: any) {
+// --- SUB-COMPONENT: WP STYLE MODAL FORM ---
+function AnnouncementFormModal({ initialData, tags, tiers, onClose, onSuccess }: any) {
     const [isPending, startTransition] = useTransition();
     const [searchTerm, setSearchTerm] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -216,7 +251,6 @@ function AnnouncementFormModal({ initialData, groups, tiers, onClose, onSuccess 
     const watchedGroupIds = watch("groupIds");
     const watchedTierIds = watch("tierIds");
 
-    // Search Users Logic
     useEffect(() => {
         const delay = setTimeout(async () => {
             if (searchTerm.length > 1) {
@@ -232,7 +266,6 @@ function AnnouncementFormModal({ initialData, groups, tiers, onClose, onSuccess 
     const handleUserSelect = (user: any) => {
         if (!selectedUsers.find(u => u.id === user.id)) {
             setSelectedUsers([...selectedUsers, user]);
-            // setValue("affiliateIds", [...selectedUsers, user].map(u => u.id));
         }
         setSearchTerm("");
         setSearchResults([]);
@@ -252,8 +285,6 @@ function AnnouncementFormModal({ initialData, groups, tiers, onClose, onSuccess 
                 ...data,
                 startsAt: new Date(data.startsAt),
                 expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
-                // Pass affiliateIds if backend supports it
-                // affiliateIds: selectedUsers.map(u => u.id) 
             });
 
             if(res.success) {
@@ -266,121 +297,92 @@ function AnnouncementFormModal({ initialData, groups, tiers, onClose, onSuccess 
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="px-6 py-5 border-b flex justify-between items-center bg-gray-50/80">
-                    <h3 className="font-bold text-gray-900">{initialData ? "Edit Announcement" : "New Announcement"}</h3>
-                    <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-black" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-sans text-[#1d2327]">
+            <div className="bg-[#f0f0f1] border border-[#c3c4c7] shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+                <div className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center bg-white">
+                    <h3 className="text-[14px] font-semibold m-0">{initialData ? "Edit Announcement" : "New Announcement"}</h3>
+                    <button onClick={onClose} className="text-[#50575e] hover:text-[#d63638]"><X className="w-5 h-5" /></button>
                 </div>
                 
-                <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {/* Basic Info */}
-                    <div className="space-y-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-gray-700 uppercase">Title</label>
-                            <input {...register("title", { required: true })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-black" placeholder="Headline..." />
+                <div className="flex-1 overflow-y-auto p-4 bg-white">
+                  <form id="announcement-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                    
+                    {/* Basic Info WP Metabox */}
+                    <div>
+                        <label className="text-[13px] font-semibold block mb-1">Title</label>
+                        <input {...register("title", { required: true })} className="w-full border border-[#8c8f94] rounded-sm px-2 py-1.5 text-[13px] focus:border-[#2271b1] outline-none" placeholder="Headline..." />
+                    </div>
+
+                    <div className="border border-[#c3c4c7] p-3 bg-[#f6f7f7] grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[12px] font-semibold text-[#50575e] block mb-1">Notice Type</label>
+                            <select {...register("type")} className="w-full border border-[#8c8f94] rounded-sm px-2 py-1 text-[13px] bg-white">
+                                <option value="INFO">ℹ️ Information</option>
+                                <option value="WARNING">⚠️ Warning / Important</option>
+                                <option value="SUCCESS">✅ Success / Good News</option>
+                            </select>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-gray-700 uppercase">Type</label>
-                                <select {...register("type")} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                                    <option value="INFO">ℹ️ Info</option>
-                                    <option value="WARNING">⚠️ Warning</option>
-                                    <option value="SUCCESS">✅ Success</option>
-                                </select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-gray-700 uppercase">Status</label>
-                                <select {...register("isActive", { setValueAs: v => v === "true" })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                                    <option value="true">Active</option>
-                                    <option value="false">Draft</option>
-                                </select>
-                            </div>
+                        <div>
+                            <label className="text-[12px] font-semibold text-[#50575e] block mb-1">Status</label>
+                            <select {...register("isActive", { setValueAs: v => v === "true" })} className="w-full border border-[#8c8f94] rounded-sm px-2 py-1 text-[13px] bg-white">
+                                <option value="true">Active (Published)</option>
+                                <option value="false">Draft (Hidden)</option>
+                            </select>
                         </div>
                     </div>
 
                     {/* TARGETING SECTION */}
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-                        <label className="text-xs font-bold text-gray-900 flex items-center gap-2">
-                            <Users className="w-3.5 h-3.5" /> Target Audience
+                    <div className="border border-[#c3c4c7] p-4 bg-white space-y-3">
+                        <label className="text-[13px] font-semibold flex items-center gap-1.5 m-0">
+                            <Users className="w-4 h-4 text-[#50575e]" /> Target Audience
                         </label>
                         
-                        <div className="flex gap-4">
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <input type="radio" value="ALL" {...register("targetType")} className="text-black focus:ring-black" />
+                        <div className="flex gap-4 mb-3 border-b border-[#f0f0f1] pb-3">
+                            <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+                                <input type="radio" value="ALL" {...register("targetType")} className="text-[#2271b1] focus:ring-[#2271b1]" />
                                 All Affiliates
                             </label>
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <input type="radio" value="SEGMENTED" {...register("targetType")} className="text-black focus:ring-black" />
-                                Specific Groups/Tiers
+                            <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+                                <input type="radio" value="SEGMENTED" {...register("targetType")} className="text-[#2271b1] focus:ring-[#2271b1]" />
+                                Specific Tags/Tiers
                             </label>
                         </div>
 
                         {targetType === "SEGMENTED" && (
-                            <div className="space-y-4 pt-2 animate-in slide-in-from-top-2">
-                                {/* Group Selector */}
+                            <div className="space-y-4">
+                                {/* Tag Selector */}
                                 <div>
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Filter by Group</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {groups.map((g: any) => (
+                                    <p className="text-[11px] font-semibold text-[#50575e] uppercase mb-1.5 m-0">Filter by Tags</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {tags.map((g: any) => (
                                             <button 
                                                 key={g.id} type="button"
                                                 onClick={() => toggleSelection("groupIds", g.id)}
-                                                className={cn("text-xs px-2 py-1 rounded border transition-colors", 
-                                                    watchedGroupIds.includes(g.id) ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
+                                                className={cn("text-[11px] px-2 py-1 border transition-colors", 
+                                                    watchedGroupIds.includes(g.id) ? "bg-[#f0f6fc] text-[#2271b1] border-[#2271b1]" : "bg-white text-[#50575e] border-[#c3c4c7] hover:border-[#8c8f94]"
                                                 )}
                                             >
                                                 {g.name}
                                             </button>
                                         ))}
+                                        {tags.length === 0 && <span className="text-[11px] text-[#8c8f94] italic">No tags available</span>}
                                     </div>
                                 </div>
 
                                 {/* Tier Selector */}
                                 <div>
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Filter by Tier</p>
-                                    <div className="flex flex-wrap gap-2">
+                                    <p className="text-[11px] font-semibold text-[#50575e] uppercase mb-1.5 m-0">Filter by Tier</p>
+                                    <div className="flex flex-wrap gap-1.5">
                                         {tiers.map((t: any) => (
                                             <button 
                                                 key={t.id} type="button"
                                                 onClick={() => toggleSelection("tierIds", t.id)}
-                                                className={cn("text-xs px-2 py-1 rounded border transition-colors", 
-                                                    watchedTierIds.includes(t.id) ? "bg-yellow-500 text-white border-yellow-600" : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
+                                                className={cn("text-[11px] px-2 py-1 border transition-colors", 
+                                                    watchedTierIds.includes(t.id) ? "bg-[#fcf9e8] text-[#8a6d3b] border-[#f0b849]" : "bg-white text-[#50575e] border-[#c3c4c7] hover:border-[#8c8f94]"
                                                 )}
                                             >
                                                 {t.name}
                                             </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Specific User Search (UI Only - needs schema support for persistence) */}
-                                <div className="relative">
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Specific Affiliates (Optional)</p>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
-                                        <input 
-                                            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                            className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-xs" 
-                                            placeholder="Search affiliate name..."
-                                        />
-                                    </div>
-                                    {searchResults.length > 0 && (
-                                        <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-32 overflow-y-auto">
-                                            {searchResults.map(user => (
-                                                <button key={user.id} type="button" onClick={() => handleUserSelect(user)} className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex justify-between">
-                                                    <span>{user.user.name}</span>
-                                                    <span className="text-gray-400">{user.slug}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        {selectedUsers.map((u, idx) => (
-                                            <span key={idx} className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] border border-blue-100 flex items-center gap-1">
-                                                <User className="w-3 h-3"/> {u.user.name}
-                                                <button type="button" onClick={() => setSelectedUsers(selectedUsers.filter(su => su.id !== u.id))}><X className="w-3 h-3 hover:text-red-500"/></button>
-                                            </span>
                                         ))}
                                     </div>
                                 </div>
@@ -389,20 +391,22 @@ function AnnouncementFormModal({ initialData, groups, tiers, onClose, onSuccess 
                     </div>
 
                     {/* Content */}
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-700 uppercase">Message</label>
-                        <textarea {...register("content", { required: true })} rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-black" />
+                    <div>
+                        <label className="text-[13px] font-semibold block mb-1">Message Content</label>
+                        <textarea {...register("content", { required: true })} rows={5} className="w-full border border-[#8c8f94] rounded-sm px-2 py-1.5 text-[13px] focus:border-[#2271b1] outline-none" />
                     </div>
 
-                    {/* Footer */}
-                    <div className="pt-2 flex justify-end gap-3 border-t">
-                        <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                        <button type="submit" disabled={isPending} className="bg-black text-white px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-gray-800 shadow-lg">
-                            {isPending ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4"/>}
-                            {initialData ? "Update Announcement" : "Publish Announcement"}
-                        </button>
-                    </div>
-                </form>
+                  </form>
+                </div>
+
+                {/* Footer */}
+                <div className="p-3 border-t border-[#c3c4c7] bg-[#f0f0f1] flex justify-end gap-2 shrink-0">
+                    <button type="button" onClick={onClose} className="px-3 py-1.5 border border-[#8c8f94] bg-[#f0f0f1] text-[#2c3338] text-[13px] rounded-sm hover:bg-[#e6e6e6]">Cancel</button>
+                    <button type="submit" form="announcement-form" disabled={isPending} className="px-4 py-1.5 border border-[#2271b1] bg-[#2271b1] text-white text-[13px] rounded-sm hover:bg-[#135e96] disabled:opacity-50 flex items-center gap-1.5">
+                        {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        {initialData ? "Update" : "Publish"}
+                    </button>
+                </div>
             </div>
         </div>
     );

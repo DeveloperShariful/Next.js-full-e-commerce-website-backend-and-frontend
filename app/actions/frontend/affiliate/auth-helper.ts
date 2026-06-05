@@ -1,11 +1,11 @@
-////app/actions/storefront/affiliates/auth-helper.ts
+// app/actions/storefront/affiliates/auth-helper.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
 import { syncUser } from "@/lib/auth-sync"; 
 import { redirect } from "next/navigation";
-import { serializePrismaData } from "@/lib/format-data"; // ✅ Import helper
+import { serializePrismaData } from "@/lib/format-data"; 
 
 export async function requireUser() {
   const user = await syncUser();
@@ -26,8 +26,9 @@ export async function getAuthAffiliate() {
     where: { userId: user.id },
     include: {
       user: true,
-      tier: true,
-      group: true
+      tier: true
+      // ✅ FIXED: Removed 'group' because AffiliateGroup table is deleted. 
+      // Tags are natively available in the affiliateAccount model if needed.
     }
   });
 
@@ -39,6 +40,6 @@ export async function getAuthAffiliate() {
     throw new Error("Your affiliate account is suspended or rejected.");
   }
 
-  // ✅ FIX: Serialize before returning to prevent Decimal errors anywhere
+  // ✅ Serialize before returning to prevent Decimal errors anywhere
   return serializePrismaData(affiliate);
 }

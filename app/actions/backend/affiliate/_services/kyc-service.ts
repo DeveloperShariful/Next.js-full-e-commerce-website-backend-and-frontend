@@ -3,111 +3,112 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-// ✅ ১. সঠিক Enum টি ইমপোর্ট করুন
-import { Prisma, AffiliateDocumentStatus } from "@prisma/client"; 
 import { auditService } from "@/lib/audit-service";
 import { revalidatePath } from "next/cache";
-import { ActionResponse } from "../types";
+import { ActionResponse, AffiliateKycDocument } from "../types";
 import { protectAction } from "../permission-service";
 
 // =========================================
-// READ OPERATIONS
+// READ OPERATIONS (Dynamic JSON Aggregation)
 // =========================================
 export async function getDocuments(page: number = 1, limit: number = 20, status?: string) {
   await protectAction("MANAGE_PARTNERS"); 
 
-  const skip = (page - 1) * limit;
-
-  // ✅ ২. Type Guard: চেক করুন status স্ট্রিংটি আসলে Valid Enum কি না
-  let whereStatus: AffiliateDocumentStatus | undefined;
-
-  // যদি status থাকে, "ALL" না হয় এবং সেটি Enum লিস্টের মধ্যে থাকে
-  if (status && status !== "ALL") {
-    const isValid = Object.values(AffiliateDocumentStatus).includes(status as AffiliateDocumentStatus);
-    if (isValid) {
-      whereStatus = status as AffiliateDocumentStatus;
+  // Since documents are stored in JSON inside AffiliateAccount, 
+  // we fetch accounts that have KYC documents.
+  const accounts = await db.affiliateAccount.findMany({
+    where: { 
+      kycDocuments: { not: undefined }, // Fetch only users who submitted docs
+    },
+    select: {
+      id: true,
+      slug: true,
+      kycStatus: true,
+      kycDocuments: true,
+      user: { select: { name: true, email: true, image: true } }
     }
-  }
+  });
 
-  // ✅ ৩. এখন আর 'as any' দরকার নেই, কারণ whereStatus এখন সঠিক টাইপের
-  const where: Prisma.AffiliateDocumentWhereInput = whereStatus ? { status: whereStatus } : {};
+  // Flatten the documents array into a standard list for the table
+  let allDocs: any[] = [];
 
-  const [total, data] = await Promise.all([
-    db.affiliateDocument.count({ where }),
-    db.affiliateDocument.findMany({
-      where,
-      take: limit,
-      skip,
-      orderBy: { createdAt: "desc" },
-      include: {
-        affiliate: {
-          select: {
-            id: true,
-            slug: true,
-            kycStatus: true,
-            user: {
-              select: { name: true, email: true, image: true }
-            }
+  accounts.forEach(acc => {
+    const docs = (acc.kycDocuments as unknown as AffiliateKycDocument[]) || [];
+    docs.forEach((doc, index) => {
+      if (!status || status === "ALL" || doc.status === status) {
+        allDocs.push({
+          ...doc,
+          id: `${acc.id}-${index}`, // Generate temporary ID for UI rendering
+          accountId: acc.id,
+          docIndex: index,
+          affiliate: {
+            id: acc.id,
+            slug: acc.slug,
+            kycStatus: acc.kycStatus,
+            user: acc.user
           }
-        }
+        });
       }
-    })
-  ]);
+    });
+  });
+
+  // In-memory pagination (Perfect for JSON since max pending docs won't exceed a few hundred)
+  const total = allDocs.length;
+  const paginatedDocs = allDocs.slice((page - 1) * limit, page * limit);
 
   return {
-    documents: data,
+    documents: paginatedDocs,
     total,
     totalPages: Math.ceil(total / limit)
   };
 }
 
 // =========================================
-// WRITE OPERATIONS (Transactional)
+// WRITE OPERATIONS (Transactional JSON Update)
 // =========================================
 
-export async function verifyDocumentAction(documentId: string): Promise<ActionResponse> {
+// ⚠️ UI UPDATE NOTE: For verify/reject, the UI button MUST pass both 'accountId' and 'docIndex' now.
+export async function verifyDocumentAction(accountId: string, docIndex: number): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
 
     await db.$transaction(async (tx) => {
-      const doc = await tx.affiliateDocument.findUnique({
-        where: { id: documentId },
-        include: { affiliate: { include: { user: true } } } 
+      const affiliate = await tx.affiliateAccount.findUnique({
+        where: { id: accountId },
+        include: { user: true }
       });
 
-      if (!doc) throw new Error("Document not found");
-      await tx.affiliateDocument.update({
-        where: { id: documentId },
+      if (!affiliate || !affiliate.kycDocuments) throw new Error("Document not found");
+
+      const docs = affiliate.kycDocuments as unknown as AffiliateKycDocument[];
+      if (!docs[docIndex]) throw new Error("Document index out of bounds");
+
+      // Update the specific document status
+      docs[docIndex].status = "APPROVED";
+      docs[docIndex].verifiedAt = new Date().toISOString();
+      docs[docIndex].rejectionReason = undefined;
+
+      const pendingDocs = docs.filter(d => d.status !== "APPROVED").length;
+
+      await tx.affiliateAccount.update({
+        where: { id: accountId },
         data: {
-          status: AffiliateDocumentStatus.APPROVED, 
-          verifiedAt: new Date(),
-          rejectionReason: null
-        }
-      });
-      const pendingDocs = await tx.affiliateDocument.count({
-        where: {
-          affiliateId: doc.affiliateId,
-          status: { not: AffiliateDocumentStatus.APPROVED } 
+          kycDocuments: docs as any,
+          kycStatus: pendingDocs === 0 ? "VERIFIED" : affiliate.kycStatus
         }
       });
 
-      if (pendingDocs === 0) {
-        await tx.affiliateAccount.update({
-          where: { id: doc.affiliateId },
-          data: { kycStatus: "VERIFIED" } 
-        });
-      }
       await tx.notificationQueue.create({
           data: {
               channel: "EMAIL",
-              recipient: doc.affiliate.user.email,
+              recipient: affiliate.user.email,
               templateSlug: "KYC_VERIFIED",
               status: "PENDING",
-              userId: doc.affiliate.userId,
+              userId: affiliate.userId,
               content: "", 
               metadata: { 
-                  affiliate_name: doc.affiliate.user.name || "Partner",
-                  document_type: doc.type.replace("_", " ") 
+                  affiliate_name: affiliate.user.name || "Partner",
+                  document_type: docs[docIndex].type.replace("_", " ") 
               }
           }
       });
@@ -115,9 +116,9 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
       await auditService.log({
         userId: actor.id,
         action: "VERIFY_KYC",
-        entity: "AffiliateDocument",
-        entityId: documentId,
-        meta: { affiliateId: doc.affiliateId }
+        entity: "AffiliateAccount",
+        entityId: accountId,
+        meta: { docIndex }
       });
     });
 
@@ -128,45 +129,46 @@ export async function verifyDocumentAction(documentId: string): Promise<ActionRe
   }
 }
 
-export async function rejectDocumentAction(documentId: string, reason: string): Promise<ActionResponse> {
+export async function rejectDocumentAction(accountId: string, docIndex: number, reason: string): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_PARTNERS");
     
     if (!reason) return { success: false, message: "Rejection reason is required." };
 
     await db.$transaction(async (tx) => {
-      const doc = await tx.affiliateDocument.findUnique({
-        where: { id: documentId },
-        include: { affiliate: { include: { user: true } } } 
+      const affiliate = await tx.affiliateAccount.findUnique({
+        where: { id: accountId },
+        include: { user: true }
       });
 
-      if (!doc) throw new Error("Document not found");
+      if (!affiliate || !affiliate.kycDocuments) throw new Error("Document not found");
 
-      await tx.affiliateDocument.update({
-        where: { id: documentId },
-        data: {
-          status: AffiliateDocumentStatus.REJECTED, 
-          rejectionReason: reason,
-          verifiedAt: null
-        }
-      });
+      const docs = affiliate.kycDocuments as unknown as AffiliateKycDocument[];
+      if (!docs[docIndex]) throw new Error("Document index out of bounds");
+
+      // Update the specific document status
+      docs[docIndex].status = "REJECTED";
+      docs[docIndex].rejectionReason = reason;
 
       await tx.affiliateAccount.update({
-        where: { id: doc.affiliateId },
-        data: { kycStatus: "REJECTED" }
+        where: { id: accountId },
+        data: {
+          kycDocuments: docs as any,
+          kycStatus: "REJECTED"
+        }
       });
 
       await tx.notificationQueue.create({
           data: {
               channel: "EMAIL",
-              recipient: doc.affiliate.user.email,
+              recipient: affiliate.user.email,
               templateSlug: "KYC_REJECTED",
               status: "PENDING",
-              userId: doc.affiliate.userId,
+              userId: affiliate.userId,
               content: "",
               metadata: { 
-                  affiliate_name: doc.affiliate.user.name || "Partner",
-                  document_type: doc.type.replace("_", " "),
+                  affiliate_name: affiliate.user.name || "Partner",
+                  document_type: docs[docIndex].type.replace("_", " "),
                   rejection_reason: reason
               }
           }
@@ -175,9 +177,9 @@ export async function rejectDocumentAction(documentId: string, reason: string): 
       await auditService.log({
         userId: actor.id,
         action: "REJECT_KYC",
-        entity: "AffiliateDocument",
-        entityId: documentId,
-        meta: { reason, affiliateId: doc.affiliateId }
+        entity: "AffiliateAccount",
+        entityId: accountId,
+        meta: { reason, docIndex }
       });
     });
 

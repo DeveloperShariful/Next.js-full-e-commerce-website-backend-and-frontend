@@ -26,8 +26,8 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
     ...(search && {
       OR: [
         { product: { name: { contains: search, mode: "insensitive" } } },
-        { affiliate: { user: { name: { contains: search, mode: "insensitive" } } } },
-        { group: { name: { contains: search, mode: "insensitive" } } }
+        { affiliate: { user: { name: { contains: search, mode: "insensitive" } } } }
+        // ✅ FIXED: Removed Group search since table is deleted
       ]
     })
   };
@@ -53,10 +53,8 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
         },
         affiliate: {
           select: { id: true, slug: true, user: { select: { name: true, email: true } } }
-        },
-        group: {
-          select: { id: true, name: true, slug: true }
         }
+        // ✅ FIXED: Removed Group inclusion
       }
     })
   ]);
@@ -94,15 +92,11 @@ export async function upsertRateAction(data: {
   type: CommissionType;
   isDisabled: boolean;
   affiliateId?: string | null;
-  groupId?: string | null;
+  // groupId?: string | null; ✅ Removed
 }): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
     const rateDecimal = DecimalMath.toDecimal(data.rate);
-
-    if (data.affiliateId && data.groupId) {
-      return { success: false, message: "Cannot assign to both Affiliate and Group at once." };
-    }
 
     const productExists = await db.product.findFirst({
         where: { id: data.productId, deletedAt: null }
@@ -114,7 +108,7 @@ export async function upsertRateAction(data: {
       type: data.type,
       isDisabled: data.isDisabled,
       affiliateId: data.affiliateId || null,
-      groupId: data.groupId || null,
+      // groupId removed
     };
 
     if (data.id) {
@@ -125,6 +119,7 @@ export async function upsertRateAction(data: {
     } 
     else {
       if (data.affiliateId) {
+        // ✅ FIXED: Only using Unique index for Affiliate since Group index is removed
         await db.affiliateProductRate.upsert({
           where: {
             productId_affiliateId: {
@@ -135,20 +130,10 @@ export async function upsertRateAction(data: {
           create: { productId: data.productId, ...payload },
           update: payload
         });
-      } else if (data.groupId) {
-        await db.affiliateProductRate.upsert({
-          where: {
-            productId_groupId: {
-              productId: data.productId,
-              groupId: data.groupId
-            }
-          },
-          create: { productId: data.productId, ...payload },
-          update: payload
-        });
       } else {
+        // ✅ FIXED: Global rate update (null affiliateId)
         const existingGlobal = await db.affiliateProductRate.findFirst({
-          where: { productId: data.productId, affiliateId: null, groupId: null }
+          where: { productId: data.productId, affiliateId: null }
         });
 
         if (existingGlobal) {
@@ -225,8 +210,9 @@ export async function bulkImportRatesAction(rates: {
 
     await db.$transaction(async (tx) => {
       for (const r of validRates) {
+         // ✅ FIXED: Removed groupId from query
          const existing = await tx.affiliateProductRate.findFirst({
-           where: { productId: r.productId, affiliateId: null, groupId: null }
+           where: { productId: r.productId, affiliateId: null }
          });
          
          if(existing) {

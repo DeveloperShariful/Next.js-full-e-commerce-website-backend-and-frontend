@@ -12,6 +12,9 @@ import { revalidatePath, unstable_cache } from "next/cache";
 import { protectAction } from "../permission-service";
 import { auditService } from "@/lib/audit-service";
 
+// =========================================
+// STRICT ZOD VALIDATION FOR JSON CONFIG
+// =========================================
 const mlmSchema = z.object({
   isEnabled: z.boolean(),
   maxLevels: z.number().min(1).max(10),
@@ -34,8 +37,11 @@ export async function distributeMLMCommission(
   const config = await getCachedMLMConfig();
 
   if (!config.isEnabled) return;
+  
   let baseAmount = new Prisma.Decimal(0);
-  if (config.commissionBasis === MLMBasis.PROFIT) {
+  
+  // ✅ FIXED: Using string "PROFIT_MARGIN" directly instead of deleted MLMBasis Enum
+  if (config.commissionBasis === "PROFIT_MARGIN") {
     baseAmount = DecimalMath.toDecimal(profitAmount);
   } else {
     baseAmount = DecimalMath.toDecimal(salesAmount);
@@ -77,7 +83,7 @@ export async function distributeMLMCommission(
         metadata: {
           level: node.level,
           sourceAffiliate: directAffiliateId,
-          basis: config.commissionBasis,
+          basis: config.commissionBasis, // This will now save "PROFIT_MARGIN" or "SALES_AMOUNT" correctly
           type: "MLM_COMMISSION"
         }
       }
@@ -96,6 +102,7 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
   const ancestorIds = pathIds.filter(id => id !== startAffiliateId).reverse().slice(0, maxLevels);
 
   if (ancestorIds.length === 0) return [];
+  
   const validAncestors = await db.affiliateAccount.findMany({
     where: {
       id: { in: ancestorIds },
@@ -122,7 +129,7 @@ export async function getUpline(startAffiliateId: string, maxLevels: number) {
 }
 
 // =========================================
-// CONFIGURATION ACTIONS
+// CONFIGURATION ACTIONS (Re-routed to StoreSettings JSON)
 // =========================================
 
 export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Promise<ActionResponse> {
@@ -132,31 +139,27 @@ export async function updateMlmConfigAction(data: z.infer<typeof mlmSchema>): Pr
     const result = mlmSchema.safeParse(data);
     if (!result.success) return { success: false, message: "Validation failed." };
 
-    const levelRatesJson = result.data.levelRates as Prisma.JsonObject;
+    const payload = result.data;
 
-    await db.affiliateMLMConfig.upsert({
-      where: { id: "mlm_config" },
+    // ✅ FIXED: Saved as JSON inside StoreSettings
+    await db.storeSettings.upsert({
+      where: { id: "settings" },
       create: {
-        id: "mlm_config",
-        isEnabled: result.data.isEnabled,
-        maxLevels: result.data.maxLevels,
-        commissionBasis: result.data.commissionBasis,
-        levelRates: levelRatesJson,
+        storeName: "My Store", 
+        currency: "AUD",
+        mlmConfig: payload,
       },
       update: {
-        isEnabled: result.data.isEnabled,
-        maxLevels: result.data.maxLevels,
-        commissionBasis: result.data.commissionBasis,
-        levelRates: levelRatesJson,
+        mlmConfig: payload,
       }
     });
 
     await auditService.log({
         userId: actor.id,
         action: "UPDATE_MLM_CONFIG",
-        entity: "AffiliateMLMConfig",
-        entityId: "mlm_config",
-        newData: result.data
+        entity: "StoreSettings",
+        entityId: "mlmConfig",
+        newData: payload
     });
 
     revalidatePath("/admin/affiliate/network");

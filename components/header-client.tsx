@@ -327,7 +327,7 @@ export default function HeaderClient({ isAffiliate, userRole }: HeaderClientProp
                                     </div>
                                     
                                     <Link 
-                                        href="/account" 
+                                        href="/my-account" 
                                         className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f8f9fa] border-b border-[#f0f0f0]"
                                         onClick={closeAllOverlays}
                                     >
@@ -337,7 +337,7 @@ export default function HeaderClient({ isAffiliate, userRole }: HeaderClientProp
 
                                     {isAffiliate && (
                                         <Link 
-                                            href="/affiliate/dashboard" 
+                                            href="/affiliates" 
                                             className="flex items-center gap-3 px-4 py-3 text-sm text-[#333] hover:bg-[#f0f8ff] border-b border-[#f0f0f0]"
                                             onClick={closeAllOverlays}
                                         >
@@ -379,11 +379,11 @@ export default function HeaderClient({ isAffiliate, userRole }: HeaderClientProp
         {/* 🛡️ NEW INLINE SEARCH BAR (100% Client-Side Live Search Dropdown, no overlay!) */}
         <div className="hidden lg:flex justify-center w-full max-w-[1400px] mx-auto px-6 pb-4 pt-1 relative" ref={searchRef}>
           <div className="w-full max-w-[700px] relative">
-            <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus-within:border-gray-400 focus-within:bg-white transition-all text-sm font-medium">
+            <div className="w-full flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-s px-4 py-2.5 focus-within:border-gray-400 focus-within:bg-white transition-all text-sm font-medium">
               <IoSearch size={18} className="text-gray-400" />
               <input
                 type="text"
-                placeholder="Search high-performance electric bikes, spare parts, apparel..."
+                placeholder="Search high-performance electric bikes, spare parts, apparel... start typing"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)} // Opens inline dropdown on focus
@@ -538,7 +538,7 @@ export default function HeaderClient({ isAffiliate, userRole }: HeaderClientProp
                      </Link>
                  ) : (
                      <Link 
-                        href="/account"
+                        href="/my-account"
                         className="text-[1.2rem] font-medium text-[#333] no-underline flex items-center gap-3 bg-transparent border-b border-[#ececec] w-full text-left cursor-pointer p-0 hover:text-black hover:font-bold mb-4"
                         onClick={closeAllOverlays}
                      >

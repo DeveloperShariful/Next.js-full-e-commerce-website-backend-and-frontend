@@ -6,7 +6,8 @@ import { db } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Role, AddressType } from '@prisma/client'; 
 import { sendNotification } from '@/app/api/email/send-notification';
-import bcrypt from "bcryptjs"; // ✅ NEW: Password hashing library imported
+import bcrypt from "bcryptjs"; 
+import { nanoid } from 'nanoid'; // ✅ To generate affiliate slug
 
 // Helper function to extract address data from FormData
 const extractAddress = (prefix: 'billing_' | 'shipping_', formData: FormData) => {
@@ -25,7 +26,6 @@ const extractAddress = (prefix: 'billing_' | 'shipping_', formData: FormData) =>
   };
 };
 
-// Helper function to safely save or update Address in Prisma
 async function saveAddress(userId: string, type: AddressType, addressData: any) {
   const existingAddress = await db.address.findFirst({
     where: { userId, type }
@@ -39,10 +39,25 @@ async function saveAddress(userId: string, type: AddressType, addressData: any) 
   } else {
     if (addressData.firstName || addressData.address1 || addressData.city) {
       await db.address.create({
+        data: { userId, type, ...addressData }
+      });
+    }
+  }
+}
+
+// ✅ HELPER: Auto-Create Affiliate Account if Role is AFFILIATE
+async function ensureAffiliateAccount(userId: string, role: string, userName: string) {
+  if (role === 'AFFILIATE') {
+    const existing = await db.affiliateAccount.findUnique({ where: { userId } });
+    if (!existing) {
+      const baseSlug = (userName || "partner").toLowerCase().replace(/[^a-z0-9]/g, '');
+      const uniqueSlug = `${baseSlug}-${nanoid(4)}`;
+      
+      await db.affiliateAccount.create({
         data: {
-          userId,
-          type,
-          ...addressData
+          userId: userId,
+          slug: uniqueSlug,
+          status: "ACTIVE", // Auto-approved because created by Admin
         }
       });
     }
@@ -78,7 +93,6 @@ export async function createUser(formData: FormData) {
       return { success: false, message: 'A user with this email already exists.' };
     }
 
-    // ✅ FIX: Hashing password before creating database entry
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
     const metafields = {
@@ -88,18 +102,23 @@ export async function createUser(formData: FormData) {
       website: website?.trim()
     };
 
+    const finalName = name?.trim() || nickname?.trim() || "Customer";
+
     const newUser = await db.user.create({
       data: {
-        name: name?.trim() || nickname?.trim(),
+        name: finalName,
         email: email.toLowerCase().trim(),
         role: role || 'CUSTOMER',
-        password: hashedPassword, // Saved securely as hashed string
+        password: hashedPassword,
         notes: bio?.trim(), 
         image: image || null, 
         metafields: metafields, 
         isActive: true
       }
     });
+
+    // ✅ Sync with Affiliate Hub if role is AFFILIATE
+    await ensureAffiliateAccount(newUser.id, role, finalName);
 
     // Extract and Save Addresses
     const billingData = extractAddress('billing_', formData);
@@ -118,6 +137,7 @@ export async function createUser(formData: FormData) {
     await saveAddress(newUser.id, AddressType.SHIPPING, shippingData);
     
     revalidatePath('/admin/users');
+    revalidatePath('/admin/affiliate'); // Also refresh affiliate dashboard
     return { success: true, message: 'New user added successfully.' };
   } catch (error: any) {
     console.error('Create user failed:', error);
@@ -167,8 +187,10 @@ export async function updateUser(formData: FormData) {
         website: website?.trim()
     };
 
+    const finalName = name?.trim() || nickname?.trim() || "Customer";
+
     const updateData: any = {
-      name: name?.trim() || nickname?.trim(),
+      name: finalName,
       email: email.toLowerCase().trim(),
       role: role,
       notes: bio?.trim(), 
@@ -179,7 +201,6 @@ export async function updateUser(formData: FormData) {
       updateData.image = image || null;
     }
 
-    // ✅ FIX: Hashing password before updating database entry
     if (password && password.trim() !== '') {
       updateData.password = await bcrypt.hash(password, 10); 
     }
@@ -188,6 +209,9 @@ export async function updateUser(formData: FormData) {
       where: { id },
       data: updateData
     });
+
+    // ✅ Sync with Affiliate Hub if role was changed to AFFILIATE
+    await ensureAffiliateAccount(id, role, finalName);
 
     // Extract and Save Addresses for existing user
     const billingData = extractAddress('billing_', formData);
@@ -207,6 +231,7 @@ export async function updateUser(formData: FormData) {
     
     revalidatePath('/admin/users');
     revalidatePath(`/admin/users/${id}`);
+    revalidatePath('/admin/affiliate');
     
     return { success: true, message: 'User profile updated successfully.' };
   } catch (error: any) {
@@ -223,15 +248,21 @@ export async function deleteUser(formData: FormData) {
   if (!id) return { success: false, message: 'User ID is missing' };
 
   try {
-    await db.user.update({
-      where: { id },
-      data: { 
-        isActive: false, 
-        deletedAt: new Date() 
-      }
+    await db.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id },
+          data: { isActive: false, deletedAt: new Date() }
+        });
+        
+        // Ensure affiliate account is also deleted softly
+        await tx.affiliateAccount.updateMany({
+            where: { userId: id },
+            data: { deletedAt: new Date(), status: "REJECTED" }
+        });
     });
     
     revalidatePath('/admin/users');
+    revalidatePath('/admin/affiliate');
     return { success: true, message: 'User moved to trash successfully.' };
   } catch (error: any) {
     console.error('Failed to move user to trash:', error);
@@ -246,15 +277,20 @@ export async function bulkDeleteUsers(ids: string[]) {
   if (!ids || ids.length === 0) return { success: false, message: 'No users selected.' };
 
   try {
-    await db.user.updateMany({
-      where: { id: { in: ids } },
-      data: { 
-        isActive: false, 
-        deletedAt: new Date() 
-      }
+    await db.$transaction(async (tx) => {
+        await tx.user.updateMany({
+          where: { id: { in: ids } },
+          data: { isActive: false, deletedAt: new Date() }
+        });
+        
+        await tx.affiliateAccount.updateMany({
+            where: { userId: { in: ids } },
+            data: { deletedAt: new Date(), status: "REJECTED" }
+        });
     });
 
     revalidatePath('/admin/users');
+    revalidatePath('/admin/affiliate');
     return { success: true, message: `${ids.length} users deleted successfully.` };
   } catch (error: any) {
     console.error('Bulk delete failed:', error);
@@ -275,7 +311,16 @@ export async function bulkChangeRole(ids: string[], newRole: Role) {
       data: { role: newRole }
     });
 
+    // ✅ If changed to affiliate in bulk, create affiliate accounts
+    if (newRole === 'AFFILIATE') {
+        const users = await db.user.findMany({ where: { id: { in: ids } } });
+        for (const user of users) {
+            await ensureAffiliateAccount(user.id, newRole, user.name || "Customer");
+        }
+    }
+
     revalidatePath('/admin/users');
+    revalidatePath('/admin/affiliate');
     return { success: true, message: `Changed role to ${newRole} for ${ids.length} users.` };
   } catch (error: any) {
     console.error('Bulk role change failed:', error);
@@ -283,10 +328,8 @@ export async function bulkChangeRole(ids: string[], newRole: Role) {
   }
 }
 
-// ============================================================================
-// 6. SEND PASSWORD RESET EMAIL
-// ============================================================================
 export async function sendPasswordReset(formData: FormData) {
+  // Logic remains unchanged...
   const email = formData.get('email') as string;
   if (!email) return { success: false, message: 'Email is missing.' };
 

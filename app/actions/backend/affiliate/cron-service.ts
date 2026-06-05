@@ -58,7 +58,8 @@ export async function processPendingReferrals() {
             throw new Error(`Affiliate ${ref.affiliateId} not found or deleted`);
         }
 
-        const updatedAffiliate = await tx.affiliateAccount.update({
+        // 1. Update Affiliate Balance
+        await tx.affiliateAccount.update({
           where: { id: affiliate.id },
           data: {
             balance: { increment: ref.commissionAmount },
@@ -66,6 +67,7 @@ export async function processPendingReferrals() {
           }
         });
 
+        // 2. Mark Referral as Paid
         await tx.referral.update({
           where: { id: ref.id },
           data: { 
@@ -74,15 +76,21 @@ export async function processPendingReferrals() {
           }
         });
 
-        await tx.affiliateLedger.create({
+        // ✅ FIXED: Replaced Deleted AffiliateLedger with Wallet & WalletTransaction
+        // Ensure the user has a wallet
+        const userWallet = await tx.wallet.upsert({
+          where: { userId: affiliate.userId },
+          create: { userId: affiliate.userId, balance: 0 },
+          update: {}
+        });
+
+        await tx.walletTransaction.create({
           data: {
-            affiliateId: ref.affiliateId,
-            type: "COMMISSION",
+            walletId: userWallet.id,
+            type: ref.isMlmReward ? "MLM_BONUS" : "AFFILIATE_COMMISSION",
             amount: ref.commissionAmount,
-            balanceBefore: DecimalMath.sub(updatedAffiliate.balance, ref.commissionAmount), 
-            balanceAfter: updatedAffiliate.balance,    
             description: ref.isMlmReward ? `MLM Reward Released: #${ref.orderId}` : `Commission Released: #${ref.orderId}`,
-            referenceId: `REL-${ref.id}` 
+            reference: `REL-${ref.id}` 
           }
         });
 

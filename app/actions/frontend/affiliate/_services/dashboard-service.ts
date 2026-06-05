@@ -1,12 +1,13 @@
-//app/actions/storefront/affiliates/_services/dashboard-service.ts
+// app/actions/storefront/affiliates/_services/dashboard-service.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { format, eachDayOfInterval, subDays, startOfDay, endOfDay } from "date-fns";
+import { format, eachDayOfInterval, subDays, startOfDay, endOfDay, isBefore, isAfter } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { AnnouncementType, CommissionType } from "@prisma/client";
 import { serializePrismaData } from "@/lib/format-data";
+import { z } from "zod";
 
 // ==========================================
 // 1. PROFILE & STATS (OPTIMIZED)
@@ -39,13 +40,8 @@ export async function getProfile(userId: string) {
           commissionRate: true, 
           commissionType: true
         }
-      },
-      group: {
-        select: {
-          id: true,
-          name: true
-        }
       }
+      // ✅ FIXED: Removed 'group' because AffiliateGroup table is deleted
     }
   });
 
@@ -67,33 +63,36 @@ export async function getProfile(userId: string) {
       commissionRate: affiliate.tier.commissionRate.toNumber(),
       commissionType: affiliate.tier.commissionType
     } : null,
-    group: affiliate.group ? {
-      id: affiliate.group.id,
-      name: affiliate.group.name
-    } : null
   };
 }
 
 export async function getActiveContests() {
-  const contests = await db.affiliateContest.findMany({
-    where: {
-      isActive: true,
-      startDate: { lte: new Date() },
-      endDate: { gte: new Date() }
-    },
-    orderBy: { endDate: "asc" },
-    take: 3, 
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      endDate: true,
-      prizes: true, 
-      criteria: true  
-    }
+  // ✅ FIXED: Fetching from StoreSettings JSON instead of deleted table
+  const settings = await db.storeSettings.findUnique({
+    where: { id: "settings" },
+    select: { affiliateContests: true }
   });
 
-  return serializePrismaData(contests);
+  if (!settings || !settings.affiliateContests) return [];
+
+  const contests = settings.affiliateContests as any[];
+  const now = new Date();
+
+  // Filter only active and ongoing contests
+  const activeContests = contests
+    .filter(c => c.isActive && isBefore(new Date(c.startDate), now) && isAfter(new Date(c.endDate), now))
+    .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
+    .slice(0, 3)
+    .map(c => ({
+      id: c.id,
+      title: c.title,
+      description: c.description || "",
+      endDate: new Date(c.endDate),
+      prizes: c.prizes,
+      criteria: c.criteria
+    }));
+
+  return serializePrismaData(activeContests);
 }
 
 export async function getStats(affiliateId: string) {
@@ -127,53 +126,61 @@ export async function getStats(affiliateId: string) {
 }
 
 // ==========================================
-// 2. ENTERPRISE FEATURES
+// 2. ENTERPRISE FEATURES (DYNAMIC JSON TARGETING)
 // ==========================================
 
 export async function getAnnouncements(affiliateId: string) {
   const affiliate = await db.affiliateAccount.findUnique({
     where: { id: affiliateId },
-    select: { groupId: true, tierId: true }
+    select: { tags: true, tierId: true } // ✅ FIXED: Using tags instead of groupId
   });
 
   if (!affiliate) return [];
 
-  const announcements = await db.affiliateAnnouncement.findMany({
-    where: {
-      isActive: true,
-      startsAt: { lte: new Date() },
-      OR: [
-        { expiresAt: null },
-        { expiresAt: { gte: new Date() } }
-      ],
-      AND: [
-        {
-          OR: [
-            { targetGroups: { none: {} }, targetTiers: { none: {} } },
-            { targetGroups: { some: { id: affiliate.groupId || "x" } } },
-            { targetTiers: { some: { id: affiliate.tierId || "x" } } }
-          ]
-        }
-      ]
-    },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-    select: { 
-        id: true,
-        title: true,
-        content: true,
-        type: true,
-        createdAt: true
-    }
+  // ✅ FIXED: Fetching from StoreSettings JSON instead of deleted table
+  const settings = await db.storeSettings.findUnique({
+    where: { id: "settings" },
+    select: { affiliateAnnouncements: true }
   });
 
-  return announcements.map(a => ({
-    id: a.id,
-    title: a.title,
-    message: a.content,
-    type: a.type as AnnouncementType,
-    date: a.createdAt
-  }));
+  if (!settings || !settings.affiliateAnnouncements) return [];
+
+  const announcements = settings.affiliateAnnouncements as any[];
+  const now = new Date();
+
+  const userTags = affiliate.tags || [];
+  const userTierId = affiliate.tierId;
+
+  // Filter based on active status, date validity, and dynamic targeting logic
+  const validAnnouncements = announcements
+    .filter(a => {
+        if (!a.isActive) return false;
+        
+        const startsAt = new Date(a.startsAt);
+        const expiresAt = a.expiresAt ? new Date(a.expiresAt) : null;
+        
+        if (isAfter(startsAt, now)) return false; // Not started yet
+        if (expiresAt && isBefore(expiresAt, now)) return false; // Expired
+
+        // Targeting Logic
+        const hasNoTargets = (!a.groupIds || a.groupIds.length === 0) && (!a.tierIds || a.tierIds.length === 0);
+        const matchesTag = a.groupIds?.some((tag: string) => userTags.includes(tag));
+        const matchesTier = a.tierIds?.includes(userTierId);
+
+        // Show if targeted to ALL, or if user's tag/tier matches
+        return hasNoTargets || matchesTag || matchesTier;
+    })
+    .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
+    .slice(0, 5)
+    .map(a => ({
+        id: a.id,
+        title: a.title,
+        message: a.content,
+        type: a.type as AnnouncementType,
+        date: new Date(a.startsAt)
+    }));
+
+  return validAnnouncements;
 }
 
 export async function getTierProgress(affiliateId: string) {

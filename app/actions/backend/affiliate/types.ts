@@ -3,71 +3,47 @@
 import { z } from "zod";
 import { affiliateGeneralSchema } from "./schemas";
 import { AffiliateStatus, PayoutStatus, PayoutMethod, MediaType, Role, DiscountType } from "@prisma/client";
-/**
- * ==================================================================
- * 3. ENTERPRISE EVENT BUS TYPES (NEW)
- * ==================================================================
- */
-export type EventType = 
-  | "ORDER_CREATED" 
-  | "COMMISSION_EARNED" 
-  | "TIER_UPGRADE_CHECK" 
-  | "FRAUD_ALERT" 
-  | "PAYOUT_REQUESTED"
-  | "MLM_BONUS_TRIGGER";
-
-export interface AffiliateEventPayload {
-  orderId?: string;
-  affiliateId?: string;
-  userId?: string;
-  amount?: number;
-  meta?: Record<string, any>;
-  timestamp: number;
-}
 
 /**
  * ==================================================================
- * 4. ADVANCED MLM & COMMISSION TYPES (NEW)
+ * 🌟 STRICT JSON TYPES FOR OPTIMIZED SCHEMA (NEW)
  * ==================================================================
  */
-export interface MLMConfigDTO {
-  isEnabled: boolean;
-  maxLevels: number;
-  commissionBasis: "SALES_AMOUNT" | "PROFIT_MARGIN" | "CV"; 
-  levelRates: Record<string, number>;
+export interface AffiliateKycDocument {
+  type: "PASSPORT" | "DRIVING_LICENSE" | "NATIONAL_ID" | "TAX_FORM";
+  url: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  documentNumber?: string;
+  rejectionReason?: string;
+  verifiedAt?: Date | string;
 }
 
-export interface CommissionCalculationResult {
-  amount: number;
-  source: string; // 'GLOBAL', 'TIER', 'PRODUCT_OVERRIDE', 'MLM'
-  calculationLog: string[];
-  profitMarginCheck?: {
-    cost: number;
-    profit: number;
-    isLoss: boolean;
-  };
+export interface AffiliatePixelData {
+  type: string;
+  pixelId: string;
+  enabled: boolean;
 }
 
-/**
- * ==================================================================
- * 5. SECURITY & COMPLIANCE TYPES (NEW)
- * ==================================================================
- */
-export interface TaxComplianceStatus {
-  isFormSubmitted: boolean;
-  taxFormUrl?: string;
-  taxId?: string;
-  verifiedAt?: Date;
+export interface AffiliateFraudRuleData {
+  type: "IP_CLICK_LIMIT" | "CONVERSION_RATE_LIMIT" | "ORDER_VALUE_LIMIT" | "BLACKLIST_COUNTRY";
+  value: string;
+  action: "BLOCK" | "FLAG" | "SUSPEND";
+  reason?: string;
 }
 
-export type IdempotencyScope = "ORDER_PROCESS" | "PAYOUT_RELEASE";
-export interface AffiliateConfigDTOExtended extends AffiliateConfigDTO {
-  requireTaxFormForPayout?: boolean;
-  taxFormThreshold?: number; 
-  enableProfitMarginProtection?: boolean;
-  minProfitMargin?: number; 
-  postbackUrlSecret?: string; 
+export interface AffiliateCreativeData {
+  title: string;
+  type: "IMAGE" | "VIDEO" | "DOCUMENT";
+  url: string;
 }
+
+export interface AffiliateAnnouncementData {
+  title: string;
+  content: string;
+  type: "INFO" | "WARNING" | "SUCCESS";
+  date: Date | string;
+}
+
 /**
  * ==================================================================
  * 1. SECURITY TYPES (UPDATED)
@@ -80,6 +56,7 @@ export type AffiliatePermission =
   | "MANAGE_CONFIGURATION"
   | "MANAGE_NETWORK"
   | "MANAGE_FRAUD"; 
+
 /**
  * ==================================================================
  * 2. SHARED TYPES
@@ -149,12 +126,7 @@ export interface AffiliateUserTableItem {
   slug: string;
   status: AffiliateStatus;
   tierName: string;
-  groupName: string;
-  groupRate?: number | null;
-  groupType?: "PERCENTAGE" | "FIXED"; 
-  tierRate?: number | null;
-  tierType?: "PERCENTAGE" | "FIXED";
-  tags: string[];
+  tags: string[];         // Removed groupName/groupRate as Tags handles this now
   coupons: string[];
   storeCredit: number;
   balance: number;
@@ -171,6 +143,8 @@ export interface AffiliateUserTableItem {
   paymentReady?: boolean;
   commissionRate: number | null;
   commissionType?: "PERCENTAGE" | "FIXED";
+  pixels?: AffiliatePixelData[]; // Added for JSON support
+  kycDocuments?: AffiliateKycDocument[]; // Added for JSON support
 }
 
 export interface PayoutQueueItem {
@@ -182,7 +156,7 @@ export interface PayoutQueueItem {
   method: PayoutMethod;
   status: PayoutStatus;
   requestedAt: Date;
-  bankDetails?: any;
+  bankDetails?: Record<string, string>; // Strictly typed JSON
   paypalEmail?: string | null;
   riskScore?: number; 
 }
@@ -217,3 +191,69 @@ export interface TrackingPixelItem {
   createdAt: Date;
 }
 
+/**
+ * ==================================================================
+ * 3. ENTERPRISE EVENT BUS TYPES
+ * ==================================================================
+ */
+export type EventType = 
+  | "ORDER_CREATED" 
+  | "COMMISSION_EARNED" 
+  | "TIER_UPGRADE_CHECK" 
+  | "FRAUD_ALERT" 
+  | "PAYOUT_REQUESTED"
+  | "MLM_BONUS_TRIGGER";
+
+export interface AffiliateEventPayload {
+  orderId?: string;
+  affiliateId?: string;
+  userId?: string;
+  amount?: number;
+  meta?: Record<string, unknown>; // Replaced any with unknown for safety
+  timestamp: number;
+}
+
+/**
+ * ==================================================================
+ * 4. ADVANCED MLM & COMMISSION TYPES
+ * ==================================================================
+ */
+export interface MLMConfigDTO {
+  isEnabled: boolean;
+  maxLevels: number;
+  commissionBasis: "SALES_AMOUNT" | "PROFIT_MARGIN" | "CV"; 
+  levelRates: Record<string, number>;
+}
+
+export interface CommissionCalculationResult {
+  amount: number;
+  source: string; // 'GLOBAL', 'TIER', 'PRODUCT_OVERRIDE', 'MLM'
+  calculationLog: string[];
+  profitMarginCheck?: {
+    cost: number;
+    profit: number;
+    isLoss: boolean;
+  };
+}
+
+/**
+ * ==================================================================
+ * 5. SECURITY & COMPLIANCE TYPES
+ * ==================================================================
+ */
+export interface TaxComplianceStatus {
+  isFormSubmitted: boolean;
+  taxFormUrl?: string;
+  taxId?: string;
+  verifiedAt?: Date;
+}
+
+export type IdempotencyScope = "ORDER_PROCESS" | "PAYOUT_RELEASE";
+
+export interface AffiliateConfigDTOExtended extends AffiliateConfigDTO {
+  requireTaxFormForPayout?: boolean;
+  taxFormThreshold?: number; 
+  enableProfitMarginProtection?: boolean;
+  minProfitMargin?: number; 
+  postbackUrlSecret?: string; 
+}

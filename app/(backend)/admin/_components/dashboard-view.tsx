@@ -5,7 +5,6 @@
 import { useState } from "react";
 import { ActionAlerts } from "./action-alerts";
 import { BusinessPulse } from "./business-pulse";
-import { RecentOrders } from "./recent-orders";
 import { Overview } from "./overview";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { CalendarDays } from "lucide-react";
@@ -129,9 +128,6 @@ export function DashboardView({ data }: DashboardViewProps) {
                <Overview data={data.graphData} currencySymbol={data.currencySymbol} />
              </div>
            </div>
-
-           {/* Recent Orders Meta Box */}
-           <RecentOrders orders={data.recentOrders} />
         </div>
       </div>
       

@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, CheckCircle, Key, PlugZap, Save, Loader2, Globe } from "lucide-react";
 import { StatusBadge } from "../status-badge";
 import { toast } from "sonner";
-import { testMerchantConnection } from "@/app/actions/backend/settings/marketing-settings/merchant_center/test-connection";
-import { updateMarketingConfig } from "@/app/actions/backend/settings/marketing-settings/update-marketing-config";
+import { testMerchantConnection } from "@/app/actions/backend/marketing-settings/merchant_center/test-connection";
+import { updateMarketingConfig } from "@/app/actions/backend/marketing-settings/update-marketing-config";
 // ✅ Import the Type
 import { MarketingSettingsValues } from "@/app/(backend)/admin/marketing/_schema/marketing-validation";
 

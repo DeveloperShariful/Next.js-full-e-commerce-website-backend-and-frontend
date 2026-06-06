@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Clock, AlertTriangle, ShoppingBag, Loader2, AlertCircle } from "lucide-react";
-import { getMerchantStatus } from "@/app/actions/backend/settings/marketing-settings/merchant_center/get-merchant-status";
+import { getMerchantStatus } from "@/app/actions/backend/marketing-settings/merchant_center/get-merchant-status";
 
 interface StatsData {
   active: number;

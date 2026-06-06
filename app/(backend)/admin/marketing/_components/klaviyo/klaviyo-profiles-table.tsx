@@ -13,8 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Mail, Phone, MapPin, ArrowRight, ArrowLeft, Search } from "lucide-react";
-import { getKlaviyoProfiles } from "@/app/actions/backend/settings/marketing-settings/klaviyo/get-profiles";
-import { KlaviyoProfile } from "@/app/actions/backend/settings/marketing-settings/klaviyo/klaviyo";
+import { getKlaviyoProfiles } from "@/app/actions/backend/marketing-settings/klaviyo/get-profiles";
+import { KlaviyoProfile } from "@/app/actions/backend/marketing-settings/klaviyo/klaviyo";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 

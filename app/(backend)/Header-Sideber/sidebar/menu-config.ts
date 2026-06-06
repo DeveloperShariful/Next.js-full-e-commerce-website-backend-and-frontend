@@ -78,6 +78,7 @@ export const sidebarConfig: SidebarGroup[] = [
       { name: "Marketing-Integrations", href: "/admin/marketing", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { name: "Merchant Center", href: "/admin/marketing/merchant-center", icon: Link, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ]
   },
   {

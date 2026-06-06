@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
-import { syncProductsToGoogle } from "@/app/actions/backend/settings/marketing-settings/merchant_center/sync-products";
+import { syncProductsToGoogle } from "@/app/actions/backend/marketing-settings/merchant_center/sync-products";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress"; // Ensure you have this shadcn component
 

@@ -309,6 +309,29 @@ enum ReviewStatus {
   TRASH
 }
 
+// মার্কেটিং প্ল্যাটফর্মগুলোর নাম
+enum SalesChannel {
+  GOOGLE
+  FACEBOOK
+  KLAVIYO
+  TIKTOK
+}
+
+// প্রোডাক্ট সিঙ্ক হওয়ার স্ট্যাটাস
+enum ChannelSyncStatus {
+  PENDING      // সিঙ্ক হওয়ার অপেক্ষায়
+  SYNCED       // গুগলে সাকসেসফুলি চলে গেছে
+  FAILED       // গুগল রিজেক্ট করেছে (যেমন- বারকোড নাই)
+  EXCLUDED     // এডমিন ইচ্ছা করে এই প্ল্যাটফর্মে পাঠাতে চায় না
+}
+
+// গুগলের জন্য প্রোডাক্টের অবস্থা
+enum ProductCondition {
+  NEW
+  REFURBISHED
+  USED
+}
+
 // ==========================================
 // 3. USER, AUTH & SYSTEM (NextAuth.js Updated)
 // ==========================================
@@ -493,6 +516,8 @@ model WalletTransaction {
 model Category {
   id                      String                @id @default(uuid())
   name                    String
+  googleCategoryId       String?   // e.g., "212" (Apparel & Accessories > Clothing)
+  googleCategoryName     String?   // e.g., "Apparel & Accessories > Clothing"
   slug                    String                @unique
   description             String?               @db.Text
   image                   String?
@@ -607,6 +632,11 @@ model Product {
   versions                 ProductVersion[]
   stockHistory             StockHistory[]
   productCode              Int                    @unique @default(autoincrement())
+  condition                ProductCondition @default(NEW)
+  googleProductCategory    String?          // e.g., "Apparel & Accessories > Clothing"
+  customLabels             String[]         // e.g., ["Summer Sale", "Best Seller"] (Postgres Array)
+  channelStatuses          ProductChannelStatus[]
+
   name                     String
   slug                     String                 @unique
   description              String?                @db.Text
@@ -1934,6 +1964,10 @@ model SeoGlobalConfig {
 
 model MarketingIntegration {
   id                        String   @id @default("marketing_config")
+  
+  // ==========================================
+  // 1. Google Tag Manager (GTM) & Search Console
+  // ==========================================
   gtmEnabled                Boolean  @default(false)
   gtmContainerId            String?
   gtmAuth                   String?
@@ -1941,24 +1975,93 @@ model MarketingIntegration {
   dataLayerName             String   @default("dataLayer")
   gscVerificationCode       String?
   gscServiceAccountJson     String?  @db.Text
+
+  // ==========================================
+  // 🚀 ADVANCED GOOGLE MERCHANT CENTER (SHOPify LEVEL)
+  // ==========================================
+  
+  // 1. OAuth & Connection 
+  googleAccountId           String?  
+  googleAccessToken         String?  @db.Text
+  googleRefreshToken        String?  @db.Text 
+  googleTokenExpiry         DateTime?
+
+  // 2. Onboarding Status & Setup Wizard
+  gmcSetupStep              Int      @default(0)    // Wizard tracking (0=Not Started, 1=Account Connected, 2=Domain Claimed, 3=Mapped, 4=Completed)
   gmcMerchantId             String?
+  gmcMerchantName           String?                 // ড্রপডাউন থেকে সিলেক্ট করা একাউন্টের নাম
+  gmcIsSubAccount           Boolean  @default(false)
   gmcTargetCountry          String   @default("AU")
   gmcLanguage               String   @default("en")
+  
+  // 3. Domain Verification & Claiming
+  gmcDomainVerified         Boolean  @default(false) // ওয়েবসাইট গুগলে ভেরিফাইড কি না
+  gmcDomainClaimed          Boolean  @default(false) // ওয়েবসাইট গুগলে ক্লেইম করা কি না
+  gmcSiteVerificationToken  String?  @db.Text        // Google Site Verification API এর মেটা ট্যাগ বা টোকেন
+
+  // 4. Target Programs (গুগল শপিং, ফ্রি লিস্টিং ইত্যাদি)
+  gmcActivePrograms         String[] @default(["surfaces_across_google"]) // surfaces_across_google = Free Listings
+
+  // 5. Global Attribute Mapping (Json এ রাখা বেস্ট কারণ এটি ডায়নামিক)
+  // Example: { "color": "attr_color", "size": "attr_size", "brand": "vendor_name" }
+  gmcAttributeMapping       Json?    
+
+  // 6. Sync Preferences
   gmcContentApiEnabled      Boolean  @default(false)
-  fbPixelId                 String?
+  gmcAutoSyncShipping       Boolean  @default(true)  // ওয়েবসাইটের শিপিং রুল গুগলে পাঠানো হবে কিনা
+  gmcAutoSyncTaxes          Boolean  @default(true)
+
+  // ==========================================
+  // 3. Facebook / Meta Pixel & CAPI
+  // ==========================================
   fbEnabled                 Boolean  @default(false)
+  fbPixelId                 String?
   fbAccessToken             String?  @db.Text
   fbTestEventCode           String?
-  fbDataProcessingOptions   Json?
   fbDomainVerification      String?
+  // Facebook এর কাস্টম সেটিংসের কোনো নির্দিষ্ট আকার নেই, তাই এটি JSON রাখা বেস্ট
+  fbDataProcessingOptions   Json?    
+
+  // ==========================================
+  // 4. Klaviyo (Email Marketing)
+  // ==========================================
   klaviyoEnabled            Boolean  @default(false)
   klaviyoPublicKey          String?
   klaviyoPrivateKey         String?  @db.Text
-  klaviyoListIds            Json?
+  // একাধিক লিস্ট আইডি থাকতে পারে, তাই JSON
+  klaviyoListIds            Json?    
   klaviyoTrackViewedProduct Boolean  @default(true)
   klaviyoTrackAddedToCart   Boolean  @default(true)
+
+  // ==========================================
+  // 5. System Status
+  // ==========================================
+  // কোন প্ল্যাটফর্ম ভেরিফাই হয়েছে কি হয়নি তার সাধারণ স্টেটাস রাখার জন্য JSON
   verificationStatus        Json?    @default("{}")
   updatedAt                 DateTime @default(now()) @updatedAt
+}
+
+model ProductChannelStatus {
+  id               String            @id @default(uuid())
+  productId        String
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  channel          SalesChannel      // GOOGLE, FACEBOOK
+  status           ChannelSyncStatus @default(PENDING)
+  
+  channelProductId String?           
+  
+  // ★ UPDATED: Advanced Diagnostics 
+  errorMessage     String?           @db.Text 
+  googleIssues     Json?             // গুগলের বিস্তারিত ওয়ার্নিং এবং এরর লিস্ট (e.g., [{ severity: "error", code: "image_too_small" }])
+  
+  lastSyncedAt     DateTime?         
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([productId, channel])
+  @@index([status])
+  @@index([channel, status])
 }
 
 model SystemLog {

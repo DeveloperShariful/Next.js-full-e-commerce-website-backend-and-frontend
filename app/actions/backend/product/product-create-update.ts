@@ -8,6 +8,9 @@ import { Prisma } from "@prisma/client";
 import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/backend/product/product-utils"; 
 import { auth } from "@/auth";
 
+// 🔥 NEW: Import Google Merchant Center Sync Action
+import { syncProductToGoogle } from "@/app/actions/backend/merchant-center/gmc-product-sync.actions";
+
 import { parseProductFormData } from "./product-data-parser";
 import { 
     handleInventory, 
@@ -459,6 +462,17 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         if ("success" in savedProduct) {
             return savedProduct;
         }
+
+        // ====================================================================
+        // 🔥 NEW: GOOGLE MERCHANT CENTER AUTO-SYNC (FIRE AND FORGET)
+        // ====================================================================
+        // প্রোডাক্ট সেভ হওয়ার পর ব্যাকগ্রাউন্ডে গুগলে ডাটা চলে যাবে, ইউজারকে ওয়েট করতে হবে না।
+        if (savedProduct && savedProduct.id) {
+            syncProductToGoogle(savedProduct.id).catch((err) => {
+                console.error("Background GMC Sync failed for Product ID:", savedProduct.id, err);
+            });
+        }
+        // ====================================================================
 
         // ====================================================================
         // 🚀 ULTIMATE DYNAMIC REVALIDATION

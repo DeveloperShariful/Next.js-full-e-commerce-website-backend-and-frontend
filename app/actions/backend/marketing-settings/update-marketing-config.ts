@@ -1,4 +1,4 @@
-// File: app/actions/admin/settings/marketing-settings/update-marketing-config.ts
+// File: app/actions/backend/marketing-settings/update-marketing-config.ts
 "use server";
 
 import { db } from "@/lib/prisma";

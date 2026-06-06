@@ -11,7 +11,7 @@ import { Form } from "@/components/ui/form";
 import { Loader2, Save } from "lucide-react"; // Icon added
 
 import { MarketingSettingsSchema, MarketingSettingsValues } from "@/app/(backend)/admin/marketing/_schema/marketing-validation";
-import { updateMarketingConfig } from "@/app/actions/backend/settings/marketing-settings/update-marketing-config";
+import { updateMarketingConfig } from "@/app/actions/backend/marketing-settings/update-marketing-config";
 
 import { GtmIntegrationCard } from "./gtm/gtm-integration-card";
 import { SearchConsoleCard } from "./search-console/search-console-card";

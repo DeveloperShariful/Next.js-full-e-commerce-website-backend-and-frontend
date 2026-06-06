@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, AlertTriangle } from "lucide-react";
-import { getMerchantDiagnostics } from "@/app/actions/backend/settings/marketing-settings/merchant_center/get-diagnostics";
+import { getMerchantDiagnostics } from "@/app/actions/backend/marketing-settings/merchant_center/get-diagnostics";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function MerchantDiagnosticsTable() {

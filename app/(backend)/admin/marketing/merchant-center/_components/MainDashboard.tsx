@@ -25,8 +25,6 @@ interface Props {
 
 export default function MainDashboard({ config, currentStep, searchParams, dbStats }: Props) {
   const [isPending, startTransition] = useTransition();
-  
-  // 🚀 FIX: React State দিয়ে ট্যাব কন্ট্রোল করা হচ্ছে (কোনো Next.js ক্যাশিং ঝামেলা নেই)
   const [activeTab, setActiveTab] = useState<string>("dashboard");
 
   const showNotice = searchParams.status && searchParams.message;
@@ -48,18 +46,19 @@ export default function MainDashboard({ config, currentStep, searchParams, dbSta
   };
 
   return (
-    <div className="min-h-screen bg-[#f0f0f1] text-[#3c434a] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica_Neue',sans-serif] pb-10">
+    // 🚀 RESPONSIVE WRAPPER: ডেক্সটপ ও মোবাইলে সুন্দরভাবে ফিট হওয়ার জন্য
+    <div className="w-full min-h-screen bg-[#f0f0f1] text-[#3c434a] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica_Neue',sans-serif] p-0 m-0 pb-10">
       
-      {/* WordPress Style Top Header */}
-      <div className="bg-white border-b border-[#ccd0d4] pt-4 px-6 mb-6">
+      {/* WordPress Style Top Header (Responsive Padding: px-4 sm:px-6) */}
+      <div className="bg-white border-b border-[#ccd0d4] pt-4 px-4 sm:px-6 m-0 mb-6 w-full">
         <h1 className="text-[23px] font-normal text-[#1d2327] m-0 mb-5">Google for WooCommerce / Shop</h1>
         
         {currentStep === 4 && (
-          <div className="flex gap-6">
+          <div className="flex gap-4 sm:gap-6 overflow-x-auto scrollbar-none whitespace-nowrap">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)} // 🚀 ক্লিকে সাথে সাথে স্টেট চেঞ্জ হবে
+                onClick={() => setActiveTab(tab.id)} 
                 className={`pb-3 text-[14px] font-semibold border-b-4 bg-transparent outline-none cursor-pointer transition-colors ${
                   activeTab === tab.id 
                     ? "border-[#2271b1] text-[#1d2327]" 
@@ -73,20 +72,22 @@ export default function MainDashboard({ config, currentStep, searchParams, dbSta
         )}
       </div>
 
-      <div className="px-4 sm:px-6 max-w-[1200px]">
+      {/* 🚀 DYNAMIC CONTENT CONTAINER (Responsive Padding: px-2 sm:px-6) */}
+      {/* এটি মোবাইলে সামান্য গ্যাপ রাখবে যাতে টেক্সট স্ক্রিনে ধাক্কা না খায়, কিন্তু বড় স্ক্রিনে পুরো চওড়া হয়ে যাবে */}
+      <div className="w-full px-2 sm:px-6 m-0">
         
         {/* Notices */}
         {showNotice && searchParams.status === "success" && (
-          <div className="bg-white border-l-4 border-[#00a32a] shadow-sm p-3 mb-5">
+          <div className="bg-white border-l-4 border-[#00a32a] shadow-sm p-3 mb-5 mx-0">
             <p className="text-[13px] m-0"><strong>Success:</strong> {decodeURIComponent(searchParams.message || "")}</p>
           </div>
         )}
 
-        {/* content area */}
+        {/* Content rendering */}
         {currentStep < 4 ? (
           <OnboardingWizard currentStep={currentStep} config={config} />
         ) : (
-          <div className="mt-2">
+          <div className="mt-2 w-full p-0 m-0">
             {activeTab === "dashboard" && (
               <TabDashboard 
                 config={config} 

@@ -3,46 +3,33 @@
 "use server";
 
 import { google } from "googleapis";
-import { db } from "@/lib/prisma"; // 👈 আপনার কাস্টম ডাটাবেস ইম্পোর্ট
+import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-// ============================================================================
-// 1. OAUTH CONFIGURATION (Shopify/WooCommerce Level Setup)
-// ============================================================================
-// Google Cloud Console থেকে পাওয়া Credentials. এগুলো .env ফাইলে থাকতে হবে।
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
-// Redirect URI হবে: https://yourdomain.com/api/auth/google/callback
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI!;
 
-// Google API Client ইনিশিয়ালাইজেশন
 const oauth2Client = new google.auth.OAuth2(
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI
 );
 
-// গুগলের যেসব পারমিশন আমাদের লাগবে (Content API এবং User Profile)
 const SCOPES = [
-  "https://www.googleapis.com/auth/content", // Merchant Center এ প্রোডাক্ট সিঙ্ক করার জন্য
-  "https://www.googleapis.com/auth/userinfo.email", // কোন ইমেইল দিয়ে কানেক্ট করেছে তা দেখার জন্য
+  "https://www.googleapis.com/auth/content", 
+  "https://www.googleapis.com/auth/userinfo.email", 
+  "https://www.googleapis.com/auth/siteverification", 
+  "https://www.googleapis.com/auth/adwords" 
 ];
 
-// ============================================================================
-// 2. GENERATE GOOGLE LOGIN URL
-// ============================================================================
-/**
- * এডমিন যখন "Connect Google" বাটনে ক্লিক করবে, তখন এই ফাংশন কল হবে।
- * এটি একটি সিকিউর URL তৈরি করে দিবে, যেখানে গিয়ে এডমিন পারমিশন দিবে।
- */
 export async function getGoogleAuthUrl() {
   try {
     const authUrl = oauth2Client.generateAuthUrl({
-      access_type: "offline", // Offline access খুবই জরুরি, এটি ছাড়া refresh_token দিবে না
-      prompt: "consent",      // Consent দিলে প্রতিবার নতুন করে refresh_token পাওয়া যায়
+      access_type: "offline", 
+      prompt: "consent",      
       scope: SCOPES,
     });
-
     return { success: true, url: authUrl };
   } catch (error: any) {
     console.error("Error generating Google Auth URL:", error);
@@ -50,41 +37,35 @@ export async function getGoogleAuthUrl() {
   }
 }
 
-// ============================================================================
-// 3. HANDLE CALLBACK & SAVE TOKENS
-// ============================================================================
-/**
- * গুগল যখন রিডাইরেক্ট করে কোড (Code) ফেরত পাঠাবে, তখন API Route এই ফাংশনটি কল করবে।
- * এটি কোড এক্সচেঞ্জ করে টোকেন নিবে এবং ডাটাবেসে MarketingIntegration টেবিলে সেভ করবে।
- */
 export async function processGoogleCallback(code: string) {
   try {
-    // 1. কোড দিয়ে গুগলের কাছ থেকে টোকেন নেওয়া
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
-    // 2. কোন জিমেইল দিয়ে লগইন করেছে সেটা বের করা
     const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
+    
     const adminEmail = userInfo.data.email;
+    const adminPicture = userInfo.data.picture; 
 
-    // 3. ডাটাবেস আপডেট করা (db.upsert ব্যবহার করে)
     await db.marketingIntegration.upsert({
       where: { id: "marketing_config" },
       update: {
         googleAccountId: adminEmail,
+        googleAccountImage: adminPicture, 
         googleAccessToken: tokens.access_token,
         googleRefreshToken: tokens.refresh_token || undefined,
         googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-        gmcSetupStep: 1, // 🔥 FIX: লগইন সাকসেস হলে উইজার্ডকে Step 2 (Select Account) এ পাঠিয়ে দিবে
+        gmcSetupStep: 1, 
       },
       create: {
         id: "marketing_config",
         googleAccountId: adminEmail,
+        googleAccountImage: adminPicture, 
         googleAccessToken: tokens.access_token,
         googleRefreshToken: tokens.refresh_token,
         googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-        gmcSetupStep: 1, // 🔥 FIX: উইজার্ড স্টেপ আপডেট
+        gmcSetupStep: 1, 
       },
     });
 
@@ -95,13 +76,6 @@ export async function processGoogleCallback(code: string) {
   }
 }
 
-// ============================================================================
-// 4. DISCONNECT GOOGLE ACCOUNT
-// ============================================================================
-/**
- * এডমিন যখন "Disconnect" এ ক্লিক করবে, তখন ডাটাবেস থেকে টোকেন রিমুভ হবে 
- * এবং গুগলের সার্ভার থেকেও টোকেন রিভোক (Revoke) করে দেওয়া হবে সিকিউরিটির জন্য।
- */
 export async function disconnectGoogleAccount() {
   try {
     const config = await db.marketingIntegration.findUnique({
@@ -109,31 +83,129 @@ export async function disconnectGoogleAccount() {
       select: { googleAccessToken: true },
     });
 
-    // গুগলের সার্ভার থেকে টোকেন ইনভ্যালিড করা (Best Practice)
     if (config?.googleAccessToken) {
-      try {
-        await oauth2Client.revokeToken(config.googleAccessToken);
-      } catch (revokeError) {
-        console.warn("Token revoke failed at Google API, but will delete locally.", revokeError);
-      }
+      try { await oauth2Client.revokeToken(config.googleAccessToken); } 
+      catch (e) { console.warn("Token revoke failed in background.", e); }
     }
 
-    // ডাটাবেস থেকে গুগলের ক্রেডেনশিয়াল মুছে ফেলা
     await db.marketingIntegration.update({
       where: { id: "marketing_config" },
       data: {
         googleAccountId: null,
+        googleAccountImage: null, 
         googleAccessToken: null,
         googleRefreshToken: null,
         googleTokenExpiry: null,
-        gmcContentApiEnabled: false, // ডিসকানেক্ট করলে সিঙ্ক অটো অফ হয়ে যাবে
+        gmcContentApiEnabled: false,
+        gmcSetupStep: 0,
+        googleAdsAccountId: null,
+        googleAdsAccountName: null,
+        googleAdsConnected: false,
       },
     });
 
     revalidatePath("/admin/marketing/merchant-center");
-    return { success: true, message: "Google account disconnected successfully." };
+    return { success: true, message: "Google account disconnected." };
   } catch (error: any) {
     console.error("Error disconnecting Google account:", error);
     return { success: false, error: "Failed to disconnect Google account." };
+  }
+}
+
+export async function saveGoogleAdsAccount(accountId: string, accountName: string) {
+  try {
+    if (!accountId) return { success: false, error: "Google Ads Account ID is required." };
+
+    await db.marketingIntegration.update({
+      where: { id: "marketing_config" },
+      data: {
+        googleAdsAccountId: accountId.replace(/-/g, ""), 
+        googleAdsAccountName: accountName || `Account ${accountId}`,
+        googleAdsConnected: true,
+      },
+    });
+
+    revalidatePath("/admin/marketing/merchant-center");
+    return { success: true, message: "Google Ads account connected successfully!" };
+  } catch (error: any) {
+    console.error("Error saving Google Ads account:", error);
+    return { success: false, error: "Failed to save Google Ads account." };
+  }
+}
+
+export async function disconnectGoogleAdsAccount() {
+  try {
+    await db.marketingIntegration.update({
+      where: { id: "marketing_config" },
+      data: {
+        googleAdsAccountId: null,
+        googleAdsAccountName: null,
+        googleAdsConnected: false,
+      },
+    });
+
+    revalidatePath("/admin/marketing/merchant-center");
+    return { success: true, message: "Google Ads account disconnected." };
+  } catch (error: any) {
+    console.error("Error disconnecting Google Ads account:", error);
+    return { success: false, error: "Failed to disconnect Google Ads account." };
+  }
+}
+
+// ============================================================================
+// 🚀 FETCH GOOGLE ADS ACCOUNTS (Using Stable v16 REST API - NO MOCK DATA)
+// ============================================================================
+export async function fetchAvailableAdsAccounts() {
+  try {
+    const config = await db.marketingIntegration.findUnique({
+      where: { id: "marketing_config" },
+      select: { googleAccessToken: true }
+    });
+
+    if (!config?.googleAccessToken) return { success: false, error: "Google account not connected." };
+
+    const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+    
+    // যদি টোকেন না থাকে, এটি সরাসরি ম্যানুয়াল ইনপুট বক্সে ব্যাক করবে
+    if (!devToken) {
+      return { success: true, needsManualInput: true, accounts: [] };
+    }
+
+    // 🚀 UPDATED: v17 এর জায়গায় v16 এন্ডপয়েন্ট ব্যবহার করা হয়েছে
+    const response = await fetch("https://googleads.googleapis.com/v16/customers:listAccessibleCustomers", {
+      headers: {
+        "Authorization": `Bearer ${config.googleAccessToken}`,
+        "developer-token": devToken,
+      }
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData?.error?.message || `API Error: Status Code ${response.status}`;
+
+      console.error("\n=================== 🔴 GOOGLE ADS API ERROR (v16) 🔴 ===================");
+      console.error(`Request URL: https://googleads.googleapis.com/v16/customers:listAccessibleCustomers`);
+      console.error(`HTTP Status: ${response.status} (${response.statusText})`);
+      console.error(`Error Details:`, JSON.stringify(errData, null, 2));
+      console.error("========================================================================\n");
+
+      return { success: false, error: errMsg }; 
+    }
+
+    const data = await response.json();
+    const accounts = (data.resourceNames || []).map((resource: string) => {
+      const id = resource.replace("customers/", "");
+      return {
+        id: id,
+        name: `Ads Account: ${id.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`, 
+      };
+    });
+
+    return { success: true, accounts, needsManualInput: false };
+  } catch (error: any) {
+    console.error("\n=================== 💥 GOOGLE ADS API EXCEPTION 💥 ===================");
+    console.error(error);
+    console.error("====================================================================\n");
+    return { success: false, error: error.message || "Failed to fetch accounts from Google API." };
   }
 }

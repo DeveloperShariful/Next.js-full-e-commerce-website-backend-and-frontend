@@ -1982,6 +1982,7 @@ model MarketingIntegration {
   
   // 1. OAuth & Connection 
   googleAccountId           String?  
+  googleAccountImage        String?
   googleAccessToken         String?  @db.Text
   googleRefreshToken        String?  @db.Text 
   googleTokenExpiry         DateTime?
@@ -2011,6 +2012,14 @@ model MarketingIntegration {
   gmcAutoSyncShipping       Boolean  @default(true)  // ওয়েবসাইটের শিপিং রুল গুগলে পাঠানো হবে কিনা
   gmcAutoSyncTaxes          Boolean  @default(true)
 
+  // ==========================================
+  // 🚀 NEW: GOOGLE ADS INTEGRATION (WooCommerce Style)
+  // ==========================================
+  googleAdsAccountId        String?  // এডস একাউন্ট আইডি (e.g. 556-643-3646)
+  googleAdsAccountName      String?  
+  googleAdsConnected        Boolean  @default(false)
+
+  
   // ==========================================
   // 3. Facebook / Meta Pixel & CAPI
   // ==========================================

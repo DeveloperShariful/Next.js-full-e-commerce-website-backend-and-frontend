@@ -2,146 +2,115 @@
 
 "use client";
 
-import { useTransition, useState } from "react";
+import { useState, useTransition } from "react";
 import { disconnectGoogleAccount } from "@/app/actions/backend/merchant-center/gmc-auth.actions";
-import GmcSettingsForm from "./GmcSettingsForm";
-// 🔥 উইজার্ডের Step 3 টাই আমরা ড্যাশবোর্ডে রিইউজ করবো (এডিট করার জন্য)
-import Step3AttributeMapping from "./Step3AttributeMapping"; 
-import Link from "next/link";
+import OnboardingWizard from "./OnboardingWizard";
+import TabDashboard from "./TabDashboard";
+import TabProductFeed from "./TabProductFeed";
+import TabAttributes from "./TabAttributes";
+import TabSettings from "./TabSettings";
 
 interface Props {
   config: any;
+  currentStep: number;
+  searchParams: { status?: string; message?: string };
+  dbStats: {
+    totalStoreViews: number;
+    syncedCount: number;
+    failedCount: number;
+    totalProductsCount: number;
+    syncLogs: any[];
+  };
 }
 
-export default function MainDashboard({ config }: Props) {
+export default function MainDashboard({ config, currentStep, searchParams, dbStats }: Props) {
   const [isPending, startTransition] = useTransition();
-  // 🔥 নতুন স্টেট: ড্যাশবোর্ডে কোন ট্যাব ওপেন থাকবে
-  const [activeTab, setActiveTab] = useState<"settings" | "mapping">("settings");
+  
+  // 🚀 FIX: React State দিয়ে ট্যাব কন্ট্রোল করা হচ্ছে (কোনো Next.js ক্যাশিং ঝামেলা নেই)
+  const [activeTab, setActiveTab] = useState<string>("dashboard");
+
+  const showNotice = searchParams.status && searchParams.message;
+
+  const tabs = [
+    { id: "dashboard", label: "Dashboard" },
+    { id: "reports", label: "Reports" },
+    { id: "product-feed", label: "Product Feed" },
+    { id: "attributes", label: "Attributes" },
+    { id: "settings", label: "Settings" },
+  ];
 
   const handleDisconnect = () => {
-    if (!confirm("Are you sure? This will stop all automatic product syncing to Google.")) return;
-    
+    if (!confirm("Are you sure? This will disconnect your account.")) return;
     startTransition(async () => {
-      const result = await disconnectGoogleAccount();
-      if (!result.success) {
-        alert(result.error);
-      }
+      const res = await disconnectGoogleAccount();
+      if (!res.success) alert(res.error);
     });
   };
 
   return (
-    <div>
-      {/* WordPress Style Tabs (Main Navigation) */}
-      <div className="flex border-b border-[#ccd0d4] mb-5">
-        <button
-          onClick={() => setActiveTab("settings")}
-          className={`px-4 py-2 text-[14px] font-semibold border border-b-0 rounded-t-[3px] mr-2 transition-colors ${
-            activeTab === "settings" 
-              ? "bg-white border-[#ccd0d4] text-[#1d2327] relative top-[1px]" 
-              : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96]"
-          }`}
-        >
-          General Settings
-        </button>
-        <button
-          onClick={() => setActiveTab("mapping")}
-          className={`px-4 py-2 text-[14px] font-semibold border border-b-0 rounded-t-[3px] transition-colors ${
-            activeTab === "mapping" 
-              ? "bg-white border-[#ccd0d4] text-[#1d2327] relative top-[1px]" 
-              : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96]"
-          }`}
-        >
-          Attribute Mapping
-        </button>
+    <div className="min-h-screen bg-[#f0f0f1] text-[#3c434a] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica_Neue',sans-serif] pb-10">
+      
+      {/* WordPress Style Top Header */}
+      <div className="bg-white border-b border-[#ccd0d4] pt-4 px-6 mb-6">
+        <h1 className="text-[23px] font-normal text-[#1d2327] m-0 mb-5">Google for WooCommerce / Shop</h1>
+        
+        {currentStep === 4 && (
+          <div className="flex gap-6">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)} // 🚀 ক্লিকে সাথে সাথে স্টেট চেঞ্জ হবে
+                className={`pb-3 text-[14px] font-semibold border-b-4 bg-transparent outline-none cursor-pointer transition-colors ${
+                  activeTab === tab.id 
+                    ? "border-[#2271b1] text-[#1d2327]" 
+                    : "border-transparent text-[#50575e] hover:text-[#2271b1]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="px-4 sm:px-6 max-w-[1200px]">
         
-        {/* Left Column: Dynamic Content based on Tab */}
-        <div className="lg:col-span-8">
-          
-          {/* TAB 1: General Settings */}
-          {activeTab === "settings" && (
-            <div className="bg-white border border-[#ccd0d4] rounded-none shadow-none mb-5">
-              <h2 className="text-[14px] font-semibold text-[#1d2327] border-b border-[#ccd0d4] px-4 py-3 m-0">
-                Sync Settings
-              </h2>
-              <div className="p-4">
-                <GmcSettingsForm initialData={config} disabled={false} />
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Editable Mapping Component */}
-          {activeTab === "mapping" && (
-            <div className="bg-white border border-[#ccd0d4] rounded-none shadow-none mb-5">
-              <h2 className="text-[14px] font-semibold text-[#1d2327] border-b border-[#ccd0d4] px-4 py-3 m-0">
-                Edit Attribute Mapping
-              </h2>
-              <div className="p-0">
-                {/* 
-                  🔥 Magic: উইজার্ডের Step 3 কম্পোনেন্টটি আমরা এখানে সরাসরি কল করে দিয়েছি।
-                  যেহেতু এটি ডাটাবেস থেকে ফেচ করে ডাটা দেখায়, তাই আপনার আগের সেভ করা সব ডাটা এখানে চলে আসবে।
-                  এবং এখান থেকে সেভ করলে ডাটাবেস আপডেট হয়ে যাবে!
-                */}
-                <Step3AttributeMapping />
-              </div>
-            </div>
-          )}
-
-        </div>
-
-        {/* Right Column: Connection Overview & Actions (Always Visible) */}
-        <div className="lg:col-span-4">
-          
-          {/* Connection Status Card */}
-          <div className="bg-white border border-[#ccd0d4] mb-5">
-            <h2 className="text-[14px] font-semibold text-[#1d2327] border-b border-[#ccd0d4] px-4 py-3 m-0">
-              Google Connection
-            </h2>
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-2 h-2 bg-[#00a32a] rounded-full inline-block"></span>
-                <p className="text-[13px] m-0 text-[#3c434a]">
-                  Connected as <strong>{config.googleAccountId}</strong>
-                </p>
-              </div>
-              
-              <div className="bg-[#f0f0f1] border border-[#ccd0d4] p-3 rounded-[3px] mb-4">
-                <p className="text-[12px] text-[#646970] m-0 mb-1">Merchant Center ID:</p>
-                <p className="text-[14px] font-semibold text-[#1d2327] m-0">{config.gmcMerchantId}</p>
-                
-                {config.gmcDomainClaimed && (
-                  <p className="text-[12px] text-[#00a32a] m-0 mt-2 font-semibold">✓ Domain Verified & Claimed</p>
-                )}
-              </div>
-
-              <button
-                onClick={handleDisconnect}
-                disabled={isPending}
-                className="text-[#d63638] hover:text-[#b32d2e] text-[13px] underline bg-transparent border-none p-0 cursor-pointer disabled:opacity-50"
-              >
-                {isPending ? "Disconnecting..." : "Disconnect Google Account"}
-              </button>
-            </div>
+        {/* Notices */}
+        {showNotice && searchParams.status === "success" && (
+          <div className="bg-white border-l-4 border-[#00a32a] shadow-sm p-3 mb-5">
+            <p className="text-[13px] m-0"><strong>Success:</strong> {decodeURIComponent(searchParams.message || "")}</p>
           </div>
+        )}
 
-          {/* Quick Links Card */}
-          <div className="bg-white border border-[#ccd0d4]">
-            <h2 className="text-[14px] font-semibold text-[#1d2327] border-b border-[#ccd0d4] px-4 py-3 m-0">
-              Quick Actions
-            </h2>
-            <div className="p-4 flex flex-col gap-3 text-[13px]">
-              <Link href="/admin/marketing/merchant-center/sync-logs" className="text-[#2271b1] hover:underline">
-                View Product Sync Logs &rarr;
-              </Link>
-              <a href="https://merchants.google.com/" target="_blank" className="text-[#2271b1] hover:underline">
-                Open Google Merchant Center &rarr;
-              </a>
-            </div>
+        {/* content area */}
+        {currentStep < 4 ? (
+          <OnboardingWizard currentStep={currentStep} config={config} />
+        ) : (
+          <div className="mt-2">
+            {activeTab === "dashboard" && (
+              <TabDashboard 
+                config={config} 
+                totalStoreViews={dbStats.totalStoreViews}
+                syncedCount={dbStats.syncedCount}
+                failedCount={dbStats.failedCount}
+              />
+            )}
+            {activeTab === "reports" && <div className="p-10 text-center text-[#646970] bg-white border border-[#ccd0d4]">Reports feature coming soon.</div>}
+            
+            {activeTab === "product-feed" && (
+              <TabProductFeed 
+                syncLogs={dbStats.syncLogs} 
+                totalProducts={dbStats.totalProductsCount} 
+              />
+            )}
+            
+            {activeTab === "attributes" && <TabAttributes />}
+            
+            {activeTab === "settings" && (
+              <TabSettings config={config} onDisconnect={handleDisconnect} isPending={isPending} />
+            )}
           </div>
-
-        </div>
+        )}
       </div>
     </div>
   );

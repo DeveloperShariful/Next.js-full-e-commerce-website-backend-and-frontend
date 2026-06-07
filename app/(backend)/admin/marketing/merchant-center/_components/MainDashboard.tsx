@@ -51,7 +51,7 @@ export default function MainDashboard({ config, currentStep, searchParams, dbSta
       
       {/* WordPress Style Top Header (Responsive Padding: px-4 sm:px-6) */}
       <div className="bg-white border-b border-[#ccd0d4] pt-4 px-4 sm:px-6 m-0 mb-6 w-full">
-        <h1 className="text-[23px] font-normal text-[#1d2327] m-0 mb-5">Google for WooCommerce / Shop</h1>
+        <h1 className="text-[23px] font-bold text-[#1d2327] m-0 mb-5">Google Merchant Center</h1>
         
         {currentStep === 4 && (
           <div className="flex gap-4 sm:gap-6 overflow-x-auto scrollbar-none whitespace-nowrap">
@@ -74,7 +74,7 @@ export default function MainDashboard({ config, currentStep, searchParams, dbSta
 
       {/* 🚀 DYNAMIC CONTENT CONTAINER (Responsive Padding: px-2 sm:px-6) */}
       {/* এটি মোবাইলে সামান্য গ্যাপ রাখবে যাতে টেক্সট স্ক্রিনে ধাক্কা না খায়, কিন্তু বড় স্ক্রিনে পুরো চওড়া হয়ে যাবে */}
-      <div className="w-full px-2 sm:px-6 m-0">
+      <div className="w-full  m-0">
         
         {/* Notices */}
         {showNotice && searchParams.status === "success" && (

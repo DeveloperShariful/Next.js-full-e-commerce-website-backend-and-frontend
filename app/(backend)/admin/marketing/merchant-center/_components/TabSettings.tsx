@@ -2,13 +2,45 @@
 
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { 
+  disconnectGoogleAccount, 
   disconnectGoogleAdsAccount, 
   saveGoogleAdsAccount,
   fetchAvailableAdsAccounts
 } from "@/app/actions/backend/merchant-center/gmc-auth.actions";
-import GmcSettingsForm from "./GmcSettingsForm";
+import { 
+  updateGmcSettings, 
+  saveGoogleAdsConversionSettings, // 🚀 নতুন সার্ভার অ্যাকশন
+  GmcSettingsData 
+} from "@/app/actions/backend/merchant-center/gmc-settings.actions";
+
+// ============================================================================
+// 🌍 GOOGLE SUPPORTED COUNTRIES & LANGUAGES (CONSTANTS)
+// ============================================================================
+const SUPPORTED_COUNTRIES = [
+  { code: "AU", name: "Australia" },
+  { code: "US", name: "United States" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "CA", name: "Canada" },
+  { code: "NZ", name: "New Zealand" },
+  { code: "IE", name: "Ireland" },
+  { code: "IN", name: "India" },
+  { code: "SG", name: "Singapore" },
+  { code: "ZA", name: "South Africa" },
+  { code: "AE", name: "United Arab Emirates" },
+];
+
+const SUPPORTED_LANGUAGES = [
+  { code: "en", name: "English" },
+  { code: "es", name: "Spanish" },
+  { code: "fr", name: "French" },
+  { code: "de", name: "German" },
+  { code: "it", name: "Italian" },
+  { code: "ja", name: "Japanese" },
+  { code: "ar", name: "Arabic" },
+  { code: "hi", name: "Hindi" },
+];
 
 interface Props {
   config: any;
@@ -17,16 +49,66 @@ interface Props {
 }
 
 export default function TabSettings({ config, onDisconnect, isPending }: Props) {
+  // ==========================================
+  // 🚀 STATE MANAGEMENT (Form & Connections)
+  // ==========================================
   const [isPendingAds, startTransition] = useTransition();
+  const [isPendingForm, startFormTransition] = useTransition();
+  const [isPendingConversion, startConversionTransition] = useTransition();
+  
+  // Connection UI States
   const [isConnecting, setIsConnecting] = useState(false);
   const [adsAccounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [needsManual, setNeedsManual] = useState(false);
   const [manualId, setManualId] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // 🚀 NEW: Custom Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Settings Form State
+  const [formData, setFormData] = useState<GmcSettingsData>({
+    gmcContentApiEnabled: config?.gmcContentApiEnabled || false,
+    gmcMerchantId: config?.gmcMerchantId || "",
+    gmcTargetCountry: config?.gmcTargetCountry || "AU",
+    gmcLanguage: config?.gmcLanguage || "en",
+  });
+  const [formMessage, setFormMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // 🚀 Google Ads Conversion Tracking States
+  const [conversionId, setConversionId] = useState(config?.googleAdsConversionId || "");
+  const [conversionLabel, setConversionLabel] = useState(config?.googleAdsConversionLabel || "");
+  const [enhancedConversions, setEnhancedConversions] = useState(config?.googleAdsEnhancedConversionsEnabled || false);
+  const [conversionMessage, setConversionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Sync internal states with config changes
+  useEffect(() => {
+    if (config) {
+      setConversionId(config.googleAdsConversionId || "");
+      setConversionLabel(config.googleAdsConversionLabel || "");
+      setEnhancedConversions(config.googleAdsEnhancedConversionsEnabled || false);
+    }
+  }, [config]);
+
+  // ==========================================
+  // 🚀 ACTION HANDLERS
+  // ==========================================
+  
+  // 1. Settings Form Submit
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormMessage(null);
+
+    startFormTransition(async () => {
+      const result = await updateGmcSettings(formData);
+      if (result.success) {
+        setFormMessage({ type: "success", text: "Settings saved successfully." });
+        setTimeout(() => setFormMessage(null), 3000); 
+      } else {
+        setFormMessage({ type: "error", text: result.error || "Failed to save." });
+      }
+    });
+  };
+
+  // 2. Disconnect Google Ads
   const handleDisconnectAds = () => {
     if (!confirm("Disconnect Google Ads account?")) return;
     startTransition(async () => {
@@ -35,34 +117,60 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
     });
   };
 
+  // 3. Connect Google Ads & Fetch List
   const handleStartConnection = async () => {
     setErrorMsg(null);
     setIsConnecting(true);
     const res = await fetchAvailableAdsAccounts();
     if (res.success) {
-      if (res.needsManualInput) {
-        setNeedsManual(true);
-      } else if (res.accounts && res.accounts.length > 0) {
+      if (res.accounts && res.accounts.length > 0) {
         setAccounts(res.accounts);
       } else {
         setNeedsManual(true);
       }
     } else {
-      setErrorMsg(res.error || null); // 🚀 TS Error Fixed
+      setErrorMsg(res.error || null);
       setNeedsManual(true);
     }
   };
 
+  // 4. Save Connected Account with real descriptive name
   const handleSaveAdsAccount = (idToSave: string) => {
     if (!idToSave) return;
+    
+    // সিলেক্টেড অ্যাকাউন্টের আসল নাম বের করা
+    const selectedAcc = adsAccounts.find(a => a.id === idToSave);
+    const displayName = selectedAcc ? selectedAcc.name : `Ads Account: ${idToSave}`;
+
     startTransition(async () => {
-      const res = await saveGoogleAdsAccount(idToSave, "");
+      const res = await saveGoogleAdsAccount(idToSave, displayName);
       if (res.success) {
         setIsConnecting(false);
         setNeedsManual(false);
         setManualId("");
       } else {
-        setErrorMsg(res.error || null); // 🚀 TS Error Fixed
+        setErrorMsg(res.error || null);
+      }
+    });
+  };
+
+  // 5. Save Google Ads Conversion & Tracking Settings
+  const handleSaveConversionSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    setConversionMessage(null);
+
+    startConversionTransition(async () => {
+      const res = await saveGoogleAdsConversionSettings({
+        googleAdsConversionId: conversionId.trim(),
+        googleAdsConversionLabel: conversionLabel.trim(),
+        googleAdsEnhancedConversionsEnabled: enhancedConversions
+      });
+
+      if (res.success) {
+        setConversionMessage({ type: "success", text: "Tracking preferences saved successfully." });
+        setTimeout(() => setConversionMessage(null), 3000);
+      } else {
+        setConversionMessage({ type: "error", text: res.error || "Failed to save tracking preferences." });
       }
     });
   };
@@ -70,7 +178,9 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
   return (
     <div className="max-w-[1000px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 mt-2">
       
-      {/* Settings Form */}
+      {/* ========================================== */}
+      {/* 🚀 SECTION 1: GMC CONFIGURATION (FORM) */}
+      {/* ========================================== */}
       <div className="md:col-span-4">
         <h3 className="text-[15px] font-semibold text-[#1d2327] m-0 mb-2">Sync Settings</h3>
         <p className="text-[13px] text-[#646970] m-0 leading-relaxed">
@@ -81,24 +191,113 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
       <div className="md:col-span-8 mb-10">
         <div className="bg-white border border-[#ccd0d4] rounded-[3px]">
           <div className="p-6">
-            <GmcSettingsForm initialData={config} disabled={false} />
+            
+            <form onSubmit={handleFormSubmit}>
+              {formMessage && (
+                <div className={`p-3 mb-4 text-[13px] border-l-4 ${formMessage.type === "success" ? "border-[#00a32a] bg-[#f0f6ea]" : "border-[#d63638] bg-[#fcf0f1]"}`}>
+                  {formMessage.text}
+                </div>
+              )}
+
+              <table className="w-full text-left border-collapse">
+                <tbody>
+                  {/* Enable API */}
+                  <tr>
+                    <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327]">Enable integration</th>
+                    <td className="py-4 align-top">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.gmcContentApiEnabled}
+                          onChange={(e) => setFormData({ ...formData, gmcContentApiEnabled: e.target.checked })}
+                          className="w-4 h-4 border-[#8c8f94] rounded-[3px] text-[#2271b1]"
+                        />
+                        <span className="text-[13px]">Enable Content API Product Sync</span>
+                      </label>
+                    </td>
+                  </tr>
+
+                  {/* Merchant ID */}
+                  <tr>
+                    <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327]">Merchant Center ID <span className="text-[#d63638]">*</span></th>
+                    <td className="py-4 align-top">
+                      <input
+                        type="text"
+                        required
+                        value={formData.gmcMerchantId}
+                        onChange={(e) => setFormData({ ...formData, gmcMerchantId: e.target.value })}
+                        className="w-full max-w-[350px] border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] bg-[#f6f7f7] focus:outline-none"
+                        readOnly
+                      />
+                      <p className="text-[12px] text-[#646970] mt-1">This ID was selected during onboarding.</p>
+                    </td>
+                  </tr>
+
+                  {/* Target Country */}
+                  <tr>
+                    <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327]">Target Country</th>
+                    <td className="py-4 align-top">
+                      <select
+                        value={formData.gmcTargetCountry}
+                        onChange={(e) => setFormData({ ...formData, gmcTargetCountry: e.target.value })}
+                        className="w-full max-w-[350px] border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none bg-white cursor-pointer"
+                      >
+                        {SUPPORTED_COUNTRIES.map((country) => (
+                          <option key={country.code} value={country.code}>{country.name} ({country.code})</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+
+                  {/* Language */}
+                  <tr>
+                    <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327] border-b-0">Content Language</th>
+                    <td className="py-4 align-top border-b-0">
+                      <select
+                        value={formData.gmcLanguage}
+                        onChange={(e) => setFormData({ ...formData, gmcLanguage: e.target.value })}
+                        className="w-full max-w-[350px] border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none bg-white cursor-pointer"
+                      >
+                        {SUPPORTED_LANGUAGES.map((lang) => (
+                          <option key={lang.code} value={lang.code}>{lang.name} ({lang.code})</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="mt-6 pt-4 border-t border-[#ccd0d4]">
+                <button
+                  type="submit"
+                  disabled={isPendingForm}
+                  className="bg-[#2271b1] hover:bg-[#135e96] text-white border border-[#2271b1] rounded-[3px] px-4 py-1.5 text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  {isPendingForm ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            </form>
+
           </div>
         </div>
       </div>
 
+      {/* Divider */}
       <div className="md:col-span-12 border-t border-[#ccd0d4] my-2"></div>
 
-      {/* Linked Accounts */}
+      {/* ========================================== */}
+      {/* 🚀 SECTION 2: LINKED ACCOUNTS */}
+      {/* ========================================== */}
       <div className="md:col-span-4">
         <h3 className="text-[15px] font-semibold text-[#1d2327] m-0 mb-2">Linked accounts</h3>
         <p className="text-[13px] text-[#646970] m-0 leading-relaxed">
-          A Google account, Google Merchant Center account, and Google Ads account are required to use this extension to its full potential.
+          A Google account, Google Merchant Center account, and Google Ads account are required to use this extension.
         </p>
       </div>
 
       <div className="md:col-span-8 flex flex-col gap-5">
 
-        {/* 1. Google Account Card */}
+        {/* 1. Google Account */}
         <div className="bg-white border border-[#ccd0d4] p-6 rounded-[3px] flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-4">
             {config.googleAccountImage ? (
@@ -117,7 +316,7 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
           </div>
         </div>
 
-        {/* 2. Merchant Center Card */}
+        {/* 2. Merchant Center */}
         <div className="bg-white border border-[#ccd0d4] p-6 rounded-[3px] flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-4">
             <div className="w-8 h-8 bg-[#4285F4] rounded-[3px] flex items-center justify-center text-white font-bold text-[16px]">M</div>
@@ -144,9 +343,9 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
                 </div>
                 <div>
                   <h4 className="text-[14px] font-semibold text-[#1d2327] m-0 mb-1">Google Ads</h4>
-                  {config.googleAdsConnected ? (
+                  {config.googleAdsConnected && config.googleAdsAccountId ? (
                     <a href={`https://ads.google.com/aw/overview?ocid=${config.googleAdsAccountId}`} target="_blank" className="text-[13px] text-[#2271b1] hover:underline m-0">
-                      Account {config.googleAdsAccountId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")} ↗
+                      {config.googleAdsAccountName || `Account ${config.googleAdsAccountId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`} ↗
                     </a>
                   ) : (
                     <p className="text-[13px] text-[#646970] m-0">No account connected</p>
@@ -163,7 +362,7 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
                 !isConnecting && (
                   <button 
                     onClick={handleStartConnection}
-                    className="border border-[#2271b1] text-[#2271b1] hover:bg-[#f6f7f7] px-5 py-1.5 rounded-[3px] text-[13px] font-semibold transition-colors"
+                    className="border border-[#2271b1] text-[#2271b1] hover:bg-[#f6f7f7] px-5 py-1.5 rounded-[3px] text-[13px] font-semibold transition-colors cursor-pointer bg-transparent"
                   >
                     Connect
                   </button>
@@ -173,8 +372,8 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
 
             {/* Google Ads Connection UI */}
             {!config.googleAdsConnected && isConnecting && (
-              <div className="mt-4 pt-4 border-t border-[#ccd0d4] max-w-[400px]">
-                {errorMsg && <p className="text-[12px] text-[#d63638] mb-2">{errorMsg}</p>}
+              <div className="mt-4 pt-4 border-t border-[#ccd0d4] max-w-[500px]">
+                {errorMsg && <p className="text-[12px] text-[#d63638] mb-2 font-semibold">API Response: {errorMsg}</p>}
                 
                 {/* DYNAMIC SELECT DROPDOWN */}
                 {adsAccounts.length > 0 && !needsManual && (
@@ -183,14 +382,14 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
                     <div className="flex gap-2">
                       <select 
                         onChange={(e) => handleSaveAdsAccount(e.target.value)}
-                        className="flex-1 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[13px] focus:outline-none bg-white cursor-pointer"
+                        className="flex-1 border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] focus:outline-none bg-white cursor-pointer"
                       >
                         <option value="">-- Choose Account --</option>
                         {adsAccounts.map(acc => (
                           <option key={acc.id} value={acc.id}>{acc.name}</option>
                         ))}
                       </select>
-                      <button onClick={() => setIsConnecting(false)} className="text-[13px] text-[#646970] hover:underline">Cancel</button>
+                      <button onClick={() => setIsConnecting(false)} className="text-[13px] text-[#646970] hover:underline bg-transparent border-none cursor-pointer">Cancel</button>
                     </div>
                   </div>
                 )}
@@ -209,11 +408,11 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
                       <button 
                         onClick={() => handleSaveAdsAccount(manualId)}
                         disabled={isPendingAds || !manualId}
-                        className="bg-[#2271b1] text-white px-3 py-1 rounded-[3px] text-[13px] font-semibold"
+                        className="bg-[#2271b1] text-white px-3 py-1 rounded-[3px] text-[13px] font-semibold cursor-pointer border-none"
                       >
                         Link Account
                       </button>
-                      <button onClick={() => setIsConnecting(false)} className="text-[13px] text-[#646970] hover:underline">Cancel</button>
+                      <button onClick={() => { setIsConnecting(false); setErrorMsg(null); }} className="text-[13px] text-[#646970] hover:underline bg-transparent border-none cursor-pointer">Cancel</button>
                     </div>
                   </div>
                 )}
@@ -234,10 +433,81 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
           )}
         </div>
 
+        {/* ========================================================== */}
+        {/* 🚀 NEW FEATURE: WOOCOMMERCE STYLE CONVERSION TRACKING CARD */}
+        {/* ========================================================== */}
+        {config.googleAdsConnected && (
+          <div className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm overflow-hidden animate-in fade-in duration-300">
+            <h2 className="text-[14px] font-semibold text-[#1d2327] border-b border-[#ccd0d4] px-6 py-4 m-0 bg-[#f9f9f9]">
+              Google Ads Tracking & Conversions
+            </h2>
+            <div className="p-6">
+              <form onSubmit={handleSaveConversionSettings}>
+                {conversionMessage && (
+                  <div className={`p-3 mb-4 text-[13px] border-l-4 ${conversionMessage.type === "success" ? "border-[#00a32a] bg-[#f0f6ea]" : "border-[#d63638] bg-[#fcf0f1]"}`}>
+                    {conversionMessage.text}
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <label className="block text-[13px] font-semibold text-[#1d2327] mb-1">
+                    Google Ads Conversion ID
+                  </label>
+                  <input 
+                    type="text"
+                    value={conversionId}
+                    onChange={(e) => setConversionId(e.target.value)}
+                    placeholder="e.g., AW-109283746"
+                    className="w-full max-w-[400px] border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] focus:border-[#2271b1] focus:outline-none"
+                  />
+                  <p className="text-[11px] text-[#646970] mt-1">This will auto-inject Google Tag (gtag.js) to track your store views.</p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-[13px] font-semibold text-[#1d2327] mb-1">
+                    Purchase Conversion Label
+                  </label>
+                  <input 
+                    type="text"
+                    value={conversionLabel}
+                    onChange={(e) => setConversionLabel(e.target.value)}
+                    placeholder="e.g., abCDefGhIJKlMnOpqR"
+                    className="w-full max-w-[400px] border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] focus:border-[#2271b1] focus:outline-none"
+                  />
+                  <p className="text-[11px] text-[#646970] mt-1">Tracks purchase values dynamically when customer orders something.</p>
+                </div>
+
+                <div className="mb-5">
+                  <label className="flex items-start gap-2 cursor-pointer max-w-[500px]">
+                    <input 
+                      type="checkbox"
+                      checked={enhancedConversions}
+                      onChange={(e) => setEnhancedConversions(e.target.checked)}
+                      className="w-4 h-4 border-[#8c8f94] rounded-[3px] text-[#2271b1] mt-0.5"
+                    />
+                    <div>
+                      <span className="text-[13px] font-semibold text-[#1d2327]">Enable Enhanced Conversions</span>
+                      <p className="text-[11px] text-[#646970] m-0 mt-0.5">Sends hashed first-party customer data safely to Google to improve campaign measurement.</p>
+                    </div>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isPendingConversion}
+                  className="bg-[#2271b1] hover:bg-[#135e96] text-white border border-[#2271b1] rounded-[3px] px-4 py-1.5 text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  {isPendingConversion ? "Saving Preferences..." : "Save Tracking Preferences"}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Global Disconnect Button (Triggering Custom Modal) */}
         <div className="text-right mt-4 mb-10">
           <button
-            onClick={() => setIsModalOpen(true)} // 🚀 TRIGGER: কাস্টম পপ-আপ ওপেন হবে
+            onClick={() => setIsModalOpen(true)} 
             disabled={isPending}
             className="bg-[#d63638] hover:bg-[#b32d2e] text-white border-none rounded-[3px] px-6 py-2.5 text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-50 transition-colors"
           >
@@ -248,7 +518,7 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
       </div>
 
       {/* ========================================================== */}
-      {/* 🚀 NEW: WOOCOMMERCE STYLE FLAT DISCONNECT CONFIRMATION MODAL */}
+      {/* 🚀 WOOCOMMERCE STYLE FLAT DISCONNECT CONFIRMATION MODAL */}
       {/* ========================================================== */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
@@ -275,8 +545,8 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
               </button>
               <button
                 onClick={() => {
-                  setIsModalOpen(false); // ক্লোজ পপ-আপ
-                  onDisconnect(); // ডিকানেক্ট অ্যাকশন ট্রিগার
+                  setIsModalOpen(false); 
+                  onDisconnect(); 
                 }}
                 className="bg-[#d63638] hover:bg-[#b32d2e] text-white border border-[#d63638] px-4 py-2 rounded-[3px] text-[13px] font-semibold cursor-pointer"
               >

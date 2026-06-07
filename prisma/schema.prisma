@@ -636,6 +636,9 @@ model Product {
   googleProductCategory    String?          // e.g., "Apparel & Accessories > Clothing"
   customLabels             String[]         // e.g., ["Summer Sale", "Best Seller"] (Postgres Array)
   channelStatuses          ProductChannelStatus[]
+  googleTitle              String?                // গুগলের জন্য কাস্টম টাইটেল (SEO অপ্টিমাইজেশনের জন্য)
+  googleDescription        String?                @db.Text // গুগলের জন্য কাস্টম ডেসক্রিপশন
+  googleIsBundle           Boolean                @default(false) // এটি গুগলকে জানাবে প্রোডাক্টটি কাস্টম বান্ডেল কিনা
 
   name                     String
   slug                     String                 @unique
@@ -882,6 +885,8 @@ model ProductVariant {
   id                  String           @id @default(uuid())
   productId           String
   product             Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  googleTitle         String?
+  googleDescription   String?          @db.Text
   name                String
   sku                 String?
   barcode             String?
@@ -2018,6 +2023,11 @@ model MarketingIntegration {
   googleAdsAccountId        String?  // এডস একাউন্ট আইডি (e.g. 556-643-3646)
   googleAdsAccountName      String?  
   googleAdsConnected        Boolean  @default(false)
+
+  googleAdsLinkStatus       String?  @default("UNLINKED") // UNLINKED, PENDING_APPROVAL, LINKED, FAILED
+  googleAdsConversionId     String?  // গুগল ট্র্যাকিং আইডি (e.g., AW-109283746)
+  googleAdsConversionLabel  String?  // পারচেজ কনভার্সন ট্র্যাকিং লেবেল (e.g., abCDefGhIJKlMnOpqR)
+  googleAdsEnhancedConversionsEnabled Boolean @default(false) // এনহ্যান্সড ট্র্যাকিং এনাবল করার জন্য
 
   
   // ==========================================

@@ -163,7 +163,7 @@ export async function syncProductToGoogle(productId: string) {
         status: "SYNCED",
         channelProductId: response.data.id,
         errorMessage: null,
-        googleIssues: Prisma.DbNull,
+        googleIssues: Prisma.DbNull, 
         lastSyncedAt: new Date(),
       },
       create: {
@@ -245,9 +245,6 @@ export async function removeProductFromGoogle(productId: string) {
     const statusCode = error.response?.status || error.status || 400;
     const errorMessage = error.response?.data?.error?.message || error.message;
 
-    // 🚀 THE ULTIMATE 404 BYPASS:
-    // গুগল যদি বলে "প্রোডাক্ট খুঁজে পাওয়া যায়নি (404)", তার মানে এটি অলরেডি ডিলিট হয়ে গেছে।
-    // এটি আমাদের জন্য সফলতাই (Success)! তাই আমরা সেভলি ডাটাবেস আপডেট করে সাকসেস রিটার্ন করবো।
     if (statusCode === 404 || errorMessage.toLowerCase().includes("not found")) {
       console.warn(`GMC Delete: Product ${productId} already deleted on Google side. Marking local status as EXCLUDED.`);
       
@@ -294,18 +291,14 @@ export async function updateProductChannelVisibility(productId: string, status: 
 }
 
 // ============================================================================
-// 🚀 6. NEW: BATCH SAVE & SYNC CONTROLLER
+// 6. BATCH SAVE & SYNC CONTROLLER
 // ============================================================================
-/**
- * এক ক্লিকে অনেকগুলো প্রোডাক্টের ড্রপডাউন আপডেট একসাথে প্রসেস করার সার্ভার অ্যাকশন
- */
 export async function bulkUpdateProductVisibility(
   updates: { productId: string; status: "SYNCED" | "EXCLUDED" }[]
 ) {
   try {
     if (!updates || updates.length === 0) return { success: true };
 
-    // লুপ চালিয়ে সব প্রোডাক্ট এক এক করে প্রসেস করা হবে
     for (const update of updates) {
       if (update.status === "EXCLUDED") {
         const res = await removeProductFromGoogle(update.productId);
@@ -406,6 +399,96 @@ export async function syncLiveProductStatuses() {
     return { success: true };
   } catch (error: any) {
     console.error("Error syncing live product statuses:", error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================================================
+// 🚀 8. NEW: SYNC SINGLE LIVE PRODUCT STATUS FROM GOOGLE (Instant Diagnostics)
+// ============================================================================
+/**
+ * একটি নির্দিষ্ট প্রোডাক্টের লাইভ স্ট্যাটাস সরাসরি গুগলের সার্ভার থেকে ফেচ করবে
+ */
+export async function syncSingleProductStatusFromGoogle(productId: string) {
+  try {
+    const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
+    if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) {
+      return { success: false, error: "GMC is not enabled." };
+    }
+
+    const shoppingContent = await getGoogleContentClient(config);
+    const lang = (config.gmcLanguage || "en").toLowerCase().trim();
+    const country = (config.gmcTargetCountry || "AU").toUpperCase().trim();
+    
+    // গুগল কন্টেন্ট এপিআই ডিলিট বা রিড করার সময় আইডি ফরম্যাট: online:language:country:productId
+    const googleProductId = `online:${lang}:${country}:${productId}`;
+
+    let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "PENDING";
+    let errorMessage: string | null = null;
+    let googleIssues: any = null;
+
+    try {
+      // গুগলের সার্ভার থেকে সরাসরি লাইভ স্ট্যাটাস আনা
+      const response = await shoppingContent.productstatuses.get({
+        merchantId: config.gmcMerchantId,
+        productId: googleProductId,
+      });
+
+      const gStatus = response.data;
+      const destinationStatuses = gStatus.destinationStatuses || [];
+      const isDisapproved = destinationStatuses.some(d => d.status === "disapproved");
+      const isPending = destinationStatuses.some(d => d.status === "pending");
+
+      if (isDisapproved) {
+        finalStatus = "FAILED";
+        const issues = gStatus.itemLevelIssues || [];
+        errorMessage = issues.length > 0 ? issues[0].description || "Disapproved by Google." : "Disapproved by Google.";
+        googleIssues = issues;
+      } else if (isPending) {
+        finalStatus = "PENDING";
+        errorMessage = "Pending policy review by Google.";
+      } else {
+        finalStatus = "SYNCED";
+      }
+    } catch (apiError: any) {
+      // যদি গুগল বলে প্রোডাক্টটি এখনো প্রসেসিং হয়নি বা নট ফাউন্ড (404), তবে এটি PENDING থাকবে
+      if (apiError.status === 404 || apiError.message?.toLowerCase().includes("not found")) {
+        finalStatus = "PENDING";
+        errorMessage = "Not synced yet or pending policy review by Google.";
+      } else {
+        throw apiError;
+      }
+    }
+
+    // ডাটাবেস আপডেট করা
+    const updatedStatus = await db.productChannelStatus.upsert({
+      where: { productId_channel: { productId, channel: "GOOGLE" } },
+      update: {
+        status: finalStatus,
+        errorMessage: errorMessage,
+        googleIssues: googleIssues || Prisma.DbNull,
+        lastSyncedAt: new Date(),
+      },
+      create: {
+        productId,
+        channel: "GOOGLE",
+        status: finalStatus,
+        errorMessage: errorMessage,
+        googleIssues: googleIssues || Prisma.DbNull,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/admin/marketing/merchant-center");
+    
+    return { 
+      success: true, 
+      status: updatedStatus.status, 
+      errorMessage: updatedStatus.errorMessage, 
+      googleIssues: updatedStatus.googleIssues 
+    };
+  } catch (error: any) {
+    console.error("Error in syncSingleProductStatusFromGoogle:", error.message);
     return { success: false, error: error.message };
   }
 }

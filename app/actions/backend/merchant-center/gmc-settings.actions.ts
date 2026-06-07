@@ -2,7 +2,7 @@
 
 "use server";
 
-import { db } from "@/lib/prisma"; // 👈 আপনার কাস্টম ডাটাবেস ইম্পোর্ট
+import { db } from "@/lib/prisma"; 
 import { revalidatePath } from "next/cache";
 
 // টাইপ ডিফাইন করা, যাতে টাইপস্ক্রিপ্টে কোনো এরর না আসে
@@ -11,6 +11,12 @@ export interface GmcSettingsData {
   gmcMerchantId: string;
   gmcTargetCountry: string;
   gmcLanguage: string;
+}
+
+export interface ConversionSettingsData {
+  googleAdsConversionId: string;
+  googleAdsConversionLabel: string;
+  googleAdsEnhancedConversionsEnabled: boolean;
 }
 
 // ============================================================================
@@ -113,6 +119,40 @@ export async function updateGmcSettings(data: GmcSettingsData) {
     return { 
       success: false, 
       error: "An error occurred while saving settings." 
+    };
+  }
+}
+
+// ============================================================================
+// 🚀 3. SAVE GOOGLE ADS CONVERSION & TRACKING SETTINGS
+// ============================================================================
+/**
+ * এটি ফ্রন্টএন্ড সেটিংস থেকে আসা কনভার্সন আইডি, লেবেল এবং
+ * এনহ্যান্সড ট্র্যাকিং অপশনটি ডাটাবেজে আপডেট করবে।
+ */
+export async function saveGoogleAdsConversionSettings(data: ConversionSettingsData) {
+  try {
+    await db.marketingIntegration.update({
+      where: { id: "marketing_config" },
+      data: {
+        googleAdsConversionId: data.googleAdsConversionId || null,
+        googleAdsConversionLabel: data.googleAdsConversionLabel || null,
+        googleAdsEnhancedConversionsEnabled: data.googleAdsEnhancedConversionsEnabled,
+      },
+    });
+
+    // Next.js ক্যাশ রিসেট করা
+    revalidatePath("/admin/marketing/merchant-center");
+
+    return { 
+      success: true, 
+      message: "Conversion tracking settings updated successfully." 
+    };
+  } catch (error: any) {
+    console.error("Error saving Google Ads conversion settings:", error);
+    return { 
+      success: false, 
+      error: error.message || "Failed to save conversion settings." 
     };
   }
 }

@@ -23,6 +23,9 @@ const SCOPES = [
   "https://www.googleapis.com/auth/adwords" 
 ];
 
+// ============================================================================
+// 1. GENERATE AUTHENTICATION URL
+// ============================================================================
 export async function getGoogleAuthUrl() {
   try {
     const authUrl = oauth2Client.generateAuthUrl({
@@ -37,6 +40,9 @@ export async function getGoogleAuthUrl() {
   }
 }
 
+// ============================================================================
+// 2. PROCESS GOOGLE OAUTH CALLBACK (Saves Token and User Info)
+// ============================================================================
 export async function processGoogleCallback(code: string) {
   try {
     const { tokens } = await oauth2Client.getToken(code);
@@ -76,6 +82,9 @@ export async function processGoogleCallback(code: string) {
   }
 }
 
+// ============================================================================
+// 3. DISCONNECT GOOGLE ACCOUNT (Complete Wipeout of GMC, Ads, and Conversion Data)
+// ============================================================================
 export async function disconnectGoogleAccount() {
   try {
     const config = await db.marketingIntegration.findUnique({
@@ -101,6 +110,10 @@ export async function disconnectGoogleAccount() {
         googleAdsAccountId: null,
         googleAdsAccountName: null,
         googleAdsConnected: false,
+        googleAdsLinkStatus: "UNLINKED",
+        googleAdsConversionId: null,
+        googleAdsConversionLabel: null,
+        googleAdsEnhancedConversionsEnabled: false,
       },
     });
 
@@ -112,16 +125,22 @@ export async function disconnectGoogleAccount() {
   }
 }
 
+// ============================================================================
+// 4. SAVE CONNECTED ADS ACCOUNT (Updates Linking and default conversion setup)
+// ============================================================================
 export async function saveGoogleAdsAccount(accountId: string, accountName: string) {
   try {
     if (!accountId) return { success: false, error: "Google Ads Account ID is required." };
 
+    const formattedId = accountId.replace(/-/g, "");
+
     await db.marketingIntegration.update({
       where: { id: "marketing_config" },
       data: {
-        googleAdsAccountId: accountId.replace(/-/g, ""), 
-        googleAdsAccountName: accountName || `Account ${accountId}`,
+        googleAdsAccountId: formattedId, 
+        googleAdsAccountName: accountName || `Ads Account: ${accountId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`,
         googleAdsConnected: true,
+        googleAdsLinkStatus: "LINKED", // ডোমেইন ও অ্যাকাউন্ট সফলভাবে লিঙ্ক করা হয়েছে
       },
     });
 
@@ -133,6 +152,9 @@ export async function saveGoogleAdsAccount(accountId: string, accountName: strin
   }
 }
 
+// ============================================================================
+// 5. DISCONNECT GOOGLE ADS ACCOUNT ONLY (Wipes Ads data while maintaining GMC)
+// ============================================================================
 export async function disconnectGoogleAdsAccount() {
   try {
     await db.marketingIntegration.update({
@@ -141,6 +163,10 @@ export async function disconnectGoogleAdsAccount() {
         googleAdsAccountId: null,
         googleAdsAccountName: null,
         googleAdsConnected: false,
+        googleAdsLinkStatus: "UNLINKED",
+        googleAdsConversionId: null,
+        googleAdsConversionLabel: null,
+        googleAdsEnhancedConversionsEnabled: false,
       },
     });
 
@@ -153,8 +179,12 @@ export async function disconnectGoogleAdsAccount() {
 }
 
 // ============================================================================
-// 🚀 FETCH GOOGLE ADS ACCOUNTS (Using Stable v16 REST API - NO MOCK DATA)
+// 🚀 6. FETCH AVAILABLE ADS ACCOUNTS (Upgraded to Stable v17 REST API)
 // ============================================================================
+/**
+ * এই ফাংশনটি গুগলের এপিআই ভার্সন ১৭ ব্যবহার করে সাকসেসফুলি অ্যাকাউন্ট লিস্ট আনবে।
+ * এছাড়াও প্রতিটি কাস্টমার আইডির ডেসক্রিপটিভ নাম ও কারেন্সি কোড প্যারালালি ফেচ করবে।
+ */
 export async function fetchAvailableAdsAccounts() {
   try {
     const config = await db.marketingIntegration.findUnique({
@@ -166,13 +196,13 @@ export async function fetchAvailableAdsAccounts() {
 
     const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
     
-    // যদি টোকেন না থাকে, এটি সরাসরি ম্যানুয়াল ইনপুট বক্সে ব্যাক করবে
+    // ডেভলপার টোকেন না থাকলে সরাসরি ম্যানুয়াল মোড অ্যাক্টিভ হবে
     if (!devToken) {
       return { success: true, needsManualInput: true, accounts: [] };
     }
 
-    // 🚀 UPDATED: v17 এর জায়গায় v16 এন্ডপয়েন্ট ব্যবহার করা হয়েছে
-    const response = await fetch("https://googleads.googleapis.com/v16/customers:listAccessibleCustomers", {
+    // 🚀 গুগলের সম্পূর্ণ সচল ও একটিভ v17 API কল করা হয়েছে (৪MD৪ সমাধান)
+    const response = await fetch("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
       headers: {
         "Authorization": `Bearer ${config.googleAccessToken}`,
         "developer-token": devToken,
@@ -183,8 +213,8 @@ export async function fetchAvailableAdsAccounts() {
       const errData = await response.json().catch(() => ({}));
       const errMsg = errData?.error?.message || `API Error: Status Code ${response.status}`;
 
-      console.error("\n=================== 🔴 GOOGLE ADS API ERROR (v16) 🔴 ===================");
-      console.error(`Request URL: https://googleads.googleapis.com/v16/customers:listAccessibleCustomers`);
+      console.error("\n=================== 🔴 GOOGLE ADS API ERROR (v17) 🔴 ===================");
+      console.error(`Request URL: https://googleads.googleapis.com/v17/customers:listAccessibleCustomers`);
       console.error(`HTTP Status: ${response.status} (${response.statusText})`);
       console.error(`Error Details:`, JSON.stringify(errData, null, 2));
       console.error("========================================================================\n");
@@ -193,15 +223,55 @@ export async function fetchAvailableAdsAccounts() {
     }
 
     const data = await response.json();
-    const accounts = (data.resourceNames || []).map((resource: string) => {
-      const id = resource.replace("customers/", "");
-      return {
-        id: id,
-        name: `Ads Account: ${id.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`, 
-      };
-    });
+    const resourceNames = data.resourceNames || [];
 
-    return { success: true, accounts, needsManualInput: false };
+    if (resourceNames.length === 0) {
+      return { success: true, accounts: [], needsManualInput: false };
+    }
+
+    // 🚀 এন্টারপ্রাইজ ফিচার: প্রতিটি কাস্টমার আইডির ডেসক্রিপটিভ নাম ও কারেন্সি বের করা
+    const accountsWithNames = await Promise.all(
+      resourceNames.map(async (resource: string) => {
+        const customerId = resource.replace("customers/", "");
+        
+        try {
+          // কাস্টমার মেটাডেটা সার্চ করার জন্য সার্চ স্ট্রীম কুয়েরি পাঠানো হচ্ছে
+          const metadataResponse = await fetch(`https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:search`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${config.googleAccessToken}`,
+              "developer-token": devToken,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              query: "SELECT customer.id, customer.descriptive_name, customer.currency_code FROM customer LIMIT 1"
+            })
+          });
+
+          if (metadataResponse.ok) {
+            const metaData = await metadataResponse.json();
+            const customerObj = metaData[0]?.results?.[0]?.customer;
+            
+            if (customerObj && customerObj.descriptiveName) {
+              return {
+                id: customerId,
+                name: `${customerObj.descriptiveName} (${customerObj.currencyCode || "AUD"}) - ${customerId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`
+              };
+            }
+          }
+        } catch (apiSubError) {
+          console.warn(`Failed to fetch descriptive name for Ads account ${customerId}:`, apiSubError);
+        }
+
+        // Fallback: যদি মেটাডাটা রিড করার পারমিশন না থাকে তবে কাস্টম নাম দেখাবে
+        return {
+          id: customerId,
+          name: `Ads Account: ${customerId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`,
+        };
+      })
+    );
+
+    return { success: true, accounts: accountsWithNames, needsManualInput: false };
   } catch (error: any) {
     console.error("\n=================== 💥 GOOGLE ADS API EXCEPTION 💥 ===================");
     console.error(error);

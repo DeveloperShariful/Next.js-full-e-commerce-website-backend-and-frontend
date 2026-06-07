@@ -1,5 +1,3 @@
-//File Path: app/(backend)/admin/marketing/merchant-center/_components/TabProductFeed.tsx
-
 "use client";
 
 import { useTransition, useState } from "react";
@@ -7,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   updateProductChannelVisibility, 
-  bulkUpdateProductVisibility 
+  bulkUpdateProductVisibility,
+  syncSingleProductStatusFromGoogle // 🚀 NEW: সিঙ্গেল প্রোডাক্ট লাইভ স্ক্যানার অ্যাকশন ইম্পোর্ট
 } from "@/app/actions/backend/merchant-center/gmc-product-sync.actions";
 
 interface Props {
@@ -24,9 +23,12 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Bulk Selection States (WordPress Style)
+  // Bulk Selection States
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState<string>("");
+
+  // 🚀 NEW: লাইভ স্ক্যানিং লোডিং স্টেট (ID ধারণ করবে)
+  const [isScanning, setIsScanning] = useState<string | null>(null);
 
   // Stats Calculation
   const activeCount = syncLogs.filter(log => log.status === "SYNCED" && !log.googleIssues).length;
@@ -77,7 +79,7 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
     );
   };
 
-  // Dropdown change handler (Only saves in state, does not trigger API)
+  // local Dropdown change handler
   const handleDropdownChange = (productId: string, value: "SYNCED" | "EXCLUDED") => {
     setSuccessMsg(null);
     setErrorMsg(null);
@@ -87,7 +89,7 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
     });
   };
 
-  // individual Checkbox selection handler
+  // individual Checkbox selection
   const handleSelectRow = (productId: string, checked: boolean) => {
     if (checked) {
       setSelectedProductIds([...selectedProductIds, productId]);
@@ -105,8 +107,8 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
     }
   };
 
-  // WordPress Style Bulk Apply Handler
-  const handleSaveAndSync  = () => {
+  // Bulk Apply Handler
+  const handleSaveAndSync = () => {
     if (!bulkAction || selectedProductIds.length === 0) return;
     
     setErrorMsg(null);
@@ -129,6 +131,23 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
         setErrorMsg(res.error || "Failed to process bulk operation.");
       }
     });
+  };
+
+  // 🚀 NEW: এক ক্লিকে সিঙ্গেল প্রোডাক্ট লাইভ স্ক্যান করার মাস্টার হ্যান্ডলার
+  const handleScanSingleProduct = async (productId: string) => {
+    setIsScanning(productId);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const res = await syncSingleProductStatusFromGoogle(productId);
+
+    if (res.success) {
+      setSuccessMsg("Live status updated from Google successfully!");
+      router.refresh(); // নতুন রিয়েল ডাটা UI তে পুশ করবে
+    } else {
+      setErrorMsg(res.error || "Failed to fetch live status from Google.");
+    }
+    setIsScanning(null);
   };
 
   // Dynamic Channel Visibility Text
@@ -181,22 +200,24 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
           <div className="bg-white p-4 sm:p-6 hidden max-md:block"></div>
         </div>
 
-        <div className="bg-[#f9f9f9] border-t border-[#ccd0d4] p-4 text-[13px] flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <span className="w-[100px] text-[#646970]">Feed setup:</span>
-            <span className="text-[#00a32a] font-semibold flex items-center gap-1">
+        {/* Responsive Info Box */}
+        <div className="bg-[#f9f9f9] border-t border-[#ccd0d4] p-4 text-[12px] sm:text-[13px] flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+            <span className="w-[100px] text-[#646970] font-medium flex-shrink-0">Feed setup:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-[#00a32a]">
               <span className="w-4 h-4 bg-[#00a32a] text-white rounded-full flex items-center justify-center text-[10px] font-bold">✓</span> 
               Product feed setup completed
-            </span>
-            {disapprovedCount > 0 && <span className="text-[#646970] ml-2">• {disapprovedCount} issues to resolve</span>}
+              {disapprovedCount > 0 && <span className="text-[#646970] ml-2 font-normal text-[11px] sm:text-[12px]">• {disapprovedCount} issues to resolve</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-[100px] text-[#646970]">Account status:</span>
-            <span className="text-[#00a32a] font-semibold flex items-center gap-1">
+          
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+            <span className="w-[100px] text-[#646970] font-medium flex-shrink-0">Account status:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-[#00a32a]">
               <span className="w-4 h-4 bg-[#00a32a] text-white rounded-full flex items-center justify-center text-[10px] font-bold">✓</span> 
               Approved
-            </span>
-            <span className="text-[#646970] ml-2">• Your product listings are on Google.</span>
+              <span className="text-[#646970] ml-2 font-normal text-[11px] sm:text-[12px]">• Your product listings are on Google.</span>
+            </div>
           </div>
         </div>
       </div>
@@ -269,7 +290,7 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
           <option value="EXCLUDED">Do not sync (Hide) Selected</option>
         </select>
         <button 
-          onClick={handleSaveAndSync }
+          onClick={handleSaveAndSync}
           disabled={isPending || !bulkAction || selectedProductIds.length === 0}
           className="bg-[#f6f7f7] text-[#2271b1] border border-[#ccd0d4] hover:bg-[#f0f0f1] rounded-[3px] px-4 py-1.5 text-[13px] font-semibold cursor-pointer disabled:opacity-50 transition-colors"
         >
@@ -331,7 +352,6 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
                   const isChecked = selectedProductIds.includes(pId);
 
                   return (
-                    // 🚀 FIXED: ব্র্যাকেট এরর সমাধান করা হয়েছে ৩৩৪ নম্বর লাইনে
                     <tr key={log.id} className={`border-b border-[#f0f0f1] hover:bg-[#f6f7f7] ${isModified ? "bg-[#fffdf0]" : ""} ${isChecked ? "bg-[#f0f6ea]" : ""}`}>
                       <td className="py-3 px-4">
                         <input 
@@ -358,12 +378,31 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
                         </select>
                       </td>
 
+                      {/* STATUS COLUMN WITH INSTANT DIAGNOSTICS SCANNER */}
                       <td className="py-3 px-4">
-                        {log.status === "SYNCED" && !log.googleIssues && <span className="text-[#00a32a] font-semibold">✓ Approved</span>}
-                        {log.status === "SYNCED" && log.googleIssues && <span className="text-[#dba617] font-semibold">⚠ Approved (With Warnings)</span>}
-                        {log.status === "FAILED" && <span className="text-[#d63638] font-semibold">✗ Disapproved</span>}
-                        {log.status === "EXCLUDED" && <span className="text-[#646970] font-semibold">Excluded</span>}
-                        {log.status === "PENDING" && <span className="text-[#646970] font-semibold">Pending (Not Synced)</span>}
+                        <div className="flex items-center gap-3">
+                          {log.status === "SYNCED" && !log.googleIssues && <span className="text-[#00a32a] font-semibold">✓ Approved</span>}
+                          {log.status === "SYNCED" && log.googleIssues && <span className="text-[#dba617] font-semibold">⚠ Approved (With Warnings)</span>}
+                          {log.status === "FAILED" && <span className="text-[#d63638] font-semibold">✗ Disapproved</span>}
+                          {log.status === "EXCLUDED" && <span className="text-[#646970] font-semibold">Excluded</span>}
+                          {log.status === "PENDING" && <span className="text-[#646970] font-semibold">Pending</span>}
+
+                          {/* 🚀 NEW: 🔍 Instant Scan Button */}
+                          {log.status !== "PENDING" && log.status !== "EXCLUDED" && (
+                            <button
+                              onClick={() => handleScanSingleProduct(pId)}
+                              disabled={isScanning === pId}
+                              title="Scan live status from Google"
+                              className="bg-transparent border-none text-[#2271b1] hover:text-[#135e96] font-semibold text-[12px] cursor-pointer disabled:opacity-50 p-0 flex items-center gap-1"
+                            >
+                              {isScanning === pId ? (
+                                <span className="animate-pulse">Scanning...</span>
+                              ) : (
+                                "🔍 Scan"
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-right">
                         <Link href={`/admin/products/create?id=${pId}`} className="text-[#2271b1] hover:underline">Edit</Link>

@@ -41,7 +41,7 @@ export async function getGoogleAuthUrl() {
 }
 
 // ============================================================================
-// 2. PROCESS GOOGLE OAUTH CALLBACK (Saves Token and User Info)
+// 2. PROCESS GOOGLE OAUTH CALLBACK
 // ============================================================================
 export async function processGoogleCallback(code: string) {
   try {
@@ -83,7 +83,7 @@ export async function processGoogleCallback(code: string) {
 }
 
 // ============================================================================
-// 3. DISCONNECT GOOGLE ACCOUNT (Complete Wipeout of GMC, Ads, and Conversion Data)
+// 3. DISCONNECT GOOGLE ACCOUNT
 // ============================================================================
 export async function disconnectGoogleAccount() {
   try {
@@ -126,7 +126,7 @@ export async function disconnectGoogleAccount() {
 }
 
 // ============================================================================
-// 4. SAVE CONNECTED ADS ACCOUNT (Updates Linking and default conversion setup)
+// 4. SAVE CONNECTED ADS ACCOUNT
 // ============================================================================
 export async function saveGoogleAdsAccount(accountId: string, accountName: string) {
   try {
@@ -140,7 +140,7 @@ export async function saveGoogleAdsAccount(accountId: string, accountName: strin
         googleAdsAccountId: formattedId, 
         googleAdsAccountName: accountName || `Ads Account: ${accountId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`,
         googleAdsConnected: true,
-        googleAdsLinkStatus: "LINKED", // ডোমেইন ও অ্যাকাউন্ট সফলভাবে লিঙ্ক করা হয়েছে
+        googleAdsLinkStatus: "LINKED", 
       },
     });
 
@@ -153,7 +153,7 @@ export async function saveGoogleAdsAccount(accountId: string, accountName: strin
 }
 
 // ============================================================================
-// 5. DISCONNECT GOOGLE ADS ACCOUNT ONLY (Wipes Ads data while maintaining GMC)
+// 5. DISCONNECT GOOGLE ADS ACCOUNT ONLY
 // ============================================================================
 export async function disconnectGoogleAdsAccount() {
   try {
@@ -179,12 +179,8 @@ export async function disconnectGoogleAdsAccount() {
 }
 
 // ============================================================================
-// 🚀 6. FETCH AVAILABLE ADS ACCOUNTS (Upgraded to Stable v17 REST API)
+// 6. FETCH AVAILABLE ADS ACCOUNTS
 // ============================================================================
-/**
- * এই ফাংশনটি গুগলের এপিআই ভার্সন ১৭ ব্যবহার করে সাকসেসফুলি অ্যাকাউন্ট লিস্ট আনবে।
- * এছাড়াও প্রতিটি কাস্টমার আইডির ডেসক্রিপটিভ নাম ও কারেন্সি কোড প্যারালালি ফেচ করবে।
- */
 export async function fetchAvailableAdsAccounts() {
   try {
     const config = await db.marketingIntegration.findUnique({
@@ -196,29 +192,25 @@ export async function fetchAvailableAdsAccounts() {
 
     const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
     
-    // ডেভলপার টোকেন না থাকলে সরাসরি ম্যানুয়াল মোড অ্যাক্টিভ হবে
-    if (!devToken) {
+    if (!devToken || devToken.trim() === "") {
       return { success: true, needsManualInput: true, accounts: [] };
     }
 
-    // 🚀 গুগলের সম্পূর্ণ সচল ও একটিভ v17 API কল করা হয়েছে (৪MD৪ সমাধান)
-    const response = await fetch("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
+    const response = await fetch("https://googleads.googleapis.com/v24/customers:listAccessibleCustomers", {
+      method: "GET",
       headers: {
         "Authorization": `Bearer ${config.googleAccessToken}`,
-        "developer-token": devToken,
-      }
+        "developer-token": devToken.trim(),
+      },
+      cache: "no-store", 
     });
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       const errMsg = errData?.error?.message || `API Error: Status Code ${response.status}`;
-
-      console.error("\n=================== 🔴 GOOGLE ADS API ERROR (v17) 🔴 ===================");
-      console.error(`Request URL: https://googleads.googleapis.com/v17/customers:listAccessibleCustomers`);
-      console.error(`HTTP Status: ${response.status} (${response.statusText})`);
-      console.error(`Error Details:`, JSON.stringify(errData, null, 2));
-      console.error("========================================================================\n");
-
+      if (response.status === 404 || response.status === 403 || response.status === 401) {
+         return { success: true, needsManualInput: true, accounts: [] }; 
+      }
       return { success: false, error: errMsg }; 
     }
 
@@ -229,53 +221,135 @@ export async function fetchAvailableAdsAccounts() {
       return { success: true, accounts: [], needsManualInput: false };
     }
 
-    // 🚀 এন্টারপ্রাইজ ফিচার: প্রতিটি কাস্টমার আইডির ডেসক্রিপটিভ নাম ও কারেন্সি বের করা
     const accountsWithNames = await Promise.all(
       resourceNames.map(async (resource: string) => {
         const customerId = resource.replace("customers/", "");
+        const formattedId = customerId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
         
         try {
-          // কাস্টমার মেটাডেটা সার্চ করার জন্য সার্চ স্ট্রীম কুয়েরি পাঠানো হচ্ছে
-          const metadataResponse = await fetch(`https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:search`, {
+          const metadataResponse = await fetch(`https://googleads.googleapis.com/v24/customers/${customerId}/googleAds:search`, {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${config.googleAccessToken}`,
-              "developer-token": devToken,
+              "developer-token": devToken.trim(),
               "Content-Type": "application/json",
+              "login-customer-id": customerId 
             },
             body: JSON.stringify({
-              query: "SELECT customer.id, customer.descriptive_name, customer.currency_code FROM customer LIMIT 1"
-            })
+              query: "SELECT customer.id, customer.descriptive_name, customer.currency_code, customer.manager FROM customer LIMIT 1"
+            }),
+            cache: "no-store",
           });
 
           if (metadataResponse.ok) {
             const metaData = await metadataResponse.json();
             const customerObj = metaData[0]?.results?.[0]?.customer;
             
-            if (customerObj && customerObj.descriptiveName) {
+            if (customerObj) {
+              const accName = customerObj.descriptiveName || "Unnamed Account";
+              const isManager = customerObj.manager === true;
+              const typeLabel = isManager ? "[Manager]" : "[Ads Account]";
+
               return {
                 id: customerId,
-                name: `${customerObj.descriptiveName} (${customerObj.currencyCode || "AUD"}) - ${customerId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`
+                name: `${typeLabel} ${accName} (${formattedId})`
               };
             }
           }
         } catch (apiSubError) {
-          console.warn(`Failed to fetch descriptive name for Ads account ${customerId}:`, apiSubError);
+          console.warn(`Failed to fetch details for account ${customerId}:`, apiSubError);
         }
 
-        // Fallback: যদি মেটাডাটা রিড করার পারমিশন না থাকে তবে কাস্টম নাম দেখাবে
-        return {
-          id: customerId,
-          name: `Ads Account: ${customerId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`,
-        };
+        return { id: customerId, name: `[Unknown] Account ID: ${formattedId}` };
       })
     );
 
-    return { success: true, accounts: accountsWithNames, needsManualInput: false };
+    const sortedAccounts = accountsWithNames.sort((a, b) => {
+      if (a.name.includes("[Manager]")) return -1;
+      if (b.name.includes("[Manager]")) return 1;
+      return 0;
+    });
+
+    return { success: true, accounts: sortedAccounts, needsManualInput: false };
+
   } catch (error: any) {
-    console.error("\n=================== 💥 GOOGLE ADS API EXCEPTION 💥 ===================");
-    console.error(error);
-    console.error("====================================================================\n");
-    return { success: false, error: error.message || "Failed to fetch accounts from Google API." };
+    console.error("Ads API Exception:", error);
+    return { success: true, needsManualInput: true, accounts: [] };
+  }
+}
+
+// ============================================================================
+// 🚀 7. NEW: AUTO-FETCH & SAVE CONVERSION TRACKING ID & LABEL
+// ============================================================================
+export async function autoFetchAndSaveConversions(accountId: string) {
+  try {
+    const config = await db.marketingIntegration.findUnique({
+      where: { id: "marketing_config" },
+      select: { googleAccessToken: true }
+    });
+    
+    if (!config?.googleAccessToken) return { success: false, error: "Token not found." };
+    const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+    if (!devToken) return { success: false, error: "Developer token missing." };
+
+    const formattedAccountId = accountId.replace(/-/g, "");
+
+    // 🚀 গুগলের ডাটাবেজ থেকে "PURCHASE" টাইপের কনভার্সন অ্যাকশন খোঁজা হচ্ছে
+    const query = "SELECT conversion_action.id, conversion_action.type, conversion_action.tag_snippets FROM conversion_action WHERE conversion_action.type = 'PURCHASE' AND conversion_action.status = 'ENABLED' LIMIT 1";
+
+    const res = await fetch(`https://googleads.googleapis.com/v24/customers/${formattedAccountId}/googleAds:search`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${config.googleAccessToken}`,
+          "developer-token": devToken.trim(),
+          "Content-Type": "application/json",
+          "login-customer-id": formattedAccountId 
+        },
+        body: JSON.stringify({ query }),
+        cache: "no-store",
+    });
+
+    if (!res.ok) {
+       return { success: false, error: "Failed to fetch conversion actions. This might be a Manager Account." };
+    }
+    
+    const data = await res.json();
+    const results = data.results || [];
+
+    if (results.length === 0) {
+       return { success: true, found: false, message: "No active Purchase conversion found in Google Ads. You can create one manually." };
+    }
+
+    const snippets = results[0]?.conversionAction?.tagSnippets || [];
+    if (snippets.length === 0) {
+       return { success: true, found: false, message: "No tag snippets found for the conversion action." };
+    }
+
+    const eventSnippet = snippets[0].eventSnippet || "";
+    const globalSiteTag = snippets[0].globalSiteTag || "";
+
+    // 🚀 Regex Magic: কোড ব্লক থেকে AW-ID এবং Label কেটে বের করা
+    const idMatch = globalSiteTag.match(/(AW-\d+)/);
+    const convId = idMatch ? idMatch[1] : null;
+
+    const labelMatch = eventSnippet.match(/'send_to':\s*'AW-\d+\/([^']+)'/);
+    const convLabel = labelMatch ? labelMatch[1] : null;
+
+    if (convId && convLabel) {
+       // ডাটাবেজে অটোমেটিক সেভ করে দেওয়া হচ্ছে
+       await db.marketingIntegration.update({
+         where: { id: "marketing_config" },
+         data: {
+           googleAdsConversionId: convId,
+           googleAdsConversionLabel: convLabel
+         }
+       });
+       revalidatePath("/admin/marketing/merchant-center");
+       return { success: true, found: true, convId, convLabel };
+    }
+
+    return { success: true, found: false, message: "Could not parse conversion tags from Google." };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }

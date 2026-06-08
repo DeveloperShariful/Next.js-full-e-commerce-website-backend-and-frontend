@@ -54,7 +54,7 @@ export default async function MerchantCenterPage({
     where: { deletedAt: null, status: "ACTIVE" }
   });
 
-  // 🚀 ৭. NEW & DYNAMIC: ডাটাবেসের `Product` টেবিল থেকে সব একটিভ প্রোডাক্ট তুলে আনা হচ্ছে
+  // 🚀 ৭. ডাটাবেসের `Product` টেবিল থেকে সব একটিভ প্রোডাক্ট তুলে আনা হচ্ছে
   const rawProducts = await db.product.findMany({
     where: { deletedAt: null, status: "ACTIVE" },
     include: {
@@ -66,19 +66,16 @@ export default async function MerchantCenterPage({
     orderBy: { updatedAt: "desc" }
   });
 
-  // 🚀 ৮. BACKWARD COMPATIBLE MAPPING: 
-  // সব প্রোডাক্টকে এমনভাবে ফরম্যাট করা হচ্ছে যেন Unsynced প্রোডাক্টগুলো অটোমেটিক PENDING স্ট্যাটাস পেয়ে যায়
-  // এবং আমাদের ফ্রন্টএন্ড টেবিলটি না ভেঙে ১০০% নিখুঁতভাবে কাজ করে।
+  // 🚀 ৮. BACKWARD COMPATIBLE MAPPING
   const formattedSyncLogs = rawProducts.map((p) => {
     const gmcStatus = p.channelStatuses[0] || null;
 
     return {
-      id: gmcStatus?.id || `temp_${p.id}`, // ইউনিক আইডি
-      status: gmcStatus ? gmcStatus.status : "PENDING", // না থাকলে PENDING
+      id: gmcStatus?.id || `temp_${p.id}`, 
+      status: gmcStatus ? gmcStatus.status : "PENDING", 
       errorMessage: gmcStatus ? gmcStatus.errorMessage : null,
       googleIssues: gmcStatus ? gmcStatus.googleIssues : null,
       lastSyncedAt: gmcStatus ? gmcStatus.lastSyncedAt : null,
-      // প্রোডাক্টের বেসিক তথ্য
       product: {
         id: p.id,
         name: p.name,
@@ -90,7 +87,6 @@ export default async function MerchantCenterPage({
   });
 
   const syncLogs = JSON.parse(JSON.stringify(formattedSyncLogs));
-  const activeTab = searchParams.tab || "dashboard";
 
   return (
     <MainDashboard 

@@ -7,7 +7,7 @@ import Step3AttributeMapping from "./Step3AttributeMapping";
 
 export default function TabAttributes() {
   return (
-    <div className="max-w-[1200px] mx-auto mt-6">
+    <div className="w-ful">
       
       {/* Header Info */}
       <div className="mb-6">

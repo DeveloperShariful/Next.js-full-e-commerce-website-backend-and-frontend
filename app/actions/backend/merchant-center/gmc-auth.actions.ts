@@ -35,7 +35,6 @@ export async function getGoogleAuthUrl() {
     });
     return { success: true, url: authUrl };
   } catch (error: any) {
-    console.error("Error generating Google Auth URL:", error);
     return { success: false, error: "Failed to generate authentication URL." };
   }
 }
@@ -77,7 +76,6 @@ export async function processGoogleCallback(code: string) {
 
     return { success: true, email: adminEmail };
   } catch (error: any) {
-    console.error("Error processing Google Callback:", error);
     return { success: false, error: error.message || "Failed to process Google login." };
   }
 }
@@ -94,7 +92,7 @@ export async function disconnectGoogleAccount() {
 
     if (config?.googleAccessToken) {
       try { await oauth2Client.revokeToken(config.googleAccessToken); } 
-      catch (e) { console.warn("Token revoke failed in background.", e); }
+      catch (e) { console.warn("Token revoke failed."); }
     }
 
     await db.marketingIntegration.update({
@@ -120,7 +118,6 @@ export async function disconnectGoogleAccount() {
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true, message: "Google account disconnected." };
   } catch (error: any) {
-    console.error("Error disconnecting Google account:", error);
     return { success: false, error: "Failed to disconnect Google account." };
   }
 }
@@ -130,15 +127,14 @@ export async function disconnectGoogleAccount() {
 // ============================================================================
 export async function saveGoogleAdsAccount(accountId: string, accountName: string) {
   try {
-    if (!accountId) return { success: false, error: "Google Ads Account ID is required." };
-
+    if (!accountId) return { success: false, error: "Account ID is required." };
     const formattedId = accountId.replace(/-/g, "");
 
     await db.marketingIntegration.update({
       where: { id: "marketing_config" },
       data: {
         googleAdsAccountId: formattedId, 
-        googleAdsAccountName: accountName || `Ads Account: ${accountId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`,
+        googleAdsAccountName: accountName,
         googleAdsConnected: true,
         googleAdsLinkStatus: "LINKED", 
       },
@@ -147,7 +143,6 @@ export async function saveGoogleAdsAccount(accountId: string, accountName: strin
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true, message: "Google Ads account connected successfully!" };
   } catch (error: any) {
-    console.error("Error saving Google Ads account:", error);
     return { success: false, error: "Failed to save Google Ads account." };
   }
 }
@@ -173,13 +168,12 @@ export async function disconnectGoogleAdsAccount() {
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true, message: "Google Ads account disconnected." };
   } catch (error: any) {
-    console.error("Error disconnecting Google Ads account:", error);
     return { success: false, error: "Failed to disconnect Google Ads account." };
   }
 }
 
 // ============================================================================
-// 6. FETCH AVAILABLE ADS ACCOUNTS
+// 🚀 6. WOOCOMMERCE STYLE: FETCH ACCOUNTS WITH EXACT NAMES & MANAGER TYPES
 // ============================================================================
 export async function fetchAvailableAdsAccounts() {
   try {
@@ -189,14 +183,11 @@ export async function fetchAvailableAdsAccounts() {
     });
 
     if (!config?.googleAccessToken) return { success: false, error: "Google account not connected." };
-
     const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-    
-    if (!devToken || devToken.trim() === "") {
-      return { success: true, needsManualInput: true, accounts: [] };
-    }
+    if (!devToken || devToken.trim() === "") return { success: true, needsManualInput: true, accounts: [] };
 
-    const response = await fetch("https://googleads.googleapis.com/v24/customers:listAccessibleCustomers", {
+    // ১. প্রথমে Accessible Account ID গুলো আনা
+    const rootResponse = await fetch("https://googleads.googleapis.com/v24/customers:listAccessibleCustomers", {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${config.googleAccessToken}`,
@@ -205,81 +196,79 @@ export async function fetchAvailableAdsAccounts() {
       cache: "no-store", 
     });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || `API Error: Status Code ${response.status}`;
-      if (response.status === 404 || response.status === 403 || response.status === 401) {
-         return { success: true, needsManualInput: true, accounts: [] }; 
-      }
-      return { success: false, error: errMsg }; 
-    }
+    if (!rootResponse.ok) return { success: true, needsManualInput: true, accounts: [] }; 
 
-    const data = await response.json();
-    const resourceNames = data.resourceNames || [];
+    const rootData = await rootResponse.json();
+    const accessibleCustomers = rootData.resourceNames || [];
+    if (accessibleCustomers.length === 0) return { success: true, accounts: [], needsManualInput: false };
 
-    if (resourceNames.length === 0) {
-      return { success: true, accounts: [], needsManualInput: false };
-    }
+    let allAccountsMap = new Map();
 
-    const accountsWithNames = await Promise.all(
-      resourceNames.map(async (resource: string) => {
-        const customerId = resource.replace("customers/", "");
-        const formattedId = customerId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+    // ২. এবার customer_client কোয়েরি করে ম্যানেজার ও সাব-অ্যাকাউন্ট সবগুলোর ১০০% নিখুঁত নাম বের করা
+    await Promise.all(
+      accessibleCustomers.map(async (resource: string) => {
+        const rootId = resource.replace("customers/", "");
         
         try {
-          const metadataResponse = await fetch(`https://googleads.googleapis.com/v24/customers/${customerId}/googleAds:search`, {
+          const searchResponse = await fetch(`https://googleads.googleapis.com/v24/customers/${rootId}/googleAds:search`, {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${config.googleAccessToken}`,
               "developer-token": devToken.trim(),
               "Content-Type": "application/json",
-              "login-customer-id": customerId 
+              "login-customer-id": rootId 
             },
             body: JSON.stringify({
-              query: "SELECT customer.id, customer.descriptive_name, customer.currency_code, customer.manager FROM customer LIMIT 1"
+              // customer_client এপিআই ব্যবহার করে সব ডেটা স্ক্যান করা হচ্ছে
+              query: "SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager FROM customer_client"
             }),
             cache: "no-store",
           });
 
-          if (metadataResponse.ok) {
-            const metaData = await metadataResponse.json();
-            const customerObj = metaData[0]?.results?.[0]?.customer;
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            const results = searchData.results || [];
             
-            if (customerObj) {
-              const accName = customerObj.descriptiveName || "Unnamed Account";
-              const isManager = customerObj.manager === true;
-              const typeLabel = isManager ? "[Manager]" : "[Ads Account]";
+            results.forEach((row: any) => {
+              const client = row.customerClient;
+              if (client) {
+                const formattedId = String(client.id).replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+                const accName = client.descriptiveName || "Unnamed Account";
+                const isManager = client.manager === true;
+                const typeLabel = isManager ? "[Manager Account]" : "[Ads Account]";
 
-              return {
-                id: customerId,
-                name: `${typeLabel} ${accName} (${formattedId})`
-              };
-            }
+                allAccountsMap.set(String(client.id), {
+                  id: String(client.id),
+                  name: `${typeLabel} ${accName} (${formattedId})`,
+                  isManager
+                });
+              }
+            });
           }
-        } catch (apiSubError) {
-          console.warn(`Failed to fetch details for account ${customerId}:`, apiSubError);
+        } catch (e) {
+          console.warn(`Failed to scan tree for ${rootId}`);
         }
-
-        return { id: customerId, name: `[Unknown] Account ID: ${formattedId}` };
       })
     );
 
-    const sortedAccounts = accountsWithNames.sort((a, b) => {
-      if (a.name.includes("[Manager]")) return -1;
-      if (b.name.includes("[Manager]")) return 1;
-      return 0;
+    const finalAccounts = Array.from(allAccountsMap.values());
+    if (finalAccounts.length === 0) return { success: true, needsManualInput: true, accounts: [] };
+
+    // Manager অ্যাকাউন্টগুলো উপরে দেখানোর জন্য সর্টিং
+    finalAccounts.sort((a, b) => {
+      if (a.isManager && !b.isManager) return -1;
+      if (!a.isManager && b.isManager) return 1;
+      return a.name.localeCompare(b.name);
     });
 
-    return { success: true, accounts: sortedAccounts, needsManualInput: false };
-
+    return { success: true, accounts: finalAccounts, needsManualInput: false };
   } catch (error: any) {
-    console.error("Ads API Exception:", error);
     return { success: true, needsManualInput: true, accounts: [] };
   }
 }
 
 // ============================================================================
-// 🚀 7. NEW: AUTO-FETCH & SAVE CONVERSION TRACKING ID & LABEL
+// 🚀 7. MAGIC FEATURE: AUTO-FETCH OR AUTO-CREATE CONVERSION TRACKING
 // ============================================================================
 export async function autoFetchAndSaveConversions(accountId: string) {
   try {
@@ -294,41 +283,65 @@ export async function autoFetchAndSaveConversions(accountId: string) {
 
     const formattedAccountId = accountId.replace(/-/g, "");
 
-    // 🚀 গুগলের ডাটাবেজ থেকে "PURCHASE" টাইপের কনভার্সন অ্যাকশন খোঁজা হচ্ছে
+    const headers = {
+      "Authorization": `Bearer ${config.googleAccessToken}`,
+      "developer-token": devToken.trim(),
+      "Content-Type": "application/json",
+      "login-customer-id": formattedAccountId 
+    };
+
+    // 🚀 ধাপ ১: অ্যাকাউন্টে কোনো Purchase কনভার্সন আছে কিনা চেক করা
     const query = "SELECT conversion_action.id, conversion_action.type, conversion_action.tag_snippets FROM conversion_action WHERE conversion_action.type = 'PURCHASE' AND conversion_action.status = 'ENABLED' LIMIT 1";
 
-    const res = await fetch(`https://googleads.googleapis.com/v24/customers/${formattedAccountId}/googleAds:search`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${config.googleAccessToken}`,
-          "developer-token": devToken.trim(),
-          "Content-Type": "application/json",
-          "login-customer-id": formattedAccountId 
-        },
-        body: JSON.stringify({ query }),
-        cache: "no-store",
+    const searchRes = await fetch(`https://googleads.googleapis.com/v24/customers/${formattedAccountId}/googleAds:search`, {
+        method: "POST", headers, cache: "no-store", body: JSON.stringify({ query }),
     });
 
-    if (!res.ok) {
-       return { success: false, error: "Failed to fetch conversion actions. This might be a Manager Account." };
-    }
-    
-    const data = await res.json();
-    const results = data.results || [];
+    let snippets = [];
 
-    if (results.length === 0) {
-       return { success: true, found: false, message: "No active Purchase conversion found in Google Ads. You can create one manually." };
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      const results = data.results || [];
+      if (results.length > 0) {
+        snippets = results[0]?.conversionAction?.tagSnippets || [];
+      }
     }
 
-    const snippets = results[0]?.conversionAction?.tagSnippets || [];
+    // 🚀 ধাপ ২: যদি কনভার্সন না থাকে, তবে অটোমেটিক নতুন একটি ক্রিয়েট করা (WooCommerce Style)
     if (snippets.length === 0) {
-       return { success: true, found: false, message: "No tag snippets found for the conversion action." };
+      const createRes = await fetch(`https://googleads.googleapis.com/v24/customers/${formattedAccountId}/conversionActions:mutate`, {
+        method: "POST", headers, cache: "no-store",
+        body: JSON.stringify({
+          operations: [{
+            create: {
+              name: "GoBike Store Purchase (Auto Created)",
+              category: "PURCHASE",
+              type: "WEBPAGE",
+              status: "ENABLED",
+              valueSettings: { default_value: 0.0, always_use_default_value: false }
+            }
+          }]
+        })
+      });
+
+      if (createRes.ok) {
+        // ক্রিয়েট হওয়ার পর আবার কোয়েরি করে নতুন কোড (tag snippet) আনা হচ্ছে
+        const newSearchRes = await fetch(`https://googleads.googleapis.com/v24/customers/${formattedAccountId}/googleAds:search`, {
+          method: "POST", headers, cache: "no-store", body: JSON.stringify({ query }),
+        });
+        const newData = await newSearchRes.json();
+        snippets = newData.results?.[0]?.conversionAction?.tagSnippets || [];
+      } else {
+        return { success: true, found: false, message: "No conversion found and API lacks permission to create one automatically." };
+      }
     }
+
+    if (snippets.length === 0) return { success: true, found: false, message: "Tag snippet generation failed." };
 
     const eventSnippet = snippets[0].eventSnippet || "";
     const globalSiteTag = snippets[0].globalSiteTag || "";
 
-    // 🚀 Regex Magic: কোড ব্লক থেকে AW-ID এবং Label কেটে বের করা
+    // 🚀 ধাপ ৩: Regex দিয়ে AW-ID এবং Label কেটে বের করা
     const idMatch = globalSiteTag.match(/(AW-\d+)/);
     const convId = idMatch ? idMatch[1] : null;
 
@@ -336,19 +349,16 @@ export async function autoFetchAndSaveConversions(accountId: string) {
     const convLabel = labelMatch ? labelMatch[1] : null;
 
     if (convId && convLabel) {
-       // ডাটাবেজে অটোমেটিক সেভ করে দেওয়া হচ্ছে
+       // ডাটাবেজে সেভ করা
        await db.marketingIntegration.update({
          where: { id: "marketing_config" },
-         data: {
-           googleAdsConversionId: convId,
-           googleAdsConversionLabel: convLabel
-         }
+         data: { googleAdsConversionId: convId, googleAdsConversionLabel: convLabel }
        });
        revalidatePath("/admin/marketing/merchant-center");
-       return { success: true, found: true, convId, convLabel };
+       return { success: true, found: true, convId, convLabel, autoCreated: true };
     }
 
-    return { success: true, found: false, message: "Could not parse conversion tags from Google." };
+    return { success: true, found: false, message: "Could not parse conversion tags." };
   } catch (error: any) {
     return { success: false, error: error.message };
   }

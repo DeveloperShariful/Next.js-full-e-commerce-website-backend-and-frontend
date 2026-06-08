@@ -9,6 +9,7 @@ import TabDashboard from "./TabDashboard";
 import TabProductFeed from "./TabProductFeed";
 import TabAttributes from "./TabAttributes";
 import TabSettings from "./TabSettings";
+import TabReports from "./TabReports"; // 🚀 নতুন Reports ট্যাব ইম্পোর্ট করা হয়েছে
 
 interface Props {
   config: any;
@@ -46,10 +47,10 @@ export default function MainDashboard({ config, currentStep, searchParams, dbSta
   };
 
   return (
-    // 🚀 RESPONSIVE WRAPPER: ডেক্সটপ ও মোবাইলে সুন্দরভাবে ফিট হওয়ার জন্য
+    // 🚀 RESPONSIVE WRAPPER
     <div className="w-full min-h-screen bg-[#f0f0f1] text-[#3c434a] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica_Neue',sans-serif] p-0 m-0 pb-10">
       
-      {/* WordPress Style Top Header (Responsive Padding: px-4 sm:px-6) */}
+      {/* WordPress Style Top Header */}
       <div className="bg-white border-b border-[#ccd0d4] pt-4 px-4 sm:px-6 m-0 mb-6 w-full">
         <h1 className="text-[23px] font-bold text-[#1d2327] m-0 mb-5">Google Merchant Center</h1>
         
@@ -72,9 +73,8 @@ export default function MainDashboard({ config, currentStep, searchParams, dbSta
         )}
       </div>
 
-      {/* 🚀 DYNAMIC CONTENT CONTAINER (Responsive Padding: px-2 sm:px-6) */}
-      {/* এটি মোবাইলে সামান্য গ্যাপ রাখবে যাতে টেক্সট স্ক্রিনে ধাক্কা না খায়, কিন্তু বড় স্ক্রিনে পুরো চওড়া হয়ে যাবে */}
-      <div className="w-full  m-0">
+      {/* 🚀 DYNAMIC CONTENT CONTAINER */}
+      <div className="w-full ">
         
         {/* Notices */}
         {showNotice && searchParams.status === "success" && (
@@ -96,7 +96,9 @@ export default function MainDashboard({ config, currentStep, searchParams, dbSta
                 failedCount={dbStats.failedCount}
               />
             )}
-            {activeTab === "reports" && <div className="p-10 text-center text-[#646970] bg-white border border-[#ccd0d4]">Reports feature coming soon.</div>}
+            
+            {/* 🚀 NEW: Reports Tab */}
+            {activeTab === "reports" && <TabReports />}
             
             {activeTab === "product-feed" && (
               <TabProductFeed 

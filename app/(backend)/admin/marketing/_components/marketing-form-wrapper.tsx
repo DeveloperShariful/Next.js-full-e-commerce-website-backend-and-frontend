@@ -15,7 +15,6 @@ import { updateMarketingConfig } from "@/app/actions/backend/marketing-settings/
 
 import { GtmIntegrationCard } from "./gtm/gtm-integration-card";
 import { SearchConsoleCard } from "./search-console/search-console-card";
-import { MerchantMainView } from "./merchant-center/merchant-main-view";
 import { FacebookPixelCard } from "./facebook/facebook-pixel-card";
 import { KlaviyoIntegrationCard } from "./klaviyo/klaviyo-integration-card";
 import { KlaviyoProfilesTable } from "./klaviyo/klaviyo-profiles-table"; 
@@ -119,7 +118,6 @@ export default function MarketingFormWrapper({ initialData }: MarketingFormWrapp
           <div className="mt-4 sm:mt-6">
             <TabsContent value="gtm"><GtmIntegrationCard /></TabsContent>
             <TabsContent value="gsc"><SearchConsoleCard /></TabsContent>
-            <TabsContent value="gmc"><MerchantMainView /></TabsContent>
             <TabsContent value="facebook"><FacebookPixelCard /></TabsContent>
             <TabsContent value="klaviyo"><KlaviyoIntegrationCard /></TabsContent>
             <TabsContent value="profiles"><KlaviyoProfilesTable /></TabsContent>

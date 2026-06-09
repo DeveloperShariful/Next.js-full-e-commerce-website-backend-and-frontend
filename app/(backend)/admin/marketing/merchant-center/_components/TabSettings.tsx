@@ -8,7 +8,8 @@ import {
   disconnectGoogleAdsAccount, 
   saveGoogleAdsAccount,
   fetchAvailableAdsAccounts,
-  autoFetchAndSaveConversions // 🚀 নতুন ম্যাজিক ফাংশন ইম্পোর্ট করা হলো
+  autoFetchAndSaveConversions,
+  fetchAvailableConversionActions // 🚀 নতুন ম্যাজিক ফাংশন ইম্পোর্ট করা হলো
 } from "@/app/actions/backend/merchant-center/gmc-auth.actions";
 import { 
   updateGmcSettings, 
@@ -61,6 +62,9 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
   const [isConnecting, setIsConnecting] = useState(false);
   const [isFetchingAdsList, setIsFetchingAdsList] = useState(false);
   const [adsAccounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [isFetchingTags, setIsFetchingTags] = useState(false);
+  const [conversionActions, setConversionActions] = useState<{ id: string; name: string; convId: string; convLabel: string }[]>([]); 
+  const [selectedConvActionId, setSelectedConvActionId] = useState("");
   
   const [selectedAdsId, setSelectedAdsId] = useState(""); // 👈 ড্রপডাউন সিলেক্ট করার জন্য স্টেট
   const [needsManual, setNeedsManual] = useState(false);
@@ -82,6 +86,7 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
   const [conversionLabel, setConversionLabel] = useState(config?.googleAdsConversionLabel || "");
   const [enhancedConversions, setEnhancedConversions] = useState(config?.googleAdsEnhancedConversionsEnabled || false);
   const [conversionMessage, setConversionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  
 
   useEffect(() => {
     if (config) {
@@ -158,6 +163,7 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
       if (res.success) {
         // ২. 🚀 অটো-ফেচ ম্যাজিক কল করা!
         const convRes = await autoFetchAndSaveConversions(idToSave);
+       
         
         if (convRes.success && convRes.found) {
           // ম্যাজিক! ইনপুট বক্সে সাথে সাথে ডাটা বসে যাবে
@@ -435,18 +441,85 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
         </div>
 
         {/* ========================================================== */}
-        {/* 🚀 CONVERSION TRACKING CARD (Auto Filled!) */}
+        {/* 🚀 CONVERSION TRACKING CARD (With Dynamic Selection Dropdown) */}
         {/* ========================================================== */}
         {config.googleAdsConnected && (
           <div className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm overflow-hidden animate-in fade-in duration-300">
-            <h2 className="text-[14px] font-semibold text-[#1d2327] border-b border-[#ccd0d4] px-6 py-4 m-0 bg-[#f9f9f9]">
-              Google Ads Tracking & Conversions
-            </h2>
+            <div className="border-b border-[#ccd0d4] px-6 py-4 bg-[#f9f9f9] flex justify-between items-center">
+              <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Google Ads Tracking & Conversions</h2>
+              
+              {/* 🚀 Auto-Fetch Tags Button */}
+              <button 
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  setConversionMessage(null);
+                  setIsFetchingTags(true);
+                  
+                  // ১. গুগলের সবকটি একটিভ কনভার্সন নিয়ে আসা হচ্ছে
+                  const res = await fetchAvailableConversionActions(config.googleAdsAccountId);
+                  
+                  if (res.success && res.actions) {
+                    setConversionActions(res.actions);
+                    
+                    if (res.actions.length > 0) {
+                      // প্রথম কনভার্সনটি ডিফল্ট সিলেক্ট ও অটো-ফিল করা হচ্ছে
+                      setSelectedConvActionId(res.actions[0].id);
+                      setConversionId(res.actions[0].convId);
+                      setConversionLabel(res.actions[0].convLabel);
+                      setConversionMessage({ type: "success", text: `Successfully loaded ${res.actions.length} conversion actions!` });
+                    } else {
+                      setConversionMessage({ type: "error", text: "No active conversion actions found. Please create one manually in Google Ads." });
+                    }
+                  } else {
+                    setConversionMessage({ type: "error", text: res.error || "Failed to fetch conversions." });
+                  }
+                  
+                  setIsFetchingTags(false);
+                  setTimeout(() => setConversionMessage(null), 6000);
+                }}
+                disabled={isFetchingTags}
+                className="bg-white border border-[#2271b1] text-[#2271b1] hover:bg-[#f6f7f7] px-3 py-1 rounded-[3px] text-[12px] font-semibold cursor-pointer disabled:opacity-50 transition-colors flex items-center gap-1"
+              >
+                {isFetchingTags ? "Loading..." : "⚡ Auto-Fetch Tags"}
+              </button>
+            </div>
+            
             <div className="p-6">
               <form onSubmit={handleSaveConversionSettings}>
                 {conversionMessage && (
                   <div className={`p-3 mb-4 text-[13px] border-l-4 ${conversionMessage.type === "success" ? "border-[#00a32a] bg-[#f0f6ea]" : "border-[#d63638] bg-[#fcf0f1]"}`}>
                     {conversionMessage.text}
+                  </div>
+                )}
+
+                {/* 🚀 NEW: DYNAMIC CONVERSION SELECTION DROPDOWN */}
+                {conversionActions.length > 0 && (
+                  <div className="mb-4 bg-[#f6f7f7] p-4 border border-[#ccd0d4] rounded-[3px] animate-in fade-in duration-300">
+                    <label className="block text-[13px] font-semibold text-[#1d2327] mb-1">
+                      Select Google Ads Conversion Action
+                    </label>
+                    <p className="text-[11px] text-[#646970] mb-2">Choose the action you want to track for purchases (e.g. Go Bike's Purchase).</p>
+                    <select
+                      value={selectedConvActionId}
+                      onChange={(e) => {
+                        const actId = e.target.value;
+                        setSelectedConvActionId(actId);
+                        const found = conversionActions.find(a => a.id === actId);
+                        if (found) {
+                          // সিলেক্ট করা মাত্রই নিচের বক্সগুলোতে অটো-ফিল হয়ে যাবে!
+                          setConversionId(found.convId);
+                          setConversionLabel(found.convLabel);
+                        }
+                      }}
+                      className="w-full max-w-[400px] border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none bg-white cursor-pointer"
+                    >
+                      {conversionActions.map((act) => (
+                        <option key={act.id} value={act.id}>
+                          {act.name} (ID: {act.id})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
 

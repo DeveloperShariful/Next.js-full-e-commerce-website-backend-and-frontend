@@ -30,6 +30,8 @@ import LinkedProducts from "./LinkedProducts";
 import BundleItems from "./BundleItems";
 import Description from "./description";
 import ShortDescription from "./short_description";
+import GoogleShopping from "./GoogleShopping"; 
+import { ChannelVisibility } from "./ChannelVisibility"; // 🚀 চ্যানেল ভিজিবিলিটি ইম্পোর্ট
 
 interface ProductFormProps {
   initialData: ProductFormValues;
@@ -44,7 +46,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const [activeTab, setActiveTab] = useState("general");
   const [hasDraft, setHasDraft] = useState(false);
   
-  // ✅ FIX: Hydration Error State for Origin
   const [origin, setOrigin] = useState("");
 
   const methods = useForm<ProductFormValues>({
@@ -59,12 +60,10 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const isVirtual = watch("isVirtual");
   const formValues = watch();
 
-  // ✅ FIX: Set Origin only on Client Side to prevent Hydration Mismatch
   useEffect(() => {
       setOrigin(window.location.origin);
   }, []);
 
-  // --- 1. Auto-Save Logic (Local Storage) ---
   useEffect(() => {
     if (!isDirty) return;
     
@@ -75,7 +74,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     return () => clearTimeout(handler);
   }, [formValues, isDirty]);
 
-  // --- 2. Check for Draft on Mount ---
   useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -109,7 +107,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     toast.success("Draft discarded");
   };
 
- // --- 3. Submit Handler ---
   const onSubmit = async (data: ProductFormValues) => {
     if (isEdit && !isDirty) {
         toast.success("No changes detected.");
@@ -124,7 +121,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     Object.keys(data).forEach((key) => {
         const value = (data as any)[key];
         
-        // ✅ FIX: Changed 'categoryIds' serialization based on new schema
         if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'categoryIds', 'digitalFiles', 'bundleItems', 'inventoryData', 'metafields', 'seoSchema', 'giftCardAmounts'].includes(key)) {
             formData.append(key, JSON.stringify(value));
         } 
@@ -187,6 +183,11 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 ======================================= */}
                 <div className="flex-1 w-full min-w-0 space-y-4">
                     
+                    {/* 🚀 MOBILE ONLY: Publish widget shown at the very top of mobile views */}
+                    <div className="block lg:hidden w-full">
+                        <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
+                    </div>
+
                     <div className="space-y-1">
                         <input 
                             {...methods.register("name")}
@@ -197,7 +198,6 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                             <div className="text-[12px] flex flex-wrap items-center gap-1 text-[#646970] mt-1 ml-1">
                                 <span className="font-semibold text-[#50575e]">Permalink:</span>
                                 <span className="text-[#2271b1]">
-                                    {/* ✅ FIX: Hydration safe origin */}
                                     {origin ? `${origin}/product/` : '/product/'}
                                 </span>
                                 <input 
@@ -251,6 +251,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                     {id: 'attributes', label: 'Attributes', show: true},
                                     {id: 'variations', label: 'Variations', show: productType === 'VARIABLE'},
                                     {id: 'bundle', label: 'Bundle Items', show: productType === 'BUNDLE'}, 
+                                    {id: 'google-shopping', label: 'Merchant Center', show: true}, 
                                     {id: 'advanced', label: 'Advanced', show: true},
                                 ].map(tab => tab.show && (
                                     <li key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -271,6 +272,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                 {activeTab === 'attributes' && <Attributes />}
                                 {activeTab === 'variations' && <Variations />}
                                 {activeTab === 'bundle' && <BundleItems />}
+                                {activeTab === 'google-shopping' && <GoogleShopping />} 
                                 {activeTab === 'advanced' && <Advanced />}
                                 {activeTab === 'linked' && <LinkedProducts />}
                             </div>
@@ -286,14 +288,21 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                 ======================================= */}
                 <div className="w-full lg:w-[280px] xl:w-[320px] shrink-0 space-y-4">
                     
-                    <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
-                    
+                    {/* 🚀 DESKTOP ONLY: Publish widget hidden on mobile, shown on desktop */}
+                    <div className="hidden lg:block w-full">
+                        <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
+                    </div>
+
+                    {/* Channel Visibility Sidebar Widget */}
                     <Categories />
                     <Collections />
                     <Brand /> 
                     <Tag />
                     <ProductImage />
                     <GalleryImages />
+                    {isEdit && initialData.id && (
+                      <ChannelVisibility productId={initialData.id} />
+                    )}
                     
                 </div>
             </div>

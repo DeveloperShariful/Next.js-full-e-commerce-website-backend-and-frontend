@@ -112,6 +112,26 @@ export const productSchema = z.object({
   gender: emptyToString,
   ageGroup: emptyToString,
 
+  // ==========================================
+  // 🚀 NEW: GOOGLE MERCHANT CENTER FIELDS
+  // ==========================================
+  condition: z.enum(["NEW", "REFURBISHED", "USED"]).default("NEW"),
+  googleProductCategory: emptyToString,
+  googleTitle: emptyToString,
+  googleDescription: emptyToString,
+  googleIsBundle: z.boolean().default(false),
+  
+  // 🚀 NEW: GOOGLE SPECIFIC ATTRIBUTES (Stored in JSON metafields)
+  google_size: emptyToString,
+  google_size_system: emptyToString,
+  google_size_type: emptyToString,
+  google_color: emptyToString,
+  google_material: emptyToString,
+  google_pattern: emptyToString,
+  google_multipack: emptyToString,
+  google_adult_content: z.boolean().default(false),
+  google_availability_date: emptyToString,
+
   attributes: z.array(z.object({
     id: z.string().optional(),
     name: z.string(),

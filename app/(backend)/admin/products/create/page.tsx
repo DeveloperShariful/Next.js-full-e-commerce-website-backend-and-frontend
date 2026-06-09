@@ -1,4 +1,4 @@
-// app/admin/products/create/page.tsx
+// File: app/admin/products/create/page.tsx
 
 // File: app/admin/products/create/page.tsx
 
@@ -29,7 +29,7 @@ export default async function CreateProductPage(props: PageProps) {
     galleryImages: [], 
     tags: [],
     collectionIds: [],
-    categoryIds: [], // ✅ FIX: Added initial empty array for Categories
+    categoryIds: [], 
     digitalFiles: [],
     bundleItems: [],
     upsells: [],
@@ -46,6 +46,24 @@ export default async function CreateProductPage(props: PageProps) {
     soldIndividually: false,
     isPreOrder: false,
     
+    // গুগল কোর কলাম ডিফল্ট ভ্যালু
+    condition: "NEW",
+    googleProductCategory: "",
+    googleTitle: "",
+    googleDescription: "",
+    googleIsBundle: false,
+
+    // গুগল কাস্টম মেটাফিল্ডস ডিফল্ট ভ্যালু
+    google_size: "",
+    google_size_system: "",
+    google_size_type: "",
+    google_color: "",
+    google_material: "",
+    google_pattern: "",
+    google_multipack: "",
+    google_adult_content: false,
+    google_availability_date: "",
+
     metafields: [],
     giftCardAmounts: [],
     version: 1,
@@ -63,7 +81,7 @@ export default async function CreateProductPage(props: PageProps) {
         tags: true,
         collections: true,
         brand: true,
-        categories: true, // ✅ FIX: Include new Array Relation
+        categories: true, 
         downloadFiles: true,
         bundleItems: {
           include: {
@@ -77,17 +95,44 @@ export default async function CreateProductPage(props: PageProps) {
 
     if (!product) return notFound();
 
-    // Transform DB JSON to Metafields Array UI format
+    // 🚀 উকমার্স গুগল ফিল্ডস আলাদা করা এবং কাস্টম মেটাফিল্ডস সুরক্ষিত রাখার লজিক
     let parsedMetafields: { key: string; value: string }[] = [];
+    let google_size = "";
+    let google_size_system = "";
+    let google_size_type = "";
+    let google_color = "";
+    let google_material = "";
+    let google_pattern = "";
+    let google_multipack = "";
+    let google_adult_content = false;
+    let google_availability_date = "";
+
     if (product.metafields && typeof product.metafields === 'object') {
         if (Array.isArray(product.metafields)) {
             parsedMetafields = product.metafields as { key: string; value: string }[];
         } else {
-            // Legacy support: Convert Object { material: "cotton" } to Array
-            parsedMetafields = Object.entries(product.metafields).map(([key, value]) => ({ 
-                key, 
-                value: String(value) 
-            }));
+            const rawMeta = product.metafields as Record<string, any>;
+            
+            // ১. গুগলের জন্য বরাদ্দকৃত ভ্যালুগুলো অবজেক্ট থেকে বের করে নেওয়া হচ্ছে
+            google_size = rawMeta.google_size || "";
+            google_size_system = rawMeta.google_size_system || "";
+            google_size_type = rawMeta.google_size_type || "";
+            google_color = rawMeta.google_color || "";
+            google_material = rawMeta.google_material || "";
+            google_pattern = rawMeta.google_pattern || "";
+            google_multipack = rawMeta.google_multipack || "";
+            google_adult_content = rawMeta.google_adult_content === true;
+            google_availability_date = rawMeta.google_availability_date || "";
+
+            // ২. গুগলের কাস্টম কীগুলো বাদ দিয়ে বাকি শুধু আসল মেটাফিল্ডসগুলো টেবিলে পাঠানো হচ্ছে
+            Object.entries(rawMeta).forEach(([key, value]) => {
+                if (!key.startsWith("google_")) {
+                    parsedMetafields.push({ 
+                        key, 
+                        value: String(value) 
+                    });
+                }
+            });
         }
     }
 
@@ -108,8 +153,7 @@ export default async function CreateProductPage(props: PageProps) {
       height: product.height ? Number(product.height) : null,
       rating: Number(product.rating),
       
-      // ✅ FIX: Multiple Categories & Relations mapping
-      categoryIds: product.categories.map((c) => c.id), // Array of IDs
+      categoryIds: product.categories.map((c) => c.id), 
       vendor: product.brand?.name,
       tags: product.tags.map((t) => t.name),
       collectionIds: product.collections.map((c) => c.id),
@@ -125,6 +169,23 @@ export default async function CreateProductPage(props: PageProps) {
             altText: img.altText || "",
             id: img.id
         })),
+
+      // 🚀 গুগল কোর কলাম এবং মেটাফিল্ড ডাটা ফর্মে ম্যাপিং
+      condition: product.condition || "NEW",
+      googleProductCategory: product.googleProductCategory || "",
+      googleTitle: product.googleTitle || "",
+      googleDescription: product.googleDescription || "",
+      googleIsBundle: product.googleIsBundle || false,
+
+      google_size,
+      google_size_system,
+      google_size_type,
+      google_color,
+      google_material,
+      google_pattern,
+      google_multipack,
+      google_adult_content,
+      google_availability_date,
       
       metafields: parsedMetafields,
       seoSchema: product.seoSchema ? product.seoSchema : { ogTitle: "", ogDescription: "", robots: "", ogImage: "" },
@@ -190,7 +251,6 @@ export default async function CreateProductPage(props: PageProps) {
     } as any;
   }
 
-  // DOUBLE SAFETY: Serialize entire object to handle Dates/Decimals for Client Component
   const sanitizedInitialData = JSON.parse(JSON.stringify(initialData));
 
   return <ProductForm initialData={sanitizedInitialData as ProductFormValues} isEdit={!!productId} />;

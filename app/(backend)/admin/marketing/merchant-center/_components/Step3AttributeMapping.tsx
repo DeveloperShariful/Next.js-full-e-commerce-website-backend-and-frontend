@@ -22,6 +22,7 @@ export default function Step3AttributeMapping() {
   // Autocomplete States
   const [googleCatResults, setGoogleCatResults] = useState<string[]>([]);
   const [activeSearchRow, setActiveSearchRow] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -42,7 +43,18 @@ export default function Step3AttributeMapping() {
     loadData();
   }, []);
 
-  // 🚀 Google Category Auto-complete Search Handler
+  // Outside click handler to close category dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setActiveSearchRow(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Google Category Auto-complete Search Handler
   const handleCategorySearch = async (categoryId: string, query: string) => {
     setCatMapping({ ...catMapping, [categoryId]: query });
     setActiveSearchRow(categoryId);
@@ -68,15 +80,14 @@ export default function Step3AttributeMapping() {
         .filter(c => c.googleCategory !== "");
 
       const result = await saveGmcMapping(categoryPayload, attrMapping);
-      if (!result.success) setErrorMsg(result.error || "Failed.");
+      if (!result.success) setErrorMsg(result.error || "Failed to save mapping.");
     });
   };
 
-  if (isLoading) return <div className="p-10 text-center text-[#646970]">Loading Advanced Mapping Data...</div>;
+  if (isLoading) return <div className="p-10 text-center text-[13px] text-[#646970]">Loading Advanced Mapping Data...</div>;
 
-  // 🚀 Multi-Select Attribute Component with VALUE PREVIEW
+  // 🚀 WP Admin Style: RESPONSIVE Multi-Select Attribute Component
   const MultiAttributeSelect = ({ section, field, label }: { section: string, field: string, label: string }) => {
-    // Array of selected slugs (e.g. ["attr_frame-color", "attr_t-shirt-color"])
     const selectedValues: string[] = attrMapping[section]?.[field] || [];
 
     const handleAdd = (val: string) => {
@@ -95,30 +106,31 @@ export default function Step3AttributeMapping() {
     };
 
     return (
-      <tr>
-        <th className="py-4 px-4 align-top w-[250px] text-[13px] font-semibold text-[#1d2327] border-b border-[#f0f0f1]">
+      // 🚀 Changed to flex-col on mobile, table-row on desktop
+      <tr className="flex flex-col md:table-row hover:bg-[#fcfcfc] transition-colors border-b border-[#f0f0f1] last:border-b-0 py-3 md:py-0">
+        <th className="block md:table-cell py-2 md:py-4 px-4 md:px-5 align-top w-full md:w-[250px] text-[13px] font-semibold text-[#1d2327]">
           {label}
         </th>
-        <td className="py-4 px-4 border-b border-[#f0f0f1]">
-          {/* Selected Badges */}
-          <div className="flex flex-wrap gap-2 mb-2">
+        <td className="block md:table-cell py-2 md:py-4 px-4 md:px-5 w-full">
+          {/* Mapped Badges with Premium Style */}
+          <div className="flex flex-wrap gap-2 mb-2.5">
             {selectedValues.map(val => {
               const attrDetails = storeAttributes.find(a => `attr_${a.slug}` === val);
               const displayName = attrDetails ? attrDetails.name : val.replace("attr_", "");
               
               return (
-                <div key={val} className="bg-[#f0f6ea] border border-[#c6e1c6] text-[#00a32a] px-2 py-1 rounded-[3px] text-[12px] flex items-center gap-2">
-                  <span className="font-semibold">{displayName}</span>
-                  <button onClick={() => handleRemove(val)} className="text-[#d63638] hover:text-[#b32d2e] font-bold">×</button>
+                <div key={val} className="bg-[#f0f6ea] border border-[#bce3c6] text-[#137333] px-2.5 py-1 rounded-[3px] text-[11px] flex items-center gap-2 font-medium shadow-sm">
+                  <span>{displayName}</span>
+                  <button onClick={() => handleRemove(val)} className="text-[#d63638] hover:text-[#b32d2e] font-bold text-[13px] bg-transparent border-none cursor-pointer">×</button>
                 </div>
               );
             })}
           </div>
 
-          {/* Dropdown to add more */}
+          {/* Select Dropdown with WordPress style */}
           <select
             onChange={(e) => { handleAdd(e.target.value); e.target.value = ""; }}
-            className="w-full max-w-[300px] border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none"
+            className="w-full md:max-w-[320px] bg-white border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] focus:outline-none cursor-pointer"
           >
             <option value="">+ Add mapping attribute...</option>
             {storeAttributes.filter(a => !selectedValues.includes(`attr_${a.slug}`)).map(attr => (
@@ -126,17 +138,17 @@ export default function Step3AttributeMapping() {
             ))}
           </select>
 
-          {/* 🚀 LIVE VALUE PREVIEW */}
+          {/* WP Notice Style Live Value Preview */}
           {selectedValues.length > 0 && (
-            <div className="mt-3 bg-[#f6f7f7] p-2 border border-[#ccd0d4] rounded-[3px] text-[11px] text-[#50575e]">
+            <div className="mt-3 bg-[#f6f7f7] p-3 border-l-4 border-[#2271b1] rounded-r-[3px] text-[11px] text-[#50575e] leading-relaxed shadow-sm">
               <strong>Values mapped to Google:</strong>
-              <ul className="list-disc ml-4 mt-1">
+              <ul className="list-disc ml-4 mt-1 space-y-0.5">
                 {selectedValues.map(val => {
                   const attrDetails = storeAttributes.find(a => `attr_${a.slug}` === val);
                   if (!attrDetails) return null;
                   return (
                     <li key={val}>
-                      {attrDetails.name}: <span className="italic">{attrDetails.values.slice(0, 5).join(", ")} {attrDetails.values.length > 5 ? "..." : ""}</span>
+                      {attrDetails.name}: <span className="italic font-medium text-[#2c3338]">{attrDetails.values.slice(0, 5).join(", ")} {attrDetails.values.length > 5 ? "..." : ""}</span>
                     </li>
                   );
                 })}
@@ -149,50 +161,66 @@ export default function Step3AttributeMapping() {
   };
 
   return (
-    <div className="p-0">
-      {/* Tabs */}
-      <div className="flex border-b border-[#ccd0d4] bg-[#f6f7f7] px-6 pt-4">
-        <button onClick={() => setActiveTab("categories")} className={`px-4 py-2 text-[13px] font-semibold border border-b-0 rounded-t-[3px] mr-1 ${activeTab === "categories" ? "bg-white border-[#ccd0d4] text-[#1d2327] relative top-[1px]" : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96]"}`}>Category Mapping</button>
-        <button onClick={() => setActiveTab("attributes")} className={`px-4 py-2 text-[13px] font-semibold border border-b-0 rounded-t-[3px] mr-1 ${activeTab === "attributes" ? "bg-white border-[#ccd0d4] text-[#1d2327] relative top-[1px]" : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96]"}`}>Product Attributes</button>
-        <button onClick={() => setActiveTab("customLabels")} className={`px-4 py-2 text-[13px] font-semibold border border-b-0 rounded-t-[3px] ${activeTab === "customLabels" ? "bg-white border-[#ccd0d4] text-[#1d2327] relative top-[1px]" : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96]"}`}>Custom Labels (Ads)</button>
+    <div className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm overflow-hidden animate-in fade-in duration-300" ref={dropdownRef}>
+      
+      {/* WordPress Admin Style Flat Tabs */}
+      <div className="flex border-b border-[#ccd0d4] bg-[#f6f7f7] px-4 pt-3 gap-1 overflow-x-auto whitespace-nowrap scrollbar-none">
+        <button 
+          onClick={() => setActiveTab("categories")} 
+          className={`px-4 py-2 text-[13px] font-semibold border-t border-l border-r transition-colors duration-150 ${activeTab === "categories" ? "bg-white border-[#ccd0d4] text-[#1d2327] rounded-t-[3px] relative top-[1px] border-b-white" : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96] rounded-t-[3px]"}`}
+        >
+          Category Mapping
+        </button>
+        <button 
+          onClick={() => setActiveTab("attributes")} 
+          className={`px-4 py-2 text-[13px] font-semibold border-t border-l border-r transition-colors duration-150 ${activeTab === "attributes" ? "bg-white border-[#ccd0d4] text-[#1d2327] rounded-t-[3px] relative top-[1px] border-b-white" : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96]"}`}
+        >
+          Product Attributes
+        </button>
+        <button 
+          onClick={() => setActiveTab("customLabels")} 
+          className={`px-4 py-2 text-[13px] font-semibold border-t border-l border-r transition-colors duration-150 ${activeTab === "customLabels" ? "bg-white border-[#ccd0d4] text-[#1d2327] rounded-t-[3px] relative top-[1px] border-b-white" : "bg-transparent border-transparent text-[#2271b1] hover:text-[#135e96]"}`}
+        >
+          Custom Labels (Ads)
+        </button>
       </div>
 
-      <div className="p-6">
-        {errorMsg && <div className="bg-[#fcf0f1] border-l-4 border-[#d63638] p-3 mb-5 text-[13px] text-[#d63638]">{errorMsg}</div>}
+      <div className="p-4 sm:p-6">
+        {errorMsg && <div className="bg-[#fcf0f1] border-l-4 border-[#d63638] p-3 mb-5 text-[13px] text-[#d63638] font-medium">{errorMsg}</div>}
 
-        {/* 🚀 TAB 1: CATEGORY MAPPING WITH AUTOCOMPLETE */}
+        {/* 🚀 TAB 1: CATEGORY MAPPING WITH RESPONSIVE WP LIST TABLE */}
         {activeTab === "categories" && (
           <div>
             <p className="text-[13px] text-[#646970] mb-4">Search and select the official Google category that matches your store category.</p>
-            <div className="bg-white border border-[#ccd0d4] max-h-[500px] overflow-y-visible pb-32">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-[#f9f9f9] border-b border-[#ccd0d4]">
+            <div className="border border-[#ccd0d4] rounded-[3px] overflow-hidden max-h-[500px] overflow-y-auto pb-32">
+              <table className="block md:table w-full text-left border-collapse text-[13px]">
+                <thead className="hidden md:table-header-group bg-[#f9f9f9] border-b border-[#ccd0d4] text-[#1d2327] font-semibold">
                   <tr>
-                    <th className="py-2 px-4 text-[13px] font-semibold text-[#1d2327]">Store Category</th>
-                    <th className="py-2 px-4 text-[13px] font-semibold text-[#1d2327]">Google Category (Search)</th>
+                    <th className="py-2.5 px-4">Store Category</th>
+                    <th className="py-2.5 px-4">Google Category (Search)</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="block md:table-row-group divide-y divide-[#f0f0f0]">
                   {storeCategories.map(cat => (
-                    <tr key={cat.id}>
-                      <td className="py-3 px-4 text-[13px] font-semibold text-[#2271b1] border-b border-[#f0f0f1] w-1/3">{cat.name}</td>
-                      <td className="py-3 px-4 border-b border-[#f0f0f1] relative">
+                    <tr key={cat.id} className="flex flex-col md:table-row hover:bg-[#fcfcfc] transition-colors py-3 md:py-0">
+                      <td className="block md:table-cell py-1.5 md:py-3 px-4 font-semibold text-[#2271b1] w-full md:w-1/3">{cat.name}</td>
+                      <td className="block md:table-cell py-1.5 md:py-3 px-4 relative w-full">
                         <input
                           type="text"
                           value={catMapping[cat.id] || ""}
                           onChange={(e) => handleCategorySearch(cat.id, e.target.value)}
                           onFocus={() => setActiveSearchRow(cat.id)}
-                          placeholder="Type to search (e.g. Bikes)"
-                          className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none"
+                          placeholder="Type to search official Google taxonomy (e.g. Bikes)"
+                          className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] focus:outline-none transition-shadow"
                         />
-                        {/* Auto-complete Dropdown */}
+                        {/* Auto-complete Floating Dropdown */}
                         {activeSearchRow === cat.id && googleCatResults.length > 0 && (
-                          <ul className="absolute z-50 left-4 right-4 top-[45px] bg-white border border-[#ccd0d4] shadow-lg max-h-[200px] overflow-y-auto">
+                          <ul className="absolute z-50 left-4 right-4 mt-1 bg-white border border-[#ccd0d4] shadow-md max-h-[200px] overflow-y-auto rounded-[3px] list-none p-0 m-0">
                             {googleCatResults.map((res, i) => (
                               <li 
                                 key={i} 
                                 onClick={() => selectGoogleCategory(cat.id, res)}
-                                className="px-3 py-2 text-[12px] hover:bg-[#2271b1] hover:text-white cursor-pointer border-b border-[#f0f0f1] last:border-b-0"
+                                className="px-3 py-2 text-[12px] hover:bg-[#2271b1] hover:text-white cursor-pointer border-b border-[#f0f0f1] last:border-b-0 text-[#2c3338]"
                               >
                                 {res}
                               </li>
@@ -208,11 +236,11 @@ export default function Step3AttributeMapping() {
           </div>
         )}
 
-        {/* 🚀 TAB 2: ATTRIBUTE MAPPING WITH MULTI-SELECT & PREVIEW */}
+        {/* 🚀 TAB 2 & 3: ATTRIBUTES AND CUSTOM LABELS */}
         {activeTab === "attributes" && (
-          <div className="bg-white border border-[#ccd0d4]">
-            <table className="w-full text-left border-collapse">
-              <tbody>
+          <div className="border border-[#ccd0d4] rounded-[3px] overflow-hidden">
+            <table className="block md:table w-full text-left border-collapse text-[13px]">
+              <tbody className="block md:table-row-group">
                 <MultiAttributeSelect section="attributes" field="color" label="Color" />
                 <MultiAttributeSelect section="attributes" field="size" label="Size" />
                 <MultiAttributeSelect section="attributes" field="material" label="Material" />
@@ -223,11 +251,10 @@ export default function Step3AttributeMapping() {
           </div>
         )}
 
-        {/* 🚀 TAB 3: CUSTOM LABELS */}
         {activeTab === "customLabels" && (
-          <div className="bg-white border border-[#ccd0d4]">
-            <table className="w-full text-left border-collapse">
-              <tbody>
+          <div className="border border-[#ccd0d4] rounded-[3px] overflow-hidden">
+            <table className="block md:table w-full text-left border-collapse text-[13px]">
+              <tbody className="block md:table-row-group">
                 <MultiAttributeSelect section="customLabels" field="customLabel0" label="Custom Label 0 (Ads)" />
                 <MultiAttributeSelect section="customLabels" field="customLabel1" label="Custom Label 1" />
               </tbody>
@@ -235,8 +262,13 @@ export default function Step3AttributeMapping() {
           </div>
         )}
 
+        {/* Submit Actions */}
         <div className="mt-6 pt-5 border-t border-[#ccd0d4] text-right">
-          <button onClick={handleComplete} disabled={isPending} className="bg-[#2271b1] text-white px-6 py-2 text-[13px] font-semibold shadow-sm">
+          <button 
+            onClick={handleComplete} 
+            disabled={isPending} 
+            className="w-full sm:w-auto bg-[#2271b1] hover:bg-[#135e96] border border-[#2271b1] text-white px-5 py-2 text-[13px] font-semibold rounded-[3px] cursor-pointer shadow-sm disabled:opacity-50 transition-colors"
+          >
             {isPending ? "Saving configuration..." : "Save & Complete Setup"}
           </button>
         </div>

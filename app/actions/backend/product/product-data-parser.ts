@@ -1,6 +1,6 @@
 // File: app/actions/backend/product/product-data-parser.ts
 
-import { ProductType, TaxStatus, ProductStatus } from "@prisma/client";
+import { ProductType, TaxStatus, ProductStatus, ProductCondition } from "@prisma/client";
 import { parseJSON, cleanPrice } from "@/app/actions/backend/product/product-utils"; 
 
 export const parseProductFormData = (formData: FormData) => {
@@ -16,9 +16,12 @@ export const parseProductFormData = (formData: FormData) => {
         taxStatusInput = "SHIPPING_ONLY";
     }
 
+    // গুগল কন্ডিশন এনাম হ্যান্ডেল করা
+    const conditionInput = (formData.get("condition") as string || "NEW").toUpperCase();
+
     return {
         id: formData.get("id") as string,
-        version: parseInt(formData.get("version") as string) || 1, // 🔥 Added Version
+        version: parseInt(formData.get("version") as string) || 1, 
         name,
         slug,
         description: formData.get("description") as string,
@@ -30,7 +33,7 @@ export const parseProductFormData = (formData: FormData) => {
         isFeatured: formData.get("isFeatured") === "true",
 
         bundleItems: parseJSON<any[]>(formData.get("bundleItems") as string, []),
-        giftCardAmounts: parseJSON<number[]>(formData.get("giftCardAmounts") as string, []), // 🔥 Added Gift Card
+        giftCardAmounts: parseJSON<number[]>(formData.get("giftCardAmounts") as string, []), 
 
         videoUrl: formData.get("videoUrl") as string || null,
         videoThumbnail: formData.get("videoThumbnail") as string || null,
@@ -41,7 +44,6 @@ export const parseProductFormData = (formData: FormData) => {
         gender: formData.get("gender") as string || null,
         ageGroup: formData.get("ageGroup") as string || null,
         
-        // 🔥 Updated JSON Parsers
         metafields: parseJSON(formData.get("metafields") as string, []), 
         seoSchema: parseJSON(formData.get("seoSchema") as string, null),   
 
@@ -98,6 +100,7 @@ export const parseProductFormData = (formData: FormData) => {
         lowStockThreshold: parseInt(formData.get("lowStockThreshold") as string) || 2,
         backorderStatus: formData.get("backorderStatus") as any || "DO_NOT_ALLOW",
         soldIndividually: formData.get("soldIndividually") === "true",
+        
         mpn: formData.get("mpn") as string || null,
         hsCode: formData.get("hsCode") as string || null,
         countryOfManufacture: formData.get("countryOfManufacture") as string || null,
@@ -113,5 +116,25 @@ export const parseProductFormData = (formData: FormData) => {
         preOrderReleaseDate: formData.get("preOrderReleaseDate") as string || null,
         preOrderLimit: formData.get("preOrderLimit") ? parseInt(formData.get("preOrderLimit") as string) : null,
         preOrderMessage: formData.get("preOrderMessage") as string || null,
+
+        // ==========================================
+        // 🚀 NEW: GOOGLE MERCHANT CENTER FIELDS
+        // ==========================================
+        condition: conditionInput as ProductCondition,
+        googleProductCategory: formData.get("googleProductCategory") as string || null,
+        googleTitle: formData.get("googleTitle") as string || null,
+        googleDescription: formData.get("googleDescription") as string || null,
+        googleIsBundle: formData.get("googleIsBundle") === "true",
+
+        // 🚀 NEW: GOOGLE SPECIFIC ATTRIBUTES
+        google_size: formData.get("google_size") as string || "",
+        google_size_system: formData.get("google_size_system") as string || "",
+        google_size_type: formData.get("google_size_type") as string || "",
+        google_color: formData.get("google_color") as string || "",
+        google_material: formData.get("google_material") as string || "",
+        google_pattern: formData.get("google_pattern") as string || "",
+        google_multipack: formData.get("google_multipack") as string || "",
+        google_adult_content: formData.get("google_adult_content") === "true",
+        google_availability_date: formData.get("google_availability_date") as string || "",
     };
 };

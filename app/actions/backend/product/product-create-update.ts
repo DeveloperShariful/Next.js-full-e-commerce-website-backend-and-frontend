@@ -8,7 +8,7 @@ import { Prisma } from "@prisma/client";
 import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/backend/product/product-utils"; 
 import { auth } from "@/auth";
 
-// 🔥 NEW: Import Google Merchant Center Sync Action
+// 🔥 GMC Sync Action
 import { syncProductToGoogle } from "@/app/actions/backend/merchant-center/gmc-product-sync.actions";
 
 import { parseProductFormData } from "./product-data-parser";
@@ -208,10 +208,34 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 calculatedStock = await calculateBundleStock(tx, data.bundleItems);
             }
 
+            // 🚀 উকমার্স গুগল সাইজ, কালার ইত্যাদি ডাটা ডাইনামিকলি Metafields JSON এর ভেতর ইনজেক্ট করার ম্যাজিক লজিক
+            const metafieldsObj: Record<string, any> = {};
+            
+            // কাস্টম মেটাফিল্ডসগুলো প্রথমে অবজেক্টে রূপান্তর করা হচ্ছে
+            if (Array.isArray(data.metafields)) {
+                data.metafields.forEach((item: any) => {
+                    if (item.key && item.value) {
+                        metafieldsObj[item.key] = item.value;
+                    }
+                });
+            }
+
+            // গুগলের স্পেসিফিক ফিল্ডগুলো একই মেটাফিল্ডস অবজেক্টের ভেতরে মার্চ (Merge) করে সেভ করা হচ্ছে
+            metafieldsObj.google_size = data.google_size || "";
+            metafieldsObj.google_size_system = data.google_size_system || "";
+            metafieldsObj.google_size_type = data.google_size_type || "";
+            metafieldsObj.google_color = data.google_color || "";
+            metafieldsObj.google_material = data.google_material || "";
+            metafieldsObj.google_pattern = data.google_pattern || "";
+            metafieldsObj.google_multipack = data.google_multipack || "";
+            metafieldsObj.google_adult_content = data.google_adult_content;
+            metafieldsObj.google_availability_date = data.google_availability_date || "";
+
             const normalizeInventory = (items: any[]) => items?.map(i => ({ loc: i.locationId, qty: i.quantity })).sort((a,b) => a.loc.localeCompare(b.loc)) || [];
             const normalizeImages = (imgs: any[]) => imgs?.map(i => (typeof i === 'string' ? i : i.url)).sort() || [];
             const normalizeAttributes = (attrs: any[]) => attrs?.map(a => ({ n: a.name, v: [...(a.values || [])].sort() })).sort((a,b) => a.n.localeCompare(b.n)) || [];
             
+            // 🚀 Scalars changed লজিকে নতুন গুগল মার্চেন্ট সেন্টারের ৫টি কলাম ফিক্স করা হয়েছে (ডেল্টা সিস্টেম অক্ষুণ্ণ রাখতে)
             const scalarsChanged = !oldProductData || 
                 oldProductData.name !== data.name ||
                 oldProductData.slug !== finalSlug ||
@@ -233,7 +257,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 oldProductData.isPreOrder !== data.isPreOrder ||
                 oldProductData.preOrderLimit !== (data.preOrderLimit || null) ||
                 oldProductData.preOrderMessage !== (data.preOrderMessage || null) ||
-                oldProductData.featuredImage !== (data.featuredImage || null);
+                oldProductData.featuredImage !== (data.featuredImage || null) ||
+                // 👇 গুগল মার্চেন্ট সেন্টার কোর কলাম কম্প্যারিসন
+                oldProductData.condition !== data.condition ||
+                oldProductData.googleProductCategory !== (data.googleProductCategory || null) ||
+                oldProductData.googleTitle !== (data.googleTitle || null) ||
+                oldProductData.googleDescription !== (data.googleDescription || null) ||
+                oldProductData.googleIsBundle !== data.googleIsBundle;
 
             const categoriesChanged = !oldProductData || !arraysHaveSameContent(
                 oldProductData.categories.map((c: any) => c.id),
@@ -278,7 +308,12 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 data.bundleItems.map((b: any) => b.childProductId).sort()
             ));
 
-            const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged;
+            const metafieldsChanged = !oldProductData || !isDeepEqual(
+                oldProductData.metafields,
+                metafieldsObj
+            );
+
+            const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged || metafieldsChanged;
 
             if (type === "UPDATE" && !anyChanges) {
                 return { success: true, message: "No changes detected.", productId: data.id };
@@ -309,7 +344,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 }
             } : undefined;
 
-            const productData: any = {
+            const productPayload: any = {
                 name: data.name,
                 slug: finalSlug, 
                 description: data.description,
@@ -337,7 +372,9 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 videoThumbnail: data.videoThumbnail,
                 gender: data.gender,
                 ageGroup: data.ageGroup,
-                metafields: data.metafields || Prisma.DbNull,
+                
+                // 🚀 মার্চ করা নতুন মেটাফিল্ডস অবজেক্ট সেভ করা হচ্ছে
+                metafields: metafieldsObj, 
                 seoSchema: data.seoSchema || Prisma.DbNull,
                 
                 isFeatured: data.isFeatured || false,
@@ -377,6 +414,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 crossSellIds: data.crossSells,
 
                 brand: brandConnect,
+
+                // 🚀 গুগল কোর কলামগুলো ডাটাবেজে সেভ করা হচ্ছে
+                condition: data.condition,
+                googleProductCategory: data.googleProductCategory,
+                googleTitle: data.googleTitle,
+                googleDescription: data.googleDescription,
+                googleIsBundle: data.googleIsBundle,
                 
                 ...(collectionsChanged || type === "CREATE" ? { collections: collectionsRelation } : {}),
                 ...(categoriesChanged || type === "CREATE" ? { categories: categoriesRelation } : {})
@@ -386,26 +430,26 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             
             if (data.id) {
                  if (tagsChanged) {
-                     productData.tags = {
+                     productPayload.tags = {
                          set: [],
                          connectOrCreate: tagOperations
                      };
                  }
 
-                 if (scalarsChanged || tagsChanged || collectionsChanged || categoriesChanged || variationsChanged || type === "UPDATE") {
+                 if (scalarsChanged || tagsChanged || collectionsChanged || categoriesChanged || variationsChanged || metafieldsChanged || type === "UPDATE") {
                      product = await tx.product.update({
                         where: { id: data.id },
-                        data: productData
+                        data: productPayload
                     });
                  } else {
                      product = { id: data.id, name: data.name, slug: finalSlug };
                  }
             } else {
-                productData.tags = {
+                productPayload.tags = {
                     connectOrCreate: tagOperations
                 };
                 product = await tx.product.create({
-                    data: productData
+                    data: productPayload
                 });
             }
 
@@ -463,36 +507,25 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             return savedProduct;
         }
 
-        // ====================================================================
-        // 🔥 NEW: GOOGLE MERCHANT CENTER AUTO-SYNC (FIRE AND FORGET)
-        // ====================================================================
-        // প্রোডাক্ট সেভ হওয়ার পর ব্যাকগ্রাউন্ডে গুগলে ডাটা চলে যাবে, ইউজারকে ওয়েট করতে হবে না।
+        // গুগল মার্চেন্ট সেন্টার সিঙ্ক অ্যাক্টিভ করা
         if (savedProduct && savedProduct.id) {
             syncProductToGoogle(savedProduct.id).catch((err) => {
                 console.error("Background GMC Sync failed for Product ID:", savedProduct.id, err);
             });
         }
-        // ====================================================================
 
-        // ====================================================================
-        // 🚀 ULTIMATE DYNAMIC REVALIDATION
-        // ====================================================================
         if (savedProduct && savedProduct.id) {
-            // ১. প্রোডাক্ট পেজ ডাইনামিকলি রিভ্যালিডেট
             revalidatePath(`/product/${savedProduct.slug}`);
 
-            // ২. এই প্রোডাক্টটি যেসব ক্যাটাগরি ও প্যারেন্ট ক্যাটাগরি ফাইলে কানেক্টেড, সেগুলোর ক্যাশ ডাইনামিকলি ক্লিয়ার হবে (কোনো হার্ডকোডিং ছাড়া)
             try {
                 const connectedCategories = await db.category.findMany({
-                    where: {
-                        products: { some: { id: savedProduct.id } }
-                    },
+                    where: { products: { some: { id: savedProduct.id } } },
                     select: { slug: true }
                 });
 
                 connectedCategories.forEach((cat) => {
                     if (cat.slug) {
-                        revalidatePath(`/${cat.slug}`); // e.g. /bikes, /apparel
+                        revalidatePath(`/${cat.slug}`); 
                     }
                 });
             } catch (e) {
@@ -500,7 +533,6 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             }
         }
 
-        // ৩. আপনার অরিজিনাল বর্ডার ও রিভ্যালিডেশন কোড হুবহু অক্ষত রাখা হয়েছে
         revalidatePath("/admin/products");
         return { success: true, productId: savedProduct.id };
 

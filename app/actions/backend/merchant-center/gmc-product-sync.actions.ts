@@ -83,10 +83,45 @@ export async function syncProductToGoogle(productId: string) {
 
     const shoppingContent = await getGoogleContentClient(config);
 
+    // 🚀 উকমার্স স্টাইল: কাস্টম টাইটেল ও ডেসক্রিপশন না থাকলে প্রোডাক্টের অরিজিনাল ভ্যালু ডাইনামিকলি ফলব্যাক হবে
+    const finalTitle = product.googleTitle && product.googleTitle.trim() !== "" 
+      ? product.googleTitle 
+      : product.name;
+
+    const finalDescription = product.googleDescription && product.googleDescription.trim() !== ""
+      ? product.googleDescription
+      : (product.description || product.shortDescription || product.name);
+
+    // `metafields` (JSON কলাম) থেকে সাইজ, কালার, ম্যাটেরিয়াল ডেটাগুলো বের করে নেওয়া
+    let google_size = "";
+    let google_size_system = "";
+    let google_size_type = "";
+    let google_color = "";
+    let google_material = "";
+    let google_pattern = "";
+    let google_multipack: number | undefined = undefined;
+    let google_adult_content = false;
+    let google_availability_date = "";
+
+    if (product.metafields && typeof product.metafields === "object" && !Array.isArray(product.metafields)) {
+      const meta = product.metafields as Record<string, any>;
+      google_size = meta.google_size || "";
+      google_size_system = meta.google_size_system || "";
+      google_size_type = meta.google_size_type || "";
+      google_color = meta.google_color || "";
+      google_material = meta.google_material || "";
+      google_pattern = meta.google_pattern || "";
+      google_adult_content = meta.google_adult_content === true;
+      google_availability_date = meta.google_availability_date || "";
+      if (meta.google_multipack) {
+        google_multipack = parseInt(meta.google_multipack) || undefined;
+      }
+    }
+
     const googleProductParams: any = {
       offerId: product.id,
-      title: product.name,
-      description: stripHtmlTags(product.description || product.shortDescription || product.name),
+      title: finalTitle,
+      description: stripHtmlTags(finalDescription),
       link: formatGmcUrl(`${SITE_URL}/product/${product.slug}`),
       imageLink: formatGmcUrl(product.featuredImage),
       contentLanguage: config.gmcLanguage || "en",
@@ -94,12 +129,15 @@ export async function syncProductToGoogle(productId: string) {
       channel: "online",
       
       availability: (product.trackQuantity === false || product.stock > 0) ? "in stock" : "out of stock",
-      condition: "new",
+      condition: product.condition.toLowerCase(), // NEW, REFURBISHED, USED এনাম ডাইনামিকলি কনভার্ট হবে
       price: { value: Number(product.price).toFixed(2), currency: "AUD" }, 
       
       brand: product.brand?.name || "GoBike",
       gtin: product.barcode || undefined,
       mpn: product.mpn || undefined,
+      gender: product.gender || undefined,
+      ageGroup: product.ageGroup || undefined,
+      isBundle: product.googleIsBundle,
     };
 
     if (product.images && product.images.length > 1) {
@@ -108,7 +146,8 @@ export async function syncProductToGoogle(productId: string) {
         .map((img) => formatGmcUrl(img.url));
     }
 
-    let googleCategory = product.categories.find(c => c.googleCategoryName)?.googleCategoryName;
+    // গুগল প্রোডাক্ট ক্যাটাগরি ম্যাপিং
+    let googleCategory = product.googleProductCategory || product.categories.find(c => c.googleCategoryName)?.googleCategoryName;
     if (!googleCategory && mappingRules?.attributes?.defaultCategory) {
       googleCategory = mappingRules.attributes.defaultCategory;
     }
@@ -131,13 +170,29 @@ export async function syncProductToGoogle(productId: string) {
       googleProductParams.shippingHeight = { value: Number(product.height), unit: "cm" };
     }
 
+    // সাইজ, কালার, ম্যাটেরিয়াল ডেটাগুলো গুগল ফিড প্যারামিটারসে ইনজেক্ট করা হচ্ছে
+    if (google_size) googleProductParams.sizes = [google_size];
+    if (google_size_system) googleProductParams.sizeSystem = google_size_system;
+    if (google_size_type) googleProductParams.sizeType = google_size_type;
+    if (google_color) googleProductParams.color = google_color;
+    if (google_material) googleProductParams.material = google_material;
+    if (google_pattern) googleProductParams.pattern = google_pattern;
+    if (google_multipack) googleProductParams.multipack = google_multipack;
+    if (google_adult_content) googleProductParams.adult = google_adult_content;
+    if (google_availability_date) {
+      googleProductParams.availabilityDate = new Date(google_availability_date).toISOString();
+    }
+
     if (mappingRules && mappingRules.attributes) {
-      googleProductParams.color = extractMappedValue(mappingRules.attributes.color, product);
-      googleProductParams.size = extractMappedValue(mappingRules.attributes.size, product);
-      googleProductParams.material = extractMappedValue(mappingRules.attributes.material, product);
-      googleProductParams.pattern = extractMappedValue(mappingRules.attributes.pattern, product);
-      googleProductParams.gender = extractMappedValue(mappingRules.attributes.gender, product);
-      googleProductParams.ageGroup = extractMappedValue(mappingRules.attributes.ageGroup, product);
+      if (!googleProductParams.color) googleProductParams.color = extractMappedValue(mappingRules.attributes.color, product);
+      if (!googleProductParams.sizes) {
+        const sizeVal = extractMappedValue(mappingRules.attributes.size, product);
+        if (sizeVal) googleProductParams.sizes = [sizeVal];
+      }
+      if (!googleProductParams.material) googleProductParams.material = extractMappedValue(mappingRules.attributes.material, product);
+      if (!googleProductParams.pattern) googleProductParams.pattern = extractMappedValue(mappingRules.attributes.pattern, product);
+      if (!googleProductParams.gender) googleProductParams.gender = extractMappedValue(mappingRules.attributes.gender, product);
+      if (!googleProductParams.ageGroup) googleProductParams.ageGroup = extractMappedValue(mappingRules.attributes.ageGroup, product);
     }
 
     if (mappingRules && mappingRules.customLabels) {
@@ -149,7 +204,7 @@ export async function syncProductToGoogle(productId: string) {
     }
 
     Object.keys(googleProductParams).forEach(key => {
-      if (googleProductParams[key] === undefined) delete googleProductParams[key];
+      if (googleProductParams[key] === undefined || googleProductParams[key] === "") delete googleProductParams[key];
     });
 
     const response = await shoppingContent.products.insert({
@@ -406,9 +461,6 @@ export async function syncLiveProductStatuses() {
 // ============================================================================
 // 🚀 8. NEW: SYNC SINGLE LIVE PRODUCT STATUS FROM GOOGLE (Instant Diagnostics)
 // ============================================================================
-/**
- * একটি নির্দিষ্ট প্রোডাক্টের লাইভ স্ট্যাটাস সরাসরি গুগলের সার্ভার থেকে ফেচ করবে
- */
 export async function syncSingleProductStatusFromGoogle(productId: string) {
   try {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
@@ -420,7 +472,6 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
     const lang = (config.gmcLanguage || "en").toLowerCase().trim();
     const country = (config.gmcTargetCountry || "AU").toUpperCase().trim();
     
-    // গুগল কন্টেন্ট এপিআই ডিলিট বা রিড করার সময় আইডি ফরম্যাট: online:language:country:productId
     const googleProductId = `online:${lang}:${country}:${productId}`;
 
     let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "PENDING";
@@ -428,7 +479,6 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
     let googleIssues: any = null;
 
     try {
-      // গুগলের সার্ভার থেকে সরাসরি লাইভ স্ট্যাটাস আনা
       const response = await shoppingContent.productstatuses.get({
         merchantId: config.gmcMerchantId,
         productId: googleProductId,
@@ -451,7 +501,6 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
         finalStatus = "SYNCED";
       }
     } catch (apiError: any) {
-      // যদি গুগল বলে প্রোডাক্টটি এখনো প্রসেসিং হয়নি বা নট ফাউন্ড (404), তবে এটি PENDING থাকবে
       if (apiError.status === 404 || apiError.message?.toLowerCase().includes("not found")) {
         finalStatus = "PENDING";
         errorMessage = "Not synced yet or pending policy review by Google.";
@@ -460,7 +509,6 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
       }
     }
 
-    // ডাটাবেস আপডেট করা
     const updatedStatus = await db.productChannelStatus.upsert({
       where: { productId_channel: { productId, channel: "GOOGLE" } },
       update: {

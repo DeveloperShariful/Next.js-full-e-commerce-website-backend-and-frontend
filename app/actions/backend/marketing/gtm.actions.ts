@@ -1,4 +1,4 @@
-//app/actions/backend/tag-manager/gtm.actions.ts
+//app/actions/backend/marketing/gtm.actions.ts
 
 "use server";
 

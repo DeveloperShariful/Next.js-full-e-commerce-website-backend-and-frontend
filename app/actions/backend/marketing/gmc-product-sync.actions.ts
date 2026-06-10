@@ -1,4 +1,4 @@
-//File Path: app/actions/backend/merchant-center/gmc-product-sync.actions.ts
+//File Path: app/actions/backend/marketing/gmc-product-sync.actions.ts
 
 "use server";
 

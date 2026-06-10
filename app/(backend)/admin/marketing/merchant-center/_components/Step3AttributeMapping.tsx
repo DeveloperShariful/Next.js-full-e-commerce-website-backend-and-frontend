@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, useRef } from "react";
-import { getStoreMappingData, saveGmcMapping, searchGoogleCategories } from "@/app/actions/backend/merchant-center/gmc-mapping.actions";
+import { getStoreMappingData, saveGmcMapping, searchGoogleCategories } from "@/app/actions/backend/marketing/gmc-mapping.actions";
 
 export default function Step3AttributeMapping() {
   const [isPending, startTransition] = useTransition();

@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { disconnectGoogleAccount } from "@/app/actions/backend/merchant-center/gmc-auth.actions";
+import { disconnectGoogleAccount } from "@/app/actions/backend/marketing/gmc-auth.actions";
 import OnboardingWizard from "./OnboardingWizard";
 import TabDashboard from "./TabDashboard";
 import TabProductFeed from "./TabProductFeed";

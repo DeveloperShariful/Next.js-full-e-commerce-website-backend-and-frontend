@@ -1,4 +1,4 @@
-//app/actions/backend/merchant-center/gmc-status.actions.ts
+//app/actions/backend/marketing/gmc-status.actions.ts
 
 "use server";
 

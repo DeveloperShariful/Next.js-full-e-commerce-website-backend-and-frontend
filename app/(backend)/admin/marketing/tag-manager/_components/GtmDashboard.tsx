@@ -9,7 +9,7 @@ import {
   fetchGtmAccountsAndContainers, 
   fetchGtmWorkspaceDetails, 
   saveGtmContainerId 
-} from "@/app/actions/backend/tag-manager/gtm.actions";
+} from "@/app/actions/backend/marketing/gtm.actions";
 
 // Types
 interface GtmContainer {
@@ -149,24 +149,35 @@ export default function GtmDashboard({ config }: Props) {
     <div className="w-full">
       <Toaster position="top-right" />
 
-      <div className="max-w-[1200px] mx-auto space-y-6">
+      <div className="w-full space-y-6">
         
         {/* 🚀 Google Account Profile Card */}
         {config && config.googleAccountId && (
-          <div className="bg-white border border-[#ccd0d4] p-5 rounded-[3px] flex items-center justify-between shadow-sm animate-in fade-in duration-300">
-            <div className="flex items-center gap-4">
+          <div className="bg-white border border-[#ccd0d4] p-4 sm:p-5 rounded-[3px] flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0 shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center gap-4 min-w-0">
               {config.googleAccountImage ? (
-                <img src={config.googleAccountImage} alt="Gmail Avatar" className="w-8 h-8 rounded-full border border-[#ccd0d4]" referrerPolicy="no-referrer" />
+                <img 
+                  src={config.googleAccountImage} 
+                  alt="Gmail Avatar" 
+                  className="w-8 h-8 rounded-full border border-[#ccd0d4] shrink-0" 
+                  referrerPolicy="no-referrer" 
+                />
               ) : (
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500">G</div>
+                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500 shrink-0">G</div>
               )}
-              <div>
-                <h4 className="text-[14px] font-semibold text-[#1d2327] m-0 mb-1">Google Account</h4>
-                <p className="text-[13px] text-[#646970] m-0">{config.googleAccountId}</p>
+              {/* 🚀 min-w-0 এবং truncate ব্যবহারের ফলে মোবাইল স্ক্রিনে লম্বা ইমেইল এলাইনমেন্ট নষ্ট করবে না বা স্ক্রিনের বাইরে যাবে না */}
+              <div className="min-w-0">
+                <h4 className="text-[14px] font-semibold text-[#1d2327] m-0 mb-0.5">Google Account</h4>
+                <p className="text-[13px] text-[#646970] m-0 truncate max-w-[200px] sm:max-w-none" title={config.googleAccountId}>
+                  {config.googleAccountId}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-[13px] font-semibold text-[#00a32a]">
-              <span className="w-4 h-4 bg-[#00a32a] text-white rounded-full flex items-center justify-center text-[10px]">✓</span> Connected
+            
+            {/* 🚀 self-start sm:self-auto এর ফলে মোবাইলে ব্যাজটি সুন্দরভাবে নিচে নেমে বাম পাশে এলাইন হবে এবং মোবাইলের জন্য একটি হালকা বর্ডার ও গ্রিন ব্যাকগ্রাউন্ড দেওয়া হয়েছে যা দেখতে প্রিমিয়াম লাগবে */}
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-[#00a32a] self-start sm:self-auto shrink-0 bg-[#e6f4ea] sm:bg-transparent px-2.5 py-1 sm:p-0 rounded-[3px] border border-[#bce3c6] sm:border-0">
+              <span className="w-4 h-4 bg-[#00a32a] text-white rounded-full flex items-center justify-center text-[10px]">✓</span> 
+              <span>Connected</span>
             </div>
           </div>
         )}

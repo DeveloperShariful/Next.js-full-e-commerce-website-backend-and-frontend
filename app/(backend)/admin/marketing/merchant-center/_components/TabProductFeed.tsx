@@ -7,7 +7,7 @@ import {
   updateProductChannelVisibility, 
   bulkUpdateProductVisibility,
   syncSingleProductStatusFromGoogle // 🚀 NEW: সিঙ্গেল প্রোডাক্ট লাইভ স্ক্যানার অ্যাকশন ইম্পোর্ট
-} from "@/app/actions/backend/merchant-center/gmc-product-sync.actions";
+} from "@/app/actions/backend/marketing/gmc-product-sync.actions";
 
 interface Props {
   syncLogs: any[];

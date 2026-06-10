@@ -5,7 +5,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { ProductFormValues } from "../schema";
-import { searchGoogleCategories } from "@/app/actions/backend/merchant-center/gmc-mapping.actions"; // 🚀 গুগল ক্যাটাগরি সার্চ অ্যাকশন ইম্পোর্ট
+import { searchGoogleCategories } from "@/app/actions/backend/marketing/gmc-mapping.actions"; // 🚀 গুগল ক্যাটাগরি সার্চ অ্যাকশন ইম্পোর্ট
 
 export default function GoogleShopping() {
   const { register, setValue, watch } = useFormContext<ProductFormValues>();

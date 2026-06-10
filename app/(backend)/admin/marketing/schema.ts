@@ -1,4 +1,5 @@
-// File: app/(backend)/admin/settings/marketing/schema.ts
+//app/(backend)/admin/marketing/schema.ts
+
 import { z } from "zod";
 
 const jsonString = z.string().refine((val) => {

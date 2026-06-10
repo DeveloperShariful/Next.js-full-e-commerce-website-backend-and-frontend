@@ -3,7 +3,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { getGoogleAuthUrl } from "@/app/actions/backend/merchant-center/gmc-auth.actions";
+import { getGoogleAuthUrl } from "@/app/actions/backend/marketing/gmc-auth.actions";
 
 export default function Step1ConnectGoogle() {
   const [isPending, startTransition] = useTransition();

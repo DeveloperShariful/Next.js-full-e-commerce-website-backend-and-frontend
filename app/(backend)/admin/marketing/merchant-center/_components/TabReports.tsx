@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchGmcReportsData, GmcReportData } from "@/app/actions/backend/merchant-center/gmc-reports.actions";
+import { fetchGmcReportsData, GmcReportData } from "@/app/actions/backend/marketing/gmc-reports.actions";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from "recharts";

@@ -1,4 +1,4 @@
-//app/actions/backend/facebook/fb-settings.actions.ts
+//app/actions/backend/marketing/fb-settings.actions.ts
 
 "use server";
 

@@ -7,11 +7,11 @@ import {
   fetchAvailableMerchantAccounts, 
   saveSelectedMerchantAccount, 
   autoClaimWebsiteDomain 
-} from "@/app/actions/backend/merchant-center/gmc-onboarding.actions";
+} from "@/app/actions/backend/marketing/gmc-onboarding.actions";
 import { 
   fetchAvailableAdsAccounts, 
   saveGoogleAdsAccount 
-} from "@/app/actions/backend/merchant-center/gmc-auth.actions";
+} from "@/app/actions/backend/marketing/gmc-auth.actions";
 
 interface Props {
   config: any;

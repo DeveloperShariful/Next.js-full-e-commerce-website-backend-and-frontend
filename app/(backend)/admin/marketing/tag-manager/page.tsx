@@ -18,6 +18,7 @@ export default async function GtmPage() {
       gtmContainerId: true,
       gtmEnabled: true,
     }
+    
   }) || { googleAccountId: null, googleAccountImage: null, gtmContainerId: null, gtmEnabled: false };
 
   const sanitizedConfig = JSON.parse(JSON.stringify(config));

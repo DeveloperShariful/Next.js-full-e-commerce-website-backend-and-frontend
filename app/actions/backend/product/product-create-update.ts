@@ -9,7 +9,7 @@ import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, s
 import { auth } from "@/auth";
 
 // 🔥 GMC Sync Action
-import { syncProductToGoogle } from "@/app/actions/backend/merchant-center/gmc-product-sync.actions";
+import { syncProductToGoogle } from "@/app/actions/backend/marketing/gmc-product-sync.actions";
 
 import { parseProductFormData } from "./product-data-parser";
 import { 

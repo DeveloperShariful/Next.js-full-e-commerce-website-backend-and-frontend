@@ -1,7 +1,7 @@
 //File Path: app/api/auth/google/route.ts
 
 import { NextResponse } from "next/server";
-import { processGoogleCallback } from "@/app/actions/backend/merchant-center/gmc-auth.actions";
+import { processGoogleCallback } from "@/app/actions/backend/marketing/gmc-auth.actions";
 
 export async function GET(request: Request) {
   try {

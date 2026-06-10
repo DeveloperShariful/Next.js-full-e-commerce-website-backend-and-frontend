@@ -1,4 +1,4 @@
-//app/actions/backend/facebook/capi.actions.ts
+//app/actions/backend/marketing/capi.actions.ts
 
 "use server";
 

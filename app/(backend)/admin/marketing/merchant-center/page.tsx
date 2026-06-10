@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/prisma";
 import MainDashboard from "./_components/MainDashboard";
-import { syncLiveProductStatuses } from "@/app/actions/backend/merchant-center/gmc-product-sync.actions";
+import { syncLiveProductStatuses } from "@/app/actions/backend/marketing/gmc-product-sync.actions";
 
 export const dynamic = "force-dynamic";
 

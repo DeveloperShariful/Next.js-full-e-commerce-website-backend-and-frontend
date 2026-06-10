@@ -5,7 +5,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { toast, Toaster } from "react-hot-toast";
 import { Copy, Check, Info, Settings, HelpCircle, Save } from "lucide-react";
-import { getFbSettings, updateFbSettings, FbSettingsData } from "@/app/actions/backend/facebook/fb-settings.actions";
+import { getFbSettings, updateFbSettings, FbSettingsData } from "@/app/actions/backend/marketing/fb-settings.actions";
 
 export default function FacebookSettingsPage() {
   const [isPending, startTransition] = useTransition();
@@ -21,7 +21,6 @@ export default function FacebookSettingsPage() {
     fbDomainVerification: "",
   });
 
-  // ১. মাউন্ট হওয়ার সময় ডাটাবেজ থেকে ডেটা ফেচ করা
   useEffect(() => {
     setOrigin(window.location.origin);
     getFbSettings().then((res) => {
@@ -178,7 +177,7 @@ export default function FacebookSettingsPage() {
 
           </div>
 
-          {/* RIGHT COLUMN (Feed Panel & Help Guide) */}
+          {/* RIGHT COLUMN (🚀 Australian English Guide) */}
           <div className="lg:col-span-4 space-y-6">
              
              {/* Product Feed XML Panel */}
@@ -207,12 +206,13 @@ export default function FacebookSettingsPage() {
              <div className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm p-5 space-y-3">
                 <div className="flex items-center gap-2 border-b border-[#f0f0f1] pb-3">
                    <HelpCircle size={16} className="text-[#50575e]" />
-                   <h4 className="text-[13px] font-semibold text-[#1d2327] m-0">Quick Guide</h4>
+                   <h4 className="text-[13px] font-semibold text-[#1d2327] m-0">Meta Setup Guide</h4>
                 </div>
                 <ul className="list-decimal pl-4 m-0 text-[12px] text-[#50575e] space-y-2.5 leading-relaxed">
-                  <li>গুগল বা ফেসবুক পিক্সেল চালু করতে প্রথমে পিক্সেল আইডি এবং টোকেন দিন।</li>
-                  <li>CAPI টেস্ট করার জন্য আপনার ফেসবুক ইভেন্ট টেস্ট উইন্ডোর থেকে টেস্ট কোডটি এখানে বসিয়ে দিন।</li>
-                  <li>ক্যাটালগ অটো-সিঙ্ক করতে পাশে থাকা XML ফিড ইউআরএলটি কপি করে ফেসবুক কমার্স ম্যানেজার ড্যাশবোর্ডে "Scheduled Data Source" এ সেভ করুন।</li>
+                  <li>To enable browser tracking, please enter your <strong>Meta Pixel ID</strong>.</li>
+                  <li>For server-side tracking (Conversions API), generate your <strong>CAPI Access Token</strong> in your Meta Events Manager.</li>
+                  <li>To test server-side events in real-time, copy the test code from your Meta Event Testing window and paste it here.</li>
+                  <li>To automatically sync your product catalog to your Facebook Shop, copy the XML Feed URL on the left and paste it as a <strong>"Scheduled Feed"</strong> inside your Facebook Commerce Manager dashboard.</li>
                 </ul>
              </div>
 

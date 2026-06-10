@@ -10,12 +10,12 @@ import {
   fetchAvailableAdsAccounts,
   autoFetchAndSaveConversions,
   fetchAvailableConversionActions // 🚀 নতুন ম্যাজিক ফাংশন ইম্পোর্ট করা হলো
-} from "@/app/actions/backend/merchant-center/gmc-auth.actions";
+} from "@/app/actions/backend/marketing/gmc-auth.actions";
 import { 
   updateGmcSettings, 
   saveGoogleAdsConversionSettings, 
   GmcSettingsData 
-} from "@/app/actions/backend/merchant-center/gmc-settings.actions";
+} from "@/app/actions/backend/marketing/gmc-settings.actions";
 
 // ============================================================================
 // 🌍 GOOGLE SUPPORTED COUNTRIES & LANGUAGES

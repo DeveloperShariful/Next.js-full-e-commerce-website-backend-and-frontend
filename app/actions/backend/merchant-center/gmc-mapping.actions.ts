@@ -8,28 +8,24 @@ import { revalidatePath } from "next/cache";
 // ============================================================================
 // 1. GOOGLE TAXONOMY (CATEGORY) SEARCH ENGINE
 // ============================================================================
-// মেমোরি ক্যাশ (যাতে বারবার গুগলের সার্ভার থেকে ডাউনলোড করতে না হয়)
 let cachedTaxonomy: string[] | null = null;
 
 export async function searchGoogleCategories(query: string) {
   try {
-    // যদি ক্যাশ খালি থাকে, তবে গুগলের অফিসিয়াল সার্ভার থেকে 5500+ ক্যাটাগরি ডাউনলোড করবে
     if (!cachedTaxonomy) {
       const res = await fetch("https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt");
       const text = await res.text();
-      // প্রথম লাইনটি (হেডার) বাদ দিয়ে সব ক্যাটাগরি array তে নেওয়া হলো
       cachedTaxonomy = text.split('\n').slice(1).filter(Boolean);
     }
 
     if (!query || query.length < 2) {
-      return { success: true, data: cachedTaxonomy.slice(0, 50) }; // ডিফল্ট প্রথম ৫০টি দেখাবে
+      return { success: true, data: cachedTaxonomy.slice(0, 50) }; 
     }
 
-    // সার্চ কুয়েরি অনুযায়ী ফিল্টার করা (Case Insensitive)
     const q = query.toLowerCase();
     const results = cachedTaxonomy
       .filter((line) => line.toLowerCase().includes(q))
-      .slice(0, 50); // স্পিড ঠিক রাখার জন্য সর্বোচ্চ ৫০টি রেজাল্ট দিবে
+      .slice(0, 50); 
 
     return { success: true, data: results };
   } catch (error) {
@@ -49,7 +45,6 @@ export async function getStoreMappingData() {
       orderBy: { name: "asc" },
     });
 
-    // 🔥 FIX: values সহ ডাটা আনা হলো, যাতে UI-তে প্রিভিউ দেখানো যায়!
     const attributes = await db.attribute.findMany({
       where: { deletedAt: null },
       select: { id: true, name: true, slug: true, values: true }, 
@@ -61,7 +56,6 @@ export async function getStoreMappingData() {
       select: { gmcAttributeMapping: true },
     });
 
-    // Default Multi-Select Mapping Structure
     const defaultMapping = {
       attributes: {
         color: [], size: [], material: [], pattern: [], 
@@ -86,17 +80,18 @@ export async function getStoreMappingData() {
 }
 
 // ============================================================================
-// 3. SAVE ADVANCED MAPPING DATA
+// 3. SAVE ADVANCED MAPPING DATA (🚀 FIXED: BULLETPROOF UPDATE & UPSERT)
 // ============================================================================
 export async function saveGmcMapping(
   categoryMapping: { categoryId: string; googleCategory: string }[],
   attributeMappingPayload: any
 ) {
   try {
+    // 🚀 FIX 1: update এর জায়গায় updateMany ব্যবহার করা হয়েছে যাতে ডিলিট হওয়া আইডির কারণে ক্র্যাশ না করে
     if (categoryMapping && categoryMapping.length > 0) {
       await db.$transaction(
         categoryMapping.map((cat) => 
-          db.category.update({
+          db.category.updateMany({
             where: { id: cat.categoryId },
             data: { googleCategoryName: cat.googleCategory.trim() }
           })
@@ -104,18 +99,26 @@ export async function saveGmcMapping(
       );
     }
 
-    await db.marketingIntegration.update({
+    // 🚀 FIX 2: update এর জায়গায় upsert ব্যবহার করা হয়েছে যাতে রো-টি না থাকলে অটো তৈরি হয়
+    await db.marketingIntegration.upsert({
       where: { id: "marketing_config" },
-      data: {
+      update: {
         gmcAttributeMapping: attributeMappingPayload,
         gmcSetupStep: 4, 
         gmcContentApiEnabled: true, 
       },
+      create: {
+        id: "marketing_config",
+        gmcAttributeMapping: attributeMappingPayload,
+        gmcSetupStep: 4, 
+        gmcContentApiEnabled: true, 
+      }
     });
 
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true, message: "Advanced Mapping Configuration Saved Successfully!" };
   } catch (error: any) {
+    console.error("Save GMC Mapping Error:", error);
     return { success: false, error: "Failed to save mapping configuration." };
   }
 }

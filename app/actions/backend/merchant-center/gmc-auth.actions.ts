@@ -16,11 +16,13 @@ const oauth2Client = new google.auth.OAuth2(
   GOOGLE_REDIRECT_URI
 );
 
+// 🚀 GTM API Read-only scope যুক্ত করা হয়েছে
 const SCOPES = [
   "https://www.googleapis.com/auth/content", 
   "https://www.googleapis.com/auth/userinfo.email", 
   "https://www.googleapis.com/auth/siteverification", 
-  "https://www.googleapis.com/auth/adwords" 
+  "https://www.googleapis.com/auth/adwords",
+  "https://www.googleapis.com/auth/tagmanager.readonly" // 🚀 GTM Read-only Scope
 ];
 
 // ============================================================================
@@ -35,12 +37,13 @@ export async function getGoogleAuthUrl() {
     });
     return { success: true, url: authUrl };
   } catch (error: any) {
+    console.error("Error generating Google Auth URL:", error);
     return { success: false, error: "Failed to generate authentication URL." };
   }
 }
 
 // ============================================================================
-// 2. PROCESS GOOGLE OAUTH CALLBACK
+// 2. PROCESS GOOGLE OAUTH CALLBACK (Saves Token and User Info)
 // ============================================================================
 export async function processGoogleCallback(code: string) {
   try {
@@ -76,12 +79,13 @@ export async function processGoogleCallback(code: string) {
 
     return { success: true, email: adminEmail };
   } catch (error: any) {
+    console.error("Error processing Google Callback:", error);
     return { success: false, error: error.message || "Failed to process Google login." };
   }
 }
 
 // ============================================================================
-// 3. DISCONNECT GOOGLE ACCOUNT
+// 3. DISCONNECT GOOGLE ACCOUNT (Complete Wipeout of GMC, Ads, and Conversion Data)
 // ============================================================================
 export async function disconnectGoogleAccount() {
   try {
@@ -92,7 +96,7 @@ export async function disconnectGoogleAccount() {
 
     if (config?.googleAccessToken) {
       try { await oauth2Client.revokeToken(config.googleAccessToken); } 
-      catch (e) { console.warn("Token revoke failed."); }
+      catch (e) { console.warn("Token revoke failed in background.", e); }
     }
 
     await db.marketingIntegration.update({
@@ -118,23 +122,25 @@ export async function disconnectGoogleAccount() {
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true, message: "Google account disconnected." };
   } catch (error: any) {
+    console.error("Error disconnecting Google account:", error);
     return { success: false, error: "Failed to disconnect Google account." };
   }
 }
 
 // ============================================================================
-// 4. SAVE CONNECTED ADS ACCOUNT
+// 4. SAVE CONNECTED ADS ACCOUNT (Updates Linking and default conversion setup)
 // ============================================================================
 export async function saveGoogleAdsAccount(accountId: string, accountName: string) {
   try {
-    if (!accountId) return { success: false, error: "Account ID is required." };
+    if (!accountId) return { success: false, error: "Google Ads Account ID is required." };
+
     const formattedId = accountId.replace(/-/g, "");
 
     await db.marketingIntegration.update({
       where: { id: "marketing_config" },
       data: {
         googleAdsAccountId: formattedId, 
-        googleAdsAccountName: accountName,
+        googleAdsAccountName: accountName || `Ads Account: ${accountId.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`,
         googleAdsConnected: true,
         googleAdsLinkStatus: "LINKED", 
       },
@@ -143,12 +149,13 @@ export async function saveGoogleAdsAccount(accountId: string, accountName: strin
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true, message: "Google Ads account connected successfully!" };
   } catch (error: any) {
+    console.error("Error saving Google Ads account:", error);
     return { success: false, error: "Failed to save Google Ads account." };
   }
 }
 
 // ============================================================================
-// 5. DISCONNECT GOOGLE ADS ACCOUNT ONLY
+// 5. DISCONNECT GOOGLE ADS ACCOUNT ONLY (Wipes Ads data while maintaining GMC)
 // ============================================================================
 export async function disconnectGoogleAdsAccount() {
   try {
@@ -168,12 +175,13 @@ export async function disconnectGoogleAdsAccount() {
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true, message: "Google Ads account disconnected." };
   } catch (error: any) {
+    console.error("Error disconnecting Google Ads account:", error);
     return { success: false, error: "Failed to disconnect Google Ads account." };
   }
 }
 
 // ============================================================================
-// 7. FETCH AVAILABLE ADS ACCOUNTS (🚀 FIXED: NO MORE SILENT FAILURES)
+// 🚀 6. FETCH AVAILABLE ADS ACCOUNTS (Upgraded to Stable v17 REST API)
 // ============================================================================
 export async function fetchAvailableAdsAccounts() {
   try {
@@ -183,6 +191,7 @@ export async function fetchAvailableAdsAccounts() {
     });
 
     if (!config?.googleAccessToken) return { success: false, error: "Google account not connected." };
+
     const devToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
     if (!devToken || devToken.trim() === "") return { success: true, needsManualInput: true, accounts: [] };
 
@@ -202,10 +211,9 @@ export async function fetchAvailableAdsAccounts() {
       cache: "no-store", 
     });
 
-    // 🚀 FIX: আমি এই জায়গাটা বাদ দিয়েছিলাম! এখন গুগলের এরর সরাসরি স্ক্রিনে এবং টার্মিনালে দেখাবে
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      console.error("\n❌ GOOGLE API ERROR (FETCH ACCOUNTS):", JSON.stringify(errData, null, 2));
+      console.error("❌ Google Ads List API Error:", JSON.stringify(errData, null, 2));
       return { 
         success: false, 
         error: errData?.error?.message || "Failed to fetch accounts. Token might be expired or restricted.", 
@@ -271,7 +279,7 @@ export async function fetchAvailableAdsAccounts() {
 }
 
 // ============================================================================
-// 🚀 7. MAGIC FEATURE: AUTO-FETCH & SAVE CONVERSION TRACKING ID & LABEL (FIXED REGEX)
+// 🚀 7. MAGIC FEATURE: AUTO-FETCH OR AUTO-CREATE CONVERSION TRACKING
 // ============================================================================
 export async function autoFetchAndSaveConversions(accountId: string) {
   try {
@@ -328,11 +336,9 @@ export async function autoFetchAndSaveConversions(accountId: string) {
     const eventSnippet = snippets[0].eventSnippet || "";
     const globalSiteTag = snippets[0].globalSiteTag || "";
 
-    // 🚀 ১০০% বুলেটপ্রুফ রেগুলার এক্সপ্রেশন (সিঙ্গেল/ডাবল কোটেশন যাই থাকুক, আইডি ও লেবেল কেটে বের করবে)
     const idMatch = globalSiteTag.match(/AW-\d+/) || eventSnippet.match(/AW-\d+/);
     const convId = idMatch ? idMatch[0] : null;
 
-    // লেবেল কাটার ফ্লেক্সিবল লজিক
     const labelMatch = eventSnippet.match(/AW-\d+\/([a-zA-Z0-9_ -]+)/);
     const convLabel = labelMatch ? labelMatch[1] : null;
 
@@ -381,7 +387,6 @@ export async function fetchAvailableConversionActions(accountId: string) {
       "login-customer-id": formattedAccountId 
     };
 
-    // 🚀 গুগলের সবকটি একটিভ কনভার্সন অ্যাকশন নিয়ে আসার কোয়েরি
     const query = `
       SELECT conversion_action.id, conversion_action.name, conversion_action.tag_snippets 
       FROM conversion_action 
@@ -404,7 +409,6 @@ export async function fetchAvailableConversionActions(accountId: string) {
        return { success: true, actions: [] };
     }
 
-    // 🚀 প্রতিটি কনভার্সনের নাম, আইডি এবং তাদের ভেতরের ট্যাগ কেটে লিস্ট বানানো হচ্ছে
     const actionsList = results.map((row: any) => {
       const action = row.conversionAction || {};
       const name = action.name || "Unnamed Action";
@@ -425,12 +429,7 @@ export async function fetchAvailableConversionActions(accountId: string) {
         convLabel = labelMatch ? labelMatch[1] : "";
       }
 
-      return {
-        id,
-        name, // যেমন: "Go Bike's Purchase"
-        convId,
-        convLabel
-      };
+      return { id, name, convId, convLabel };
     });
 
     return { success: true, actions: actionsList };

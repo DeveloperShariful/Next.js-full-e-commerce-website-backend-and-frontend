@@ -1,4 +1,4 @@
-// File: app/(backend)/admin/settings/marketing-settings/_schema/marketing-validation.ts
+// File: app/(backend)/admin/settings/marketing/schema.ts
 import { z } from "zod";
 
 const jsonString = z.string().refine((val) => {

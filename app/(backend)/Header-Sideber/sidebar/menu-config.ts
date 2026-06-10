@@ -6,7 +6,7 @@ import {
   TicketPercent, BarChart3, Settings, 
   FileText, ShieldCheck, MessageSquare, ScrollText, 
   Undo2, Megaphone, Truck, MedalIcon, MessageCircle,
-  Handshake, Link, Network, UserPlus
+  Handshake, Link, Network, UserPlus, Facebook
 } from "lucide-react";
 import { Role } from "@prisma/client";
 
@@ -17,7 +17,7 @@ export interface SidebarItem {
   icon?: any;
   roles?: Role[];
   // 🚀 New: Submenu support
-  submenu?: { name: string; href: string; icon?: any }[]; 
+  submenu?: { name: string; href: string; icon?: any ; roles?: Role[];}[]; 
 }
 
 export interface SidebarGroup {
@@ -46,18 +46,18 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Package,
         // 🚀 All Catalog Items are now children
         submenu: [
-           { name: "All Products", href: "/admin/products" },
-           { name: "Categories", href: "/admin/categories" },
-           { name: "Brands", href: "/admin/brands" },
-           { name: "Attributes", href: "/admin/attributes" },
-           { name: "Tags", href: "/admin/tags" },
-           { name: "Reviews", href: "/admin/reviews" },
-           { name: "Inventory", href: "/admin/inventory" },
+           { name: "All Products", href: "/admin/products", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
+           { name: "Categories", href: "/admin/categories", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
+           { name: "Brands", href: "/admin/brands" , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+           { name: "Attributes", href: "/admin/attributes", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
+           { name: "Tags", href: "/admin/tags", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
+           { name: "Reviews", href: "/admin/reviews", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
+           { name: "Inventory", href: "/admin/inventory" , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
            
         ]
       },
-      { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
-      { name: "Media", href: "/admin/media" ,icon: MedalIcon },
+      { name: "Orders", href: "/admin/orders", icon: ShoppingCart, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
+      { name: "Media", href: "/admin/media" ,icon: MedalIcon , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
       
     ]
   },
@@ -66,20 +66,27 @@ export const sidebarConfig: SidebarGroup[] = [
     items: [
       { name: "Invoices", href: "/admin/invoices", icon: FileText },
       { name: "Shipments", href: "/admin/shipments", icon: Truck },
-      { name: "Refunds", href: "/admin/refunds", icon: Undo2 },
+      { name: "Refunds", href: "/admin/refunds", icon: Undo2, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
       { name: "Support Ticket", href: "/admin/support", icon: MessageSquare },
       { name: "Warranty-Cliem", href: "/admin/warranty-claims", icon: Megaphone },
     ]
   },
   {
     title: "Marketing",
-    items: [
-      { name: "Coupons", href: "/admin/coupons", icon: TicketPercent },
-      { name: "Marketing-Integrations", href: "/admin/marketing", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-      { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-      { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-      { name: "Merchant Center", href: "/admin/marketing/merchant-center", icon: Link, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-    ]
+    items: [ { 
+        name: "Marketing", // Parent Item
+        href: "/admin/marketing",    // Double Click Link
+        icon: Package,
+        submenu: [
+         { name: "Coupons", href: "/admin/coupons", icon: TicketPercent },
+         { name: "Marketing-Integrations", href: "/admin/marketing", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Merchant Center", href: "/admin/marketing/merchant-center", icon: Link, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Facebook", href: "/admin/marketing/facebook", icon: Facebook, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+        ]
+      }
+    ] 
   },
   {
     title: "System",

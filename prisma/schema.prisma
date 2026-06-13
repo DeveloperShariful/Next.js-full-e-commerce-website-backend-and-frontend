@@ -53,6 +53,7 @@ enum OrderStatus {
   PENDING
   AWAITING_PAYMENT
   PROCESSING
+  COMPLETED
   PACKED
   SHIPPED
   DELIVERED
@@ -639,7 +640,7 @@ model Product {
   googleTitle              String?                // গুগলের জন্য কাস্টম টাইটেল (SEO অপ্টিমাইজেশনের জন্য)
   googleDescription        String?                @db.Text // গুগলের জন্য কাস্টম ডেসক্রিপশন
   googleIsBundle           Boolean                @default(false) // এটি গুগলকে জানাবে প্রোডাক্টটি কাস্টম বান্ডেল কিনা
-
+  analytics                ProductAnalytics[]
   name                     String
   slug                     String                 @unique
   description              String?                @db.Text
@@ -1035,6 +1036,11 @@ model Order {
   userId                 String?
   user                   User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
   guestEmail             String?
+  isFirstOrder           Boolean  @default(false)  // এটি True হলে বুঝবেন সে New Customer
+  utmSource              String?  // e.g. "facebook", "google", "newsletter"
+  utmMedium              String?  // e.g. "cpc", "social", "email"
+  utmCampaign            String?  // e.g. "summer_sale_2025"
+  referringSite          String?  // কোন ওয়েবসাইট থেকে আসল
   status                 OrderStatus        @default(PENDING)
   paymentStatus          PaymentStatus      @default(UNPAID)
   fulfillmentStatus      FulfillmentStatus  @default(UNFULFILLED)
@@ -1866,14 +1872,56 @@ model Notification {
 }
 
 model Analytics {
-  id          String   @id @default(uuid())
-  date        DateTime @default(now()) @db.Date
-  totalSales  Decimal  @default(0) @db.Decimal(12, 2)
-  totalOrders Int      @default(0)
-  visitors    Int      @default(0)
+  id                 String   @id @default(uuid())
+  date               DateTime @default(now()) @db.Date // প্রতিদিনের জন্য একটি রো তৈরি হবে
+
+  // --- Sales Metrics (WooCommerce Overview) ---
+  grossSales         Decimal  @default(0) @db.Decimal(12, 2) // ট্যাক্স, শিপিং, ডিসকাউন্ট বাদে অরিজিনাল দাম
+  netSales           Decimal  @default(0) @db.Decimal(12, 2) // ডিসকাউন্ট ও রিফান্ড বাদ দেওয়ার পর প্রকৃত সেল
+  totalTax           Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকা ট্যাক্স আসল
+  totalShipping      Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন শিপিং বাবদ কত টাকা আসল
+  totalDiscounts     Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকার কুপন/ডিসকাউন্ট দেওয়া হলো
+  totalRefunds       Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকা রিফান্ড করা হলো
+
+  // --- Order & Item Metrics ---
+  totalOrders        Int      @default(0) // ওই দিনের মোট সফল অর্ডার
+  productsSold       Int      @default(0) // মোট কত পিস প্রোডাক্ট বিক্রি হলো
+  variationsSold     Int      @default(0) // এর মধ্যে কতগুলো ভ্যারিয়েশন ছিল
+
+  // --- Customer Metrics (Shopify Style) ---
+  newCustomers       Int      @default(0) // যারা জীবনে প্রথমবার অর্ডার করল
+  returningCustomers Int      @default(0) // যারা আগেও কিনেছে, আজ আবার কিনল
+
+  // --- Cart & Checkout Metrics ---
+  abandonedCheckouts Int      @default(0) // কতজন পেমেন্ট পেজ থেকে চলে গেছে
+  recoveredCheckouts Int      @default(0) // কতজন ইমেইল পেয়ে আবার এসে পেমেন্ট করেছে
+
+  // --- Traffic Metrics (Redis থেকে দিনশেষে আপডেট হবে) ---
+  totalVisitors      Int      @default(0) // ইউনিক ইউজার
+  totalPageViews     Int      @default(0) // মোট পেজ ভিউ
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
 
   @@unique([date])
-  @@index([date, totalSales])
+  @@index([date, netSales])
+}
+
+model ProductAnalytics {
+  id             String   @id @default(uuid())
+  date           DateTime @db.Date
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId     String?  // ক্যাটাগরি লিডারবোর্ড দেখানোর জন্য
+  
+  itemsSold      Int      @default(0) // আজ এই প্রোডাক্টটি কত পিস বিক্রি হলো
+  netSales       Decimal  @default(0) @db.Decimal(12, 2) // এই প্রোডাক্ট থেকে আজ কত টাকা আসল
+  views          Int      @default(0) // আজ কতবার দেখা হলো (Redis থেকে আসবে)
+
+  @@unique([date, productId])
+  @@index([date])
+  @@index([categoryId, date])
+  @@index([itemsSold(sort: Desc)])
 }
 
 model MediaFolder {

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { updateOrderStatus } from "@/app/actions/backend/order/update-status";
-import { deleteOrder } from "@/app/actions/backend/order/order-actions";
+import { deleteOrder } from "@/app/actions/backend/order/bulk-update";
 
 // ✅ STRICT TYPES IMPORT
 import { OrderDetailsType } from "../types";

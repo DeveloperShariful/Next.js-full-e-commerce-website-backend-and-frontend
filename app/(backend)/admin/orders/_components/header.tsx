@@ -4,13 +4,15 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+// 🔥 FIXED: Imported useTransition for route loading state
+import { useState, useTransition } from "react";
 import { OrderImportExportButtons } from "./import-export-buttons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { DateRange } from "react-day-picker";
-import { CalendarIcon } from "lucide-react";
+// 🔥 FIXED: Imported Loader2 for spinning animation
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrdersHeaderProps {
@@ -21,9 +23,18 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // 🔥 NEW: Transition hook for smooth loading animation
+  const [isPending, startTransition] = useTransition();
+  const [activeAction, setActiveAction] = useState<"filter" | "search" | null>(null);
+
   const currentStatus = searchParams.get("status") || "all";
   const [query, setQuery] = useState(searchParams.get("query") || "");
-  const [date, setDate] = useState<DateRange | undefined>(undefined);
+  const [date, setDate] = useState<DateRange | undefined>(() => {
+    const sd = searchParams.get("startDate");
+    const ed = searchParams.get("endDate");
+    if (sd) return { from: new Date(sd), to: ed ? new Date(ed) : new Date(sd) };
+    return undefined;
+  });
   const [paymentMethod, setPaymentMethod] = useState<string>(searchParams.get("paymentMethod") || "all");
 
   const updateFilters = (newParams: Record<string, string | undefined>) => {
@@ -33,7 +44,11 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
           else params.delete(key);
       });
       params.set("page", "1");
-      router.push(`/admin/orders?${params.toString()}`);
+
+      // 🔥 FIXED: Wrapped router.push in startTransition to show loading state
+      startTransition(() => {
+          router.push(`/admin/orders?${params.toString()}`);
+      });
   };
 
   const handleStatusChange = (val: string) => {
@@ -42,16 +57,16 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setActiveAction("search");
     updateFilters({ query: query || undefined });
   };
 
   const applyFilters = () => {
+    setActiveAction("filter");
     let startDate, endDate;
     if (date?.from) {
-        const toDate = date.to ? date.to : date.from;
-        toDate.setHours(23, 59, 59, 999);
-        startDate = date.from.toISOString();
-        endDate = toDate.toISOString();
+        startDate = format(date.from, "yyyy-MM-dd");
+        endDate = date.to ? format(date.to, "yyyy-MM-dd") : startDate;
     }
     
     updateFilters({ 
@@ -61,7 +76,6 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
     });
   };
 
-  // Status map to match WooCommerce labels exactly (Now fully visible thanks to backend update)
   const statuses = [
     { id: "all", label: "All", countKey: "all" },
     { id: "PENDING", label: "Pending payment", countKey: "pending" },
@@ -75,8 +89,6 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
 
   return (
     <div className="mb-2">
-      
-      {/* Top Header: Title & Add New Button (Responsive) */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
         <div className="flex items-center gap-3">
           <h1 className="text-[23px] font-normal text-[#1d2327]">Orders</h1>
@@ -93,10 +105,7 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
         </div>
       </div>
 
-      {/* Status Links & Search Box (Responsive Flex-wrap) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 text-[13px] gap-3 md:gap-0">
-        
-        {/* Status Links */}
         <ul className="flex flex-wrap items-center text-[#646970] gap-y-1 m-0 p-0 list-none">
           {statuses.map((status, index) => {
             const count = counts[status.countKey] || 0;
@@ -108,8 +117,9 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
               <li key={status.id} className="inline-block mr-1">
                 <button
                   onClick={() => handleStatusChange(status.id)}
+                  disabled={isPending}
                   className={cn(
-                    "hover:text-[#135e96] transition-colors",
+                    "hover:text-[#135e96] transition-colors disabled:opacity-50",
                     isActive ? "text-[#000] font-semibold" : "text-[#2271b1]"
                   )}
                 >
@@ -121,33 +131,37 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
           })}
         </ul>
 
-        {/* WooCommerce style Search Box (Full width on mobile) */}
         <form onSubmit={handleSearch} className="flex items-center w-full md:w-auto">
             <input 
                 type="search" 
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="border border-[#8c8f94] bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none w-full md:w-[200px]"
+                disabled={isPending}
+                className="border border-[#8c8f94] bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none w-full md:w-[200px] disabled:bg-gray-100"
                 placeholder="Search orders..."
             />
             <button 
                 type="submit" 
-                className="ml-1 border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors whitespace-nowrap"
+                disabled={isPending}
+                className="ml-1 border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors whitespace-nowrap disabled:opacity-70 flex items-center gap-1.5"
             >
-                Search orders
+                {/* 🔥 FIXED: Show spinner when searching */}
+                {isPending && activeAction === "search" ? (
+                   <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching...</>
+                ) : (
+                   "Search orders"
+                )}
             </button>
         </form>
-
       </div>
 
-      {/* WordPress Table Navigation Top (Filters - Stacked on Mobile) */}
       <div className="flex flex-col sm:flex-row flex-wrap gap-2 my-3 text-[13px]">
-         
          <Popover>
             <PopoverTrigger asChild>
                 <button
+                    disabled={isPending}
                     className={cn(
-                        "h-[30px] px-2 border border-[#8c8f94] bg-white text-left flex items-center w-full sm:w-auto min-w-[150px] shadow-sm",
+                        "h-[30px] px-2 border border-[#8c8f94] bg-white text-left flex items-center w-full sm:w-auto min-w-[150px] shadow-sm disabled:opacity-70",
                         !date && "text-[#32373c]"
                     )}
                 >
@@ -180,7 +194,8 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
          <select 
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
-            className="h-[30px] px-2 border border-[#8c8f94] bg-white text-[#32373c] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none shadow-sm w-full sm:w-auto min-w-[160px]"
+            disabled={isPending}
+            className="h-[30px] px-2 border border-[#8c8f94] bg-white text-[#32373c] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none shadow-sm w-full sm:w-auto min-w-[160px] disabled:bg-gray-100"
          >
             <option value="all">All sales channels</option>
             <option value="stripe">Stripe</option>
@@ -190,12 +205,17 @@ export const OrdersHeader = ({ counts }: OrdersHeaderProps) => {
 
          <button 
             onClick={applyFilters}
-            className="border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors shadow-sm w-full sm:w-auto"
+            disabled={isPending}
+            className="border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors shadow-sm w-full sm:w-auto disabled:opacity-70 flex items-center gap-1.5"
          >
-            Filter
+            {/* 🔥 FIXED: Show spinner when filtering */}
+            {isPending && activeAction === "filter" ? (
+               <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Filtering...</>
+            ) : (
+               "Filter"
+            )}
          </button>
       </div>
-
     </div>
   );
 };

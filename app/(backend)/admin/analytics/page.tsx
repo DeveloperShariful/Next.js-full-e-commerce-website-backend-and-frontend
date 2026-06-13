@@ -1,163 +1,110 @@
-//app/(backend)/admin/analytics/page.tsx
+// Location: app/(backend)/admin/analytics/page.tsx
 
-"use client";
+import React from "react";
+import { getOverviewData } from "@/app/actions/backend/analytics/overview.actions";
+import { getLeaderboardsData } from "@/app/actions/backend/analytics/leaderboards.actions";
+import { parseDateRange } from "@/app/actions/backend/analytics/shared.utils";
+import { format } from "date-fns"; // 🔥 NEW: Imported for formatting dates
 
-import { useState, useEffect } from "react";
-import { getAnalyticsDashboardData } from "@/app/actions/backend/analytics";
-import { AnalyticsResponse, Period } from "@/app/actions/backend/analytics/types";
-import { Loader2, AlertCircle } from "lucide-react";
+import SummaryCards from "./_components/summary-cards";
+import AnalyticsChart from "./_components/analytics-chart";
+import DateRangePicker from "./_components/date-range-picker";
+import OverviewLeaderboards from "./_components/overview-leaderboards";
 
-// Components
-import { AnalyticsHeader } from "./_components/analytics-header";
-import { KpiStatsGrid } from "./_components/kpi-stats-grid";
-import { SalesGrowthChart } from "./_components/sales-growth-chart";
-import { OperationsWidget } from "./_components/operations-widget";
-import { ProductInsightsWidget } from "./_components/product-insights-widget";
-import { CustomerInsightsWidget } from "./_components/customer-insights-widget";
-import { ForecastWidget } from "./_components/forecast-widget";
-import { TrafficConversionWidget } from "./_components/traffic-conversion-widget";
-import { BrandReputationWidget } from "./_components/brand-reputation-widget";
+type SearchParams = Promise<{ period?: string; compare?: string; from?: string; to?: string }>;
 
-export default function AnalyticsPage() {
-  const [period, setPeriod] = useState<Period>("30d");
-  const [data, setData] = useState<AnalyticsResponse | null>(null);
+interface PageProps {
+  searchParams: SearchParams;
+}
+
+export default async function AnalyticsOverviewPage(props: PageProps) {
+  const searchParams = await props.searchParams;
+
+  const period = searchParams.period || "month_to_date"; 
+  const compareParam = searchParams.compare;
+  const compare = compareParam !== undefined ? compareParam : "previous_year"; 
   
-  // Two loading states: 
-  // 1. initialLoad: Shows full screen spinner (First time only)
-  // 2. isFetching: Shows subtle indicators (When switching tabs)
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const customFrom = searchParams.from;
+  const customTo = searchParams.to;
+  
+  const dates = parseDateRange(period, compare, customFrom, customTo);
+  const isComparing = compare !== "none";
 
-  useEffect(() => {
-    let isMounted = true;
+  const [overviewData, leaderboardsData] = await Promise.all([
+    getOverviewData(dates.current, dates.previous),
+    getLeaderboardsData(dates.current)
+  ]);
 
-    async function fetchData() {
-      // If we already have data, it's a "refetch", so use isFetching
-      if (data) {
-        setIsFetching(true);
-      } else {
-        setInitialLoad(true);
-      }
+  // 🔥 NEW: Formatting dates for the Chart Legend
+  const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime() 
+      ? format(dates.current.from, "MMM d, yyyy")
+      : `${format(dates.current.from, "MMM d")} - ${format(dates.current.to, "d, yyyy")}`;
       
-      setError(null);
-      
-      try {
-        const res = await getAnalyticsDashboardData(period);
-        
-        if (isMounted) {
-          if (res.success && res.data) {
-            // ✅ FIX: Serialize data to handle any remaining Decimal objects safely
-            setData(JSON.parse(JSON.stringify(res.data)));
-          } else {
-            setError(res.error || "Failed to load analytics data.");
-          }
-        }
-      } catch (err) {
-        if (isMounted) setError("An unexpected error occurred.");
-        console.error(err);
-      } finally {
-        if (isMounted) {
-          setInitialLoad(false);
-          setIsFetching(false);
-        }
-      }
-    }
+  const previousDateLabel = dates.previous.from.getTime() === dates.previous.to.getTime() 
+      ? format(dates.previous.from, "MMM d, yyyy")
+      : `${format(dates.previous.from, "MMM d")} - ${format(dates.previous.to, "d, yyyy")}`;
 
-    fetchData();
-
-    return () => { isMounted = false; };
-  }, [period]);
-
-  // --- 1. Initial Full Screen Loading ---
-  if (initialLoad) {
-    return (
-      <div className="h-[calc(100vh-100px)] w-full flex flex-col items-center justify-center bg-slate-50/50">
-        <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
-        <h3 className="text-slate-800 font-bold text-lg">Initializing Analytics...</h3>
-        <p className="text-slate-500 text-sm mt-1 animate-pulse">Calculating Revenue, Traffic & Forecasts</p>
-      </div>
-    );
-  }
-
-  // --- 2. Error State ---
-  if (error) {
-    return (
-      <div className="p-8 flex items-center justify-center h-[50vh]">
-        <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-100 shadow-sm max-w-md w-full text-center">
-          <AlertCircle className="h-10 w-10 mx-auto mb-3 text-red-500" />
-          <h3 className="text-lg font-bold mb-2">Data Load Failed</h3>
-          <p className="text-sm opacity-80 mb-6">{error}</p>
-          <button 
-            onClick={() => setPeriod(period)}
-            className="px-6 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 transition"
-          >
-            Retry Connection
-          </button>
+  return (
+    <div className="w-full">
+      <div className="bg-white border border-[#c3c4c7] shadow-sm p-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 rounded-sm">
+        <div className="w-full sm:w-auto">
+          <h2 className="text-[13px] font-semibold text-[#50575e] mb-2 uppercase tracking-wide">Date range:</h2>
+          <DateRangePicker />
         </div>
       </div>
-    );
-  }
 
-  // --- 3. Main Dashboard (With Overlay Loading Support) ---
-  return (
-    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6 lg:p-8 space-y-8 pb-24 relative">
-      
-      {/* Header receives isFetching to show localized spinner */}
-      <AnalyticsHeader period={period} setPeriod={setPeriod} isFetching={isFetching} />
+      <SummaryCards 
+        current={overviewData.currentSummary} 
+        previous={overviewData.previousSummary} 
+        isComparing={isComparing} 
+      />
 
-      {/* Content Wrapper: Reduces opacity slightly when fetching new data */}
-      <div className={`space-y-8 transition-opacity duration-300 ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+      <h2 className="text-[18px] text-[#1d2327] mb-4 font-normal mt-8">sessions</h2>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         
-        {data && (
-          <>
-            <section>
-              <KpiStatsGrid summary={data.summary} />
-            </section>
+        {/* Total Sales Chart */}
+        <div className="border border-[#c3c4c7] shadow-sm rounded-sm overflow-hidden bg-white flex flex-col">
+          <div className="flex-1">
+            <AnalyticsChart 
+              currentPeriod={overviewData.currentPeriod} 
+              previousPeriod={overviewData.previousPeriod} 
+              metricKey="grossSales" // Total Sales
+              isCurrency={true} 
+              isComparing={isComparing}
+              // 🔥 NEW: Required props for custom chart header
+              metricLabel="Total sales"
+              currentTotal={overviewData.currentSummary.totalSales}
+              previousTotal={overviewData.previousSummary.totalSales}
+              currentDateLabel={currentDateLabel}
+              previousDateLabel={previousDateLabel}
+            />
+          </div>
+        </div>
 
-            <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2">
-                 <SalesGrowthChart data={data.salesChart} />
-              </div>
-              <div className="xl:col-span-1">
-                 <ForecastWidget data={data.salesForecast} />
-              </div>
-            </section>
+        {/* Net Sales Chart */}
+        <div className="border border-[#c3c4c7] shadow-sm rounded-sm overflow-hidden bg-white flex flex-col">
+          <div className="flex-1">
+            <AnalyticsChart 
+              currentPeriod={overviewData.currentPeriod} 
+              previousPeriod={overviewData.previousPeriod} 
+              metricKey="netSales" 
+              isCurrency={true} 
+              isComparing={isComparing}
+              // 🔥 NEW: Required props for custom chart header
+              metricLabel="Net sales"
+              currentTotal={overviewData.currentSummary.netSales}
+              previousTotal={overviewData.previousSummary.netSales}
+              currentDateLabel={currentDateLabel}
+              previousDateLabel={previousDateLabel}
+            />
+          </div>
+        </div>
 
-            <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                 <TrafficConversionWidget 
-                    funnel={data.conversionFunnel} 
-                    mostViewed={data.mostViewedProducts} 
-                 />
-              </div>
-              <div className="xl:col-span-1">
-                 <BrandReputationWidget 
-                    reviews={data.reviewSummary}
-                    brands={data.brandPerformance}
-                 />
-              </div>
-            </section>
-
-            <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-               <ProductInsightsWidget 
-                  topProducts={data.topProducts} 
-                  inventory={data.inventoryHealth}
-                  categories={data.categoryPerformance}
-               />
-               <CustomerInsightsWidget 
-                  demographics={data.customerDemographics}
-                  retention={data.customerTypeBreakdown}
-                  topCustomers={data.topCustomers}
-               />
-               <OperationsWidget 
-                  statusData={data.orderStatusDistribution} 
-                  cartMetrics={data.cartMetrics}
-               />
-            </section>
-          </>
-        )}
       </div>
+
+      <OverviewLeaderboards data={leaderboardsData} />
     </div>
   );
 }

@@ -35,14 +35,25 @@ export const round = (num: number): number => {
   return Math.round(num * 100) / 100;
 };
 
+// 🔥 FIXED: Changed 'totalSales' to 'netSales' and 'grossSales' to match schema
 export async function updateAnalytics(amount: number) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     try {
         await db.analytics.upsert({
             where: { date: today },
-            update: { totalSales: { increment: amount }, totalOrders: { increment: 1 } },
-            create: { date: today, totalSales: amount, totalOrders: 1, visitors: 0 }
+            update: { 
+              netSales: { increment: amount }, 
+              grossSales: { increment: amount }, 
+              totalOrders: { increment: 1 } 
+            },
+            create: { 
+              date: today, 
+              netSales: amount, 
+              grossSales: amount, 
+              totalOrders: 1, 
+              totalVisitors: 0 // FIXED: Changed visitors to totalVisitors based on schema
+            }
         });
     } catch (error) {
         console.error("Analytics Error:", error);

@@ -77,16 +77,16 @@ export const sidebarConfig: SidebarGroup[] = [
         href: "/admin/marketing",    // Double Click Link
         icon: Package,
         submenu: [
-         { name: "Coupons", href: "/admin/coupons", icon: TicketPercent , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]},
-         { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-         { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
          { name: "Klaviyo", href: "/admin/marketing/klaviyo", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
          { name: "Facebook", href: "/admin/marketing/facebook", icon: UserPlus, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
          { name: "Tag-Manager", href: "/admin/marketing/tag-manager", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
          { name: "Merchant Center", href: "/admin/marketing/merchant-center", icon: Link, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
          { name: "Search-Console", href: "/admin/marketing/search-console", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
         ]
-      }
+      },
+      { name: "Coupons", href: "/admin/coupons", icon: TicketPercent , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]},
+      { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
     ] 
   },
   {

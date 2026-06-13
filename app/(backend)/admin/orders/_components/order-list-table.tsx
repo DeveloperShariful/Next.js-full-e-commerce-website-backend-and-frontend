@@ -8,7 +8,7 @@ import Link from "next/link";
 import { format, formatDistanceToNow, isToday } from "date-fns";
 import { toast } from "sonner"; 
 import { Eye, Check, Loader2, Trash2, RefreshCcw, AlertTriangle, Truck } from "lucide-react";
-import { bulkUpdateOrderStatus, deleteOrder, restoreOrder } from "@/app/actions/backend/order/order-actions";
+import { bulkUpdateOrderStatus, deleteOrder, restoreOrder } from "@/app/actions/backend/order/bulk-update";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface OrderListTableProps {
@@ -21,6 +21,7 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
   const { formatPrice } = useGlobalStore(); 
   
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  // 🟢 isPending already existed, we just need to use it in the button
   const [isPending, startTransition] = useTransition();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState<string>("");
@@ -133,12 +134,12 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
   return (
     <div className={`transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
         
-        {/* Bulk Actions Bar */}
         <div className="flex items-center gap-1 mb-2">
             <select 
                 value={bulkAction}
                 onChange={(e) => setBulkAction(e.target.value)}
-                className="border border-[#8c8f94] bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:border-[#2271b1] focus:ring-1 outline-none shadow-sm min-w-[150px]"
+                disabled={isPending}
+                className="border border-[#8c8f94] bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:border-[#2271b1] focus:ring-1 outline-none shadow-sm min-w-[150px] disabled:bg-gray-100"
             >
                 <option value="">Bulk actions</option>
                 {!isTrashView ? (
@@ -156,15 +157,21 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                     </>
                 )}
             </select>
+
             <button 
                 onClick={handleApplyBulkAction}
-                className="border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors shadow-sm"
+                disabled={isPending || !bulkAction}
+                className="border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors shadow-sm disabled:opacity-50 disabled:border-[#8c8f94] disabled:text-[#8c8f94] flex items-center gap-1"
             >
-                Apply
+                {/* 🔥 FIXED: Show spinner when Bulk Action is running */}
+                {isPending && !loadingId ? (
+                   <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Applying...</>
+                ) : (
+                   "Apply"
+                )}
             </button>
         </div>
 
-        {/* The Classic WP Table (Responsive) */}
         <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] w-full overflow-x-auto">
             <table className="w-full text-[13px] text-left border-collapse">
                 <thead>
@@ -184,7 +191,6 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                         <th className="py-2 px-3 font-medium text-[#2c3338] hidden sm:table-cell">Ship to</th>
                         <th className="py-2 px-3 font-medium text-[#2c3338]">Total</th>
                         <th className="py-2 px-3 font-medium text-[#2c3338] text-right">Actions</th>
-                        {/* 🔥 NEW: Origin Column Added Here */}
                         <th className="py-2 px-3 font-medium text-[#2c3338] hidden xl:table-cell">Origin</th>
                     </tr>
                 </thead>
@@ -223,12 +229,10 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                                             #{order.orderNumber} {customerName}
                                         </Link>
                                         
-                                        {/* 🔥 Mobile only Origin display (since the column hides on small screens) */}
                                         <div className="text-[12px] text-[#646970] mt-1 xl:hidden">
                                             Origin: {originText}
                                         </div>
 
-                                        {/* Mobile only date display */}
                                         <div className="text-[12px] text-[#646970] mt-1 md:hidden">
                                             {displayDate}
                                         </div>
@@ -319,7 +323,6 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                                         )}
                                     </td>
                                     
-                                    {/* 🔥 NEW: Origin Column Added After Actions (Hidden on small screens) */}
                                     <td className="py-3 px-3 align-top text-[13px] text-[#646970] hidden xl:table-cell">
                                         {originText}
                                     </td>

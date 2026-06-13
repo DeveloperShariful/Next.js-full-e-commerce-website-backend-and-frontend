@@ -18,39 +18,61 @@ export async function getOrders(
     const skip = (page - 1) * limit;
     const isTrashMode = status === 'trash';
 
+    // Accurate Timezone Calculation for Full Day
+    let parsedStartDate: Date | undefined;
+    let parsedEndDate: Date | undefined;
+
+    if (startDate) {
+      parsedStartDate = new Date(startDate);
+      parsedStartDate.setHours(0, 0, 0, 0); // Start of the day
+    }
+
+    if (endDate) {
+      parsedEndDate = new Date(endDate);
+      parsedEndDate.setHours(23, 59, 59, 999); // End of the day
+    }
+
+    // 🔥 FIXED: Separate Base Filter array created
+    // এটি ডেট, পেমেন্ট মেথড এবং সার্চ কোয়ারিগুলো ধরে রাখবে।
+    const baseFilterParams: any[] = [];
+
+    if (query) {
+      baseFilterParams.push({
+        OR: [
+          { orderNumber: { contains: query, mode: 'insensitive' } },
+          { user: { name: { contains: query, mode: 'insensitive' } } },
+          { user: { email: { contains: query, mode: 'insensitive' } } },
+          { guestEmail: { contains: query, mode: 'insensitive' } },
+          // JSON Address Search (Guest Search Supported)
+          { billingAddress: { path: ['firstName'], string_contains: query } },
+          { billingAddress: { path: ['phone'], string_contains: query } }
+        ]
+      });
+    }
+
+    if (parsedStartDate) {
+      baseFilterParams.push({ createdAt: { gte: parsedStartDate } });
+    }
+
+    if (parsedEndDate) {
+      baseFilterParams.push({ createdAt: { lte: parsedEndDate } });
+    }
+
+    if (paymentMethod && paymentMethod !== "all") {
+      baseFilterParams.push({
+        OR: [
+            { paymentGateway: { contains: paymentMethod, mode: 'insensitive' } },
+            { paymentMethod: { contains: paymentMethod, mode: 'insensitive' } }
+        ]
+      });
+    }
+
+    // Main Where Condition
     const whereCondition: any = {
       AND: [
-        isTrashMode 
-            ? { deletedAt: { not: null } } 
-            : { deletedAt: null },
-
-        status && status !== 'all' && status !== 'trash' 
-            ? { status: status as OrderStatus } 
-            : {},
-
-        query ? {
-          OR: [
-            { orderNumber: { contains: query, mode: 'insensitive' } },
-            { user: { name: { contains: query, mode: 'insensitive' } } },
-            { user: { email: { contains: query, mode: 'insensitive' } } },
-            { guestEmail: { contains: query, mode: 'insensitive' } }
-          ]
-        } : {},
-
-        startDate ? {
-            createdAt: { gte: new Date(startDate) }
-        } : {},
-
-        endDate ? {
-            createdAt: { lte: new Date(endDate) }
-        } : {},
-
-        paymentMethod && paymentMethod !== "all" ? {
-            OR: [
-                { paymentGateway: { contains: paymentMethod, mode: 'insensitive' } },
-                { paymentMethod: { contains: paymentMethod, mode: 'insensitive' } }
-            ]
-        } : {}
+        ...baseFilterParams, // বেস ফিল্টার এখানে বসানো হলো
+        isTrashMode ? { deletedAt: { not: null } } : { deletedAt: null },
+        status && status !== 'all' && status !== 'trash' ? { status: status as OrderStatus } : {}
       ]
     };
 
@@ -59,7 +81,6 @@ export async function getOrders(
         where: whereCondition,
         include: {
           user: { select: { name: true, email: true } },
-          // 🔥 NEW: Added affiliate relation to fetch dynamic Origin
           affiliate: {
             include: {
               user: { select: { name: true } }
@@ -75,18 +96,30 @@ export async function getOrders(
 
       db.order.count({ where: whereCondition }),
 
+      // 🔥 FIXED: GroupBy now uses baseFilterParams 
+      // ফলে ডেট সিলেক্ট করলে শুধু ওই ডেটের Pending, Processing কাউন্ট হবে!
       db.order.groupBy({
         by: ['status'],
         _count: { status: true },
-        where: { deletedAt: null }
+        where: { 
+          AND: [
+            ...baseFilterParams,
+            { deletedAt: null }
+          ] 
+        }
       }),
 
+      // 🔥 FIXED: Trash count also respects date & search filters
       db.order.count({
-        where: { deletedAt: { not: null } }
+        where: { 
+          AND: [
+            ...baseFilterParams,
+            { deletedAt: { not: null } }
+          ] 
+        }
       })
     ]);
 
-    // 🔥 Serialize Decimals to Numbers
     const serializedOrders = orders.map(order => ({
         ...order,
         total: Number(order.total),
@@ -97,7 +130,6 @@ export async function getOrders(
         refundedAmount: Number(order.refundedAmount || 0),
     }));
 
-    // 🔥 NEW: Added missing status counts for WooCommerce header
     const counts = {
       all: statusCounts.reduce((acc, curr) => acc + curr._count.status, 0),
       pending: statusCounts.find(s => s.status === 'PENDING')?._count.status || 0,
@@ -126,14 +158,9 @@ export async function getOrderDetails(orderId: string) {
     const order = await db.order.findUnique({
       where: { id: orderId },
       include: {
-        // 1. Customer
         user: true,
-        
-        // 🔥 NEW: Affiliate & Subscription (From Schema)
         affiliate: { include: { user: true } },
         subscription: true,
-        
-        // 2. Items with LIVE Product Data
         items: {
             include: {
                 product: { 
@@ -146,23 +173,13 @@ export async function getOrderDetails(orderId: string) {
                 }
             }
         },
-        
-        // 3. Logistics
         shipments: { orderBy: { shippedDate: 'desc' } },
         pickupLocation: true, 
-        
-        // 4. Financials
         transactions: { orderBy: { createdAt: 'desc' } },
         refunds: { orderBy: { createdAt: 'desc' } },
         disputes: true, 
-        
-        // 5. Marketing
         discount: true, 
-        
-        // 6. After Sales
         returns: true, 
-
-        // 7. Communication
         orderNotes: { orderBy: { createdAt: 'desc' } }
       }
     });

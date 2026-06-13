@@ -1,5 +1,6 @@
 // File Location: app/admin/orders/page.tsx
 
+import { db } from "@/lib/prisma"; // 🔥 Prisma Client Imported
 import { getOrders } from "@/app/actions/backend/order/get-orders"; 
 import { OrderListTable } from "./_components/order-list-table";
 import { OrdersHeader } from "./_components/header";
@@ -21,7 +22,6 @@ export default async function OrdersPage(props: OrdersPageProps) {
   const searchParams = await props.searchParams;
   
   const page = Number(searchParams.page) || 1;
-  // 🔥 FIXED: Limit is properly extracted from URL and passed to getOrders
   const limit = Number(searchParams.limit) || 20; 
   const query = searchParams.query || "";
   const status = searchParams.status || "all";
@@ -29,6 +29,12 @@ export default async function OrdersPage(props: OrdersPageProps) {
   const endDate = searchParams.endDate;
   const paymentMethod = searchParams.paymentMethod;
   
+  // 🔥 NEW: Fetch active gateways and map to match headers (Stripe, Paypal etc)
+  const dbGateways = await db.paymentGateway.findMany({
+    where: { isEnabled: true },
+    select: { identifier: true, name: true }
+  });
+
   const { data: orders, meta } = await getOrders(
     page, 
     limit, 
@@ -43,7 +49,9 @@ export default async function OrdersPage(props: OrdersPageProps) {
 
   return (
     <div className=" max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans">
-      <OrdersHeader counts={meta?.counts || {}} />
+      
+      {/* 🔥 Passing the dynamic gateways array down to the header */}
+      <OrdersHeader counts={meta?.counts || {}} gateways={dbGateways} />
       
       <OrderListTable 
         orders={serializedOrders} 

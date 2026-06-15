@@ -48,10 +48,12 @@ export default function ImportExportButtons() {
                 
                 toast.dismiss(); 
                 if (res.success) {
-                    toast.success(res.message);
-                    window.location.reload(); 
+                  // res.message না থাকলে একটি ডিফল্ট মেসেজ ব্যবহার করা হবে
+                  toast.success(res.message || "Import successful!");
+                  window.location.reload(); 
                 } else {
-                    toast.error(res.message);
+                  // res.message অথবা res.error না থাকলে ডিফল্ট এরর মেসেজ ব্যবহার করা হবে
+                  toast.error(res.message || res.error || "Import failed.");
                 }
                 setIsImporting(false);
             }

@@ -133,12 +133,6 @@ export default function CartClient() {
         ) : (
           <>
             <h1 className="text-center mb-8 text-3xl font-bold text-gray-900">Your Shopping Cart</h1>
-            {isLoading && (
-              <div className="fixed inset-0 bg-white/80 flex justify-center items-center text-2xl z-[1000] font-bold">
-                Updating Cart...
-              </div>
-            )}
-
             <div className={`grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-8 items-start ${isLoading ? 'opacity-60 pointer-events-none' : ''}`}>
 
               {/* Cart Items */}

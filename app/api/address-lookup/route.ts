@@ -9,21 +9,24 @@ interface TransdirectLocation {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
-  if (!query || query.trim().length < 1) {
-    return NextResponse.json(
-      { error: 'A search query is required.' },
-      { status: 400 } 
-    );
+
+  // Transdirect returns 404 for queries shorter than 3 chars — skip the round-trip.
+  if (!query || query.trim().length < 3) {
+    return NextResponse.json([]);
   }
+
   const API_URL = `https://www.transdirect.com.au/api/locations?q=${encodeURIComponent(query)}`;
   try {
     const apiResponse = await fetch(API_URL, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      next: { revalidate: 0 }
+      headers: { 'Content-Type': 'application/json' },
+      next: { revalidate: 0 },
     });
+
+    // 404 = no results for this query (short or unrecognised) — not a server error.
+    if (apiResponse.status === 404) {
+      return NextResponse.json([]);
+    }
 
     if (!apiResponse.ok) {
       throw new Error(`Transdirect API responded with status: ${apiResponse.status}`);

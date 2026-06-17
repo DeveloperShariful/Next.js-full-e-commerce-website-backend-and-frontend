@@ -620,7 +620,7 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
           selectedShipping={selectedShipping}
           shippingRates={shippingRates}
           appliedCoupons={appliedCoupons}
-          // ✅ NEW: Centralized PI props — both Express + Credit Card share this
+          orderNotes={orderNotes}
           stripeClientSecret={stripeClientSecret}
           stripePaymentIntentId={stripePaymentIntentId}
           stripePublicKey={stripePublicKey}

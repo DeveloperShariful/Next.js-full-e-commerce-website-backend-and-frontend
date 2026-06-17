@@ -286,9 +286,9 @@ export async function POST(request: Request) {
     ]);
 
     console.log(
-      `✅ [Stripe Create Order] #${newOrder.orderNumber} | ` +
+      `✅ [Create Order] #${newOrder.orderNumber} | ` +
       `Total: $${secureOrderTotal.toFixed(2)} | GST: $${taxTotal.toFixed(2)} | ` +
-      `First Order: ${isFirstOrder}`
+      `Method: ${selectedPaymentMethod} | First Order: ${isFirstOrder}`
     );
 
     return NextResponse.json({

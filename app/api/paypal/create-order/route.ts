@@ -1,7 +1,8 @@
 // app/api/paypal/create-order/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
-import { OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
+import { Prisma, OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
+import { auth } from '@/auth';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 
 // ============================================================================
@@ -9,10 +10,10 @@ import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 // ============================================================================
 interface CartItemDTO {
   id: string;
-  databaseId: number;
+  databaseId?: number;
   name: string;
   quantity: number;
-  price: number;
+  price?: number | string;
   variationId?: string;
 }
 interface AddressDTO {
@@ -26,8 +27,25 @@ interface AddressDTO {
   phone: string;
   country?: string;
 }
-interface CouponDTO { code: string; amount: number; }
+interface CouponDTO { code: string; amount?: number; }
 interface ShippingRateDTO { id: string; label: string; cost: number; }
+interface MetaDataDTO { key: string; value: string; }
+
+const MAX_ORDER_NUMBER_RETRIES = 5;
+
+// ============================================================================
+// ORDER NUMBER GENERATOR — sequential, same logic as stripe/create-order
+// ============================================================================
+async function generateNextOrderNumber(): Promise<string> {
+  const lastOrder = await db.order.findFirst({
+    orderBy: { createdAt: 'desc' },
+    select: { orderNumber: true },
+  });
+  if (!lastOrder?.orderNumber) return '1000';
+  const numericPart = lastOrder.orderNumber.replace(/[^0-9]/g, '');
+  if (!numericPart) return '1000';
+  return String(parseInt(numericPart, 10) + 1);
+}
 
 // ============================================================================
 // DYNAMIC PAYPAL CREDENTIALS FROM DB
@@ -46,11 +64,11 @@ async function getPayPalCredentials() {
 
 async function generatePayPalAccessToken() {
   const { clientId, secret, apiUrl } = await getPayPalCredentials();
-  const auth = Buffer.from(`${clientId}:${secret}`).toString('base64');
+  const credentials = Buffer.from(`${clientId}:${secret}`).toString('base64');
   const response = await fetch(`${apiUrl}/v1/oauth2/token`, {
     method: 'POST',
     body: 'grant_type=client_credentials',
-    headers: { Authorization: `Basic ${auth}` },
+    headers: { Authorization: `Basic ${credentials}` },
   });
   if (!response.ok) throw new Error('Failed to authenticate with PayPal API.');
   const data = await response.json();
@@ -64,49 +82,66 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const {
-      orderId,
       cartItems,
       customerInfo,
       shippingInfo,
       selectedShipping,
       shippingRates,
       appliedCoupons,
+      orderNotes,
+      affiliateMetaData,
     } = body as {
-      orderId: string;
       cartItems: CartItemDTO[];
       customerInfo: AddressDTO;
-      shippingInfo: AddressDTO;
+      shippingInfo?: AddressDTO;
       selectedShipping: string;
       shippingRates: ShippingRateDTO[];
       appliedCoupons: CouponDTO[];
+      orderNotes?: string;
+      affiliateMetaData?: MetaDataDTO[];
     };
 
-    if (!orderId) return NextResponse.json({ error: 'Store Order ID is required.' }, { status: 400 });
-    if (!cartItems || cartItems.length === 0) return NextResponse.json({ error: 'Your cart is empty.' }, { status: 400 });
-    if (!customerInfo?.email || !customerInfo?.firstName) return NextResponse.json({ error: 'Missing billing details.' }, { status: 400 });
+    if (!cartItems || cartItems.length === 0) {
+      return NextResponse.json({ error: 'Cart is empty. Cannot create order.' }, { status: 400 });
+    }
+    if (!customerInfo?.email || !customerInfo?.firstName) {
+      return NextResponse.json({ error: 'Billing details (Name and Email) are required.' }, { status: 400 });
+    }
+
+    // Auth — resolve logged-in user if any
+    const session = await auth();
+    const sessionUserId = session?.user?.email
+      ? (await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } }))?.id
+      : null;
 
     const country = customerInfo.country || 'AU';
     const couponCode = appliedCoupons?.[0]?.code;
 
-    // ✅ PERF: Parallel DB lookups
+    // ── Parallel DB lookups ────────────────────────────────────
     const [rawProductResults, discountRecord, activeTaxRate] = await Promise.all([
       Promise.all(
         cartItems.map(async (item) => {
-          const product = await db.product.findUnique({
-            where: { id: item.id },
-            select: { id: true, name: true, price: true, taxStatus: true },
-          });
-          return { item, product };
+          const [product, variant] = await Promise.all([
+            db.product.findUnique({
+              where: { id: item.id },
+              select: { id: true, name: true, price: true, taxStatus: true, stock: true },
+            }),
+            item.variationId
+              ? db.productVariant.findUnique({ where: { id: item.variationId } })
+              : Promise.resolve(null),
+          ]);
+          return { item, product, variant };
         })
       ),
       couponCode ? db.discount.findUnique({ where: { code: couponCode } }) : Promise.resolve(null),
       db.taxRate.findFirst({ where: { country, isActive: true } }),
     ]);
 
-    // Build order items + subtotal (server-side prices — not trusting frontend)
+    // ── Build order items + subtotal (server-side prices — never trust client) ──
     let subtotal = 0;
     const validOrderItems: Array<{
       productId: string;
+      variantId: string | null;
       productName: string;
       price: number;
       quantity: number;
@@ -114,13 +149,14 @@ export async function POST(request: Request) {
       taxStatus: TaxStatus;
     }> = [];
 
-    for (const { item, product } of rawProductResults) {
-      if (!product) throw new Error(`Product '${item.name}' no longer exists.`);
-      const price = Number(product.price);
+    for (const { item, product, variant } of rawProductResults) {
+      if (!product) throw new Error(`Product missing or unavailable.`);
+      const price = variant ? Number(variant.price) : Number(product.price);
       const itemTotal = price * item.quantity;
       subtotal += itemTotal;
       validOrderItems.push({
         productId: product.id,
+        variantId: item.variationId || null,
         productName: product.name,
         price,
         quantity: item.quantity,
@@ -129,7 +165,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Shipping cost
+    // ── Shipping ──────────────────────────────────────────────
     let shippingCost = 0;
     let shippingMethodLabel = 'Standard Shipping';
     if (selectedShipping) {
@@ -139,13 +175,14 @@ export async function POST(request: Request) {
         shippingMethodLabel = matchedRate.label;
       } else {
         const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
-        if (!shippingRate) throw new Error('Invalid shipping method selected.');
-        shippingCost = Number(shippingRate.price);
-        shippingMethodLabel = shippingRate.name;
+        if (shippingRate) {
+          shippingCost = Number(shippingRate.price);
+          shippingMethodLabel = shippingRate.name;
+        }
       }
     }
 
-    // Discount
+    // ── Discount ──────────────────────────────────────────────
     let discountTotal = 0;
     let discountId: string | undefined;
     if (discountRecord?.isActive) {
@@ -155,7 +192,7 @@ export async function POST(request: Request) {
       if (discountTotal > subtotal) discountTotal = subtotal;
     }
 
-    // GST (tax-inclusive prices — extract amount)
+    // ── GST (tax-inclusive — extract amount) ──────────────────
     let taxTotal = 0;
     if (activeTaxRate) {
       const rate = Number(activeTaxRate.rate);
@@ -174,55 +211,87 @@ export async function POST(request: Request) {
     const secureOrderTotal = (subtotal - discountTotal) + shippingCost;
     if (secureOrderTotal <= 0) throw new Error('Order total is zero. Invalid for PayPal.');
 
-    const billingJson = JSON.parse(JSON.stringify(customerInfo));
-    const shippingJson = JSON.parse(JSON.stringify(shippingInfo || customerInfo));
-    const dbOrderItems = validOrderItems.map(({ taxStatus: _ts, ...rest }) => rest);
-
-    // Update order with server-verified amounts (replaces placeholder from stripe/create-order)
-    const updatedOrder = await db.order.update({
-      where: { id: orderId },
-      data: {
-        status: OrderStatus.PENDING,
-        paymentStatus: PaymentStatus.UNPAID,
-        currency: 'AUD',
-        subtotal,
-        discountTotal,
-        shippingTotal: shippingCost,
-        taxTotal: Number(taxTotal.toFixed(2)),
-        total: secureOrderTotal,
-        totalDue: secureOrderTotal,
-        guestEmail: customerInfo.email,
-        billingAddress: billingJson,
-        shippingAddress: shippingJson,
-        shippingMethod: shippingMethodLabel,
-        paymentGateway: 'paypal',
-        paymentMethod: 'PayPal',
-        discountId,
-        items: { deleteMany: {}, create: dbOrderItems },
+    // ── First order check ─────────────────────────────────────
+    const previousOrderCount = await db.order.count({
+      where: {
+        OR: [
+          { guestEmail: customerInfo.email },
+          ...(sessionUserId ? [{ userId: sessionUserId }] : []),
+        ],
+        paymentStatus: PaymentStatus.PAID,
       },
     });
+    const isFirstOrder = previousOrderCount === 0;
 
-    // ✅ FIX: Removed two bugs that caused double-application:
-    //
-    // BUG 1 — Double coupon usedCount increment:
-    //   stripe/create-order ALREADY increments usedCount when the order is first created.
-    //   paypal/create-order was incrementing again → coupon quota consumed 2× per order.
-    //   Fix: removed the usedCount increment from this route entirely.
-    //
-    // BUG 2 — Double stock decrement:
-    //   stripe/create-order ALREADY decrements stock when the order is first created.
-    //   paypal/create-order was decrementing again → stock went negative on PayPal orders.
-    //   Fix: removed stock decrement from this route.
-    //   Stock is now managed solely by the capture route (paypal/capture-order)
-    //   and the initial stripe/create-order call.
-    //
-    // NOTE: stripe/create-order has the same premature-decrement issue (stock reduced before
-    //   payment is confirmed). That route should be updated separately to use
-    //   InventoryReservation at creation and only hard-decrement at payment capture.
+    // ── Build metadata ────────────────────────────────────────
+    const metaDataArray = Array.isArray(affiliateMetaData) ? [...affiliateMetaData] : [];
+    metaDataArray.push({ key: '_payment_method', value: 'paypal' });
+    metaDataArray.push({ key: '_created_via', value: 'Headless_PayPal_Create_Order_API' });
 
+    const billingJson = JSON.parse(JSON.stringify(customerInfo));
+    const shippingJson = JSON.parse(JSON.stringify(shippingInfo || customerInfo));
+    const metadataJson = JSON.parse(JSON.stringify(metaDataArray));
+    const dbOrderItems = validOrderItems.map(({ taxStatus: _ts, ...rest }) => rest);
+
+    const orderData = {
+      status: OrderStatus.PENDING,
+      paymentStatus: PaymentStatus.UNPAID,
+      currency: 'AUD',
+      subtotal,
+      discountTotal,
+      shippingTotal: shippingCost,
+      taxTotal: Number(taxTotal.toFixed(2)),
+      total: secureOrderTotal,
+      totalDue: secureOrderTotal,
+      guestEmail: customerInfo.email,
+      userId: sessionUserId || undefined,
+      billingAddress: billingJson,
+      shippingAddress: shippingJson,
+      shippingMethod: shippingMethodLabel,
+      paymentGateway: 'paypal',
+      paymentMethod: 'PayPal',
+      discountId,
+      customerNote: orderNotes || '',
+      metadata: metadataJson,
+      isFirstOrder,
+      items: { create: dbOrderItems },
+    };
+
+    // ── Create DB order with duplicate-number retry ───────────
+    let newOrder: Awaited<ReturnType<typeof db.order.create>> | null = null;
+
+    for (let attempt = 0; attempt < MAX_ORDER_NUMBER_RETRIES; attempt++) {
+      const nextOrderNumber = await generateNextOrderNumber();
+      try {
+        newOrder = await db.order.create({ data: { orderNumber: nextOrderNumber, ...orderData } });
+        break;
+      } catch (err) {
+        const isP2002 = err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+        if (isP2002 && attempt < MAX_ORDER_NUMBER_RETRIES - 1) {
+          console.warn(`⚠️ Order number collision on ${nextOrderNumber}, retrying...`);
+          continue;
+        }
+        if (isP2002) {
+          const fallback = `${Date.now()}`;
+          newOrder = await db.order.create({ data: { orderNumber: fallback, ...orderData } });
+          break;
+        }
+        throw err;
+      }
+    }
+
+    if (!newOrder?.id) throw new Error('Failed to create pending order in database.');
+
+    // ── Coupon usage tracking ─────────────────────────────────
+    await Promise.allSettled([
+      discountId
+        ? db.discount.update({ where: { id: discountId }, data: { usedCount: { increment: 1 } } })
+        : Promise.resolve(),
+    ]);
+
+    // ── Create PayPal order ───────────────────────────────────
     const { token, apiUrl } = await generatePayPalAccessToken();
 
-    // Build PayPal items for the payment popup
     const paypalItems = validOrderItems.map(({ productName, price, quantity }) => ({
       name: productName.slice(0, 127),
       quantity: String(quantity),
@@ -232,10 +301,10 @@ export async function POST(request: Request) {
     const paypalPayload = {
       intent: 'CAPTURE',
       purchase_units: [{
-        reference_id: updatedOrder.id,
-        custom_id: updatedOrder.id,
-        invoice_id: `${updatedOrder.orderNumber}-${Date.now().toString().slice(-4)}`,
-        description: `Order ${updatedOrder.orderNumber} from GoBike`,
+        reference_id: newOrder.id,
+        custom_id: newOrder.id,
+        invoice_id: `${newOrder.orderNumber}-${Date.now().toString().slice(-4)}`,
+        description: `Order ${newOrder.orderNumber} from GoBike`,
         amount: {
           currency_code: 'AUD',
           value: secureOrderTotal.toFixed(2),
@@ -254,7 +323,7 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
-        'PayPal-Request-Id': `create_order_${updatedOrder.id}`,
+        'PayPal-Request-Id': `create_order_${newOrder.id}`,
       },
       body: JSON.stringify(paypalPayload),
     });
@@ -262,19 +331,19 @@ export async function POST(request: Request) {
     const paypalOrder = await paypalResponse.json();
 
     if (!paypalResponse.ok) {
-      await db.order.update({ where: { id: updatedOrder.id }, data: { status: OrderStatus.FAILED } });
+      await db.order.update({ where: { id: newOrder.id }, data: { status: OrderStatus.FAILED } });
       throw new Error(paypalOrder.message || 'PayPal rejected the order initialization.');
     }
 
     console.log(
-      `✅ [PayPal Create Order] #${updatedOrder.orderNumber} | ` +
+      `✅ [PayPal Create Order] #${newOrder.orderNumber} | ` +
       `Total: $${secureOrderTotal.toFixed(2)} | GST: $${taxTotal.toFixed(2)}`
     );
 
     return NextResponse.json({
       id: paypalOrder.id,
-      wcOrderId: updatedOrder.id,
-      wcOrderKey: updatedOrder.orderNumber,
+      wcOrderId: newOrder.id,
+      wcOrderKey: newOrder.orderNumber,
     });
 
   } catch (error: unknown) {

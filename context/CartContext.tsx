@@ -218,23 +218,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   // --- Action: Clear Cart ---
-  const clearCart = async () => { 
-    if (cartItems.length === 0) return; 
-    
-    const previousItems = [...cartItems];
-    const previousCoupons = [...appliedCoupons];
-    
+  // useCallback with [fetchInitialCart] gives a stable reference — fetchInitialCart
+  // itself has empty deps so it never changes. A stable clearCart reference breaks the
+  // infinite re-render loop in OrderConfirmationClient (useEffect depends on clearCart).
+  const clearCart = useCallback(async () => {
     setCartItems([]);
-    setAppliedCoupons([]); 
-
+    setAppliedCoupons([]);
     try {
       const response = await clearCartAction();
-      if (!response.success) throw new Error(response.error || "Clear failed");
+      if (!response.success) throw new Error(response.error || 'Clear failed');
     } catch (error: unknown) {
-      setCartItems(previousItems);
-      setAppliedCoupons(previousCoupons);
+      fetchInitialCart();
     }
-  };
+  }, [fetchInitialCart]);
 
   const applyCoupon = async (code: string): Promise<boolean> => {
     if (!code || code.trim() === "") {

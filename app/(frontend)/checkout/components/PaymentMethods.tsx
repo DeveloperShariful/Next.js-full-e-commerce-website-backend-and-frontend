@@ -67,6 +67,7 @@ interface PaymentMethodsProps {
   selectedShipping: string;
   shippingRates: ShippingRateDTO[];
   appliedCoupons: CouponDTO[];
+  orderNotes: string;
   // Shared Stripe Payment Intent (created once in CheckoutClientComponent)
   stripeClientSecret: string | null;
   stripePaymentIntentId?: string | null;
@@ -91,6 +92,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     selectedShipping,
     shippingRates,
     appliedCoupons,
+    orderNotes,
     stripeClientSecret,
     stripePaymentIntentId,
     stripePublicKey,
@@ -160,12 +162,10 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     }
 
     // ── BNPL: Klarna / Afterpay / Zip ────────────────────────
+    // These methods need explicit payment_method_types on the PI, which is incompatible
+    // with the shared PI (automatic_payment_methods used by Express Checkout + Card).
+    // Solution: create a fresh dedicated PI for each BNPL payment.
     if (selectedPaymentMethod.startsWith('stripe_')) {
-      if (!stripeClientSecret || !stripePaymentIntentId) {
-        toast.error('Payment system is still loading. Please wait a moment.');
-        return;
-      }
-
       setIsRedirecting(true);
       toast.loading('Preparing secure redirect...', { id: 'bnpl-redirect' });
 
@@ -183,27 +183,21 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
         let paymentMethodType = selectedPaymentMethod.replace('stripe_', '');
         if (paymentMethodType === 'afterpay') paymentMethodType = 'afterpay_clearpay';
 
-        const selectedRate = shippingRates.find(r => r.id === selectedShipping);
-
-        // Update shared PI with orderId + verified amount (server uses DB amount)
-        await fetch('/api/stripe/update-payment-intent', {
+        // Create a dedicated PI for this BNPL method with explicit payment_method_types.
+        // orderId → server fetches authoritative amount from DB (never trusts frontend).
+        const piRes = await fetch('/api/stripe/create-payment-intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            paymentIntentId: stripePaymentIntentId,
-            amount: total,
             orderId: orderDetails.orderId,
-            customerInfo,
-            shippingInfo: shippingInfo || customerInfo,
-            cartItems,
-            appliedCoupons,
-            metadata: {
-              shipping_method_id: selectedShipping || '',
-              shipping_method_title: selectedRate?.label || 'Standard Shipping',
-              shipping_cost: String(selectedRate?.cost || '0'),
-            },
+            payment_method_types: [paymentMethodType],
           }),
         });
+        const piData = await piRes.json();
+        if (!piRes.ok || !piData.clientSecret) {
+          throw new Error(piData.error || 'Could not initialize payment. Please try again.');
+        }
+        const bnplClientSecret = piData.clientSecret;
 
         const stripe = await loadStripe(mainStripeKey);
         if (!stripe) throw new Error('Stripe failed to load.');
@@ -223,31 +217,26 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
           },
         };
 
-        // ✅ FIX: Use Stripe's own PaymentIntentResult type — imported from @stripe/stripe-js.
-        // PaymentIntentResult = { paymentIntent: PaymentIntent } | { error: StripeError }
-        // StripeError.message is `string | undefined` — handled below with || fallback.
         let confirmResult: PaymentIntentResult | undefined;
 
         if (paymentMethodType === 'klarna') {
-          confirmResult = await stripe.confirmKlarnaPayment(stripeClientSecret, {
+          confirmResult = await stripe.confirmKlarnaPayment(bnplClientSecret, {
             payment_method: { billing_details: billingDetails },
             return_url: returnUrl,
           });
         } else if (paymentMethodType === 'afterpay_clearpay') {
-          confirmResult = await stripe.confirmAfterpayClearpayPayment(stripeClientSecret, {
+          confirmResult = await stripe.confirmAfterpayClearpayPayment(bnplClientSecret, {
             payment_method: { billing_details: billingDetails },
             return_url: returnUrl,
           });
         } else if (paymentMethodType === 'zip') {
-          // Zip uses a non-standard confirm method — cast to any to bypass type check
-          confirmResult = await (stripe as any).confirmZipPayment(stripeClientSecret, {
+          confirmResult = await (stripe as any).confirmZipPayment(bnplClientSecret, {
             payment_method: { billing_details: billingDetails },
             return_url: returnUrl,
           });
         }
 
         if (confirmResult?.error) {
-          // StripeError.message is string | undefined — fallback to generic message
           throw new Error(confirmResult.error.message || 'Payment redirect failed.');
         }
 
@@ -390,7 +379,6 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
             <PayPalPaymentGateway
               total={total}
               isPlacingOrder={isPlacingOrder}
-              onPlaceOrder={onPlaceOrder as any}
               isShippingSelected={isShippingSelected}
               cartItems={cartItems}
               customerInfo={customerInfo}
@@ -398,6 +386,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
               selectedShipping={selectedShipping}
               shippingRates={shippingRates as any}
               appliedCoupons={appliedCoupons as any}
+              orderNotes={orderNotes}
             />
           </div>
         ) : (

@@ -2,9 +2,17 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncSelect from 'react-select/async';
 import type { CSSObject } from '@emotion/react';
+
+function debounce<Args extends unknown[]>(fn: (...args: Args) => void, ms: number) {
+  let timer: ReturnType<typeof setTimeout>;
+  return (...args: Args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
 
 // --- Interfaces ---
 interface ShippingFormData {
@@ -121,11 +129,12 @@ export default function ShippingForm({
   };
 
   const loadAddressOptions = useCallback(async (inputValue: string): Promise<AddressOption[]> => {
-    if (inputValue.trim().length < 1) return [];
+    if (inputValue.trim().length < 3) return [];
     try {
       const response = await fetch(`/api/address-lookup?query=${encodeURIComponent(inputValue)}`);
       if (!response.ok) return [];
       const data = await response.json();
+      if (!Array.isArray(data)) return [];
       return data.map((item: ApiAddressItem) => ({ ...item, label: item.value }));
     } catch (error) {
       console.error('Address lookup failed:', error);
@@ -133,10 +142,16 @@ export default function ShippingForm({
     }
   }, []);
 
-  const debouncedLoadOptions = useCallback(
-    (inputValue: string, callback: (options: AddressOption[]) => void) => {
-      loadAddressOptions(inputValue).then(options => callback(options));
-    },
+  // Real 400ms debounce — previously this was just useCallback with no delay,
+  // so every keystroke fired a request. Now waits 400ms after the user stops typing.
+  const debouncedLoadOptions = useMemo(
+    () => debounce(
+      (inputValue: string, callback: (options: AddressOption[]) => void) => {
+        if (inputValue.trim().length < 3) { callback([]); return; }
+        loadAddressOptions(inputValue).then(callback);
+      },
+      400
+    ),
     [loadAddressOptions]
   );
 

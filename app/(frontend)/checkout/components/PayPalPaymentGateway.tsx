@@ -5,15 +5,17 @@
 import React, { useRef } from 'react';
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import { useCart } from '@/context/CartContext';
+import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 
 export interface CartItemDTO {
   id: string;
-  databaseId: number;
+  databaseId?: number;
   name: string;
   quantity: number;
-  price: number;
+  price?: number | string;
+  variationId?: string;
 }
 
 export interface AddressDTO {
@@ -41,7 +43,6 @@ export interface CouponDTO {
 interface PayPalGatewayProps {
   total: number;
   isPlacingOrder: boolean;
-  onPlaceOrder: (paymentData?: { paymentMethodId: string }) => Promise<{ orderId: string; orderKey: string } | void | null>;
   isShippingSelected: boolean;
   cartItems: CartItemDTO[];
   customerInfo: Partial<AddressDTO>;
@@ -49,6 +50,7 @@ interface PayPalGatewayProps {
   selectedShipping: string;
   shippingRates: ShippingRateDTO[];
   appliedCoupons: CouponDTO[];
+  orderNotes: string;
 }
 
 // ============================================================
@@ -65,16 +67,16 @@ interface PayPalGatewayProps {
 // ============================================================
 
 const PayPalPaymentGatewayComponent = ({
-    total,
-    isPlacingOrder,
-    onPlaceOrder,
-    isShippingSelected,
-    cartItems,
-    customerInfo,
-    shippingInfo,
-    selectedShipping,
-    shippingRates,
-    appliedCoupons
+  total,
+  isPlacingOrder,
+  isShippingSelected,
+  cartItems,
+  customerInfo,
+  shippingInfo,
+  selectedShipping,
+  shippingRates,
+  appliedCoupons,
+  orderNotes,
 }: PayPalGatewayProps) => {
 
   const router = useRouter();
@@ -82,12 +84,8 @@ const PayPalPaymentGatewayComponent = ({
   const wcOrderIdRef = useRef<string | null>(null);
   const wcOrderKeyRef = useRef<string | null>(null);
 
-  // ✅ FIX: usePayPalScriptReducer replaces the broken setInterval polling.
-  // This hook is provided by PayPalScriptProvider context (set in CheckoutClient.tsx).
-  // isPending: SDK still loading, isResolved: SDK fully ready, isRejected: SDK failed.
   const [{ isPending, isResolved, isRejected }] = usePayPalScriptReducer();
 
-  // While SDK is loading, show skeleton (same UI as before)
   if (isPending) {
     return (
       <div className="w-full h-12 bg-gray-200 animate-pulse rounded-md flex justify-center items-center text-xs text-gray-500">
@@ -96,7 +94,6 @@ const PayPalPaymentGatewayComponent = ({
     );
   }
 
-  // If SDK failed to load (network error, invalid client ID, etc.)
   if (isRejected) {
     return (
       <div className="w-full h-12 bg-red-50 border border-red-200 rounded-md flex justify-center items-center text-xs text-red-600">
@@ -105,7 +102,6 @@ const PayPalPaymentGatewayComponent = ({
     );
   }
 
-  // isResolved = true → SDK is ready, render buttons immediately
   if (!isResolved) return null;
 
   return (
@@ -123,89 +119,90 @@ const PayPalPaymentGatewayComponent = ({
         toast.loading("Initializing secure payment...", { id: 'paypal-init' });
 
         try {
-            const orderDetails = await onPlaceOrder({ paymentMethodId: 'paypal' });
+          // Affiliate tracking from cookies
+          const affiliateId = Cookies.get('solid_affiliate_id');
+          const visitId = Cookies.get('solid_affiliate_visit_id');
+          const affiliateMetaData: { key: string; value: string }[] = [];
+          if (affiliateId) affiliateMetaData.push({ key: 'solid_affiliate_id', value: affiliateId });
+          if (visitId) affiliateMetaData.push({ key: 'solid_affiliate_visit_id', value: visitId });
 
-            if (!orderDetails) throw new Error("Failed to initialize store order.");
+          // Single request: creates DB order + PayPal order in one step.
+          // No stripe/create-order call needed for PayPal.
+          const res = await fetch('/api/paypal/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cartItems,
+              customerInfo,
+              shippingInfo: shippingInfo || customerInfo,
+              selectedShipping,
+              shippingRates,
+              appliedCoupons,
+              orderNotes,
+              affiliateMetaData,
+            }),
+          });
 
-            wcOrderIdRef.current = orderDetails.orderId;
-            wcOrderKeyRef.current = orderDetails.orderKey;
+          const data = await res.json();
+          toast.dismiss('paypal-init');
 
-            const res = await fetch('/api/paypal/create-order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    orderId: orderDetails.orderId,
-                    total,
-                    cartItems,
-                    customerInfo,
-                    shippingInfo,
-                    selectedShipping,
-                    shippingRates,
-                    appliedCoupons
-                })
-            });
+          if (!res.ok) throw new Error(data.error || 'Failed to create PayPal order.');
 
-            const data = await res.json();
-            toast.dismiss('paypal-init');
+          wcOrderIdRef.current = data.wcOrderId;
+          wcOrderKeyRef.current = data.wcOrderKey;
 
-            if (!res.ok) throw new Error(data.error || "Failed to create order");
-
-            return data.id;
+          return data.id; // PayPal order ID
         } catch (err: unknown) {
-            toast.dismiss('paypal-init');
-            const msg = err instanceof Error ? err.message : "Failed to start payment.";
-            toast.error(msg);
-            throw err;
+          toast.dismiss('paypal-init');
+          const msg = err instanceof Error ? err.message : 'Failed to start payment.';
+          toast.error(msg);
+          throw err;
         }
       }}
 
       onApprove={async (data) => {
-        toast.loading("Verifying payment...", { id: 'paypal-capture' });
+        toast.loading('Verifying payment...', { id: 'paypal-capture' });
         try {
-            const res = await fetch('/api/paypal/capture-order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    paypalOrderId: data.orderID,
-                    wcOrderId: wcOrderIdRef.current
-                })
-            });
+          const res = await fetch('/api/paypal/capture-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              paypalOrderId: data.orderID,
+              wcOrderId: wcOrderIdRef.current,
+            }),
+          });
 
-            const captureData = await res.json();
-            toast.dismiss('paypal-capture');
+          const captureData = await res.json();
+          toast.dismiss('paypal-capture');
 
-            if (captureData.success) {
-                toast.success('Payment successful!');
-
-                if (typeof clearCart === 'function') {
-                    await clearCart();
-                }
-
-                router.push(`/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}`);
-            } else {
-                toast.error(captureData.message || "Payment could not be verified automatically.");
-            }
+          if (captureData.success) {
+            toast.success('Payment successful!');
+            await clearCart();
+            router.push(`/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}`);
+          } else {
+            toast.error(captureData.message || 'Payment could not be verified automatically.');
+          }
         } catch (err) {
-            toast.dismiss('paypal-capture');
-            toast.error("Network error during verification.");
-            console.error("Capture Catch Error:", err);
+          toast.dismiss('paypal-capture');
+          toast.error('Network error during verification.');
+          console.error('Capture Catch Error:', err);
         }
       }}
 
       onCancel={() => {
-          toast.error("You cancelled the payment.");
+        toast.error('You cancelled the payment.');
       }}
 
       onError={(err) => {
         toast.dismiss();
-        console.error("PayPal transaction failed:", err);
-        toast.error("A PayPal error occurred. Please try again.");
+        console.error('PayPal transaction failed:', err);
+        toast.error('A PayPal error occurred. Please try again.');
       }}
     />
   );
 };
 
-// ✅ React.memo — now includes isPlacingOrder in comparison (was missing before)
+// ✅ React.memo — re-renders only when total, shippingSelected, or isPlacingOrder change
 const PayPalPaymentGateway = React.memo(PayPalPaymentGatewayComponent, (prevProps, nextProps) => {
   return (
     prevProps.total === nextProps.total &&

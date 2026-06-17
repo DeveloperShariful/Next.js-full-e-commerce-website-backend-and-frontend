@@ -141,20 +141,20 @@ export default function ShippingForm({
   );
 
   const labelClass = "block text-sm font-semibold mb-2 text-[#333]";
-  const inputClass = "w-full h-[40px] px-1 border border-[#ddd] rounded-[5px] text-base transition-colors duration-200 focus:outline-none focus:border-[#007bff] focus:ring-[2px] focus:ring-[#007bff]/20 read-only:bg-[#f5f5f5] read-only:cursor-not-allowed read-only:text-[#555]";
+  const inputClass = "w-full h-[48px] px-3 border border-[#ddd] rounded-[5px] text-base transition-colors duration-200 focus:outline-none focus:border-[#007bff] focus:ring-[2px] focus:ring-[#007bff]/20 read-only:bg-[#f5f5f5] read-only:cursor-not-allowed read-only:text-[#555]";
 
   return (
     <div className="w-full flex flex-col gap-6">
-      <h2 className="text-[1rem] font-extrabold text-center md:text-[1.75rem] md:font-bold md:text-left m-0 border-b border-[#e0e0e0] pb-3 md:pb-4">
+      <h2 className="text-[1.4rem] font-extrabold text-center md:text-[1.75rem] md:font-bold md:text-left m-0 border-b border-[#e0e0e0] pb-3 md:pb-4">
         {title}
       </h2>
 
-      <div className="grid grid-cols-[10px_1fr] md:grid-cols-2 gap-2">
-        <div >
+      <div className="grid grid-cols-2 gap-5">
+        <div className="col-span-2">
           <label className={labelClass}>Country / Region *</label>
           <input type="text" value="Australia" readOnly className={inputClass} />
         </div>
-        <div >
+        <div className="col-span-2">
           <label className={labelClass}>Email address *</label>
           <input
             name="email"
@@ -167,7 +167,7 @@ export default function ShippingForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-5">
         <div>
           <label className={labelClass}>First name *</label>
           <input

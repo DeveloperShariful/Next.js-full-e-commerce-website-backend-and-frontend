@@ -1,102 +1,144 @@
-// app/actions/storefront/cart/cartActions.ts
+// app/actions/frontend/cart/cartActions.ts
 "use server";
 
 import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import { auth } from "@/auth"; 
+import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 
 export interface CartActionResponse {
   success: boolean;
-  items?: any[]; 
-  appliedCoupons?: { code: string; amount: number }[]; 
+  items?: any[];
+  appliedCoupons?: { code: string; amount: number }[];
   error?: string;
 }
 
 // ============================================================================
-// 1. SESSION & USER MANAGEMENT (CART MERGING)
+// ✅ FIX: Explicit session type — avoids NextAuth v5 overload resolution bug.
+// Awaited<ReturnType<typeof auth>> → TypeScript picks NextMiddleware overload
+// instead of Session | null → 'user' does not exist error.
+// Using a plain structural type bypasses this entirely.
+// ============================================================================
+type AuthUser = {
+  id?: string | null;
+  email?: string | null;
+};
+type AuthSession = { user?: AuthUser | null } | null;
+
+async function resolveUserId(session: AuthSession): Promise<string | null> {
+  if (!session?.user) return null;
+  // Fast path: auth callbacks expose id (NextAuth v5 with custom callbacks)
+  if (session.user.id) return session.user.id as string;
+  // Standard path: email-based DB lookup (default NextAuth behaviour)
+  if (session.user.email) {
+    const user = await db.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true },
+    });
+    return user?.id || null;
+  }
+  return null;
+}
+
+// ============================================================================
+// 1. SESSION & USER MANAGEMENT
 // ============================================================================
 async function getCartSessionAndUser() {
   const cookieStore = await cookies();
   let sessionId = cookieStore.get("cart_session")?.value;
-  const session = await auth();
-  const userId = session?.user?.id;
+
+  // ✅ FIX: Cast auth() result to AuthSession
+  const session = (await auth()) as AuthSession;
+  const userId = await resolveUserId(session);
 
   if (!sessionId) {
     sessionId = crypto.randomUUID();
-    cookieStore.set("cart_session", sessionId, { maxAge: 60 * 60 * 24 * 30, httpOnly: true });
+    cookieStore.set("cart_session", sessionId, {
+      maxAge: 60 * 60 * 24 * 30,
+      httpOnly: true,
+      path: "/",
+    });
   }
 
   let cart = await db.cart.findFirst({
-    where: userId ? { userId } : { sessionId }
+    where: userId ? { userId } : { sessionId },
   });
 
+  // Merge guest cart into user cart on login
   if (userId) {
-    const guestCart = await db.cart.findFirst({ where: { sessionId, userId: null } });
+    const guestCart = await db.cart.findFirst({
+      where: { sessionId, userId: null },
+    });
+
     if (guestCart) {
       if (cart) {
         const guestItems = await db.cartItem.findMany({ where: { cartId: guestCart.id } });
         for (const item of guestItems) {
-          const exist = await db.cartItem.findFirst({
-            where: { cartId: cart.id, productId: item.productId, variantId: item.variantId }
+          const existing = await db.cartItem.findFirst({
+            where: { cartId: cart.id, productId: item.productId, variantId: item.variantId },
           });
-          if (exist) {
+          if (existing) {
             await db.cartItem.update({
-              where: { id: exist.id },
-              data: { quantity: exist.quantity + item.quantity }
+              where: { id: existing.id },
+              data: { quantity: existing.quantity + item.quantity },
             });
           } else {
             await db.cartItem.create({
-              data: { cartId: cart.id, productId: item.productId, variantId: item.variantId, quantity: item.quantity }
+              data: {
+                cartId: cart.id,
+                productId: item.productId,
+                variantId: item.variantId,
+                quantity: item.quantity,
+              },
             });
           }
         }
-        
-        const guestCoupons = guestCart.appliedCoupons ? (guestCart.appliedCoupons as any[]) : [];
-        const userCoupons = cart.appliedCoupons ? (cart.appliedCoupons as any[]) : [];
-        const mergedCoupons = [...userCoupons, ...guestCoupons.filter(gc => !userCoupons.some(uc => uc.code === gc.code))];
-
+        const guestCoupons = (guestCart.appliedCoupons as any[]) || [];
+        const userCoupons  = (cart.appliedCoupons  as any[]) || [];
+        const merged = [
+          ...userCoupons,
+          ...guestCoupons.filter((gc: any) => !userCoupons.some((uc: any) => uc.code === gc.code)),
+        ];
         await db.cart.update({
-            where: { id: cart.id },
-            data: { appliedCoupons: mergedCoupons.length > 0 ? mergedCoupons : Prisma.JsonNull }
+          where: { id: cart.id },
+          data: { appliedCoupons: merged.length > 0 ? merged : Prisma.JsonNull },
         });
-
         await db.cart.delete({ where: { id: guestCart.id } });
       } else {
-        cart = await db.cart.update({
-          where: { id: guestCart.id },
-          data: { userId }
-        });
+        cart = await db.cart.update({ where: { id: guestCart.id }, data: { userId } });
       }
     }
   }
 
   if (!cart) {
-    cart = await db.cart.create({
-      data: { sessionId, userId: userId || null }
-    });
+    cart = await db.cart.create({ data: { sessionId, userId: userId || null } });
   }
 
   return { cart, sessionId, userId };
 }
 
 // ============================================================================
-// 2. INVENTORY VALIDATION
+// 2. INVENTORY VALIDATION & RESERVATION
 // ============================================================================
-async function validateStockAndReserve(cartId: string, productId: string, variantId: string | null, requestedQuantity: number) {
+async function validateStockAndReserve(
+  cartId: string,
+  productId: string,
+  variantId: string | null,
+  requestedQuantity: number
+) {
   const product = await db.product.findUnique({ where: { id: productId } });
   if (!product) return { valid: false, error: "Product not found." };
   if (product.status !== "ACTIVE") return { valid: false, error: "This product is currently unavailable." };
 
-  let trackQuantity = product.trackQuantity;
-  let stock = product.stock;
-  let backorderStatus = product.backorderStatus; 
+  let trackQuantity  = product.trackQuantity;
+  let stock          = product.stock;
+  let backorderStatus = product.backorderStatus;
 
   if (variantId) {
     const variant = await db.productVariant.findUnique({ where: { id: variantId } });
     if (!variant) return { valid: false, error: "Product variant not found." };
-    trackQuantity = variant.trackQuantity;
-    stock = variant.stock;
+    trackQuantity   = variant.trackQuantity;
+    stock           = variant.stock;
   }
 
   if (trackQuantity && backorderStatus === "DO_NOT_ALLOW") {
@@ -104,18 +146,19 @@ async function validateStockAndReserve(cartId: string, productId: string, varian
       where: {
         productId,
         variantId,
-        expiresAt: { gt: new Date() }, 
-        cartId: { not: cartId } 
+        expiresAt: { gt: new Date() },
+        cartId: { not: cartId },
       },
-      _sum: { quantity: true }
+      _sum: { quantity: true },
     });
 
-    const reservedStock = activeReservations._sum.quantity || 0;
-    const availableStock = stock - reservedStock;
+    const reservedStock   = activeReservations._sum.quantity || 0;
+    const availableStock  = stock - reservedStock;
 
     if (requestedQuantity > availableStock) {
-      if (availableStock <= 0) return { valid: false, error: "Sorry, this item is currently out of stock or reserved by others." };
-      else return { valid: false, error: `Only ${availableStock} item(s) left in stock!` };
+      if (availableStock <= 0)
+        return { valid: false, error: "Sorry, this item is out of stock or reserved by others." };
+      return { valid: false, error: `Only ${availableStock} item(s) left in stock!` };
     }
   }
 
@@ -124,128 +167,184 @@ async function validateStockAndReserve(cartId: string, productId: string, varian
     await db.inventoryReservation.deleteMany({ where: { cartId, productId, variantId } });
     await db.inventoryReservation.create({
       data: {
-        cartId, productId, variantId, locationId: defaultLocation.id,
-        quantity: requestedQuantity, expiresAt: new Date(Date.now() + 15 * 60 * 1000) 
-      }
+        cartId,
+        productId,
+        variantId,
+        locationId: defaultLocation.id,
+        quantity: requestedQuantity,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
     });
   }
+
   return { valid: true };
 }
 
 // ============================================================================
-// 3. CART FORMATTING
+// 3. CART ITEM FORMATTING
 // ============================================================================
 async function getFormattedCartItems(cartId: string) {
   await db.inventoryReservation.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+
   const cart = await db.cart.findUnique({
     where: { id: cartId },
-    include: { items: { orderBy: { id: 'asc' }, include: { product: { include: { attributes: true } }, variant: true } } },
+    include: {
+      items: {
+        orderBy: { id: "asc" },
+        include: {
+          product: { include: { attributes: true } },
+          variant: true,
+        },
+      },
+    },
   });
+
   if (!cart) return [];
+
+  const formatPrice = (amount: number) =>
+    new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: "AUD",
+      minimumFractionDigits: 2,
+    }).format(amount);
 
   return cart.items.map((item) => {
     const isVariant = !!item.variant;
-    const priceNum = isVariant ? Number(item.variant!.price) : Number(item.product.price);
-    const totalNum = priceNum * item.quantity;
-    const formatPrice = (amount: number) => new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2 }).format(amount);
+    const priceNum  = isVariant ? Number(item.variant!.price) : Number(item.product.price);
     const rawWeight = isVariant ? item.variant?.weight : item.product.weight;
-    const weightNum = rawWeight ? Number(rawWeight.toString()) : 0;
 
     return {
-      id: item.product.id, databaseId: item.product.productCode,
+      id: item.product.id,
+      databaseId: item.product.productCode,
       name: isVariant ? `${item.product.name} - ${item.variant!.name}` : item.product.name,
-      slug: item.product.slug, price: formatPrice(priceNum), rawPrice: priceNum, // ✅ Added rawPrice for accurate backend math
+      slug: item.product.slug,
+      price: formatPrice(priceNum),
+      rawPrice: priceNum,
       image: isVariant && item.variant!.image ? item.variant!.image : item.product.featuredImage,
-      quantity: item.quantity, key: item.id, total: formatPrice(totalNum), weight: weightNum,
+      quantity: item.quantity,
+      key: item.id,
+      total: formatPrice(priceNum * item.quantity),
+      weight: rawWeight ? Number(rawWeight.toString()) : 0,
       isPreOrder: isVariant ? item.variant!.isPreOrder : item.product.isPreOrder,
-      isVirtual: item.product.isVirtual, taxStatus: item.product.taxStatus, shippingClassId: item.product.shippingClassId || null,
-      attributes: item.product.attributes.map((attr) => ({ id: attr.id, name: attr.name, label: attr.name, value: attr.values.join(", ") })),
+      isVirtual: item.product.isVirtual,
+      taxStatus: item.product.taxStatus,
+      shippingClassId: item.product.shippingClassId || null,
+      attributes: item.product.attributes.map((attr) => ({
+        id: attr.id,
+        name: attr.name,
+        label: attr.name,
+        value: attr.values.join(", "),
+      })),
     };
   });
 }
 
 // ============================================================================
-// 4. MAIN EXPORTED ACTIONS
+// 4. COUPON RE-VALIDATION
+// ============================================================================
+async function revalidateCoupons(
+  cartId: string,
+  savedCoupons: any[],
+  subtotal: number
+): Promise<{ code: string; amount: number }[]> {
+  if (!savedCoupons || savedCoupons.length === 0) return [];
+
+  const code = savedCoupons[0].code;
+  const discount = await db.discount.findUnique({ where: { code } });
+  const now = new Date();
+
+  if (
+    discount &&
+    discount.isActive &&
+    !discount.deletedAt &&
+    discount.startDate <= now &&
+    (!discount.endDate || discount.endDate >= now) &&
+    (!discount.minSpend || subtotal >= Number(discount.minSpend)) &&
+    (!discount.usageLimit || discount.usedCount < discount.usageLimit)
+  ) {
+    let amount = 0;
+    if (discount.type === "FIXED_CART" || discount.type === "FIXED_AMOUNT") {
+      amount = Number(discount.value);
+    } else if (discount.type === "PERCENTAGE") {
+      amount = (subtotal * Number(discount.value)) / 100;
+    }
+    if (amount > subtotal) amount = subtotal;
+    const valid = [{ code: discount.code, amount }];
+    await db.cart.update({ where: { id: cartId }, data: { appliedCoupons: valid } });
+    return valid;
+  }
+
+  await db.cart.update({ where: { id: cartId }, data: { appliedCoupons: Prisma.JsonNull } });
+  return [];
+}
+
+// ============================================================================
+// 5. EXPORTED ACTIONS
 // ============================================================================
 
-// ✅ ENTERPRISE FIX: Re-validating and Re-calculating Coupon on every load
 export async function getCartAction(): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
     const items = await getFormattedCartItems(cart.id);
-    
-    let validCoupons: { code: string; amount: number }[] = [];
-    const savedCoupons = cart.appliedCoupons ? (cart.appliedCoupons as any[]) : [];
-
-    // If there is a coupon, verify it again dynamically
-    if (savedCoupons.length > 0) {
-      const code = savedCoupons[0].code;
-      const subtotal = items.reduce((acc, item) => acc + (item.rawPrice * item.quantity), 0);
-      
-      const discount = await db.discount.findUnique({ where: { code } });
-      const now = new Date();
-
-      if (
-        discount && discount.isActive && 
-        discount.startDate <= now && 
-        (!discount.endDate || discount.endDate >= now) &&
-        (!discount.minSpend || subtotal >= Number(discount.minSpend))
-      ) {
-        // Recalculate amount dynamically
-        let amount = 0;
-        if (discount.type === "FIXED_CART" || discount.type === "FIXED_AMOUNT") amount = Number(discount.value);
-        else if (discount.type === "PERCENTAGE") amount = (subtotal * Number(discount.value)) / 100;
-        
-        if (amount > subtotal) amount = subtotal;
-
-        validCoupons.push({ code: discount.code, amount });
-
-        // Update DB with fresh calculated amount
-        await db.cart.update({
-          where: { id: cart.id },
-          data: { appliedCoupons: validCoupons }
-        });
-      } else {
-        // Auto-remove invalid/expired coupon
-        await db.cart.update({ where: { id: cart.id }, data: { appliedCoupons: Prisma.JsonNull } });
-      }
-    }
-
+    const subtotal = items.reduce((acc, item) => acc + item.rawPrice * item.quantity, 0);
+    const savedCoupons = (cart.appliedCoupons as any[]) || [];
+    const validCoupons = await revalidateCoupons(cart.id, savedCoupons, subtotal);
     return { success: true, items, appliedCoupons: validCoupons };
   } catch (error) {
+    console.error("[getCartAction]", error);
     return { success: false, items: [], error: "Failed to fetch cart. Please try again." };
   }
 }
 
-export async function addToCartAction(productId: string, quantity: number, variantId?: string): Promise<CartActionResponse> {
+export async function addToCartAction(
+  productId: string,
+  quantity: number,
+  variantId?: string
+): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
-    const existingItem = await db.cartItem.findFirst({ where: { cartId: cart.id, productId, variantId: variantId || null } });
-    const newQuantity = existingItem ? existingItem.quantity + quantity : quantity;
-    
+    const existing = await db.cartItem.findFirst({
+      where: { cartId: cart.id, productId, variantId: variantId || null },
+    });
+    const newQuantity = existing ? existing.quantity + quantity : quantity;
+
     const stockCheck = await validateStockAndReserve(cart.id, productId, variantId || null, newQuantity);
-    if (!stockCheck.valid) return { success: false, error: stockCheck.error }; 
+    if (!stockCheck.valid) return { success: false, error: stockCheck.error };
 
-    if (existingItem) await db.cartItem.update({ where: { id: existingItem.id }, data: { quantity: newQuantity } });
-    else await db.cartItem.create({ data: { cartId: cart.id, productId, variantId: variantId || null, quantity: newQuantity } });
-
-    // Re-fetch to trigger dynamic coupon calculation
+    if (existing) {
+      await db.cartItem.update({ where: { id: existing.id }, data: { quantity: newQuantity } });
+    } else {
+      await db.cartItem.create({
+        data: { cartId: cart.id, productId, variantId: variantId || null, quantity: newQuantity },
+      });
+    }
     return await getCartAction();
-  } catch (error) { return { success: false, error: "An unexpected error occurred while adding to cart." }; }
+  } catch (error) {
+    console.error("[addToCartAction]", error);
+    return { success: false, error: "An unexpected error occurred while adding to cart." };
+  }
 }
 
-export async function updateCartItemQuantityAction(cartItemId: string, quantity: number): Promise<CartActionResponse> {
+export async function updateCartItemQuantityAction(
+  cartItemId: string,
+  quantity: number
+): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
     const cartItem = await db.cartItem.findUnique({ where: { id: cartItemId } });
     if (!cartItem) return { success: false, error: "Cart item not found." };
 
-    const stockCheck = await validateStockAndReserve(cart.id, cartItem.productId, cartItem.variantId, quantity);
+    const stockCheck = await validateStockAndReserve(
+      cart.id, cartItem.productId, cartItem.variantId, quantity
+    );
     if (!stockCheck.valid) return { success: false, error: stockCheck.error };
 
     await db.cartItem.update({ where: { id: cartItemId }, data: { quantity } });
     return await getCartAction();
-  } catch (error) { return { success: false, error: "Failed to update quantity." }; }
+  } catch (error) {
+    console.error("[updateCartItemQuantityAction]", error);
+    return { success: false, error: "Failed to update quantity." };
+  }
 }
 
 export async function removeFromCartAction(cartItemId: string): Promise<CartActionResponse> {
@@ -253,11 +352,16 @@ export async function removeFromCartAction(cartItemId: string): Promise<CartActi
     const { cart } = await getCartSessionAndUser();
     const cartItem = await db.cartItem.findUnique({ where: { id: cartItemId } });
     if (cartItem) {
-      await db.inventoryReservation.deleteMany({ where: { cartId: cart.id, productId: cartItem.productId, variantId: cartItem.variantId } });
+      await db.inventoryReservation.deleteMany({
+        where: { cartId: cart.id, productId: cartItem.productId, variantId: cartItem.variantId },
+      });
       await db.cartItem.delete({ where: { id: cartItemId } });
     }
     return await getCartAction();
-  } catch (error) { return { success: false, error: "Failed to remove item." }; }
+  } catch (error) {
+    console.error("[removeFromCartAction]", error);
+    return { success: false, error: "Failed to remove item." };
+  }
 }
 
 export async function clearCartAction(): Promise<CartActionResponse> {
@@ -265,72 +369,73 @@ export async function clearCartAction(): Promise<CartActionResponse> {
     const { cart } = await getCartSessionAndUser();
     await db.inventoryReservation.deleteMany({ where: { cartId: cart.id } });
     await db.cartItem.deleteMany({ where: { cartId: cart.id } });
-    await db.cart.update({ where: { id: cart.id }, data: { appliedCoupons: Prisma.JsonNull } });
-
+    await db.cart.update({
+      where: { id: cart.id },
+      data: {
+        appliedCoupons: Prisma.JsonNull,
+        shippingHash: null,
+        shippingQuotes: Prisma.JsonNull,
+      },
+    });
     return { success: true, items: [], appliedCoupons: [] };
   } catch (error) {
+    console.error("[clearCartAction]", error);
     return { success: false, error: "Failed to clear cart." };
   }
 }
 
-// ✅ ENTERPRISE FIX: Advanced Coupon Logic Added
 export async function applyCouponAction(code: string): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
-    const items = await getFormattedCartItems(cart.id);
-    
-    const subtotal = items.reduce((acc, item) => acc + (item.rawPrice * item.quantity), 0);
+    const items    = await getFormattedCartItems(cart.id);
+    const subtotal = items.reduce((acc, item) => acc + item.rawPrice * item.quantity, 0);
 
-    const discount = await db.discount.findUnique({ 
-        where: { code: code.trim().toUpperCase() } 
-    });
+    const normalizedCode = code.trim().toUpperCase();
+    const discount = await db.discount.findFirst({ where: { code: normalizedCode } });
 
-    if (!discount || !discount.isActive || discount.deletedAt) return { success: false, error: "Invalid or expired coupon code." };
+    if (!discount || !discount.isActive || discount.deletedAt) {
+      return { success: false, error: "Invalid or expired coupon code." };
+    }
 
     const now = new Date();
     if (discount.startDate > now) return { success: false, error: "This coupon is not active yet." };
     if (discount.endDate && discount.endDate < now) return { success: false, error: "This coupon has expired." };
-    
-    // Enterprise Check: Usage Limit
     if (discount.usageLimit && discount.usedCount >= discount.usageLimit) {
-        return { success: false, error: "This coupon's usage limit has been reached." };
+      return { success: false, error: "This coupon's usage limit has been reached." };
+    }
+    if (discount.minSpend && subtotal < Number(discount.minSpend)) {
+      return { success: false, error: `Minimum spend of $${discount.minSpend} required for this coupon.` };
+    }
+    if (discount.maxSpend && subtotal > Number(discount.maxSpend)) {
+      return { success: false, error: "Maximum spend limit exceeded for this coupon." };
     }
 
-    if (discount.minSpend && subtotal < Number(discount.minSpend)) return { success: false, error: `Minimum spend of $${discount.minSpend} required.` };
-    if (discount.maxSpend && subtotal > Number(discount.maxSpend)) return { success: false, error: `Maximum spend limit exceeded for this coupon.` };
-
     let discountAmount = 0;
-    if (discount.type === "FIXED_CART" || discount.type === "FIXED_AMOUNT") discountAmount = Number(discount.value);
-    else if (discount.type === "PERCENTAGE") discountAmount = (subtotal * Number(discount.value)) / 100;
-
+    if (discount.type === "FIXED_CART" || discount.type === "FIXED_AMOUNT") {
+      discountAmount = Number(discount.value);
+    } else if (discount.type === "PERCENTAGE") {
+      discountAmount = (subtotal * Number(discount.value)) / 100;
+    }
     if (discountAmount > subtotal) discountAmount = subtotal;
 
     const newCoupon = { code: discount.code, amount: discountAmount };
-    
-    await db.cart.update({
-        where: { id: cart.id },
-        data: { appliedCoupons: [newCoupon] } 
-    });
+    await db.cart.update({ where: { id: cart.id }, data: { appliedCoupons: [newCoupon] } });
 
     return { success: true, items, appliedCoupons: [newCoupon] };
   } catch (error) {
-    console.error("APPLY_COUPON_ERROR:", error);
-    return { success: false, error: "Failed to apply coupon." };
+    console.error("[applyCouponAction]", error);
+    return { success: false, error: "Failed to apply coupon. Please try again." };
   }
 }
 
 export async function removeCouponAction(code: string): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
-    const items = await getFormattedCartItems(cart.id);
-    
-    await db.cart.update({
-        where: { id: cart.id },
-        data: { appliedCoupons: Prisma.JsonNull } // Removing all coupons
-    });
-
+    const items    = await getFormattedCartItems(cart.id);
+    await db.cart.update({ where: { id: cart.id }, data: { appliedCoupons: Prisma.JsonNull } });
     return { success: true, items, appliedCoupons: [] };
   } catch (error) {
+    console.error("[removeCouponAction]", error);
     return { success: false, error: "Failed to remove coupon." };
   }
 }

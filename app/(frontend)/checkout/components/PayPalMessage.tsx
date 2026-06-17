@@ -1,27 +1,22 @@
 // app/(frontend)/checkout/components/PayPalMessage.tsx
 
 'use client';
-import React, { useEffect, useState } from 'react';
-import { PayPalMessages } from '@paypal/react-paypal-js';
 
-interface PayPalMessageProps { total: number; }
+import React from 'react';
+import { PayPalMessages, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 
+interface PayPalMessageProps {
+  total: number;
+}
+
+// ✅ FIX: আগে setInterval দিয়ে window.paypal.Messages poll করত।
+// এখন usePayPalScriptReducer hook ব্যবহার করছি — SDK context থেকে
+// সরাসরি loading state পাচ্ছি, কোনো polling loop নেই।
 export default function PayPalMessage({ total }: PayPalMessageProps) {
-  const [canRender, setCanRender] = useState(false);
+  const [{ isPending, isRejected }] = usePayPalScriptReducer();
 
-  useEffect(() => {
-    // 🛡️ Direct Vanilla JS Polling: Checks the browser window directly every 50ms
-    const interval = setInterval(() => {
-      if (typeof window !== 'undefined' && window.paypal && window.paypal.Messages) {
-        setCanRender(true);
-        clearInterval(interval);
-      }
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  if (total <= 0 || !canRender) return null;
+  // SDK loading বা failed হলে কিছু show করব না
+  if (total <= 0 || isPending || isRejected) return null;
 
   return (
     <div className="mb-4 text-center pl-2.5">

@@ -2,18 +2,30 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react'; 
+import { useState, useEffect, useCallback } from 'react';
 import AsyncSelect from 'react-select/async';
 import type { CSSObject } from '@emotion/react';
 
 // --- Interfaces ---
 interface ShippingFormData {
-  firstName: string; lastName: string; address1: string; city: string;
-  state: string; postcode: string; email: string; phone: string;
+  firstName: string;
+  lastName: string;
+  address1: string;
+  city: string;
+  state: string;
+  postcode: string;
+  email: string;
+  phone: string;
 }
+
 interface AddressOption {
-  value: string; label: string; suburb: string; postcode: string; state: string;
+  value: string;
+  label: string;
+  suburb: string;
+  postcode: string;
+  state: string;
 }
+
 interface ApiAddressItem {
   value: string;
   label: string;
@@ -21,10 +33,17 @@ interface ApiAddressItem {
   postcode: string;
   state: string;
 }
+
 interface ShippingFormProps {
   title: string;
   onAddressChange: (address: Partial<ShippingFormData>) => void;
   defaultValues?: Partial<ShippingFormData>;
+  // ✅ FIX: sessionKey prop added to differentiate billing vs shipping form storage.
+  // BUG WAS: Both forms used the same key 'checkoutShippingFormData', so when user
+  // enabled "Ship to different address" and typed in shipping form, it overwrote
+  // billing form data in sessionStorage. On page reload, billing form would load
+  // shipping address data!
+  sessionKey?: string;
 }
 
 const selectStyles = {
@@ -37,35 +56,53 @@ const selectStyles = {
   }),
 };
 
-const FORM_DATA_SESSION_KEY = 'checkoutShippingFormData';
+const EMPTY_FORM: ShippingFormData = {
+  firstName: '',
+  lastName: '',
+  address1: '',
+  city: '',
+  state: '',
+  postcode: '',
+  email: '',
+  phone: '',
+};
 
-export default function ShippingForm({ title, onAddressChange, defaultValues = {} }: ShippingFormProps) {
-  
+export default function ShippingForm({
+  title,
+  onAddressChange,
+  defaultValues = {},
+  sessionKey = 'checkout_billing_form', // ✅ Default key for billing form
+}: ShippingFormProps) {
+
   const [formData, setFormData] = useState<ShippingFormData>(() => {
+    // ✅ FIX: Uses `sessionKey` (prop) instead of hardcoded constant.
+    // Billing form uses 'checkout_billing_form'.
+    // Shipping form uses 'checkout_shipping_form' (passed from CheckoutClient).
+    // No more cross-contamination between the two forms.
     try {
-      const savedData = sessionStorage.getItem(FORM_DATA_SESSION_KEY);
-      if (savedData) {
-        return JSON.parse(savedData);
+      if (typeof window !== 'undefined') {
+        const savedData = sessionStorage.getItem(sessionKey);
+        if (savedData) {
+          return JSON.parse(savedData);
+        }
       }
     } catch (error) {
       console.error("Could not load form data from session storage", error);
     }
-    
-    return {
-      firstName: '', lastName: '', address1: '', city: '',
-      state: '', postcode: '', email: '', phone: '',
-      ...defaultValues,
-    };
+
+    return { ...EMPTY_FORM, ...defaultValues };
   });
 
   useEffect(() => {
     onAddressChange(formData);
     try {
-      sessionStorage.setItem(FORM_DATA_SESSION_KEY, JSON.stringify(formData));
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(sessionKey, JSON.stringify(formData));
+      }
     } catch (error) {
       console.error("Could not save form data to session storage", error);
     }
-  }, [formData, onAddressChange]);
+  }, [formData, onAddressChange, sessionKey]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -86,7 +123,8 @@ export default function ShippingForm({ title, onAddressChange, defaultValues = {
   const loadAddressOptions = useCallback(async (inputValue: string): Promise<AddressOption[]> => {
     if (inputValue.trim().length < 1) return [];
     try {
-      const response = await fetch(`/api/address-lookup?query=${inputValue}`);
+      const response = await fetch(`/api/address-lookup?query=${encodeURIComponent(inputValue)}`);
+      if (!response.ok) return [];
       const data = await response.json();
       return data.map((item: ApiAddressItem) => ({ ...item, label: item.value }));
     } catch (error) {
@@ -110,11 +148,7 @@ export default function ShippingForm({ title, onAddressChange, defaultValues = {
       <h2 className="text-[1.4rem] font-extrabold text-center md:text-[1.75rem] md:font-bold md:text-left m-0 border-b border-[#e0e0e0] pb-3 md:pb-4">
         {title}
       </h2>
-      
-      {/* Grid Layout Change: 
-          grid-cols-2 used directly.
-          col-span-2 used for full-width items on ALL screens.
-      */}
+
       <div className="grid grid-cols-2 gap-5">
         <div className="col-span-2">
           <label className={labelClass}>Country / Region *</label>
@@ -122,70 +156,114 @@ export default function ShippingForm({ title, onAddressChange, defaultValues = {
         </div>
         <div className="col-span-2">
           <label className={labelClass}>Email address *</label>
-          <input name="email" type="email" value={formData.email} onChange={handleInputChange} className={inputClass} required />
+          <input
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            className={inputClass}
+            required
+          />
         </div>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-5">
-        {/* First Name & Last Name (Side by Side on Mobile & Desktop) */}
         <div>
           <label className={labelClass}>First name *</label>
-          <input name="firstName" value={formData.firstName} onChange={handleInputChange} className={inputClass} required />
+          <input
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleInputChange}
+            className={inputClass}
+            required
+          />
         </div>
         <div>
           <label className={labelClass}>Last name *</label>
-          <input name="lastName" value={formData.lastName} onChange={handleInputChange} className={inputClass} required />
-        </div>
-        
-        {/* Address: Full Width */}
-        <div className="col-span-2">
-          <label className={labelClass}>Street address *</label>
-          <input name="address1" placeholder="House number and street name" value={formData.address1} onChange={handleInputChange} className={inputClass} required />
+          <input
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleInputChange}
+            className={inputClass}
+            required
+          />
         </div>
 
-        {/* Suburb/Postcode Select: Full Width */}
+        <div className="col-span-2">
+          <label className={labelClass}>Street address *</label>
+          <input
+            name="address1"
+            placeholder="House number and street name"
+            value={formData.address1}
+            onChange={handleInputChange}
+            className={inputClass}
+            required
+          />
+        </div>
+
         <div className="col-span-2">
           <label className={labelClass}>Suburb / Postcode *</label>
           <AsyncSelect
             key={formData.city + formData.postcode}
-            cacheOptions defaultOptions
+            cacheOptions
+            defaultOptions
             placeholder="Start typing your Suburb or Postcode..."
             loadOptions={debouncedLoadOptions}
             onChange={handleSelectChange}
             styles={selectStyles}
-            value={formData.city ? { label: `${formData.city}, ${formData.state} ${formData.postcode}`, value: formData.city, suburb: formData.city, postcode: formData.postcode, state: formData.state } : null}
+            value={
+              formData.city
+                ? {
+                    label: `${formData.city}, ${formData.state} ${formData.postcode}`,
+                    value: formData.city,
+                    suburb: formData.city,
+                    postcode: formData.postcode,
+                    state: formData.state,
+                  }
+                : null
+            }
             loadingMessage={() => 'Searching...'}
-            noOptionsMessage={({ inputValue }) => inputValue.length < 2 ? 'Keep typing to see suggestions' : 'No results found'}
+            noOptionsMessage={({ inputValue }) =>
+              inputValue.length < 2
+                ? 'Keep typing to see suggestions'
+                : 'No results found'
+            }
           />
         </div>
 
-        {/* State & Postcode (Side by Side on Mobile & Desktop) */}
         <div>
           <label className={labelClass}>State *</label>
-          <input 
-            name="state" 
-            value={formData.state} 
-            className={inputClass} 
-            required 
-            readOnly 
-            placeholder="Auto-filled" 
+          <input
+            name="state"
+            value={formData.state}
+            className={inputClass}
+            required
+            readOnly
+            placeholder="Auto-filled"
           />
         </div>
         <div>
           <label className={labelClass}>Postcode *</label>
-          <input 
-            name="postcode" 
-            value={formData.postcode} 
-            className={inputClass} 
-            required 
-            readOnly 
-            placeholder="Auto-filled" 
+          <input
+            name="postcode"
+            value={formData.postcode}
+            className={inputClass}
+            required
+            readOnly
+            placeholder="Auto-filled"
           />
         </div>
-        {/* Phone: Full Width */}
+
         <div className="col-span-2">
           <label className={labelClass}>Phone *</label>
-          <input name="phone" type="tel" value={formData.phone} onChange={handleInputChange} className={inputClass} required />
+          <input
+            name="phone"
+            type="tel"
+            value={formData.phone}
+            onChange={handleInputChange}
+            className={inputClass}
+            required
+          />
         </div>
       </div>
     </div>

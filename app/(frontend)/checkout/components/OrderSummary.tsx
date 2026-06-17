@@ -219,7 +219,7 @@ export default function OrderSummary({
                 >
                   <label
                     htmlFor={rate.id}
-                    className="flex items-center p-[0.3rem_0.5rem] w-full cursor-pointer md:p-1 md:text-[0.9rem]"
+                    className="flex items-center p-[0.3rem_0.5rem] w-full cursor-pointer text-[0.7rem] md:p-1 md:text-[0.9rem]"
                   >
                     <input
                       type="radio"
@@ -228,10 +228,10 @@ export default function OrderSummary({
                       value={rate.id}
                       checked={selectedRateId === rate.id}
                       readOnly
-                      className="mr-2 accent-[#ff0000]"
+                      className="mr-2 accent-[#ff0000] shrink-0"
                     />
                     <span className="flex-grow text-[#2b2b2b]">{rate.label}</span>
-                    <strong className="font-bold text-black">{formatPrice(rate.cost)}</strong>
+                    <strong className="font-bold text-black ml-2 shrink-0">{formatPrice(rate.cost)}</strong>
                   </label>
                 </div>
               ))

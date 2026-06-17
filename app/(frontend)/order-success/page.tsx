@@ -155,159 +155,146 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
           </div>
         </div>
 
-        {/* ── Main 2-column grid ── */}
-        {/* Desktop: left=items+totals, right=addresses+timeline */}
-        {/* Mobile: stacked */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+        {/* ── Items + Totals (full width) ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-gray-100">
+            <h2 className="font-bold text-gray-800 text-sm">Items Ordered</h2>
+          </div>
 
-          {/* ── LEFT: Order Items + Totals ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-gray-100">
-              <h2 className="font-bold text-gray-800 text-sm">Items Ordered</h2>
-            </div>
-
-            <div className="divide-y divide-gray-50">
-              {order.items.map((item, index) => (
-                <div key={index} className="flex items-center gap-3 px-5 py-3.5">
-                  {item.image ? (
-                    <Image
-                      src={item.image}
-                      alt={item.productName}
-                      width={52}
-                      height={52}
-                      className="w-13 h-13 rounded-lg object-cover bg-gray-100 shrink-0"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="w-13 h-13 min-w-[52px] min-h-[52px] bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                      <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
-                      {item.productName}
-                    </p>
-                    {item.variantName && (
-                      <p className="text-xs text-gray-400 mt-0.5">{item.variantName}</p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity}</p>
+          <div className="divide-y divide-gray-50">
+            {order.items.map((item, index) => (
+              <div key={index} className="flex items-center gap-3 px-5 py-3.5">
+                {item.image ? (
+                  <Image
+                    src={item.image}
+                    alt={item.productName}
+                    width={52}
+                    height={52}
+                    className="w-13 h-13 rounded-lg object-cover bg-gray-100 shrink-0"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="w-13 h-13 min-w-[52px] min-h-[52px] bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
                   </div>
-                  <div className="text-right shrink-0 pl-2">
-                    <p className="text-sm font-bold text-gray-900">{formatCurrency(item.total)}</p>
-                    <p className="text-xs text-gray-400">{formatCurrency(item.price)} ea</p>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2">
+                    {item.productName}
+                  </p>
+                  {item.variantName && (
+                    <p className="text-xs text-gray-400 mt-0.5">{item.variantName}</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity}</p>
+                </div>
+                <div className="text-right shrink-0 pl-2">
+                  <p className="text-sm font-bold text-gray-900">{formatCurrency(item.total)}</p>
+                  <p className="text-xs text-gray-400">{formatCurrency(item.price)} ea</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Totals */}
+          <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 space-y-2">
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Subtotal</span>
+              <span>{formatCurrency(order.subtotal)}</span>
+            </div>
+            {Number(order.shippingTotal) > 0 && (
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>
+                  Shipping
+                  {order.shippingMethod && (
+                    <span className="text-xs text-gray-400 ml-1">({order.shippingMethod})</span>
+                  )}
+                </span>
+                <span>{formatCurrency(order.shippingTotal)}</span>
+              </div>
+            )}
+            {Number(order.discountTotal) > 0 && (
+              <div className="flex justify-between text-sm text-green-700 font-medium">
+                <span>Discount</span>
+                <span>−{formatCurrency(order.discountTotal)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-extrabold text-gray-900 text-base pt-2 border-t border-gray-200">
+              <span>Total (AUD)</span>
+              <span>{formatCurrency(order.total)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Shipping + Billing — পাশাপাশি desktop-এ, mobile-এ উপর-নিচ ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          {/* Shipping Address */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Shipping Address</h3>
+            </div>
+            <div className="text-sm text-gray-700 space-y-0.5 leading-relaxed">
+              <p className="font-semibold text-gray-900">
+                {[shipping?.firstName, shipping?.lastName].filter(Boolean).join(' ')}
+              </p>
+              {shipping?.address1 && <p>{shipping.address1}</p>}
+              {shippingLine && <p>{shippingLine}</p>}
+              <p>Australia</p>
+              {shipping?.phone && (
+                <p className="text-gray-400 text-xs pt-1">{shipping.phone}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Billing Address */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Billing Address</h3>
+            </div>
+            <div className="text-sm text-gray-700 space-y-0.5 leading-relaxed">
+              <p className="font-semibold text-gray-900">
+                {[billing?.firstName, billing?.lastName].filter(Boolean).join(' ')}
+              </p>
+              {billing?.address1 && <p>{billing.address1}</p>}
+              {billingLine && <p>{billingLine}</p>}
+              <p>Australia</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── What Happens Next (full width) ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-bold text-gray-800 text-sm mb-4">What Happens Next</h3>
+          <div className="relative">
+            <div className="absolute left-[15px] top-4 bottom-4 w-px bg-gray-100" />
+            <div className="space-y-4">
+              {NEXT_STEPS.map((s, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 relative z-10 border ${
+                    s.done ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                  }`}>
+                    {s.emoji}
+                  </div>
+                  <div className="pt-0.5">
+                    <p className={`font-semibold text-sm ${s.done ? 'text-green-700' : 'text-gray-800'}`}>
+                      {s.title}
+                    </p>
+                    <p className="text-gray-400 text-xs mt-0.5">{s.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
-
-            {/* Totals */}
-            <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 space-y-2">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Subtotal</span>
-                <span>{formatCurrency(order.subtotal)}</span>
-              </div>
-              {Number(order.shippingTotal) > 0 && (
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>
-                    Shipping
-                    {order.shippingMethod && (
-                      <span className="text-xs text-gray-400 ml-1">({order.shippingMethod})</span>
-                    )}
-                  </span>
-                  <span>{formatCurrency(order.shippingTotal)}</span>
-                </div>
-              )}
-              {Number(order.discountTotal) > 0 && (
-                <div className="flex justify-between text-sm text-green-700 font-medium">
-                  <span>Discount</span>
-                  <span>−{formatCurrency(order.discountTotal)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-extrabold text-gray-900 text-base pt-2 border-t border-gray-200">
-                <span>Total (AUD)</span>
-                <span>{formatCurrency(order.total)}</span>
-              </div>
-            </div>
           </div>
-
-          {/* ── RIGHT: Addresses + What's Next ── */}
-          <div className="flex flex-col gap-4">
-
-            {/* Shipping + Billing addresses — side by side on sm, stacked on mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
-
-              {/* Shipping Address */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Shipping</h3>
-                </div>
-                <div className="text-sm text-gray-700 space-y-0.5 leading-relaxed">
-                  <p className="font-semibold text-gray-900">
-                    {[shipping?.firstName, shipping?.lastName].filter(Boolean).join(' ')}
-                  </p>
-                  {shipping?.address1 && <p>{shipping.address1}</p>}
-                  {shippingLine && <p>{shippingLine}</p>}
-                  <p>Australia</p>
-                  {shipping?.phone && (
-                    <p className="text-gray-400 text-xs pt-1">{shipping.phone}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Billing Address — always shown */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Billing</h3>
-                </div>
-                <div className="text-sm text-gray-700 space-y-0.5 leading-relaxed">
-                  <p className="font-semibold text-gray-900">
-                    {[billing?.firstName, billing?.lastName].filter(Boolean).join(' ')}
-                  </p>
-                  {billing?.address1 && <p>{billing.address1}</p>}
-                  {billingLine && <p>{billingLine}</p>}
-                  <p>Australia</p>
-                </div>
-              </div>
-            </div>
-
-            {/* What Happens Next */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <h3 className="font-bold text-gray-800 text-sm mb-4">What Happens Next</h3>
-              <div className="relative">
-                <div className="absolute left-[15px] top-4 bottom-4 w-px bg-gray-100" />
-                <div className="space-y-4">
-                  {NEXT_STEPS.map((s, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 relative z-10 border ${
-                        s.done ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
-                      }`}>
-                        {s.emoji}
-                      </div>
-                      <div className="pt-0.5">
-                        <p className={`font-semibold text-sm ${s.done ? 'text-green-700' : 'text-gray-800'}`}>
-                          {s.title}
-                        </p>
-                        <p className="text-gray-400 text-xs mt-0.5">{s.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-          </div>
-          {/* end RIGHT column */}
         </div>
-        {/* end main grid */}
 
         {/* ── CTA Buttons (full width) ── */}
         <div className="flex flex-col sm:flex-row gap-3 pb-4">

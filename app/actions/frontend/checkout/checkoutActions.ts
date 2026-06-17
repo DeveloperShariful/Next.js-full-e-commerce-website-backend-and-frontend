@@ -112,14 +112,95 @@ async function getSessionIds(): Promise<{ sessionId: string; userId: string | nu
 // ============================================================================
 // HELPERS
 // ============================================================================
+// ── Pricing rule helpers ──────────────────────────────────────────────────
+function applyFeeString(base: number, feeStr: string): number {
+  const v = feeStr.trim();
+  if (v.endsWith("%")) return base * (parseFloat(v) / 100);
+  return parseFloat(v) || 0;
+}
+
+function applyDiscountString(base: number, discStr: string): number {
+  return applyFeeString(base, discStr);
+}
+
+function applyPricingRules(
+  rawCost: number,
+  cartSubtotal: number,
+  cfg: {
+    globalShippingDiscount?: string | null;
+    handlingFee?: string | null;
+    markupRule1Threshold?: number | null;
+    markupRule1Fee?: string | null;
+    markupRule2Threshold?: number | null;
+    markupRule2Fee?: string | null;
+    markupRule3Fee?: string | null;
+    discountRule1Threshold?: number | null;
+    discountRule1Amount?: string | null;
+    discountRule2Threshold?: number | null;
+    discountRule2Amount?: string | null;
+  }
+): number {
+  let cost = rawCost;
+
+  // 1. Global discount (applied to raw cost first)
+  if (cfg.globalShippingDiscount) {
+    cost -= applyDiscountString(cost, cfg.globalShippingDiscount);
+  }
+
+  // 2. Handling fee
+  if (cfg.handlingFee) {
+    cost += applyFeeString(cost, cfg.handlingFee);
+  }
+
+  // 3. Dynamic markup (cart subtotal < threshold, top-down, first match)
+  if (cfg.markupRule1Threshold != null && cfg.markupRule1Fee &&
+      cartSubtotal < Number(cfg.markupRule1Threshold)) {
+    cost += applyFeeString(cost, cfg.markupRule1Fee);
+  } else if (cfg.markupRule2Threshold != null && cfg.markupRule2Fee &&
+      cartSubtotal < Number(cfg.markupRule2Threshold)) {
+    cost += applyFeeString(cost, cfg.markupRule2Fee);
+  } else if (cfg.markupRule3Fee) {
+    cost += applyFeeString(cost, cfg.markupRule3Fee);
+  }
+
+  // 4. Cart subtotal discount (highest matching threshold wins)
+  let discountStr: string | null = null;
+  if (cfg.discountRule2Threshold != null && cfg.discountRule2Amount &&
+      cartSubtotal >= Number(cfg.discountRule2Threshold)) {
+    discountStr = cfg.discountRule2Amount;
+  } else if (cfg.discountRule1Threshold != null && cfg.discountRule1Amount &&
+      cartSubtotal >= Number(cfg.discountRule1Threshold)) {
+    discountStr = cfg.discountRule1Amount;
+  }
+  if (discountStr) {
+    cost -= applyDiscountString(cost, discountStr);
+  }
+
+  return Math.max(0, cost);
+}
+
 async function fetchTransdirectQuotes(
   shippingAddress: AddressDTO,
   items: CartItemDTO[],
+  cartSubtotal: number,
   config: {
     apiKey: string;
     senderPostcode?: string | null;
     senderSuburb?: string | null;
     senderType?: string | null;
+    autoTailgateKg?: number | null;
+    globalShippingDiscount?: string | null;
+    handlingFee?: string | null;
+    markupRule1Threshold?: number | null;
+    markupRule1Fee?: string | null;
+    markupRule2Threshold?: number | null;
+    markupRule2Fee?: string | null;
+    markupRule3Fee?: string | null;
+    discountRule1Threshold?: number | null;
+    discountRule1Amount?: string | null;
+    discountRule2Threshold?: number | null;
+    discountRule2Amount?: string | null;
+    debugMode?: boolean | null;
   }
 ): Promise<ShippingRateDTO[]> {
   try {
@@ -129,6 +210,10 @@ async function fetchTransdirectQuotes(
     const receiverSuburb = String(shippingAddress.city).trim().toUpperCase();
 
     if (!receiverPostcode || !receiverSuburb) return [];
+
+    // Auto tailgate: any item heavier than threshold triggers tailgate flags
+    const tailgateKg = Number(config.autoTailgateKg ?? 25);
+    const needsTailgate = items.some((item) => item.weight > tailgateKg);
 
     const transdirectItems = items.map((item) => ({
       weight: item.weight > 0 ? Number(item.weight.toFixed(2)) : 1.0,
@@ -141,6 +226,8 @@ async function fetchTransdirectQuotes(
 
     const payload = {
       declared_value: items.reduce((acc, item) => acc + item.price * item.quantity, 0),
+      tailgate_pickup:   needsTailgate,
+      tailgate_delivery: needsTailgate,
       items: transdirectItems,
       sender: {
         postcode: String(senderPostcode).trim(),
@@ -156,6 +243,10 @@ async function fetchTransdirectQuotes(
       },
     };
 
+    if (config.debugMode) {
+      console.log("[Transdirect] Request payload:", JSON.stringify(payload, null, 2));
+    }
+
     const response = await fetch("https://www.transdirect.com.au/api/quotes", {
       method: "POST",
       headers: {
@@ -169,18 +260,50 @@ async function fetchTransdirectQuotes(
     if (!response.ok) return [];
 
     const data = await response.json();
+
+    if (config.debugMode) {
+      console.log("[Transdirect] Response:", JSON.stringify(data, null, 2));
+    }
+
     if (data.quotes && typeof data.quotes === "object") {
       const rates: ShippingRateDTO[] = [];
       Object.keys(data.quotes).forEach((courier) => {
         const quote = data.quotes[courier];
-        if (quote?.total) {
-          rates.push({
-            id: `td_${courier.toLowerCase()}`,
-            label: `${courier.replace(/_/g, " ").toUpperCase()} (Transdirect)`,
-            cost: Number(quote.total),
-            isTransdirect: true,
-          });
+        if (!quote?.total) return;
+
+        const rawCost  = Number(quote.total);
+        const finalCost = applyPricingRules(rawCost, cartSubtotal, config);
+
+        // Title Case: "tnt_overnight_express" → "Tnt Overnight Express"
+        const courierName = courier
+          .replace(/_/g, " ")
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(" ");
+
+        // Transit time: "1-3 Business Days" → "(1-3 Days)"
+        const transitRaw: string = quote.transit_time || "";
+        const transit = transitRaw.replace(/\s*Business\s*/i, " ").trim();
+
+        // Discount label: "Save −X%"
+        let discountLabel = "";
+        if (finalCost < rawCost && rawCost > 0) {
+          const saved = rawCost - finalCost;
+          const pct   = Math.round((saved / rawCost) * 100);
+          discountLabel = pct > 0
+            ? ` Save −${pct}%`
+            : ` Save −$${saved.toFixed(2)}`;
         }
+
+        // Final: "Tnt Overnight Express (1-3 Days) −40%"
+        const label = `${courierName}${transit ? ` (${transit})` : ""}${discountLabel}`;
+
+        rates.push({
+          id: `td_${courier.toLowerCase()}`,
+          label,
+          cost: Number(finalCost.toFixed(2)),
+          isTransdirect: true,
+        });
       });
       return rates;
     }
@@ -377,11 +500,26 @@ export async function getCheckoutDataAction(
       }
 
       if (transdirectRates.length === 0 && transdirectConfig?.isEnabled && transdirectConfig.apiKey) {
-        transdirectRates = await fetchTransdirectQuotes(shippingAddress, items, {
-          apiKey: transdirectConfig.apiKey!,
-          senderPostcode: transdirectConfig.senderPostcode,
-          senderSuburb: transdirectConfig.senderSuburb,
-          senderType: transdirectConfig.senderType,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tc = transdirectConfig ;
+        transdirectRates = await fetchTransdirectQuotes(shippingAddress, items, subtotal, {
+          apiKey:                 tc.apiKey!,
+          senderPostcode:         tc.senderPostcode,
+          senderSuburb:           tc.senderSuburb,
+          senderType:             tc.senderType,
+          autoTailgateKg:         tc.autoTailgateKg        ? Number(tc.autoTailgateKg)        : 25,
+          globalShippingDiscount: tc.globalShippingDiscount ?? null,
+          handlingFee:            tc.handlingFee            ?? null,
+          markupRule1Threshold:   tc.markupRule1Threshold   ? Number(tc.markupRule1Threshold)  : null,
+          markupRule1Fee:         tc.markupRule1Fee         ?? null,
+          markupRule2Threshold:   tc.markupRule2Threshold   ? Number(tc.markupRule2Threshold)  : null,
+          markupRule2Fee:         tc.markupRule2Fee         ?? null,
+          markupRule3Fee:         tc.markupRule3Fee         ?? null,
+          discountRule1Threshold: tc.discountRule1Threshold ? Number(tc.discountRule1Threshold): null,
+          discountRule1Amount:    tc.discountRule1Amount    ?? null,
+          discountRule2Threshold: tc.discountRule2Threshold ? Number(tc.discountRule2Threshold): null,
+          discountRule2Amount:    tc.discountRule2Amount    ?? null,
+          debugMode:              tc.debugMode              ?? false,
         });
 
         if (transdirectRates.length > 0) {

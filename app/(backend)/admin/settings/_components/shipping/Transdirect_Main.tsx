@@ -7,6 +7,7 @@ import { TransdirectConfig } from "@prisma/client";
 import Transdirect_Credentials from "./Transdirect_Credentials";
 import Transdirect_Sender from "./Transdirect_Sender";
 import Transdirect_Controls from "./Transdirect_Controls";
+import Transdirect_Pricing from "./Transdirect_Pricing";
 
 interface Props {
     config: TransdirectConfig | null;
@@ -14,7 +15,7 @@ interface Props {
 }
 
 export default function Transdirect_Main({ config, refreshData }: Props) {
-    const [activeSection, setActiveSection] = useState<'creds' | 'sender' | 'controls'>('creds');
+    const [activeSection, setActiveSection] = useState<'creds' | 'sender' | 'controls' | 'pricing'>('creds');
 
     return (
         <div className="w-full text-[13px] text-[#3c434a] animate-in fade-in mb-[30px]">
@@ -57,6 +58,15 @@ export default function Transdirect_Main({ config, refreshData }: Props) {
                     >
                         Preferences
                     </button>
+                    <span className="mx-2 text-[#c3c4c7]">|</span>
+                </li>
+                <li className="inline-block m-0 p-0">
+                    <button
+                        onClick={() => setActiveSection('pricing')}
+                        className={`inline-block p-0 bg-transparent border-none cursor-pointer hover:text-[#135e96] ${activeSection === 'pricing' ? "text-[#000] font-semibold" : "text-[#2271b1]"}`}
+                    >
+                        Pricing Rules
+                    </button>
                 </li>
             </ul>
 
@@ -70,6 +80,9 @@ export default function Transdirect_Main({ config, refreshData }: Props) {
                 )}
                 {activeSection === 'controls' && (
                     <Transdirect_Controls config={config} refreshData={refreshData} />
+                )}
+                {activeSection === 'pricing' && (
+                    <Transdirect_Pricing config={config} refreshData={refreshData} />
                 )}
             </div>
         </div>

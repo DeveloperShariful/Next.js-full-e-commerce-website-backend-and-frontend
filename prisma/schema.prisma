@@ -1714,6 +1714,32 @@ model TransdirectConfig {
   defaultPickupCloseTime  String   @default("17:00")
   useFrequentRates        Boolean  @default(false)
   enableOrderBoxing       Boolean  @default(false)
+
+  // ── Pricing: Handling Fee ──────────────────────────────────────────
+  handlingFee             String?
+
+  // ── Pricing: Dynamic Markup Rules (cart subtotal < threshold হলে apply) ──
+  markupRule1Threshold    Decimal?  @db.Decimal(12, 2)
+  markupRule1Fee          String?
+  markupRule2Threshold    Decimal?  @db.Decimal(12, 2)
+  markupRule2Fee          String?
+  markupRule3Fee          String?
+
+  // ── Pricing: Discount Rules (cart subtotal >= threshold হলে apply) ──
+  discountRule1Threshold  Decimal?  @db.Decimal(12, 2)
+  discountRule1Amount     String?
+  discountRule2Threshold  Decimal?  @db.Decimal(12, 2)
+  discountRule2Amount     String?
+
+  // ── Pricing: Global Discount (সব quote-এ, threshold ছাড়া) ─────────
+  globalShippingDiscount  String?
+
+  // ── Auto Tailgate (এই kg-এর বেশি হলে tailgate=true) ───────────────
+  autoTailgateKg          Decimal?  @db.Decimal(10, 3)  @default(25)
+
+  // ── Developer ──────────────────────────────────────────────────────
+  debugMode               Boolean  @default(false)
+
   createdAt               DateTime @default(now())
   updatedAt               DateTime @default(now()) @updatedAt
 }

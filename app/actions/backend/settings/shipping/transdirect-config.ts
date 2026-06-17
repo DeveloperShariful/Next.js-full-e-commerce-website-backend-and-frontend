@@ -64,13 +64,13 @@ export async function saveTransdirectPreferences(formData: FormData) {
 
     await db.transdirectConfig.upsert({
       where: { id: "transdirect_config" },
-      update: { 
-        defaultTailgatePickup, 
-        defaultTailgateDelivery, 
+      update: {
+        defaultTailgatePickup,
+        defaultTailgateDelivery,
         defaultDeclaredValue,
         enableOrderBoxing
       },
-      create: { 
+      create: {
         id: "transdirect_config",
         defaultTailgatePickup,
         defaultTailgateDelivery,
@@ -83,5 +83,44 @@ export async function saveTransdirectPreferences(formData: FormData) {
     return { success: true, message: "Preferences updated" };
   } catch (error) {
     return { success: false, error: "Failed to update preferences" };
+  }
+}
+
+// --- SAVE PRICING RULES ---
+export async function saveTransdirectPricing(formData: FormData) {
+  try {
+    const raw = (key: string) => (formData.get(key) as string | null)?.trim() || null;
+    const toDecimal = (key: string) => {
+      const v = raw(key);
+      return v && !isNaN(parseFloat(v)) ? parseFloat(v) : null;
+    };
+
+    const data = {
+      handlingFee:            raw("handlingFee"),
+      markupRule1Threshold:   toDecimal("markupRule1Threshold"),
+      markupRule1Fee:         raw("markupRule1Fee"),
+      markupRule2Threshold:   toDecimal("markupRule2Threshold"),
+      markupRule2Fee:         raw("markupRule2Fee"),
+      markupRule3Fee:         raw("markupRule3Fee"),
+      discountRule1Threshold: toDecimal("discountRule1Threshold"),
+      discountRule1Amount:    raw("discountRule1Amount"),
+      discountRule2Threshold: toDecimal("discountRule2Threshold"),
+      discountRule2Amount:    raw("discountRule2Amount"),
+      globalShippingDiscount: raw("globalShippingDiscount"),
+      autoTailgateKg:         toDecimal("autoTailgateKg") ?? 25,
+      debugMode:              formData.get("debugMode") === "true",
+    };
+
+    await db.transdirectConfig.upsert({
+      where:  { id: "transdirect_config" },
+      update: data,
+      create: { id: "transdirect_config", ...data },
+    });
+
+    revalidatePath("/admin/settings/shipping");
+    return { success: true, message: "Pricing rules saved successfully" };
+  } catch (error) {
+    console.error("SAVE_PRICING_ERROR", error);
+    return { success: false, error: "Failed to save pricing rules" };
   }
 }

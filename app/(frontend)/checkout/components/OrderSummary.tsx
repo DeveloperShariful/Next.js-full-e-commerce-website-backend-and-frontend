@@ -231,7 +231,7 @@ export default function OrderSummary({
                       className="mr-2 accent-[#ff0000]"
                     />
                     <span className="flex-grow text-[#2b2b2b]">{rate.label}</span>
-                    <strong className="font-bold text-black">${Number(rate.cost).toFixed(2)}</strong>
+                    <strong className="font-bold text-black">{formatPrice(rate.cost)}</strong>
                   </label>
                 </div>
               ))

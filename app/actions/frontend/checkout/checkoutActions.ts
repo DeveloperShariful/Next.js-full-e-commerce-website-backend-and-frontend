@@ -273,14 +273,21 @@ export async function getCheckoutDataAction(
       };
     });
 
-    // Coupon validation (runs after subtotal is computed)
+    // ✅ PERF: Phase 2 parallel queries — both depend on cart but not on each other.
+    // Guest users: couponCode may be set; userId is null → address resolves instantly.
+    // Logged-in users: both queries run in parallel instead of sequentially.
+    const couponCode = (cart.appliedCoupons as Array<{ code: string; amount: number }> | null)?.[0]?.code;
+    const [discountRecord, dbAddresses] = await Promise.all([
+      couponCode ? db.discount.findUnique({ where: { code: couponCode } }) : Promise.resolve(null),
+      userId ? db.address.findMany({ where: { userId } }) : Promise.resolve([]),
+    ]);
+
+    // Coupon validation (now uses discountRecord from Phase 2)
     let discountTotal = 0;
     const appliedCoupons: CouponDTO[] = [];
     const savedCoupons = cart.appliedCoupons as Array<{ code: string; amount: number }> | null;
 
     if (savedCoupons && savedCoupons.length > 0) {
-      const code = savedCoupons[0].code;
-      const discountRecord = await db.discount.findUnique({ where: { code } });
       const now = new Date();
 
       if (
@@ -304,12 +311,11 @@ export async function getCheckoutDataAction(
       }
     }
 
-    // Saved addresses for logged-in users
+    // Saved addresses for logged-in users (now uses dbAddresses from Phase 2)
     let billingAddress: AddressDTO | null = null;
     let shippingAddress: AddressDTO | null = shippingAddressInput || null;
 
-    if (userId) {
-      const dbAddresses = await db.address.findMany({ where: { userId } });
+    if (userId && dbAddresses.length > 0) {
       const defaultBilling =
         dbAddresses.find((a) => a.type === "BILLING" && a.isDefault) ||
         dbAddresses.find((a) => a.type === "BILLING");
@@ -396,7 +402,10 @@ export async function getCheckoutDataAction(
 
       if (selectedShippingRateId) {
         const matched = availableShippingRates.find((r) => r.id === selectedShippingRateId);
-        if (matched) shippingTotal = matched.cost;
+        // ✅ FIX: If the saved rate no longer exists in available zones (e.g. address changed
+        // to a different region), fall back to the cheapest available rate instead of leaving
+        // shippingTotal = 0. This eliminates the need for a second API call on the client.
+        shippingTotal = matched ? matched.cost : (availableShippingRates[0]?.cost ?? 0);
       } else if (availableShippingRates.length > 0) {
         shippingTotal = availableShippingRates[0].cost;
       }

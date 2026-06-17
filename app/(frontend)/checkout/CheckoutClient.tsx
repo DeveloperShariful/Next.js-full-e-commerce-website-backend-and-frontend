@@ -259,19 +259,9 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
 
         if (!rateExists && response.availableShippingRates.length > 0) {
           newSelectedShipping = response.availableShippingRates[0].id;
-          const finalResponse = await getCheckoutDataAction(addressToUse as AddressDTO, newSelectedShipping);
-          if (finalResponse.success && finalResponse.totals) {
-            dispatch({
-              type: 'SET_CHECKOUT_DATA',
-              payload: {
-                totals: finalResponse.totals,
-                rates: finalResponse.availableShippingRates || [],
-                coupons: finalResponse.appliedCoupons || [],
-                selectedShipping: newSelectedShipping,
-              },
-            });
-            return;
-          }
+          // ✅ FIX: No second API call needed — server now falls back to the cheapest
+          // available rate when the saved rate ID is not found in the zone, so
+          // response.totals already reflects the correct shippingTotal.
         }
 
         dispatch({
@@ -347,7 +337,7 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
     }
   }, [debouncedFetchShipping]);
 
-  const handleToggleShipToDifferent = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToggleShipToDifferent = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const isChecked = e.target.checked;
     dispatch({ type: 'SET_SHIP_TO_DIFFERENT_ADDRESS', payload: isChecked });
     const explicitAddress = isChecked ? shippingInfoRef.current : customerInfoRef.current;
@@ -355,44 +345,24 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
     dispatch({ type: 'SET_LOADING', key: 'shipping', payload: true });
     await refetchCartData(undefined, explicitAddress);
     dispatch({ type: 'SET_LOADING', key: 'shipping', payload: false });
-  };
+  }, [refetchCartData]);
 
-  const handleShippingSelect = async (rateId: string) => {
-    dispatch({ type: 'SET_SELECTED_SHIPPING', payload: rateId });
-
-    // Optimistic update
+  // ✅ FIX: No longer async — server confirm removed. Rates come from the server
+  // (fetched during address entry), so optimistic calculation is authoritative.
+  const handleShippingSelect = (rateId: string) => {
     const selectedRate = shippingRates.find(r => r.id === rateId);
-    if (totals && selectedRate) {
-      const newTotal = (totals.subtotal - totals.discountTotal) + selectedRate.cost;
-      dispatch({
-        type: 'SET_CHECKOUT_DATA',
-        payload: {
-          totals: { ...totals, shippingTotal: selectedRate.cost, total: newTotal },
-          rates: shippingRates,
-          coupons: appliedCoupons,
-          selectedShipping: rateId,
-        },
-      });
-    }
+    if (!totals || !selectedRate) return;
 
-    // Server confirm
-    try {
-      const addr = shipToDifferentRef.current ? shippingInfoRef.current : customerInfoRef.current;
-      const response = await getCheckoutDataAction(addr as AddressDTO, rateId);
-      if (response.success && response.totals) {
-        dispatch({
-          type: 'SET_CHECKOUT_DATA',
-          payload: {
-            totals: response.totals,
-            rates: response.availableShippingRates || shippingRates,
-            coupons: response.appliedCoupons || appliedCoupons,
-            selectedShipping: rateId,
-          },
-        });
-      }
-    } catch (e) {
-      console.error('[Checkout] Shipping sync failed:', e);
-    }
+    const newTotal = (totals.subtotal - totals.discountTotal) + selectedRate.cost;
+    dispatch({
+      type: 'SET_CHECKOUT_DATA',
+      payload: {
+        totals: { ...totals, shippingTotal: selectedRate.cost, total: newTotal },
+        rates: shippingRates,
+        coupons: appliedCoupons,
+        selectedShipping: rateId,
+      },
+    });
   };
 
   // ============================================================
@@ -516,10 +486,6 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
 
       const result = { orderId: newOrder.wcOrderId, orderKey: newOrder.wcOrderKey };
       pendingOrderRef.current = result;
-
-      // ✅ FIX: Reset loading.order after order CREATION — payment phase manages its own state.
-      // Before: loading.order stayed true → button disabled forever on payment failure.
-      // Now: order creation = step 1 (loading.order). Payment redirect = step 2 (isRedirecting in PaymentMethods).
       dispatch({ type: 'SET_LOADING', key: 'order', payload: false });
 
       return result;
@@ -678,9 +644,6 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
     components: 'buttons,messages',
   }), [paypalClientId]);
 
-  // ✅ FIX: Removed outer <Elements> wrapper — was creating a dummy PI with amount=100.
-  // Now each sub-component (ExpressCheckouts, StripePaymentGateway) uses the shared
-  // clientSecret passed from CheckoutClientComponent. No redundant Elements context.
   if (paypalClientId) {
     return (
       <PayPalScriptProvider options={paypalOptions}>

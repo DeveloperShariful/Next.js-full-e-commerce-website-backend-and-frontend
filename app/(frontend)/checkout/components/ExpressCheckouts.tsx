@@ -1,7 +1,7 @@
 // app/(frontend)/checkout/components/ExpressCheckouts.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import toast from 'react-hot-toast';
@@ -65,6 +65,7 @@ interface ExpressCheckoutsProps {
 // ============================================================================
 function CheckoutForm({
   clientSecret,
+  total,
   onOrderPlace,
   cartItems,
   customerInfo,
@@ -74,6 +75,13 @@ function CheckoutForm({
 }: ExpressCheckoutsProps & { clientSecret: string }) {
   const stripe = useStripe();
   const elements = useElements();
+
+  // ✅ FIX: Sync displayed amount in Google Pay / Apple Pay / Link when total changes
+  // (shipping selected, coupon applied, etc.) without re-mounting the Elements component.
+  useEffect(() => {
+    if (!elements || total <= 0) return;
+    elements.update({ amount: Math.round(total * 100) });
+  }, [elements, total]);
 
   const onConfirm = async () => {
     if (!stripe || !elements) {
@@ -114,10 +122,12 @@ function CheckoutForm({
       // Step 3: Confirm payment — Stripe redirects via return_url
       const returnUrl = `${window.location.origin}/order-confirmation?order_id=${orderDetails.orderId}&key=${orderDetails.orderKey}`;
 
+      // Pass clientSecret here (deferred intent pattern — not in Elements options)
       const { error } = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: { return_url: returnUrl },
+        redirect: 'if_required',
       });
 
       if (error) throw new Error(error.message || 'Payment failed or was cancelled.');
@@ -135,17 +145,15 @@ function CheckoutForm({
 // 3. MAIN COMPONENT — renders only when clientSecret is ready
 // ============================================================================
 function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
-  const { publicKey, clientSecret, isShippingSelected } = props;
+  const { publicKey, clientSecret, total, isShippingSelected } = props;
 
   // loadStripe is cached by public key — no extra cost on re-renders
   const [stripePromise] = useState(() =>
     publicKey ? loadStripe(publicKey) : null
   );
 
-  // ✅ FIX: If PI not ready yet (clientSecret = null), show skeleton.
-  // Before: would immediately start creating a PI here → double PI creation.
-  // Now: wait for parent to provide clientSecret — zero API calls from this component.
-  if (!clientSecret || !stripePromise) {
+  // Wait for clientSecret (needed at confirmPayment time) and a valid total
+  if (!clientSecret || !stripePromise || total <= 0) {
     return (
       <div className="w-full">
         <div className="h-12 w-full bg-[#f0f0f0] rounded-lg animate-pulse" />
@@ -164,11 +172,16 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
         />
       )}
 
-      {/* ✅ Use same clientSecret as credit card form — one PI for all Stripe methods */}
+      {/* ✅ FIX: Initialize Elements with mode+amount (not clientSecret) so that
+          elements.update({ amount }) works when shipping/coupon changes the total.
+          clientSecret is passed as a prop to CheckoutForm and used only in
+          stripe.confirmPayment — this is Stripe's deferred-intent pattern. */}
       <Elements
         stripe={stripePromise}
         options={{
-          clientSecret,
+          mode: 'payment',
+          amount: Math.round(total * 100),
+          currency: 'aud',
           appearance: { theme: 'stripe' },
         }}
       >

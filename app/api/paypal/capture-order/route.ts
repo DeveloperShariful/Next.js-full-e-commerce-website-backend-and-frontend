@@ -220,7 +220,7 @@ export async function POST(request: Request) {
     // ── 8. Post-payment side-effects (fire-and-forget) ────────
     if (successResponse) {
       // Confirmation emails
-      const customerEmail = order.user?.email || order.guestEmail;
+      const customerEmail = order.guestEmail || order.user?.email;
       if (customerEmail) {
         sendNotification({
           trigger: 'ORDER_PROCESSING',

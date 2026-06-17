@@ -201,7 +201,7 @@ export async function POST(request: Request) {
 
     // ── 7. Post-capture side-effects (fire-and-forget) ────────
     // Confirmation emails
-    const customerEmail = currentOrder.user?.email || currentOrder.guestEmail;
+    const customerEmail = currentOrder.guestEmail || currentOrder.user?.email;
     if (customerEmail) {
       sendNotification({
         trigger: 'ORDER_PROCESSING',

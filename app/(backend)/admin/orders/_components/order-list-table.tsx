@@ -207,9 +207,21 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                                 ? `${formatDistanceToNow(orderDate)} ago` 
                                 : format(orderDate, "MMM d, yyyy");
 
-                            const originText = order.affiliate 
-                                ? `Affiliate: ${order.affiliate.user?.name || 'Partner'}`
-                                : 'Organic';
+                            let originText = 'Direct';
+                            if (order.affiliate) {
+                              originText = `Affiliate: ${order.affiliate.user?.name || 'Partner'}`;
+                            } else if (order.utmSource) {
+                              originText = order.utmMedium
+                                ? `${order.utmSource} / ${order.utmMedium}`
+                                : order.utmSource;
+                              if (order.utmCampaign) originText += ` — ${order.utmCampaign}`;
+                            } else if (order.referringSite) {
+                              try {
+                                originText = `Ref: ${new URL(order.referringSite).hostname}`;
+                              } catch {
+                                originText = `Ref: ${order.referringSite}`;
+                              }
+                            }
 
                             const hasTracking = order.shippingTrackingNumber || order.transdirectBookingId;
 

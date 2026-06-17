@@ -25,6 +25,7 @@ import {
   applyCouponAction,
   removeCouponAction
 } from '@/app/actions/frontend/cart/cartActions';
+import { getStoredUTM } from '@/components/SourceTracker';
 
 // ============================================================================
 // 0. DEBOUNCE UTILITY
@@ -445,6 +446,8 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
     if (affiliateId) affiliateMetaData.push({ key: 'solid_affiliate_id', value: affiliateId });
     if (visitId) affiliateMetaData.push({ key: 'solid_affiliate_visit_id', value: visitId });
 
+    const utmData = getStoredUTM();
+
     try {
       const billingDetails = paymentData?.shippingAddress?.address1
         ? {
@@ -471,6 +474,10 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
         orderNotes,
         selectedPaymentMethod: paymentData?.paymentMethodId || selectedPaymentMethod,
         affiliateMetaData,
+        utmSource:     utmData.utmSource,
+        utmMedium:     utmData.utmMedium,
+        utmCampaign:   utmData.utmCampaign,
+        referringSite: utmData.referringSite,
       };
 
       const response = await fetch('/api/stripe/create-order', {
@@ -552,7 +559,7 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
   }
 
   return (
-    <div className="grid grid-cols-1 gap-8 w-full max-w-[1400px] mx-auto px-1.5 py-1.5 md:gap-10 lg:grid-cols-[1fr_550px] lg:gap-12">
+    <div className="grid grid-cols-1 gap-8 w-full max-w-[1400px] mx-auto px-2 py-2 md:gap-10 lg:grid-cols-[1fr_550px] lg:gap-12">
       <div className="flex flex-col gap-8">
         <ShippingForm
           title={shipToDifferentAddress ? 'Billing Details' : 'Billing & Shipping Details'}

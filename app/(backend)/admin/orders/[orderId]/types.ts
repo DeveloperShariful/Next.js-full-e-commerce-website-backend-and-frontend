@@ -158,6 +158,12 @@ export interface OrderDetailsType {
   tailgateDelivery: boolean;
   deliveryInstructions: string | null;
 
+  // UTM / Attribution
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  referringSite: string | null;
+
   // Relations
   user: OrderUser | null;
   items: OrderItem[];

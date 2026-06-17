@@ -90,6 +90,10 @@ export async function POST(request: Request) {
       appliedCoupons,
       orderNotes,
       affiliateMetaData,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      referringSite,
     } = body as {
       cartItems: CartItemDTO[];
       customerInfo: AddressDTO;
@@ -99,6 +103,10 @@ export async function POST(request: Request) {
       appliedCoupons: CouponDTO[];
       orderNotes?: string;
       affiliateMetaData?: MetaDataDTO[];
+      utmSource?: string;
+      utmMedium?: string;
+      utmCampaign?: string;
+      referringSite?: string;
     };
 
     if (!cartItems || cartItems.length === 0) {
@@ -254,6 +262,10 @@ export async function POST(request: Request) {
       customerNote: orderNotes || '',
       metadata: metadataJson,
       isFirstOrder,
+      utmSource:     utmSource     || null,
+      utmMedium:     utmMedium     || null,
+      utmCampaign:   utmCampaign   || null,
+      referringSite: referringSite || null,
       items: { create: dbOrderItems },
     };
 

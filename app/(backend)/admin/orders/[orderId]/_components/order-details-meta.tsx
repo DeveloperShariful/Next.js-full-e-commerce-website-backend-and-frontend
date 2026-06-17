@@ -314,7 +314,7 @@ export const OrderDetailsMeta = ({ order }: OrderDetailsMetaProps) => {
                     )}
                     {order.subscriptionId && (
                         <div className="flex justify-between max-w-[250px] border-t border-[#f0f0f1] pt-1">
-                            <span>Subscription:</span> 
+                            <span>Subscription:</span>
                             <Link href={`/admin/subscriptions/${order.subscriptionId}`} className="text-[#2271b1] hover:underline flex items-center gap-1">
                                 <LinkIcon size={10}/> View Sub
                             </Link>
@@ -322,13 +322,46 @@ export const OrderDetailsMeta = ({ order }: OrderDetailsMetaProps) => {
                     )}
                     {order.affiliate && (
                         <div className="flex justify-between max-w-[250px] border-t border-[#f0f0f1] pt-1">
-                            <span>Affiliate:</span> 
+                            <span>Affiliate:</span>
                             <Link href={`/admin/affiliates/${order.affiliate.id}`} className="text-[#2271b1] hover:underline">
                                 {order.affiliate.user?.name || "Partner"}
                             </Link>
                         </div>
                     )}
                 </div>
+
+                {/* UTM / Traffic Source */}
+                {(order.utmSource || order.utmMedium || order.utmCampaign || order.referringSite) && (
+                    <div className="pt-3 mt-3 border-t border-[#f0f0f1]">
+                        <p className="text-[11px] font-semibold text-[#1d2327] uppercase tracking-wide mb-2">Traffic Source</p>
+                        <div className="space-y-1 text-[12px] text-[#646970]">
+                            {order.utmSource && (
+                                <div className="flex items-center gap-2">
+                                    <span className="w-[70px] shrink-0">Source:</span>
+                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#2271b1] font-semibold">{order.utmSource}</span>
+                                </div>
+                            )}
+                            {order.utmMedium && (
+                                <div className="flex items-center gap-2">
+                                    <span className="w-[70px] shrink-0">Medium:</span>
+                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a]">{order.utmMedium}</span>
+                                </div>
+                            )}
+                            {order.utmCampaign && (
+                                <div className="flex items-center gap-2">
+                                    <span className="w-[70px] shrink-0">Campaign:</span>
+                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a]">{order.utmCampaign}</span>
+                                </div>
+                            )}
+                            {order.referringSite && (
+                                <div className="flex items-center gap-2">
+                                    <span className="w-[70px] shrink-0">Referrer:</span>
+                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a] truncate max-w-[150px]" title={order.referringSite}>{order.referringSite}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
 

@@ -1,4 +1,4 @@
-// app/actions/(backend)/action/settings/email/email-generator.ts
+// app/actions/backend/settings/email/email-generator.ts
 
 import { format } from "date-fns";
 

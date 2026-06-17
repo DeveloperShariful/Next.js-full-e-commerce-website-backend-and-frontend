@@ -8,6 +8,7 @@ import { useCart } from '@/context/CartContext';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { getStoredUTM } from '@/components/SourceTracker';
 
 export interface CartItemDTO {
   id: string;
@@ -126,6 +127,8 @@ const PayPalPaymentGatewayComponent = ({
           if (affiliateId) affiliateMetaData.push({ key: 'solid_affiliate_id', value: affiliateId });
           if (visitId) affiliateMetaData.push({ key: 'solid_affiliate_visit_id', value: visitId });
 
+          const utmData = getStoredUTM();
+
           // Single request: creates DB order + PayPal order in one step.
           // No stripe/create-order call needed for PayPal.
           const res = await fetch('/api/paypal/create-order', {
@@ -140,6 +143,10 @@ const PayPalPaymentGatewayComponent = ({
               appliedCoupons,
               orderNotes,
               affiliateMetaData,
+              utmSource:     utmData.utmSource,
+              utmMedium:     utmData.utmMedium,
+              utmCampaign:   utmData.utmCampaign,
+              referringSite: utmData.referringSite,
             }),
           });
 

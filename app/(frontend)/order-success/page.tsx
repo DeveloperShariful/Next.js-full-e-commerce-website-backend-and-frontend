@@ -21,8 +21,8 @@ interface AddressData {
   phone?: string;
 }
 
-function formatCurrency(amount: number | string) {
-  return `$${Number(amount).toFixed(2)}`;
+function formatCurrency(amount: { toString(): string } | number | string) {
+  return `$${parseFloat(String(amount)).toFixed(2)}`;
 }
 
 function formatDate(date: Date) {

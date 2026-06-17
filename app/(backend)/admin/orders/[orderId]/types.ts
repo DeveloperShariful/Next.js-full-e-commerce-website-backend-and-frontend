@@ -129,9 +129,12 @@ export interface OrderDetailsType {
   shippingMethod: string | null;
   shippingTrackingNumber: string | null;
   selectedCourierCode: string | null;
+  transdirectQuoteId: string | null;
   transdirectBookingId: string | null;
+  transdirectOrderStatus: string | null;
   transdirectLabelUrl: string | null;
   transdirectInvoiceUrl: string | null;
+  transdirectError: string | null;
   
   // JSON Fields
   shippingAddress: AddressJson;

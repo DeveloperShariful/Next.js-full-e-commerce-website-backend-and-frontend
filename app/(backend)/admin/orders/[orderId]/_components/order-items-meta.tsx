@@ -115,7 +115,7 @@ export const OrderItemsMeta = ({ order }: OrderItemsMetaProps) => {
                                 <p className="m-0 font-medium text-[#1d2327]">{order.shippingMethod}</p>
                                 
                                 {/* SCHEMA: Advanced Shipping Meta & Tracking Data */}
-                                {(order.selectedCourierCode || order.transdirectBookingId || order.shippingTrackingNumber) && (
+                                {(order.selectedCourierCode || order.transdirectQuoteId || order.transdirectBookingId || order.shippingTrackingNumber) && (
                                     <div className="mt-2 space-y-1 text-[11px] text-[#646970]">
                                         {order.shippingTrackingNumber && (
                                             <div className="flex gap-2 items-center">
@@ -129,10 +129,16 @@ export const OrderItemsMeta = ({ order }: OrderItemsMetaProps) => {
                                                 <span className="font-mono">{order.selectedCourierCode}</span>
                                             </div>
                                         )}
+                                        {order.transdirectQuoteId && (
+                                            <div className="flex gap-2 items-center">
+                                                <span className="font-semibold text-[#3c434a]">td_temp_booking_id:</span>
+                                                <span className="font-mono">{order.transdirectQuoteId}</span>
+                                            </div>
+                                        )}
                                         {order.transdirectBookingId && (
                                             <div className="flex gap-2 items-center">
-                                                <span className="font-semibold text-[#3c434a]">td_temp_booking_id:</span> 
-                                                <span className="font-mono">{order.transdirectBookingId}</span>
+                                                <span className="font-semibold text-[#3c434a]">td_booking_id:</span>
+                                                <span className="font-mono text-[#5b841b]">{order.transdirectBookingId}</span>
                                             </div>
                                         )}
                                     </div>

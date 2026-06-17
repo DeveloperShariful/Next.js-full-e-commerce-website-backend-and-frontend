@@ -1103,6 +1103,7 @@ model Order {
   pickupCloseTime        String?
   transdirectLabelUrl    String?
   transdirectInvoiceUrl  String?
+  transdirectError       String?
   customerNote           String?
   adminNote              String?
   deliveryInstructions   String?

@@ -45,6 +45,8 @@ export interface ShippingRateDTO {
   label: string;
   cost: number;
   isTransdirect?: boolean;
+  tdBookingId?: number;   // TransDirect temp booking ID
+  tdCourierKey?: string;  // e.g. "couriers_please"
 }
 
 export interface CouponDTO {
@@ -257,7 +259,10 @@ async function fetchTransdirectQuotes(
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.error("[Transdirect] Quotes API error:", response.status, await response.text());
+      return [];
+    }
 
     const data = await response.json();
 
@@ -265,13 +270,17 @@ async function fetchTransdirectQuotes(
       console.log("[Transdirect] Response:", JSON.stringify(data, null, 2));
     }
 
+    // TransDirect returns a temp booking ID alongside quotes
+    const tdBookingId: number | undefined = data.id ?? undefined;
+    console.log("[Transdirect] Temp booking ID:", tdBookingId ?? "none returned");
+
     if (data.quotes && typeof data.quotes === "object") {
       const rates: ShippingRateDTO[] = [];
       Object.keys(data.quotes).forEach((courier) => {
         const quote = data.quotes[courier];
         if (!quote?.total) return;
 
-        const rawCost  = Number(quote.total);
+        const rawCost   = Number(quote.total);
         const finalCost = applyPricingRules(rawCost, cartSubtotal, config);
 
         // Title Case: "tnt_overnight_express" → "Tnt Overnight Express"
@@ -295,7 +304,6 @@ async function fetchTransdirectQuotes(
             : ` Save −$${saved.toFixed(2)}`;
         }
 
-        // Final: "Tnt Overnight Express (1-3 Days) −40%"
         const label = `${courierName}${transit ? ` (${transit})` : ""}${discountLabel}`;
 
         rates.push({
@@ -303,6 +311,8 @@ async function fetchTransdirectQuotes(
           label,
           cost: Number(finalCost.toFixed(2)),
           isTransdirect: true,
+          tdBookingId,
+          tdCourierKey: courier.toLowerCase(),
         });
       });
       return rates;

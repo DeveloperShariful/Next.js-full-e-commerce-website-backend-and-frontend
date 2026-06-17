@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 
 export const maxDuration = 60; 
 
@@ -122,12 +123,13 @@ export async function POST(request: Request) {
             if (captureResponse.ok && captureData.status === 'COMPLETED') {
                 const transactionId = String(captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id);
                 const capturedAmount = Number(captureData.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value || 0);
-                
+
                 await db.$transaction([
                     db.order.update({ where: { id: wcOrderId }, data: { status: OrderStatus.PROCESSING, paymentStatus: PaymentStatus.PAID, paymentId: transactionId, totalPaid: capturedAmount, totalDue: 0 } }),
                     db.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: captureData } }),
                     db.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Captured & Rescued via PayPal Webhook. TXN: ${transactionId}`, isSystem: true } })
                 ]);
+                await syncOrderToTransdirect(wcOrderId);
             }
         }
 
@@ -150,6 +152,7 @@ export async function POST(request: Request) {
                     db.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: event } }),
                     db.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Order updated via Webhook. TXN: ${transactionId}`, isSystem: true } })
                 ]);
+                if (!isMismatch) await syncOrderToTransdirect(wcOrderId);
             }
         }
 

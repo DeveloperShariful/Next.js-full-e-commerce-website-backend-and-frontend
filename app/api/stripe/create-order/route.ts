@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
 import { auth } from '@/auth';
+import type { ShippingRateDTO } from '@/app/actions/frontend/checkout/checkoutActions';
 
 interface CartItemDTO {
   id: string;
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       customerInfo: AddressDTO;
       shippingInfo: AddressDTO;
       selectedShipping: string;
-      shippingRates: { id: string; label: string; cost: number }[];
+      shippingRates: ShippingRateDTO[];
       appliedCoupons: CouponDTO[];
       orderNotes: string;
       selectedPaymentMethod: string;
@@ -149,11 +150,18 @@ export async function POST(request: Request) {
     // Shipping
     let shippingCost = 0;
     let shippingMethodLabel = 'Standard Shipping';
+    let tdBookingId: string | undefined;
+    let tdCourierKey: string | undefined;
     if (selectedShipping) {
       const matchedRate = shippingRates?.find(r => r.id === selectedShipping);
       if (matchedRate) {
         shippingCost = Number(matchedRate.cost);
         shippingMethodLabel = matchedRate.label;
+        if (matchedRate.isTransdirect) {
+          tdBookingId  = matchedRate.tdBookingId ? String(matchedRate.tdBookingId) : undefined;
+          tdCourierKey = matchedRate.tdCourierKey ?? undefined;
+          console.log(`[Stripe Order] TransDirect: bookingId=${tdBookingId}, courier=${tdCourierKey}`);
+        }
       } else {
         const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
         if (shippingRate) {
@@ -237,6 +245,8 @@ export async function POST(request: Request) {
       utmSource: utmSource || null,
       utmMedium: utmMedium || null,
       utmCampaign: utmCampaign || null,
+      transdirectQuoteId: tdBookingId ?? null,
+      selectedCourierCode: tdCourierKey ?? null,
       items: { create: dbOrderItems },
     };
 

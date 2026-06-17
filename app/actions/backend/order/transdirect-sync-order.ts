@@ -84,59 +84,86 @@ export async function syncOrderToTransdirect(orderId: string) {
       country: "AU"
     };
 
-    // ৩. পে-লোড তৈরি
-    const payload = {
-      order_id: order.orderNumber, 
-      referrer: "GoBike System",
-      declared_value: order.total.toString(),
-      items: items,
-      sender: sender,
-      receiver: receiver,
-      notifications: { email: true, sms: false }
-    };
+    // ৩. API call — temp booking ID থাকলে confirm, না থাকলে নতুন booking
+    const tempBookingId = order.transdirectQuoteId;
+    console.log(`🔑 Temp booking ID: ${tempBookingId ?? "none — will create new"}`);
+    console.log(`🚚 Courier: ${order.selectedCourierCode ?? "unknown"}`);
+    console.log(`📍 Receiver suburb: ${receiver.suburb}, postcode: ${receiver.postcode}, state: ${receiver.state}`);
+    console.log(`📍 Receiver address: ${receiver.address}`);
+    console.log(`📞 Receiver phone: ${receiver.phone}`);
 
-    console.log("📦 CLEAN PAYLOAD:", JSON.stringify(payload, null, 2));
+    let res: Response;
 
-    // ৪. API কল
-    const res = await fetch("https://www.transdirect.com.au/api/orders", {
-      method: "POST",
-      headers: {
-        "Api-Key": config.apiKey,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
+    if (tempBookingId) {
+      // Confirm existing temp booking with selected courier
+      const confirmPayload = {
+        booked_courier: (order.selectedCourierCode || "").toUpperCase(),
+        referrer: "GoBike System",
+        sender,
+        receiver,
+        notifications: { email: true, sms: false }
+      };
+      console.log("📦 CONFIRM PAYLOAD:", JSON.stringify(confirmPayload, null, 2));
+      res = await fetch(`https://www.transdirect.com.au/api/bookings/${tempBookingId}`, {
+        method: "PUT",
+        headers: { "Api-Key": config.apiKey, "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(confirmPayload)
+      });
+    } else {
+      // No temp booking — create new order directly
+      const newPayload = {
+        order_id: order.orderNumber,
+        referrer: "GoBike System",
+        declared_value: order.total.toString(),
+        items,
+        sender,
+        receiver,
+        notifications: { email: true, sms: false }
+      };
+      console.log("📦 NEW ORDER PAYLOAD:", JSON.stringify(newPayload, null, 2));
+      res = await fetch("https://www.transdirect.com.au/api/bookings", {
+        method: "POST",
+        headers: { "Api-Key": config.apiKey, "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(newPayload)
+      });
+    }
 
     const responseData = await res.json();
-
     console.log(`📡 API STATUS: ${res.status}`);
+    console.log(`📡 API RESPONSE:`, JSON.stringify(responseData, null, 2));
 
     if (!res.ok) {
       console.error("❌ TRANSDIRECT ERROR:", JSON.stringify(responseData));
-      if (res.status === 500 && JSON.stringify(responseData).includes("No access")) {
-          return { success: false, error: "Transdirect Error: Duplicate Order ID or Invalid Address format." };
-      }
-      return { success: false, error: `Transdirect Failed: ${JSON.stringify(responseData)}` };
+      const errMsg = `TransDirect Failed (${res.status}): ${JSON.stringify(responseData)}`;
+
+      await db.order.update({
+        where: { id: orderId },
+        data: { transdirectOrderStatus: "failed", transdirectError: errMsg }
+      });
+      await db.orderNote.create({
+        data: { orderId: order.id, content: `❌ TransDirect booking failed: ${errMsg}`, isSystem: true }
+      });
+      revalidatePath(`/admin/orders/${orderId}`);
+      return { success: false, error: errMsg };
     }
 
-    // ৫. সফল - ডাটাবেস আপডেট (স্কিমার অ্যাডভান্সড ফিল্ড সহ)
-    // ✅ NEW: Booking ID, Label, Invoice URL সেভ করা হচ্ছে
+    // ৫. সফল — Booking ID, Label, Invoice URL সেভ + error clear
     await db.order.update({
         where: { id: orderId },
         data: {
             transdirectBookingId: responseData.id,
             transdirectOrderStatus: "booked",
-            transdirectLabelUrl: responseData.label_url || null, 
+            transdirectLabelUrl: responseData.label_url || null,
             transdirectInvoiceUrl: responseData.invoice_url || null,
-            transdirectBookingRef: responseData.reference || null
+            transdirectBookingRef: responseData.reference || null,
+            transdirectError: null,
         }
     });
 
     await db.orderNote.create({
       data: {
         orderId: order.id,
-        content: `Synced to Transdirect. ID: ${responseData.id}`,
+        content: `✅ Synced to Transdirect. Booking ID: ${responseData.id}`,
         isSystem: true
       }
     });
@@ -146,6 +173,13 @@ export async function syncOrderToTransdirect(orderId: string) {
 
   } catch (error: any) {
     console.error("SYNC_ERROR:", error);
-    return { success: false, error: error.message };
+    const errMsg = error.message || "Unknown error";
+    try {
+      await db.order.update({
+        where: { id: orderId },
+        data: { transdirectOrderStatus: "failed", transdirectError: errMsg }
+      });
+    } catch (_) {}
+    return { success: false, error: errMsg };
   }
 }

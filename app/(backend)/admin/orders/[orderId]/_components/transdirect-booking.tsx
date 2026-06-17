@@ -30,43 +30,59 @@ export const TransdirectSidebar = ({ order }: TransdirectSidebarProps) => {
     setLoading(false);
   };
 
-  const isSynced = !!order.transdirectBookingId;
+  const status = order.transdirectOrderStatus;
+  const isSynced = status === "booked" && !!order.transdirectBookingId;
+  const isFailed = status === "failed";
 
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
-      
-      <div 
+
+      <div
         className="px-3 py-2 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none hover:bg-[#f6f7f7] transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Transdirect Sync</h2>
         <button type="button" className="text-[#646970]">
-            {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
       </div>
 
       {isOpen && (
         <div className="p-3 text-[13px] text-[#3c434a]">
-            
-            <div className="mb-3">
-                <span className="font-semibold text-[#1d2327]">Status: </span>
-                {isSynced ? (
-                    <span className="text-[#5b841b] font-medium flex items-center gap-1 mt-1">
-                        <CheckCircle size={12}/> Order has been booked.
-                    </span>
-                ) : (
-                    <span className="text-[#d63638] font-medium flex items-center gap-1 mt-1">
-                        <AlertTriangle size={12}/> Order is pending booking.
-                    </span>
-                )}
-            </div>
 
-            {isSynced && order.transdirectBookingId && (
-                <div className="mb-3 p-2 bg-[#f6f7f7] border border-[#e2e4e7] rounded-[3px]">
-                    <span className="font-semibold text-[#1d2327] block mb-1">Transdirect ID:</span>
-                    <span className="font-mono text-[#2271b1]">{order.transdirectBookingId}</span>
-                </div>
+          {/* Status badge */}
+          <div className="mb-3">
+            <span className="font-semibold text-[#1d2327]">Status: </span>
+            {isSynced ? (
+              <span className="text-[#5b841b] font-medium flex items-center gap-1 mt-1">
+                <CheckCircle size={12} /> Booked
+              </span>
+            ) : isFailed ? (
+              <span className="text-[#d63638] font-medium flex items-center gap-1 mt-1">
+                <AlertTriangle size={12} /> Booking Failed
+              </span>
+            ) : (
+              <span className="text-[#996800] font-medium flex items-center gap-1 mt-1">
+                <AlertTriangle size={12} /> Pending Booking
+              </span>
             )}
+          </div>
+
+          {/* Error message */}
+          {isFailed && order.transdirectError && (
+            <div className="mb-3 p-2 bg-[#fcf0f1] border border-[#f5c6c6] rounded-[3px] text-[#d63638] text-[11px] break-words">
+              <span className="font-semibold block mb-1">Error:</span>
+              {order.transdirectError}
+            </div>
+          )}
+
+          {/* Booking ID */}
+          {isSynced && order.transdirectBookingId && (
+            <div className="mb-3 p-2 bg-[#f6f7f7] border border-[#e2e4e7] rounded-[3px]">
+              <span className="font-semibold text-[#1d2327] block mb-1">Transdirect ID:</span>
+              <span className="font-mono text-[#2271b1]">{order.transdirectBookingId}</span>
+            </div>
+          )}
 
             {/* Labels & Invoices (Schema Based) */}
             {isSynced && (order.transdirectLabelUrl || order.transdirectInvoiceUrl) && (

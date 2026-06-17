@@ -6,6 +6,7 @@ import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/cli
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { cookies } from 'next/headers';
+import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -165,6 +166,11 @@ export async function POST(request: Request) {
     });
 
     console.log(`🎉 [Stripe Capture] Order ${orderId} → PROCESSING. Stock decremented.`);
+
+    // TransDirect auto-booking (fire-and-forget — don't block the response)
+    syncOrderToTransdirect(orderId).catch(err =>
+      console.error('[Stripe Capture] TransDirect sync failed:', err)
+    );;
 
     // ── 6. Clear cart server-side ─────────────────────────────
     // Payment is confirmed — clear the cart immediately so header/mini-cart

@@ -4,6 +4,7 @@ import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
+import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -218,6 +219,13 @@ export async function POST(request: Request) {
     });
 
     // ── 8. Post-payment side-effects (fire-and-forget) ────────
+    if (successResponse && finalOrderStatus === OrderStatus.PROCESSING) {
+      // TransDirect auto-booking
+      syncOrderToTransdirect(wcOrderId).catch(err =>
+        console.error('[PayPal Capture] TransDirect sync failed:', err)
+      );
+    }
+
     if (successResponse) {
       // Confirmation emails
       const customerEmail = order.guestEmail || order.user?.email;

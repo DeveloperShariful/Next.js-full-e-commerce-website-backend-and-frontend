@@ -28,7 +28,7 @@ interface AddressDTO {
   country?: string;
 }
 interface CouponDTO { code: string; amount?: number; }
-interface ShippingRateDTO { id: string; label: string; cost: number; }
+interface ShippingRateDTO { id: string; label: string; cost: number; isTransdirect?: boolean; tdBookingId?: number; tdCourierKey?: string; }
 interface MetaDataDTO { key: string; value: string; }
 
 const MAX_ORDER_NUMBER_RETRIES = 5;
@@ -176,11 +176,18 @@ export async function POST(request: Request) {
     // ── Shipping ──────────────────────────────────────────────
     let shippingCost = 0;
     let shippingMethodLabel = 'Standard Shipping';
+    let tdBookingId: string | undefined;
+    let tdCourierKey: string | undefined;
     if (selectedShipping) {
       const matchedRate = shippingRates?.find(r => r.id === selectedShipping);
       if (matchedRate) {
         shippingCost = Number(matchedRate.cost);
         shippingMethodLabel = matchedRate.label;
+        if (matchedRate.isTransdirect) {
+          tdBookingId  = matchedRate.tdBookingId ? String(matchedRate.tdBookingId) : undefined;
+          tdCourierKey = matchedRate.tdCourierKey ?? undefined;
+          console.log(`[PayPal Order] TransDirect: bookingId=${tdBookingId}, courier=${tdCourierKey}`);
+        }
       } else {
         const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
         if (shippingRate) {
@@ -266,6 +273,8 @@ export async function POST(request: Request) {
       utmMedium:     utmMedium     || null,
       utmCampaign:   utmCampaign   || null,
       referringSite: referringSite || null,
+      transdirectQuoteId: tdBookingId ?? null,
+      selectedCourierCode: tdCourierKey ?? null,
       items: { create: dbOrderItems },
     };
 

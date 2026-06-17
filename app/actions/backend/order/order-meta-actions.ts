@@ -8,9 +8,11 @@ import { revalidatePath } from "next/cache";
 export async function getUniqueMetaKeys() {
   try {
     const result = await db.$queryRaw<{ key: string }[]>`
-      SELECT DISTINCT jsonb_object_keys(metadata) as key 
-      FROM "Order" 
-      WHERE metadata IS NOT NULL AND metadata != '{}'::jsonb;
+      SELECT DISTINCT jsonb_object_keys(metadata) as key
+      FROM "Order"
+      WHERE metadata IS NOT NULL
+        AND metadata != '{}'::jsonb
+        AND jsonb_typeof(metadata) = 'object';
     `;
 
     const keys = result.map(r => r.key);

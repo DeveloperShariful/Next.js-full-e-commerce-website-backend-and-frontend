@@ -1,15 +1,14 @@
 // app/order-confirmation/OrderConfirmationClient.tsx
 
-'use client'; 
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useCart } from '@/context/CartContext';
+import { clearCartAction } from '@/app/actions/frontend/cart/cartActions';
 
-export default function OrderConfirmationClient() { 
+export default function OrderConfirmationClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { clearCart } = useCart();
 
     const [message, setMessage] = useState('Verifying your secure payment, please wait...');
     const [error, setError] = useState('');
@@ -45,10 +44,10 @@ export default function OrderConfirmationClient() {
 
                 // পেমেন্ট সাকসেস হলে কার্ট ক্লিয়ার করে সাকসেস পেজে পাঠানো
                 setMessage('Payment successful! Preparing your order details...');
-                
-                if (typeof clearCart === 'function') {
-                    await clearCart();
-                }
+
+                // Directly call server action — avoids CartContext loading-state race condition
+                // where cartItems is still [] when clearCart() checks length.
+                await clearCartAction();
                 
                 // কাস্টমারকে ২ সেকেন্ড এই পেজে রেখে তারপর রিডাইরেক্ট করা হচ্ছে সুন্দর এক্সপেরিয়েন্সের জন্য
                 setTimeout(() => {
@@ -65,7 +64,7 @@ export default function OrderConfirmationClient() {
 
         verifyStripePayment();
 
-    }, [searchParams, router, clearCart]);
+    }, [searchParams, router]);
 
     return (
         <div className="min-h-[70vh] flex flex-col items-center justify-center bg-gray-50 px-4 text-center">

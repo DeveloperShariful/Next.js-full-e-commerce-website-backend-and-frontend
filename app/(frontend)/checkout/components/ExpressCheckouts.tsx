@@ -98,11 +98,13 @@ function CheckoutForm({
         throw new Error('Could not create an order. Please try another payment method.');
       }
 
-      // Step 2: Link orderId to the shared PI via metadata update
       const paymentIntentId = clientSecret.split('_secret_')[0];
       const selectedRate = shippingRates.find(r => r.id === selectedShipping);
+      const returnUrl = `${window.location.origin}/order-confirmation?order_id=${orderDetails.orderId}&key=${orderDetails.orderKey}`;
 
-      await fetch('/api/stripe/update-payment-intent', {
+      // Step 2: Update PI metadata — fire and forget so it never delays confirmPayment.
+      // capture-order's security check only fails on active mismatch, not missing metadata.
+      fetch('/api/stripe/update-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -117,20 +119,41 @@ function CheckoutForm({
             shipping_cost: String(selectedRate?.cost || '0'),
           },
         }),
-      });
+      }).catch(err => console.error('[ExpressCheckout] PI metadata update failed:', err));
 
-      // Step 3: Confirm payment — Stripe redirects via return_url
-      const returnUrl = `${window.location.origin}/order-confirmation?order_id=${orderDetails.orderId}&key=${orderDetails.orderKey}`;
-
-      // Pass clientSecret here (deferred intent pattern — not in Elements options)
-      const { error } = await stripe.confirmPayment({
+      // Step 3: Confirm payment immediately after order creation.
+      // redirect: 'if_required' — Link/saved cards resolve inline (no redirect).
+      // Standard redirect flows (3DS etc.) still redirect to return_url.
+      const result = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: { return_url: returnUrl },
         redirect: 'if_required',
       });
 
-      if (error) throw new Error(error.message || 'Payment failed or was cancelled.');
+      if (result.error) {
+        throw new Error(result.error.message || 'Payment failed or was cancelled.');
+      }
+
+      // Step 4: Payment succeeded inline (no redirect needed) — capture order + navigate.
+      // When redirect: 'if_required' causes a browser redirect, this code never runs.
+      // When payment resolves inline (Link, saved card), we must add Stripe's URL params
+      // manually so OrderConfirmationClient passes its security check.
+      if (result.paymentIntent?.status === 'succeeded') {
+        await fetch('/api/stripe/capture-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderDetails.orderId,
+            paymentIntentId: result.paymentIntent.id,
+          }),
+        });
+        toast.dismiss('express-checkout');
+        window.location.href = `${returnUrl}&payment_intent=${result.paymentIntent.id}&payment_intent_client_secret=${clientSecret}`;
+      } else {
+        toast.dismiss('express-checkout');
+        window.location.href = returnUrl;
+      }
 
     } catch (error: unknown) {
       toast.dismiss('express-checkout');

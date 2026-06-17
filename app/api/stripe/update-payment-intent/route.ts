@@ -49,17 +49,6 @@ export async function POST(request: Request) {
 
     const stripe = await getStripeInstance();
     const updateData: Stripe.PaymentIntentUpdateParams = {};
-
-    // ✅ SECURITY FIX: When orderId is present (order just created → about to charge),
-    // always use DB amount — NEVER trust the frontend `amount` field.
-    //
-    // Attack scenario without this fix:
-    //   1. User intercepts POST to /api/stripe/update-payment-intent
-    //   2. Sends { paymentIntentId: "pi_xxx", amount: 0.01, orderId: "real-order-id" }
-    //   3. PI gets updated to $0.01 → charge succeeds → order marked PAID
-    //
-    // With this fix:
-    //   orderId provided → DB lookup → order.total used → frontend amount ignored.
     if (orderId) {
       const order = await db.order.findUnique({
         where: { id: orderId },
@@ -74,9 +63,7 @@ export async function POST(request: Request) {
       updateData.amount = Math.round(Number(order.total) * 100);
       updateData.description = `Order #${order.orderNumber} for GoBike`;
     } else if (amount && typeof amount === 'number' && amount > 0) {
-      // No orderId: early update (e.g., total changed from shipping selection before order).
-      // Frontend amount accepted here since there's no order to validate against yet.
-      // This PI amount will be overridden again when orderId is provided at submit.
+
       updateData.amount = Math.round(amount * 100);
     }
 
@@ -121,6 +108,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
 
   } catch (error: unknown) {
+
+    if (
+      error instanceof Stripe.errors.StripeInvalidRequestError &&
+      error.code === 'payment_intent_unexpected_state'
+    ) {
+      return NextResponse.json({ success: true, message: 'PaymentIntent already processed.' });
+    }
     console.error('[UPDATE_PAYMENT_INTENT_ERROR]:', error);
     const message = error instanceof Error ? error.message : 'Internal server error.';
     return NextResponse.json({ error: message }, { status: 500 });

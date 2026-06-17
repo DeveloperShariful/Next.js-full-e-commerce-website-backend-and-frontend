@@ -2,9 +2,10 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
-import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
+import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
+import { cookies } from 'next/headers';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -165,7 +166,40 @@ export async function POST(request: Request) {
 
     console.log(`🎉 [Stripe Capture] Order ${orderId} → PROCESSING. Stock decremented.`);
 
-    // ── 6. Post-capture side-effects (fire-and-forget) ────────
+    // ── 6. Clear cart server-side ─────────────────────────────
+    // Payment is confirmed — clear the cart immediately so header/mini-cart
+    // shows 0 items when the user lands on order-success.
+    // Covers both logged-in (userId) and guest (cart_session cookie) flows.
+    try {
+      const cookieStore = await cookies();
+      const sessionId = cookieStore.get('cart_session')?.value;
+
+      const cartWhere = currentOrder.userId
+        ? { userId: currentOrder.userId }
+        : sessionId
+          ? { sessionId }
+          : null;
+
+      if (cartWhere) {
+        const cart = await db.cart.findFirst({ where: cartWhere, select: { id: true } });
+        if (cart) {
+          await db.inventoryReservation.deleteMany({ where: { cartId: cart.id } });
+          await db.cartItem.deleteMany({ where: { cartId: cart.id } });
+          await db.cart.update({
+            where: { id: cart.id },
+            data: {
+              appliedCoupons: Prisma.JsonNull,
+              shippingHash: null,
+              shippingQuotes: Prisma.JsonNull,
+            },
+          });
+        }
+      }
+    } catch (cartErr) {
+      console.error('[Stripe Capture] Cart clear failed (non-critical):', cartErr);
+    }
+
+    // ── 7. Post-capture side-effects (fire-and-forget) ────────
     // Confirmation emails
     const customerEmail = currentOrder.user?.email || currentOrder.guestEmail;
     if (customerEmail) {
@@ -191,7 +225,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({ orderId }),
     }).catch(err => console.error('[Stripe Capture] Affiliate trigger failed:', err));
 
-    // ── 7. Analytics update ───────────────────────────────────
+    // ── 8. Analytics update ───────────────────────────────────
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

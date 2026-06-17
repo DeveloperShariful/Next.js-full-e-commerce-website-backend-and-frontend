@@ -586,7 +586,7 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
   }
 
   return (
-    <div className="grid grid-cols-1 gap-8 w-full max-w-[1400px] mx-auto px-4 py-4 md:gap-10 lg:grid-cols-[1fr_550px] lg:gap-12">
+    <div className="grid grid-cols-1 gap-8 w-full max-w-[1400px] mx-auto px-1.5 py-1.5 md:gap-10 lg:grid-cols-[1fr_550px] lg:gap-12">
       <div className="flex flex-col gap-8">
         <ShippingForm
           title={shipToDifferentAddress ? 'Billing Details' : 'Billing & Shipping Details'}

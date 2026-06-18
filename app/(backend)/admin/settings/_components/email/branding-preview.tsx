@@ -38,7 +38,7 @@ export const BrandingPreview = ({
   const fullscreenDeskRef = useRef<HTMLIFrameElement>(null);
   const fullscreenMobRef  = useRef<HTMLIFrameElement>(null);
 
-  const autoHeight = (ref: React.RefObject<HTMLIFrameElement>) => {
+  const autoHeight = (ref: React.RefObject<HTMLIFrameElement | null>) => {
     try {
       const el = ref.current;
       if (el?.contentDocument?.body) {

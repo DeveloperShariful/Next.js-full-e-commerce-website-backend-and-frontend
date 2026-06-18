@@ -175,7 +175,7 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
       const shipping = order.shippingAddress || {};
 
       orderDetailsHtml = `
-        <h2 class="sec-h2" style="color: ${baseColor}; font-size: 20px; margin-bottom: 16px; margin-top: 36px;">Order Details</h2>
+        <h2 class="sec-h2" style="color: ${baseColor}; font-size: 20px; margin-bottom: 16px; margin-top: 36px; text-align: center;">Order Details</h2>
         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid #e5e5e5; border-radius: 6px; border-collapse: collapse; overflow: hidden;">
             <thead style="background-color: #f7f7f7;">
                 <tr>
@@ -195,25 +195,33 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
         <br/>
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
             <tr>
-                <td class="addr-col" valign="top" width="50%" style="padding-right: 10px;">
-                    <h3 class="sec-h3" style="color: ${baseColor}; font-size: 16px; margin: 0 0 10px 0;">Billing Address</h3>
-                    <div class="addr-box" style="border: 1px solid #e5e5e5; padding: 16px; border-radius: 6px; color: #444; font-size: 14px; line-height: 1.7; background-color: #fafafa;">
-                        <strong style="color: #1a1a1a;">${billing.firstName || ""} ${billing.lastName || ""}</strong><br/>
-                        ${billing.address1 || ""}<br/>
-                        ${billing.city || ""} ${billing.state || ""} ${billing.postcode || ""}<br/>
-                        ${billing.country || ""}<br/>
-                        ${billing.phone ? `<a href="tel:${billing.phone}" style="color: ${baseColor};">${billing.phone}</a><br/>` : ''}
-                        <a href="mailto:${billing.email || order.user?.email || order.guestEmail || ""}" style="color: ${baseColor};">${billing.email || order.user?.email || order.guestEmail || ""}</a>
-                    </div>
+                <td class="addr-col" valign="top" width="50%" style="padding-right: 4px; border: 1px solid #e5e5e5; background-color: #fafafa; border-radius: 6px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                            <td style="padding: 10px; vertical-align: top; font-size: 12px; line-height: 1.6; color: #444;">
+                                <strong style="color: ${baseColor}; font-size: 12px; display: block; margin-bottom: 6px;">Billing Address</strong>
+                                <strong style="color: #1a1a1a;">${billing.firstName || ""} ${billing.lastName || ""}</strong><br/>
+                                ${billing.address1 || ""}<br/>
+                                ${billing.city || ""} ${billing.state || ""} ${billing.postcode || ""}<br/>
+                                ${billing.country || ""}<br/>
+                                ${billing.phone ? `<a href="tel:${billing.phone}" style="color: ${baseColor};">${billing.phone}</a><br/>` : ''}
+                                <a href="mailto:${billing.email || order.user?.email || order.guestEmail || ""}" style="color: ${baseColor};">${billing.email || order.user?.email || order.guestEmail || ""}</a>
+                            </td>
+                        </tr>
+                    </table>
                 </td>
-                <td class="addr-col" valign="top" width="50%" style="padding-left: 10px;">
-                    <h3 class="sec-h3" style="color: ${baseColor}; font-size: 16px; margin: 0 0 10px 0;">Shipping Address</h3>
-                    <div class="addr-box" style="border: 1px solid #e5e5e5; padding: 16px; border-radius: 6px; color: #444; font-size: 14px; line-height: 1.7; background-color: #fafafa;">
-                        <strong style="color: #1a1a1a;">${shipping.firstName || ""} ${shipping.lastName || ""}</strong><br/>
-                        ${shipping.address1 || ""}<br/>
-                        ${shipping.city || ""} ${shipping.state || ""} ${shipping.postcode || ""}<br/>
-                        ${shipping.country || ""}
-                    </div>
+                <td class="addr-col" valign="top" width="50%" style="padding-left: 4px; border: 1px solid #e5e5e5; background-color: #fafafa; border-radius: 6px;">
+                    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                            <td style="padding: 10px; vertical-align: top; font-size: 12px; line-height: 1.6; color: #444;">
+                                <strong style="color: ${baseColor}; font-size: 12px; display: block; margin-bottom: 6px;">Shipping Address</strong>
+                                <strong style="color: #1a1a1a;">${shipping.firstName || ""} ${shipping.lastName || ""}</strong><br/>
+                                ${shipping.address1 || ""}<br/>
+                                ${shipping.city || ""} ${shipping.state || ""} ${shipping.postcode || ""}<br/>
+                                ${shipping.country || ""}
+                            </td>
+                        </tr>
+                    </table>
                 </td>
             </tr>
         </table>
@@ -313,11 +321,11 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
             /* Main card — full width, no rounded corners */
             .ec  { border-radius: 0 !important; }
             /* Header band */
-            .eh  { padding: 12px 8px !important; }
+            .eh  { padding: 12px 3px !important; }
             .eh h1 { font-size: 19px !important; }
             .eh p  { font-size: 12px !important; }
             /* Body content */
-            .eb  { padding: 12px 8px !important; }
+            .eb  { padding: 12px 3px !important; }
             /* Logo */
             .logo img { max-width: 120px !important; }
             /* Intro text */
@@ -332,9 +340,9 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
             /* Totals rows */
             .ttd  { padding: 8px !important; font-size: 12px !important; }
             .ttr  { font-size: 15px !important; padding: 10px 8px !important; }
-            /* Address columns — stack vertically */
-            .addr-col { display: block !important; width: 100% !important; padding: 0 0 14px 0 !important; }
-            .addr-box { padding: 12px !important; font-size: 13px !important; }
+            /* Address columns — keep side by side, reduce padding */
+            .addr-col { padding: 0 3px 8px 3px !important; }
+            .addr-box { padding: 8px !important; font-size: 11px !important; }
             /* CTA button */
             .btn { padding: 12px 20px !important; font-size: 14px !important; }
             /* Footer */
@@ -357,19 +365,23 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
 
                     <!-- Coloured header band -->
                     <tr>
-                        <td class="eh" style="background-color: ${baseColor}; padding: 16px 12px; text-align: center; color: #ffffff;">
+                        <td class="eh" style="background-color: ${baseColor}; padding: 16px 6px; text-align: center; color: #ffffff;">
                             <h1 style="margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.3px;">${template.heading || "Notification"}</h1>
                             <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.85; font-weight: 300;">
-                                ${variables.order_number && variables.order_number !== "N/A" ? `Order #${variables.order_number}` : format(new Date(), "MMMM do, yyyy")}
+                                ${variables.order_number && variables.order_number !== "N/A"
+                                  ? template.triggerEvent?.includes("ADMIN")
+                                    ? `<a href="${appUrl}/admin/orders/${order?.id || ''}" style="color: #ffffff; text-decoration: underline;">Order #${variables.order_number}</a>`
+                                    : `<a href="${appUrl}/orders" style="color: #ffffff; text-decoration: underline;">Order #${variables.order_number}</a>`
+                                  : format(new Date(), "MMMM do, yyyy")}
                             </p>
                         </td>
                     </tr>
 
                     <!-- Body -->
                     <tr>
-                        <td class="eb" style="padding: 16px 12px;">
+                        <td class="eb" style="padding: 16px 6px;">
 
-                            <div class="intro" style="color: #444; font-size: 15px; line-height: 1.85; margin-bottom: 24px;">
+                            <div class="intro" style="color: #444; font-size: 15px; line-height: 1.85; margin-bottom: 24px; text-align: center;">
                                 ${introText}
                             </div>
 

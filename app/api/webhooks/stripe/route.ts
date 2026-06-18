@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
-import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { resyncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 
 export const maxDuration = 60; 
 
@@ -80,6 +80,13 @@ export async function POST(request: Request) {
 
       // If Frontend already did the job
       if (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID) {
+          // ✅ Backup: payment done but TransDirect not synced yet → resync
+          if (order.transdirectOrderStatus !== 'booked') {
+              console.log(`🔄 [Stripe Webhook] Order ${orderId} paid but not synced to TransDirect. Backup resync...`);
+              resyncOrderToTransdirect(orderId).catch(err =>
+                  console.error('[Stripe Webhook] Backup TransDirect resync failed:', err)
+              );
+          }
           await db.paymentWebhookLog.update({ where: { eventId: event.id }, data: { processed: true } });
           return NextResponse.json({ received: true, message: "Already processed by frontend" });
       }
@@ -122,8 +129,8 @@ export async function POST(request: Request) {
       ]);
 
       console.log(`🎉 [Stripe Webhook] Rescue Successful! Order #${orderId} updated.`);
-      syncOrderToTransdirect(orderId).catch(err =>
-        console.error('[Stripe Webhook] TransDirect sync failed:', err)
+      resyncOrderToTransdirect(orderId).catch(err =>
+        console.error('[Stripe Webhook] TransDirect resync failed:', err)
       );
     }
 

@@ -28,6 +28,12 @@ export async function resyncOrderToTransdirect(orderId: string) {
     if (!order) return { success: false, error: "Order not found" };
     if (!config || !config.apiKey) return { success: false, error: "Transdirect API Key missing" };
 
+    // ✅ Already-booked guard — prevents double-sync
+    if (order.transdirectOrderStatus === 'booked') {
+      console.log(`✅ [TransDirect Resync] Order ${orderId} already booked. Skipping.`);
+      return { success: true, message: "Already synced to TransDirect" };
+    }
+
     const shipping: any = order.shippingAddress || {};
 
     const cleanSuburb = (text: string) => {

@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
-import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { resyncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 
 export const maxDuration = 60; 
 
@@ -107,6 +107,13 @@ export async function POST(request: Request) {
 
             const order = await db.order.findUnique({ where: { id: wcOrderId } });
             if (order && (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID)) {
+                // ✅ Backup: payment done but TransDirect not synced yet → resync
+                if (order.transdirectOrderStatus !== 'booked') {
+                    console.log(`🔄 [PayPal Webhook] Order ${wcOrderId} paid but not synced to TransDirect. Backup resync...`);
+                    resyncOrderToTransdirect(wcOrderId).catch(err =>
+                        console.error('[PayPal Webhook] Backup TransDirect resync failed:', err)
+                    );
+                }
                 await db.paymentWebhookLog.update({ where: { eventId: String(event.id) }, data: { processed: true } });
                 return NextResponse.json({ message: "Already processed" }, { status: 200 });
             }
@@ -129,7 +136,9 @@ export async function POST(request: Request) {
                     db.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: captureData } }),
                     db.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Captured & Rescued via PayPal Webhook. TXN: ${transactionId}`, isSystem: true } })
                 ]);
-                await syncOrderToTransdirect(wcOrderId);
+                resyncOrderToTransdirect(wcOrderId).catch(err =>
+                    console.error('[PayPal Webhook] Rescue TransDirect resync failed:', err)
+                );
             }
         }
 
@@ -152,7 +161,9 @@ export async function POST(request: Request) {
                     db.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: event } }),
                     db.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Order updated via Webhook. TXN: ${transactionId}`, isSystem: true } })
                 ]);
-                if (!isMismatch) await syncOrderToTransdirect(wcOrderId);
+                if (!isMismatch) resyncOrderToTransdirect(wcOrderId).catch(err =>
+                    console.error('[PayPal Webhook] TransDirect resync failed:', err)
+                );
             }
         }
 

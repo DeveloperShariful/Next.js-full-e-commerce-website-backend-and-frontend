@@ -235,10 +235,10 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
   if (template.triggerEvent === "WARRANTY_CLAIM_ADMIN" && metadata?.media_urls) {
       const links = metadata.media_urls.split(',').map((url: string) => url.trim());
       mediaHtml = `
-        <h2 class="sec-h2" style="color: ${baseColor}; font-size: 20px; margin-top: 32px; margin-bottom: 14px; border-top: 1px solid #eee; padding-top: 24px;">Customer Uploaded Media</h2>
-        <div style="background: #f8f9fa; padding: 16px; border-radius: 6px; border: 1px solid #e0e0e0;">
+        <h2 class="sec-h2" style="color: ${baseColor}; font-size: 20px; margin-top: 32px; margin-bottom: 14px; border-top: 1px solid #eee; padding-top: 24px; text-align: center;">Customer Uploaded Media</h2>
+        <div style="background: #f8f9fa; padding: 16px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center;">
             <p style="margin: 0 0 10px 0; font-size: 14px; color: #444;">The customer has uploaded the following files:</p>
-            <ul style="padding-left: 18px; margin: 0; color: #444; font-size: 14px; line-height: 1.9;">
+            <ul style="list-style: none; padding: 0; margin: 0; color: #444; font-size: 14px; line-height: 1.9;">
                 ${links.map((link: string, i: number) => `
                   <li>
                     <a href="${link}" target="_blank" style="color: ${baseColor}; font-weight: 600;">View Attached File ${i + 1}</a>

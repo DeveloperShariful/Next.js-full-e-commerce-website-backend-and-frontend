@@ -4,6 +4,7 @@
 
 import { db } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { sendNotification } from '@/app/api/email/send-notification';
 
 // Transdirect V4 API Base URL
 const TRANSDIRECT_API_URL = 'https://www.transdirect.com.au/api/bookings/v4';
@@ -33,48 +34,40 @@ export async function getTransdirectQuotes(formData: FormData) {
       return { success: false, message: 'Transdirect is not configured or disabled in Settings.' };
     }
 
-    // Default Dimensions if not set in product
-    const weight = partData.weight || 0.5;
-    const length = partData.length || 10;
-    const width = partData.width || 10;
-    const height = partData.height || 10;
+    // Dimensions — prefer custom override, then product data, then safe defaults
+    const customWeight = formData.get('customWeight');
+    const customLength = formData.get('customLength');
+    const customWidth  = formData.get('customWidth');
+    const customHeight = formData.get('customHeight');
 
-    // Build Transdirect Draft Booking Payload
+    const weight = Number(customWeight || partData.weight) > 0 ? Number(customWeight || partData.weight) : 1;
+    const length = Number(customLength || partData.length) > 0 ? Number(customLength || partData.length) : 10;
+    const width  = Number(customWidth  || partData.width)  > 0 ? Number(customWidth  || partData.width)  : 10;
+    const height = Number(customHeight || partData.height) > 0 ? Number(customHeight || partData.height) : 10;
+
+    // Build Transdirect Draft Booking Payload (minimal — matches working resync format)
     const payload = {
-      declared_value: 0,
+      declared_value: "0.00",
       sender: {
-        address: config.senderAddress || "123 Default St",
-        company_name: config.senderCompany || "GoBike Australia",
-        email: config.email || "support@gobike.au",
-        name: config.senderName || "GoBike Dispatch",
         postcode: config.senderPostcode || "2000",
-        phone: config.senderPhone || "0400000000",
-        state: config.senderState || "NSW",
-        suburb: config.senderSuburb || "Sydney",
-        type: config.senderType || "business",
-        country: "AU"
+        suburb:   (config.senderSuburb  || "Sydney").trim().toUpperCase(),
+        type:     config.senderType     || "business",
+        country:  "AU",
       },
       receiver: {
-        // Just providing basic location for accurate quotes
-        address: "TBA", 
-        company_name: "",
-        email: "customer@example.com",
-        name: "Customer",
-        postcode: postcode,
-        phone: "0400000000",
-        state: "", // Transdirect API can auto-detect state from postcode
-        suburb: suburb,
-        type: "residential",
-        country: "AU"
+        postcode: postcode.trim(),
+        suburb:   suburb.trim().toUpperCase(),
+        type:     "residential",
+        country:  "AU",
       },
       items: [
         {
-          weight: weight,
-          height: height,
-          width: width,
-          length: length,
+          weight,
+          height,
+          width,
+          length,
           quantity: 1,
-          description: partData.name || "Replacement Part"
+          description: "carton",
         }
       ]
     };
@@ -84,7 +77,8 @@ export async function getTransdirectQuotes(formData: FormData) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Api-Key': config.apiKey
+        'Api-Key': config.apiKey,
+        'Accept': 'application/json',
       },
       body: JSON.stringify(payload)
     });
@@ -121,99 +115,128 @@ export async function getTransdirectQuotes(formData: FormData) {
 // ============================================================================
 export async function confirmTransdirectBooking(formData: FormData) {
   try {
-    const claimId = formData.get('claimId') as string;
-    const tempBookingId = formData.get('tempBookingId') as string;
+    const claimId        = formData.get('claimId') as string;
+    const tempBookingId  = formData.get('tempBookingId') as string;
     const selectedCourier = formData.get('selectedCourier') as string;
-    const address = formData.get('address') as string;
-    const suburb = formData.get('suburb') as string;
-    const postcode = formData.get('postcode') as string;
-    const partName = formData.get('partName') as string;
+    const address        = formData.get('address') as string;
+    const suburb         = formData.get('suburb') as string;
+    const postcode       = formData.get('postcode') as string;
+    const state          = formData.get('state') as string;
+    const partName       = formData.get('partName') as string;
 
-    if (!claimId || !tempBookingId || !selectedCourier || !address || !suburb || !postcode) {
+    if (!claimId || !tempBookingId || !selectedCourier || !suburb || !postcode) {
       return { success: false, message: 'Missing required booking details.' };
     }
 
-    // Fetch Claim to get Customer's real Name, Phone, and Email
-    const claim = await db.warrantyClaim.findUnique({ where: { id: claimId } });
-    if (!claim) return { success: false, message: 'Claim not found.' };
+    const [claim, config] = await Promise.all([
+      db.warrantyClaim.findUnique({ where: { id: claimId } }),
+      db.transdirectConfig.findUnique({ where: { id: "transdirect_config" } }),
+    ]);
 
-    // 🛑 FIX: `shippingProvider` এর বদলে নতুন স্কিমার `TransdirectConfig` ব্যবহার করা হচ্ছে
-    const config = await db.transdirectConfig.findUnique({
-      where: { id: "transdirect_config" }
-    });
-
+    if (!claim)  return { success: false, message: 'Claim not found.' };
     if (!config || !config.isEnabled || !config.apiKey) {
       return { success: false, message: 'Transdirect is not configured or disabled.' };
     }
 
-    // Step 1: UPDATE the Draft Booking with the REAL receiver address
-    const updatePayload = {
-      courier: selectedCourier,
-      receiver: {
-        address: address,
-        company_name: "",
-        email: claim.email,
-        name: claim.name,
-        postcode: postcode,
-        phone: claim.phone || "0400000000",
-        state: "", // Will auto-detect
-        suburb: suburb,
-        type: "residential",
-        country: "AU"
-      }
+    const phone = (claim.phone || "0400000000").replace(/\s/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const orderId = `WC-${claimId.slice(-6).toUpperCase()}-${randomSuffix}`;
+
+    // POST to /api/orders — same endpoint used by the working order resync
+    const payload = {
+      transdirect_order_id: parseInt(tempBookingId, 10),
+      order_id:             orderId,
+      goods_summary:        partName || 'Replacement Part',
+      goods_dump:           partName || 'Replacement Part',
+      imported_from:        'WarrantyClaim',
+      purchased_time:       new Date().toISOString(),
+      sale_price:           0,
+      selected_courier:     selectedCourier,
+      courier_price:        0,
+      paid_time:            new Date().toISOString(),
+      buyer_name:           claim.name,
+      buyer_email:          claim.email,
+      delivery: {
+        name:     claim.name,
+        email:    claim.email,
+        phone,
+        address:  address || '1 Main St',
+        suburb:   suburb.trim().toUpperCase(),
+        postcode: postcode.trim(),
+        state:    state || '',
+        country:  'AU',
+      },
     };
 
-    const updateResponse = await fetch(`${TRANSDIRECT_API_URL}/${tempBookingId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Api-Key': config.apiKey
-      },
-      body: JSON.stringify(updatePayload)
-    });
+    console.log('[Warranty TD] Confirm payload:', JSON.stringify(payload, null, 2));
 
-    if (!updateResponse.ok) {
-      const errData = await updateResponse.json();
-      console.error("Transdirect Update Error:", errData);
-      return { success: false, message: 'Failed to update receiver details on Transdirect.' };
-    }
-
-    // Step 2: CONFIRM the Booking
-    const confirmResponse = await fetch(`${TRANSDIRECT_API_URL}/${tempBookingId}/confirm`, {
+    const confirmResponse = await fetch('https://www.transdirect.com.au/api/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Api-Key': config.apiKey
-      }
+        'Api-Key': config.apiKey,
+        'Accept':  'application/json',
+      },
+      body: JSON.stringify(payload),
     });
 
     const confirmData = await confirmResponse.json();
+    console.log('[Warranty TD] Confirm response:', JSON.stringify(confirmData, null, 2));
 
     if (!confirmResponse.ok) {
+      const errMsg = Array.isArray(confirmData.errors)
+        ? confirmData.errors.join(', ')
+        : (confirmData.message || 'Failed to confirm booking.');
       console.error("Transdirect Confirm Error:", confirmData);
-      return { success: false, message: confirmData.message || 'Failed to confirm booking.' };
+      return { success: false, message: errMsg };
     }
 
-    // Step 3: SAVE data to Prisma Database (WarrantyClaim Model)
+    // Save confirmed booking to DB
     await db.warrantyClaim.update({
       where: { id: claimId },
       data: {
-        trackingNumber: confirmData.connote || tempBookingId.toString(),
+        trackingNumber:  confirmData.connote || String(confirmData.id) || orderId,
         replacementPart: partName,
-        // Update database with the confirmed shipping location
-        address: address,
-        suburb: suburb,
-        postcode: postcode
-      }
+        address,
+        suburb,
+        postcode,
+        state: state || claim.state,
+      },
     });
 
-    // Revalidate UI so the tracking number block appears
+    const trackingNumber = confirmData.connote || String(confirmData.id) || orderId;
+    const courierName = selectedCourier.replace(/_/g, ' ').toUpperCase();
+
+    // Customer: "Your replacement part is on the way"
+    // Admin: "Part shipped for warranty claim"
+    await Promise.allSettled([
+      sendNotification({
+        trigger: 'WARRANTY_PART_SHIPPED',
+        recipient: claim.email,
+        data: {
+          customer_name:    claim.name,
+          order_number:     claim.orderNumber,
+          replacement_part: partName,
+          tracking_number:  trackingNumber,
+          courier:          courierName,
+        },
+      }),
+      sendNotification({
+        trigger: 'ADMIN_WARRANTY_SHIPPED',
+        recipient: '',
+        data: {
+          customer_name:    claim.name,
+          order_number:     claim.orderNumber,
+          replacement_part: partName,
+          tracking_number:  trackingNumber,
+          courier:          courierName,
+        },
+      }),
+    ]);
+
     revalidatePath(`/admin/warranty-claims/${claimId}`);
 
-    return { 
-      success: true, 
-      message: 'Booking confirmed successfully! Label generated.' 
-    };
+    return { success: true, message: 'Booking confirmed! Label has been generated.' };
 
   } catch (error) {
     console.error("Transdirect confirmBooking Action Error:", error);

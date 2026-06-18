@@ -31,6 +31,7 @@ export default function TransdirectClientBox({
   
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<any | null>(null);
+  const [isRebooking, setIsRebooking] = useState(false);
   
   // Professional Address States
   const [address, setAddress] = useState(customerAddress || '');
@@ -62,6 +63,14 @@ export default function TransdirectClientBox({
   const [tempBookingId, setTempBookingId] = useState<string | null>(null);
   const [selectedCourier, setSelectedCourier] = useState<string | null>(null);
   const [loadingBooking, setLoadingBooking] = useState(false);
+
+  // Custom Package Dimensions
+  const [useCustomDims, setUseCustomDims] = useState(false);
+  const [customWeight, setCustomWeight] = useState('');
+  const [customLength, setCustomLength] = useState('');
+  const [customWidth, setCustomWidth] = useState('');
+  const [customHeight, setCustomHeight] = useState('');
+  const [packageNote, setPackageNote] = useState('');
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -117,22 +126,29 @@ export default function TransdirectClientBox({
 
     setLoadingQuotes(true);
     setApiError(null);
-    setQuotes([]); 
+    setQuotes([]);
 
     const formData = new FormData();
     formData.append('claimId', claimId);
-    
     formData.append('suburb', suburb);
     formData.append('postcode', postcode);
 
-    const partData = JSON.stringify({ 
-      name: part.name, 
-      weight: part.weight, 
-      length: part.length, 
-      width: part.width, 
-      height: part.height 
+    const partData = JSON.stringify({
+      name: part.name,
+      weight: part.weight,
+      length: part.length,
+      width: part.width,
+      height: part.height,
     });
     formData.append('partData', partData);
+
+    // Pass custom dimensions if override is active
+    if (useCustomDims) {
+      if (customWeight) formData.append('customWeight', customWeight);
+      if (customLength) formData.append('customLength', customLength);
+      if (customWidth)  formData.append('customWidth', customWidth);
+      if (customHeight) formData.append('customHeight', customHeight);
+    }
 
     const result = await getTransdirectQuotes(formData);
     
@@ -172,10 +188,10 @@ export default function TransdirectClientBox({
     formData.append('partName', selectedPart.name);
     formData.append('tempBookingId', tempBookingId);
     formData.append('selectedCourier', selectedCourier);
-    
     formData.append('address', address);
     formData.append('suburb', suburb);
     formData.append('postcode', postcode);
+    formData.append('state', state);
 
     const result = await confirmTransdirectBooking(formData);
     
@@ -193,7 +209,7 @@ export default function TransdirectClientBox({
       
       <div className="p-5 text-[13px] text-[#3c434a]">
         
-        {trackingNumber ? (
+        {trackingNumber && !isRebooking ? (
           <div className="bg-[#f0f6fc] border border-[#c3c4c7] p-6 rounded text-center">
             <div className="w-12 h-12 mx-auto bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-3">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
@@ -202,6 +218,28 @@ export default function TransdirectClientBox({
             <p className="text-[#50575e] mb-4 text-[14px]">Replacement Part: <strong>{replacementPart}</strong></p>
             <div className="bg-white border-2 border-dashed border-[#8c8f94] py-3 px-4 inline-block rounded font-mono text-[16px] font-bold text-[#2271b1] tracking-widest shadow-sm">
               {trackingNumber}
+            </div>
+            <div className="mt-5 pt-4 border-t border-[#c3c4c7]">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRebooking(true);
+                  setSelectedPart(null);
+                  setQuotes([]);
+                  setApiError(null);
+                  setTempBookingId(null);
+                  setSelectedCourier(null);
+                  setUseCustomDims(false);
+                  setCustomWeight('');
+                  setCustomLength('');
+                  setCustomWidth('');
+                  setCustomHeight('');
+                }}
+                className="inline-flex items-center gap-2 border border-[#2271b1] text-[#2271b1] text-[13px] font-semibold px-4 py-2 rounded hover:bg-[#2271b1] hover:text-white transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Resend / Create New Label
+              </button>
             </div>
           </div>
         ) : (
@@ -306,6 +344,52 @@ export default function TransdirectClientBox({
               </div>
             </div>
 
+            {/* Custom Package Dimensions override */}
+            <div className="border border-[#c3c4c7] rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setUseCustomDims(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[13px] font-semibold text-[#1d2327] transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-[#2271b1]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                  3. Custom Package Dimensions
+                  {useCustomDims && <span className="text-[11px] font-normal text-green-700 bg-green-100 border border-green-200 px-1.5 py-0.5 rounded">Override Active</span>}
+                </span>
+                <svg className={`w-4 h-4 text-gray-500 transition-transform ${useCustomDims ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+
+              {useCustomDims && (
+                <div className="p-4 border-t border-[#c3c4c7] bg-white">
+                  <p className="text-[12px] text-gray-500 mb-3">Override the product&apos;s saved dimensions for this quote. Leave blank to use product defaults.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-[11px] text-gray-500 block mb-1">Weight (kg)</span>
+                      <input type="number" step="0.1" min="0.1" value={customWeight} onChange={e => setCustomWeight(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.weight || 1}kg` : 'e.g. 1.5'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-gray-500 block mb-1">Length (cm)</span>
+                      <input type="number" step="1" min="1" value={customLength} onChange={e => setCustomLength(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.length || 10}cm` : 'e.g. 30'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-gray-500 block mb-1">Width (cm)</span>
+                      <input type="number" step="1" min="1" value={customWidth} onChange={e => setCustomWidth(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.width || 10}cm` : 'e.g. 20'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-gray-500 block mb-1">Height (cm)</span>
+                      <input type="number" step="1" min="1" value={customHeight} onChange={e => setCustomHeight(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.height || 10}cm` : 'e.g. 15'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
+                    </div>
+                  </div>
+                  <input type="text" value={packageNote} onChange={e => setPackageNote(e.target.value)} placeholder="Package note (optional)" className="w-full mt-3 border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
+                  {selectedPart && (
+                    <button type="button" onClick={() => handleRefreshQuotes()} className="mt-3 w-full border border-[#2271b1] text-[#2271b1] text-[12px] font-semibold py-2 rounded hover:bg-[#2271b1] hover:text-white transition-colors">
+                      Re-fetch Quotes with These Dimensions
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="bg-[#f6f7f7] border border-[#c3c4c7] rounded-lg p-4 min-h-[120px] flex flex-col justify-center">
               
               {loadingQuotes ? (
@@ -320,7 +404,7 @@ export default function TransdirectClientBox({
                 </div>
               ) : quotes.length > 0 ? (
                 <div className="animate-fade-in">
-                  <p className="font-bold text-[#1d2327] mb-3 text-[13px] border-b border-gray-200 pb-2">3. Available Shipping Options</p>
+                  <p className="font-bold text-[#1d2327] mb-3 text-[13px] border-b border-gray-200 pb-2">4. Available Shipping Options</p>
                   <div className="space-y-2 mb-5 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                     {quotes.map((quote, index) => (
                       <label 

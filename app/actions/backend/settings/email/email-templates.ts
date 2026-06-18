@@ -386,11 +386,14 @@ export async function getEmailTemplates() {
 }
 
 export async function syncEmailTemplates() {
-    try {
-        for (const tmpl of DEFAULT_TEMPLATES) {
+    const errors: string[] = [];
+
+    for (const tmpl of DEFAULT_TEMPLATES) {
+        try {
+            // Try upsert by triggerEvent first
             await db.emailTemplate.upsert({
                 where: { triggerEvent: tmpl.triggerEvent },
-                update: {}, 
+                update: {},
                 create: {
                     slug: tmpl.slug,
                     name: tmpl.name,
@@ -399,15 +402,42 @@ export async function syncEmailTemplates() {
                     subject: tmpl.subject,
                     heading: tmpl.name,
                     content: tmpl.content,
-                    isEnabled: true
-                }
+                    isEnabled: true,
+                },
             });
+        } catch (e: any) {
+            // If slug conflicts with a different record, update that record's triggerEvent
+            if (e?.code === 'P2002') {
+                try {
+                    await db.emailTemplate.upsert({
+                        where: { slug: tmpl.slug },
+                        update: { triggerEvent: tmpl.triggerEvent },
+                        create: {
+                            slug: tmpl.slug,
+                            name: tmpl.name,
+                            triggerEvent: tmpl.triggerEvent,
+                            recipientType: tmpl.recipientType,
+                            subject: tmpl.subject,
+                            heading: tmpl.name,
+                            content: tmpl.content,
+                            isEnabled: true,
+                        },
+                    });
+                } catch (e2: any) {
+                    errors.push(`${tmpl.triggerEvent}: ${e2?.message}`);
+                }
+            } else {
+                errors.push(`${tmpl.triggerEvent}: ${e?.message}`);
+            }
         }
-        const templates = await db.emailTemplate.findMany({ orderBy: { name: 'asc' } });
-        return { success: true, data: templates };
-    } catch (error) {
-        return { success: false, error: "Failed to sync templates" };
     }
+
+    if (errors.length > 0) {
+        console.error('[SyncTemplates] Partial failures:', errors);
+    }
+
+    const templates = await db.emailTemplate.findMany({ orderBy: { name: 'asc' } });
+    return { success: true, data: templates, errors };
 }
 
 export async function updateEmailTemplate(formData: FormData) {

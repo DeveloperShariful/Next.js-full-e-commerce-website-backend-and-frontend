@@ -60,7 +60,7 @@ export const EmailSettingsView = ({
 
       {/* Content Area */}
       <div className="animate-in fade-in duration-150 w-full">
-        {activeTab === "config" && <ConfigForm config={config} refreshData={refreshData} />}
+        {activeTab === "config" && <ConfigForm config={config} templates={templates} refreshData={refreshData} />}
         {activeTab === "templates" && <TemplateList templates={templates} refreshData={refreshData} />}
         {activeTab === "logs" && (
             <EmailLogsTable 

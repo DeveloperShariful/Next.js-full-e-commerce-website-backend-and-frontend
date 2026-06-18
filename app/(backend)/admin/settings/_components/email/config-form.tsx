@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { EmailConfiguration } from "@prisma/client";
+import { EmailConfiguration, EmailTemplate } from "@prisma/client";
 import { saveEmailConfiguration } from "@/app/actions/backend/settings/email/email-config";
 import { sendTestEmail } from "@/app/actions/backend/settings/email/send-test-email";
 import { toast } from "sonner";
@@ -12,13 +12,15 @@ import { BrandingPreview } from "./branding-preview";
 
 interface Props {
   config: EmailConfiguration | null;
+  templates: EmailTemplate[];
   refreshData: () => void;
 }
 
-export const ConfigForm = ({ config, refreshData }: Props) => {
+export const ConfigForm = ({ config, templates, refreshData }: Props) => {
   const [loading, setLoading] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [testEmail, setTestEmail] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
   const [branding, setBranding] = useState({
     headerImage: config?.headerImage || "",
@@ -62,7 +64,7 @@ export const ConfigForm = ({ config, refreshData }: Props) => {
   const handleTestEmail = async () => {
     if (!testEmail) return toast.error("Enter an email address");
     setSendingTest(true);
-    const res = await sendTestEmail(testEmail); 
+    const res = await sendTestEmail(testEmail, selectedTemplateId || undefined);
     if (res.success) toast.success(res.message);
     else toast.error(res.error);
     setSendingTest(false);
@@ -79,7 +81,7 @@ export const ConfigForm = ({ config, refreshData }: Props) => {
     <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
         
         {/* === LEFT COLUMN: SETTINGS FORM === */}
-        <div className="flex-1 w-full min-w-0">
+        <div className="min-w-0" style={{ flex: "1 1 0%" }}>
             <form onSubmit={handleSave} className="w-full">
                 
                 <h2 className="text-[14px] font-semibold text-[#1d2327] mb-0 pb-0 border-none">Sender Options</h2>
@@ -184,52 +186,55 @@ export const ConfigForm = ({ config, refreshData }: Props) => {
                     </tbody>
                 </table>
 
-                <div className="mt-[20px] mb-[30px] pb-6 md:pb-0">
+                <h2 className="text-[14px] font-semibold text-[#1d2327] mb-0 pb-0 border-none mt-[20px]">Test Configuration</h2>
+                <table className="w-full text-left border-collapse mb-[20px] block md:table">
+                    <tbody className="block md:table-row-group">
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>Recipient Email</th>
+                            <td className={tdResponsiveClass}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <input
+                                        type="text"
+                                        placeholder="Enter recipient email"
+                                        value={testEmail}
+                                        onChange={(e) => setTestEmail(e.target.value)}
+                                        className={wpInputClass}
+                                    />
+                                    <button
+                                        onClick={handleTestEmail}
+                                        disabled={sendingTest}
+                                        className="bg-[#f6f7f7] text-[#2271b1] border border-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer min-h-[30px] flex items-center justify-center gap-2 shrink-0"
+                                    >
+                                        {sendingTest && <Loader2 className="animate-spin" size={14}/>}
+                                        {sendingTest ? "Sending..." : "Send Test Email"}
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div className="mt-[4px] mb-[30px] pb-6 md:pb-0">
                     <button type="submit" disabled={loading} className="bg-[#2271b1] text-white border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 min-h-[30px] w-full md:w-auto">
-                        {loading && <Loader2 className="animate-spin" size={14}/>} 
+                        {loading && <Loader2 className="animate-spin" size={14}/>}
                         Save changes
                     </button>
                 </div>
             </form>
         </div>
 
-        {/* === RIGHT COLUMN: WP META BOXES (PREVIEW & TEST) === */}
-        {/* On mobile it moves to the bottom and takes 100% width */}
-        <div className="w-full lg:w-[350px] shrink-0 flex flex-col gap-[20px]">
-            
-            <BrandingPreview 
+        {/* === RIGHT COLUMN: LIVE EMAIL PREVIEW === */}
+        <div className="flex flex-col gap-[20px]" style={{ flex: "0 0 580px", maxWidth: "100%" }}>
+            <BrandingPreview
                 logo={branding.headerImage}
                 baseColor={branding.baseColor}
                 bgColor={branding.backgroundColor}
                 bodyColor={branding.bodyBackgroundColor}
                 footerText={branding.footerText}
+                templates={templates}
+                selectedTemplateId={selectedTemplateId}
+                onTemplateChange={setSelectedTemplateId}
             />
-
-            {/* Test Email Meta Box */}
-            <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] box-border">
-                <h2 className="text-[14px] font-semibold text-[#1d2327] m-0 px-[12px] py-[8px] border-b border-[#c3c4c7]">Test Configuration</h2>
-                <div className="p-[12px]">
-                    <p className="text-[13px] text-[#646970] mt-0 mb-[10px]">
-                        Send a test email to verify your SMTP settings before going live.
-                    </p>
-                    <input 
-                        type="text"
-                        placeholder="Enter recipient email" 
-                        value={testEmail}
-                        onChange={(e) => setTestEmail(e.target.value)}
-                        className={`${wpInputClass} !w-full mb-[10px]`}
-                    />
-                    <button 
-                        onClick={handleTestEmail} 
-                        disabled={sendingTest} 
-                        className="w-full bg-[#f6f7f7] text-[#2271b1] border border-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] rounded-[3px] px-[12px] py-[4px] text-[13px] font-semibold cursor-pointer min-h-[30px] flex items-center justify-center gap-2"
-                    >
-                        {sendingTest && <Loader2 className="animate-spin" size={14}/>} 
-                        {sendingTest ? "Sending..." : "Send Test Email"}
-                    </button>
-                </div>
-            </div>
-            
         </div>
     </div>
   );

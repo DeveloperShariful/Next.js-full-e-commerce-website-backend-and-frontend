@@ -122,7 +122,9 @@ export async function POST(request: Request) {
       ]);
 
       console.log(`🎉 [Stripe Webhook] Rescue Successful! Order #${orderId} updated.`);
-      await syncOrderToTransdirect(orderId);
+      syncOrderToTransdirect(orderId).catch(err =>
+        console.error('[Stripe Webhook] TransDirect sync failed:', err)
+      );
     }
 
     // 🛡️ 6. Process payment_intent.payment_failed

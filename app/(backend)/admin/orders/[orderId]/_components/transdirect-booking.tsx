@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, RefreshCw, FileText, Printer, CheckCircle, AlertTriangle } from "lucide-react";
-import { syncOrderToTransdirect } from "@/app/actions/backend/order/transdirect-sync-order";
+import { resyncOrderToTransdirect } from "@/app/actions/backend/order/transdirect-sync-order";
 import { toast } from "sonner"; 
 import { useRouter } from "next/navigation";
 
@@ -22,7 +22,7 @@ export const TransdirectSidebar = ({ order }: TransdirectSidebarProps) => {
 
   const handleSync = async () => {
     setLoading(true);
-    const res = await syncOrderToTransdirect(order.id);
+    const res = await resyncOrderToTransdirect(order.id);
     if (res.success) {
       toast.success(res.message);
       router.refresh();

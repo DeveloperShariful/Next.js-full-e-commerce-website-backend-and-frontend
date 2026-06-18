@@ -249,7 +249,7 @@ async function fetchTransdirectQuotes(
       console.log("[Transdirect] Request payload:", JSON.stringify(payload, null, 2));
     }
 
-    const response = await fetch("https://www.transdirect.com.au/api/quotes", {
+    const response = await fetch("https://www.transdirect.com.au/api/bookings/v4", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

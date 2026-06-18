@@ -172,6 +172,7 @@ export async function refreshTransdirectStatuses(): Promise<{ success: boolean; 
   try {
     const config = await db.transdirectConfig.findUnique({ where: { id: "transdirect_config" } });
     if (!config?.apiKey) return { success: false, updated: 0, error: "TransDirect API Key missing." };
+    const apiKey = config.apiKey;
 
     const shipments = await db.shipment.findMany({
       where: { transdirectId: { not: null } },
@@ -191,7 +192,7 @@ export async function refreshTransdirectStatuses(): Promise<{ success: boolean; 
         batch.map(async (ship) => {
           const res = await fetch(`https://www.transdirect.com.au/api/bookings/${ship.transdirectId}`, {
             method: "GET",
-            headers: { "Api-Key": config.apiKey, "Accept": "application/json" },
+            headers: { "Api-Key": apiKey, "Accept": "application/json" },
           });
 
           if (!res.ok) return null;

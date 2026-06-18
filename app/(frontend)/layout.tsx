@@ -1,11 +1,12 @@
-// app/(frontend)/layout.tsx 
+// app/(frontend)/layout.tsx
 
-import TopBar from "@/components/TopBar"; 
+import TopBar from "@/components/TopBar";
 import Header from "@/components/header";
 import Footer from "@/components/Footer";
-import FloatingCompareBar from "@/components/FloatingCompareBar"; 
+import FloatingCompareBar from "@/components/FloatingCompareBar";
 import { CartProvider } from '@/context/CartContext';
-import { CompareProvider } from '@/context/CompareContext'; 
+import { CompareProvider } from '@/context/CompareContext';
+import { Toaster } from 'sonner';
 
 export default function FrontLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export default function FrontLayout({ children }: { children: React.ReactNode })
           
           <Footer /> 
           <FloatingCompareBar />
+          <Toaster position="top-center" richColors />
         </div>
       </CartProvider>
     </CompareProvider>

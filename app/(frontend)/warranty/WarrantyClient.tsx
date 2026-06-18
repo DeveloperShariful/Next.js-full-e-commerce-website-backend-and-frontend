@@ -5,6 +5,7 @@
 import { useState, useRef } from 'react';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { submitWarrantyClaim } from '@/app/actions/frontend/warranty/warranty-action';
+import { toast } from 'sonner';
 
 const GOBIKE_ONLINE_VALUE = 'GoBike Australia';
 
@@ -57,8 +58,6 @@ export default function WarrantyClient() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedMediaUrls, setUploadedMediaUrls] = useState<string[]>([]);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -89,8 +88,6 @@ export default function WarrantyClient() {
 
     setIsUploading(true);
     setUploadProgress(0);
-    setErrorMessage('');
-    
     let newUploadedUrls: string[] = [];
     const totalFiles = files.length;
     let completedFiles = 0;
@@ -144,7 +141,7 @@ export default function WarrantyClient() {
       
     } catch (error: any) {
       console.error(error);
-      setErrorMessage('Failed to upload files. Ensure your network is stable and files are valid.');
+      toast.error('Failed to upload files. Ensure your network is stable and files are valid.');
       setUploadProgress(0);
     } finally {
       setIsUploading(false);
@@ -168,8 +165,6 @@ export default function WarrantyClient() {
     }
 
     setIsSubmitting(true);
-    setErrorMessage('');
-    setSuccessMessage('');
 
     try {
       const mediaUrlString = uploadedMediaUrls.join(', ');
@@ -181,7 +176,7 @@ export default function WarrantyClient() {
 
       if (!result.success) throw new Error(result.message);
 
-      setSuccessMessage('Your warranty claim has been submitted successfully! Our team will review your video and contact you shortly.');
+      toast.success('Your warranty claim has been submitted successfully! Our team will review your video and contact you shortly.', { duration: 6000 });
 
       setFormData({ name: '', orderNumber: '', shopPurchased: GOBIKE_ONLINE_VALUE, email: '', description: '' });
       setAddressForm(EMPTY_ADDRESS);
@@ -189,7 +184,7 @@ export default function WarrantyClient() {
       setUploadProgress(0);
 
     } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to submit claim. Please try again.');
+      toast.error(error.message || 'Failed to submit claim. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -234,17 +229,36 @@ export default function WarrantyClient() {
 
       {/* Main — two column */}
       <section className="max-w-[1100px] mx-auto px-4 sm:px-6 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      {/* LEFT COLUMN */}
+          <div className="space-y-8">
+            <div>
+              <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
+                Warranty <span className="text-blue-600">Claim</span>
+              </h1>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                At <strong>GoBike Australia</strong>, we build high-quality electric balance bikes for kids.
+                If you experience any issues, our dedicated Australian support team is here to help you
+                get back on track quickly with genuine replacement parts.
+              </p>
+            </div>
 
-          {/* LEFT — Form */}
-          <div className="lg:col-span-2">
+            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">What is Covered?</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Our comprehensive warranty covers manufacturing defects in the frame, motor, battery,
+                and controller. Standard wear and tear (tires, brake pads) or damage from misuse are
+                not covered.
+              </p>
+              <a href="/warranty" className="text-blue-600 font-semibold text-sm hover:underline">
+                Read Full Warranty Policy →
+              </a>
+            </div>
+          </div>
+          <div>
             <div className="bg-white p-8 sm:p-10 rounded-2xl shadow-lg border border-gray-100">
               <h2 className="text-xl font-extrabold text-gray-900 mb-6 pb-4 border-b border-gray-100">Submit Your Claim</h2>
 
-              {successMessage && <div className="mb-6 p-5 bg-green-50 border-l-4 border-green-500 rounded-r-xl text-green-800 font-medium text-sm">✓ {successMessage}</div>}
-              {errorMessage && <div className="mb-6 p-5 bg-red-50 border-l-4 border-red-500 rounded-r-xl text-red-800 font-medium text-sm">✕ {errorMessage}</div>}
-
-              <form onSubmit={handleSubmit} className="space-y-6">
+<form onSubmit={handleSubmit} className="space-y-6">
 
                 {isGoBikeOnline ? (
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-[13px] text-blue-800 space-y-1">
@@ -367,67 +381,6 @@ export default function WarrantyClient() {
               </form>
             </div>
           </div>
-
-          {/* RIGHT — Info sidebar */}
-          <div className="lg:col-span-1 space-y-6 sticky top-6">
-
-            {/* What's covered */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h3 className="font-extrabold text-gray-900 mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                What&apos;s Covered
-              </h3>
-              <ul className="space-y-2.5 text-sm text-gray-600">
-                {[
-                  'Motor & controller failures',
-                  'Battery defects (non-wear)',
-                  'Frame & structural issues',
-                  'Brake & gear malfunctions',
-                  'Display & wiring faults',
-                  'Manufacturing defects',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <svg className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* What's NOT covered */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h3 className="font-extrabold text-gray-900 mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Not Covered
-              </h3>
-              <ul className="space-y-2.5 text-sm text-gray-500">
-                {[
-                  'Normal wear & tear (tyres, brake pads)',
-                  'Damage from accidents or misuse',
-                  'Water damage beyond IP rating',
-                  'Modifications by third parties',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <svg className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/></svg>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Need help */}
-            <div className="bg-blue-600 rounded-2xl p-6 text-white">
-              <h3 className="font-extrabold mb-2">Need Help?</h3>
-              <p className="text-blue-100 text-sm mb-4 leading-relaxed">
-                Having trouble with the form? Our support team is happy to help you submit your claim.
-              </p>
-              <a href="mailto:support@gobike.com.au" className="block text-center bg-white text-blue-700 font-bold text-sm py-2.5 rounded-xl hover:bg-blue-50 transition-colors">
-                Contact Support
-              </a>
-            </div>
-
-          </div>
-        </div>
       </section>
     </div>
   );

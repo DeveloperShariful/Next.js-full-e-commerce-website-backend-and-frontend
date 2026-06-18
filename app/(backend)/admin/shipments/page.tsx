@@ -22,7 +22,7 @@ export default function ShipmentsPage() {
   // State Management
   const [shipments, setShipments] = useState<ShipmentWithRelations[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [counts, setCounts] = useState<ShipmentCounts>({ ALL: 0, IN_TRANSIT: 0, DELIVERED: 0, SYNC_FAILED: 0 });
+  const [counts, setCounts] = useState<ShipmentCounts>({ ALL: 0, IN_TRANSIT: 0, DELIVERED: 0, CANCELLED: 0, SYNC_FAILED: 0 });
   const [meta, setMeta] = useState<GetShipmentsResponse["meta"]>();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
@@ -43,7 +43,7 @@ export default function ShipmentsPage() {
     const res = await getShipments(queryParams);
     if (res.success) {
       setShipments(res.data || []);
-      setCounts(res.counts || { ALL: 0, IN_TRANSIT: 0, DELIVERED: 0, SYNC_FAILED: 0 });
+      setCounts(res.counts || { ALL: 0, IN_TRANSIT: 0, DELIVERED: 0, CANCELLED: 0, SYNC_FAILED: 0 });
       setMeta(res.meta);
     }
     setLoading(false);

@@ -175,10 +175,11 @@ export async function resyncOrderToTransdirect(orderId: string) {
       return { success: false, error: errMsg };
     }
 
+    const resyncBookingIdInt = responseData.id ? parseInt(String(responseData.id), 10) : null;
     await db.order.update({
       where: { id: orderId },
       data: {
-        transdirectBookingId:    responseData.id ? parseInt(String(responseData.id), 10) : null,
+        transdirectBookingId:    resyncBookingIdInt,
         transdirectOrderStatus:  "booked",
         transdirectLabelUrl:     responseData.label_url    || null,
         transdirectInvoiceUrl:   responseData.invoice_url  || null,
@@ -186,6 +187,37 @@ export async function resyncOrderToTransdirect(orderId: string) {
         transdirectError:        null,
       }
     });
+
+    // ✅ Auto-create/update Shipment record so it appears in Admin Shipments page
+    const existingResyncShipment = await db.shipment.findFirst({ where: { orderId } });
+    const resyncShipmentItems = order.items.map(i => ({ productName: i.productName, quantity: i.quantity }));
+    if (existingResyncShipment) {
+      await db.shipment.update({
+        where: { id: existingResyncShipment.id },
+        data: {
+          courier:         cheapestCourier,
+          transdirectId:   resyncBookingIdInt,
+          labelUrl:        responseData.label_url   || null,
+          invoiceUrl:      responseData.invoice_url || null,
+          syncedToGateway: true,
+          lastSyncedAt:    new Date(),
+        }
+      });
+    } else {
+      await db.shipment.create({
+        data: {
+          orderId,
+          courier:         cheapestCourier,
+          transdirectId:   resyncBookingIdInt,
+          labelUrl:        responseData.label_url   || null,
+          invoiceUrl:      responseData.invoice_url || null,
+          items:           resyncShipmentItems,
+          shippedDate:     new Date(),
+          syncedToGateway: true,
+          lastSyncedAt:    new Date(),
+        }
+      });
+    }
 
     await db.orderNote.create({
       data: {
@@ -333,10 +365,11 @@ export async function syncOrderToTransdirect(orderId: string) {
     }
 
     // ✅ Success — save booking ID and clear error
+    const bookingIdInt = responseData.id ? parseInt(String(responseData.id), 10) : null;
     await db.order.update({
       where: { id: orderId },
       data: {
-        transdirectBookingId: responseData.id ? parseInt(String(responseData.id), 10) : null,
+        transdirectBookingId: bookingIdInt,
         transdirectOrderStatus: "booked",
         transdirectLabelUrl: responseData.label_url || null,
         transdirectInvoiceUrl: responseData.invoice_url || null,
@@ -344,6 +377,37 @@ export async function syncOrderToTransdirect(orderId: string) {
         transdirectError: null,
       }
     });
+
+    // ✅ Auto-create Shipment record so it appears in Admin Shipments page
+    const existingShipment = await db.shipment.findFirst({ where: { orderId } });
+    const shipmentItems = order.items.map(i => ({ productName: i.productName, quantity: i.quantity }));
+    if (existingShipment) {
+      await db.shipment.update({
+        where: { id: existingShipment.id },
+        data: {
+          courier:          selectedCourier,
+          transdirectId:    bookingIdInt,
+          labelUrl:         responseData.label_url  || null,
+          invoiceUrl:       responseData.invoice_url || null,
+          syncedToGateway:  true,
+          lastSyncedAt:     new Date(),
+        }
+      });
+    } else {
+      await db.shipment.create({
+        data: {
+          orderId,
+          courier:         selectedCourier,
+          transdirectId:   bookingIdInt,
+          labelUrl:        responseData.label_url  || null,
+          invoiceUrl:      responseData.invoice_url || null,
+          items:           shipmentItems,
+          shippedDate:     new Date(),
+          syncedToGateway: true,
+          lastSyncedAt:    new Date(),
+        }
+      });
+    }
 
     await db.orderNote.create({
       data: {

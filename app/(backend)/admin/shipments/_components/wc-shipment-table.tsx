@@ -164,13 +164,25 @@ export const WcShipmentTable = ({
                 )}
               </td>
 
-              {/* Delivery Status */}
+              {/* Delivery Status — live from TransDirect lastTrackingStatus */}
               <td className="py-3 px-3 align-top">
-                {ship.deliveredDate ? (
-                  <span className="bg-[#c6e1c6] text-[#5b841b] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Delivered</span>
-                ) : (
-                  <span className="bg-[#e5e5e5] text-[#777] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">In Transit</span>
-                )}
+                {(() => {
+                  const st = (ship.lastTrackingStatus || "").toLowerCase();
+                  if (st === "delivered")
+                    return <span className="bg-[#c6e1c6] text-[#5b841b] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Delivered</span>;
+                  if (st === "cancelled")
+                    return <span className="bg-[#fcf0f1] text-[#d63638] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Cancelled</span>;
+                  if (st === "dispatched")
+                    return <span className="bg-[#e5f5fa] text-[#0073aa] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Dispatched</span>;
+                  if (st === "booked")
+                    return <span className="bg-[#edfaef] text-[#00a32a] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Booked</span>;
+                  if (st === "pending")
+                    return <span className="bg-[#fcf9e8] text-[#996800] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Pending</span>;
+                  if (st === "in_transit")
+                    return <span className="bg-[#e5e5e5] text-[#777] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">In Transit</span>;
+                  // fallback — no status fetched yet
+                  return <span className="bg-[#e5e5e5] text-[#777] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Unknown</span>;
+                })()}
               </td>
 
               {/* Date */}

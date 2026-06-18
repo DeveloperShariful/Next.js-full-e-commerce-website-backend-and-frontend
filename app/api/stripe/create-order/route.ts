@@ -239,6 +239,7 @@ export async function POST(request: Request) {
       paymentGateway: selectedPaymentMethod,
       paymentMethod: paymentMethodTitle,
       discountId,
+      couponCode:  couponCode   || null,
       customerNote: orderNotes,
       metadata: metadataJson,
       isFirstOrder,

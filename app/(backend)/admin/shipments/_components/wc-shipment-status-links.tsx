@@ -13,10 +13,11 @@ interface WcShipmentStatusLinksProps {
 export const WcShipmentStatusLinks = ({ counts, currentStatus, onStatusChange }: WcShipmentStatusLinksProps) => {
   
   const availableStatuses = [
-    { label: "All", value: "ALL" as const },
+    { label: "All",        value: "ALL"        as const },
     { label: "In Transit", value: "IN_TRANSIT" as const },
-    { label: "Delivered", value: "DELIVERED" as const },
-    { label: "Sync Failed", value: "SYNC_FAILED" as const },
+    { label: "Delivered",  value: "DELIVERED"  as const },
+    { label: "Cancelled",  value: "CANCELLED"  as const },
+    { label: "Sync Failed",value: "SYNC_FAILED"as const },
   ];
 
   return (

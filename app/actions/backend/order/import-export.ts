@@ -166,8 +166,8 @@ const parseProducts = (productString: string): ParsedItem[] => {
       const dimsMatch   = itemStr.match(/\{Dims:\s*(.*?)\}/);
       const attrMatch   = itemStr.match(/\[Attr:\s*(.*?)\]/);
       const qtyMatch    = itemStr.match(/\(x(\d+)\)/);
-      // price: "(x2) - 99.99" format — captures the number after last " - "
-      const priceMatch  = itemStr.match(/\(x\d+\)\s*-\s*([\d.]+)/);
+      // price: "(x2) - 99.99" or "(x2) - $99.99" format (plugin exports with $ sign)
+      const priceMatch  = itemStr.match(/\(x\d+\)\s*-\s*\$?([\d.]+)/);
       const imgMatch    = itemStr.match(/\[Img:\s*(https?:\/\/[^\]]+)\]/);
 
       const quantity   = qtyMatch   ? parseInt(qtyMatch[1], 10)     : 1;

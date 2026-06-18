@@ -2,7 +2,6 @@
 
 import { Prisma } from "@prisma/client";
 
-// Prisma-এর জেনারেট করা টাইপ থেকে Shipment (with Order relations) বের করা হলো
 export type ShipmentWithRelations = Prisma.ShipmentGetPayload<{
   include: {
     order: {
@@ -18,23 +17,21 @@ export type ShipmentWithRelations = Prisma.ShipmentGetPayload<{
   };
 }>;
 
-// ফ্রন্টএন্ড থেকে সার্চ ও পেজিনেশনের জন্য প্যারামিটার
 export interface ShipmentQueryParams {
   search?: string;
-  status?: "ALL" | "IN_TRANSIT" | "DELIVERED" | "SYNC_FAILED";
+  status?: "ALL" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED" | "SYNC_FAILED";
   page?: number;
   limit?: number;
 }
 
-// উপরের স্ট্যাটাস লিংকের কাউন্ট রাখার জন্য (WooCommerce Style)
 export interface ShipmentCounts {
   ALL: number;
   IN_TRANSIT: number;
   DELIVERED: number;
+  CANCELLED: number;
   SYNC_FAILED: number;
 }
 
-// সার্ভার অ্যাকশনের রেসপন্স টাইপ
 export interface GetShipmentsResponse {
   success: boolean;
   data?: ShipmentWithRelations[];

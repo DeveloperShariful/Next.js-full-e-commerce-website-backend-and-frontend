@@ -195,12 +195,16 @@ export const OrderItemsMeta = ({ order }: OrderItemsMetaProps) => {
                     
                     {Number(order.discountTotal) > 0 && (
                         <tr>
-                            <td className="py-1.5 text-[#646970] flex items-center justify-end gap-1">
-                                Discount {order.couponCode && (
-                                    <span className="font-mono text-[#d63638] bg-red-50 border border-red-100 px-1 rounded-[2px] flex items-center gap-0.5">
-                                        <Tag size={10}/> {order.couponCode}
-                                    </span>
-                                )}:
+                            <td className="py-1.5 text-[#646970]">
+                                <div className="flex items-center justify-end gap-1">
+                                    Discount
+                                    {(order.discount?.code || order.couponCode) && (
+                                        <span className="font-mono text-[11px] text-[#d63638] bg-red-50 border border-red-100 px-1.5 py-0.5 rounded-[2px] flex items-center gap-0.5">
+                                            <Tag size={10}/> {order.discount?.code || order.couponCode}
+                                        </span>
+                                    )}
+                                    :
+                                </div>
                             </td>
                             <td className="py-1.5 text-[#d63638] font-medium">-{formatPrice(Number(order.discountTotal))}</td>
                         </tr>

@@ -266,6 +266,7 @@ export async function POST(request: Request) {
       paymentGateway: 'paypal',
       paymentMethod: 'PayPal',
       discountId,
+      couponCode:    couponCode    || null,
       customerNote: orderNotes || '',
       metadata: metadataJson,
       isFirstOrder,

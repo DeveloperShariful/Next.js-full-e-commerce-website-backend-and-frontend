@@ -175,6 +175,7 @@ export interface OrderDetailsType {
   affiliate: OrderAffiliate | null;
   disputes: OrderDispute[];
   returns: OrderReturn[];
+  discount?: { id: string; code: string } | null;
   _count?: { items: number };
 }
 

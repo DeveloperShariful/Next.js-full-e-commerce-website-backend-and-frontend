@@ -57,7 +57,11 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
     REVIEW: mediaList.filter(m => m.source === 'REVIEW').length,
   }), [mediaList]);
 
-  // 2. FILTER LOGIC
+  // 2. PAGINATION STATE
+  const [perPage, setPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // 3. FILTER LOGIC
   const filteredMedia = useMemo(() => {
     return mediaList.filter(item => {
       const matchSearch = item.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -67,6 +71,16 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
       return matchSearch && matchType && matchSource;
     });
   }, [mediaList, searchQuery, typeFilter, sourceFilter]);
+
+  // 4. PAGINATED SLICE
+  const totalPages = Math.max(1, Math.ceil(filteredMedia.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedMedia = filteredMedia.slice((safePage - 1) * perPage, safePage * perPage);
+  const fromItem = filteredMedia.length === 0 ? 0 : (safePage - 1) * perPage + 1;
+  const toItem = Math.min(safePage * perPage, filteredMedia.length);
+
+  // Reset to page 1 when filters/search change
+  const handleFilterChange = (setter: (v: string) => void) => (v: string) => { setter(v); setCurrentPage(1); };
 
   // 2. UPLOAD LOGIC
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -187,11 +201,11 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
       {/* Shared Toolbar */}
       <MediaToolbar
         searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
+        setSearchQuery={handleFilterChange(setSearchQuery)}
         typeFilter={typeFilter}
-        setTypeFilter={setTypeFilter}
+        setTypeFilter={handleFilterChange(setTypeFilter)}
         sourceFilter={sourceFilter}
-        setSourceFilter={setSourceFilter}
+        setSourceFilter={handleFilterChange(setSourceFilter)}
         isBulkMode={isBulkMode}
         setIsBulkMode={setIsBulkMode}
         selectedIds={selectedIds}
@@ -202,17 +216,80 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
         sourceCounts={sourceCounts}
       />
 
+      {/* Per-page + counter row */}
+      <div className="flex items-center justify-between px-2 md:px-0 mb-3 text-[13px] text-[#50575e]">
+        <span>
+          {filteredMedia.length === 0
+            ? 'No items found'
+            : `Showing ${fromItem}–${toItem} of ${filteredMedia.length} items`}
+        </span>
+        <div className="flex items-center gap-2">
+          <span>Show:</span>
+          {[20, 50, 100, 200].map(n => (
+            <button
+              key={n}
+              onClick={() => { setPerPage(n); setCurrentPage(1); }}
+              className={`px-2 py-0.5 rounded-sm border text-[12px] transition-colors ${perPage === n ? 'bg-[#2271b1] text-white border-[#2271b1]' : 'bg-white border-[#c3c4c7] text-[#2c3338] hover:border-[#2271b1] hover:text-[#2271b1]'}`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Shared Grid */}
-      <MediaGrid 
-        filteredMedia={filteredMedia}
+      <MediaGrid
+        filteredMedia={paginatedMedia}
         isBulkMode={isBulkMode}
         selectedIds={selectedIds}
         setSelectedIds={setSelectedIds}
         setSelectedIndex={setSelectedIndex}
       />
 
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1 mt-6 flex-wrap">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={safePage === 1}
+            className="px-3 py-1 border border-[#c3c4c7] bg-white text-[13px] rounded-sm hover:border-[#2271b1] hover:text-[#2271b1] disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ← Prev
+          </button>
+
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+            .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+              if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+              acc.push(p);
+              return acc;
+            }, [])
+            .map((p, i) =>
+              p === '...' ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-[#8c8f94]">…</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p as number)}
+                  className={`w-8 h-7 border text-[13px] rounded-sm transition-colors ${safePage === p ? 'bg-[#2271b1] text-white border-[#2271b1]' : 'bg-white border-[#c3c4c7] text-[#2c3338] hover:border-[#2271b1] hover:text-[#2271b1]'}`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={safePage === totalPages}
+            className="px-3 py-1 border border-[#c3c4c7] bg-white text-[13px] rounded-sm hover:border-[#2271b1] hover:text-[#2271b1] disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
       {/* Details Modal Popup */}
-      <MediaModal 
+      <MediaModal
         filteredMedia={filteredMedia}
         selectedIndex={selectedIndex}
         setSelectedIndex={setSelectedIndex}

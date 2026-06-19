@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { useSession, signOut } from "next-auth/react"; 
 import MiniCart from '@/components/MiniCart'; 
@@ -124,6 +124,7 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
 
   const totalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
   // Server-passed initialUser avoids first-render flash; session takes over after hydration
@@ -187,8 +188,14 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
     closeAllOverlays();
   };
 
+  const openMobileMenusRef = useRef<Record<string, boolean>>({});
+
   const toggleMobileMenu = (path: string) => {
-    setOpenMobileMenus(prev => ({ ...prev, [path]: !prev[path] }));
+    setOpenMobileMenus(prev => {
+      const next = { ...prev, [path]: !prev[path] };
+      openMobileMenusRef.current = next;
+      return next;
+    });
   };
 
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://gobike.au";
@@ -709,18 +716,33 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                 {navItems.map((item) => (
                     <div key={item.path} className="w-full">
                         <div className="flex items-center justify-between border-b border-[#ececec]">
-                            <Link 
-                                href={item.path} 
+                            {item.subItems ? (
+                              <button
+                                className={`text-[1rem] font-medium no-underline flex items-center gap-3 bg-transparent w-full text-left cursor-pointer py-2.5 hover:text-black hover:font-bold border-none ${pathname === item.path || pathname.startsWith(item.path + '/') ? 'text-black font-bold' : 'text-[#333]'}`}
+                                onClick={() => {
+                                  if (!openMobileMenusRef.current[item.path]) {
+                                    toggleMobileMenu(item.path);
+                                  } else {
+                                    router.push(item.path);
+                                    closeAllOverlays();
+                                  }
+                                }}
+                              >
+                                {item.label === 'Contact' ? 'Contact us' : item.label}
+                              </button>
+                            ) : (
+                            <Link
+                                href={item.path}
                                 className={`text-[1rem] font-medium no-underline flex items-center gap-3 bg-transparent w-full text-left cursor-pointer py-2.5 hover:text-black hover:font-bold ${pathname === item.path ? 'text-black font-bold' : 'text-[#333]'}`}
-                                onClick={() => !item.subItems && closeAllOverlays()}
+                                onClick={closeAllOverlays}
                             >
                                 {item.label === 'Contact' ? 'Contact us' : item.label}
                             </Link>
-                            
+                            )}
                             {item.subItems && (
-                                <button 
+                                <button
                                   onClick={() => toggleMobileMenu(item.path)}
-                                  className="p-3 text-[#333] cursor-pointer"
+                                  className="p-3 text-[#333] cursor-pointer bg-transparent border-none"
                                   aria-label={`Toggle ${item.label} Submenu`}
                                   aria-expanded={!!openMobileMenus[item.path]}
                                   aria-controls={`mobile-submenu-${item.label.replace(/\s+/g, '-').toLowerCase()}`}

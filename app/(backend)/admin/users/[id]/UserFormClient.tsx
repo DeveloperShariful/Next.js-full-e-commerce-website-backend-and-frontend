@@ -7,8 +7,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Role } from '@prisma/client';
 import { State } from 'country-state-city';
-// 🛑 FIXED: Corrected MediaPicker import path based on your folder structure
-import { MediaPicker } from '@/components/media/media-picker'; 
+import MediaPickerModal from '@/app/(backend)/admin/media/_components/MediaPickerModal';
 
 import { createUser, updateUser } from '@/app/actions/backend/users/user-actions';
 
@@ -101,7 +100,7 @@ export default function UserFormClient({ initialData, countries }: { initialData
 
   // Media Picker Handlers
   const [profileImage, setProfileImage] = useState<string>(initialData?.image || '');
-  const handleImageChange = (url: string) => setProfileImage(url);
+  const [openAvatarPicker, setOpenAvatarPicker] = useState(false);
   const handleImageRemove = () => setProfileImage('');
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -251,13 +250,27 @@ export default function UserFormClient({ initialData, countries }: { initialData
           <tr className="border-b border-[#c3c4c7] lg:border-transparent block lg:table-row">
             <th className={thClass}>Profile Picture</th>
             <td className={tdClass}>
-              <div className="max-w-[150px]">
-                  <MediaPicker 
-                    label="" 
-                    value={profileImage} 
-                    onChange={handleImageChange} 
-                    onRemove={handleImageRemove} 
-                  />
+              <div className="flex flex-col gap-2">
+                {profileImage ? (
+                  <>
+                    <img src={profileImage} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-[#c3c4c7]" />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setOpenAvatarPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">Change</button>
+                      <span className="text-[#c3c4c7]">|</span>
+                      <button type="button" onClick={handleImageRemove} className="text-[13px] text-[#d63638] hover:underline">Remove</button>
+                    </div>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setOpenAvatarPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">
+                    Set profile picture
+                  </button>
+                )}
+                <MediaPickerModal
+                  open={openAvatarPicker}
+                  onClose={() => setOpenAvatarPicker(false)}
+                  onSelect={(items) => { if (items[0]) setProfileImage(items[0].url); }}
+                  title="Select Profile Picture"
+                />
               </div>
             </td>
           </tr>

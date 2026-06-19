@@ -5,7 +5,8 @@
 import { useState } from "react"; 
 import { useFormContext } from "react-hook-form";
 import { ChevronUp, ChevronDown } from "lucide-react"; 
-import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
+import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
+import { MediaSource } from "@prisma/client";
 import { ProductFormData } from "../types";
 
 export default function ProductImage() {
@@ -15,11 +16,10 @@ export default function ProductImage() {
     
     const featuredImage = watch("featuredImage");
 
-    const handleSelect = (media: any) => {
-        // Saving both URL and ID for relation
-        setValue("featuredImage", media.url, { shouldDirty: true, shouldValidate: true });
-        setValue("featuredMediaId", media.id, { shouldDirty: true });
-        setOpen(false); 
+    const handleSelect = (items: { id: string; url: string }[]) => {
+        if (!items.length) return;
+        setValue("featuredImage", items[0].url, { shouldDirty: true, shouldValidate: true });
+        setValue("featuredMediaId", items[0].id, { shouldDirty: true });
     };
 
     return (
@@ -73,12 +73,13 @@ export default function ProductImage() {
                 </div>
             )}
 
-            {open && (
-                <MediaSelectorModal 
-                    onClose={() => setOpen(false)}
-                    onSelect={handleSelect}
-                />
-            )}
+            <MediaPickerModal
+                open={open}
+                onClose={() => setOpen(false)}
+                onSelect={handleSelect}
+                title="Select Product Image"
+                source={MediaSource.PRODUCT}
+            />
         </div>
     );
 }

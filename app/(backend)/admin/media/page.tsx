@@ -1,24 +1,21 @@
 // app/(backend)/admin/media/page.tsx
 
-import { getAllMedia } from "@/app/actions/backend/media/media-read";
-import { MediaLibrary } from "./_components/media-library";
+import { getAllMedia } from '@/app/actions/backend/media/media-action';
+import MediaLibraryUI from './_components/MediaLibraryUI';
+import type { Metadata } from 'next';
 
-// 🔥 Server Component: Pre-fetching Data
-export default async function MediaPage() {
-  
-  // 1. Initial Fetch on Server
-  // আপডেট: মাঝখানে 'null' যোগ করা হয়েছে (folderId এর জন্য)
-  // getAllMedia(query, sort, type, usage, folderId, page, limit)
-  const res = await getAllMedia("", "newest", "ALL", "ALL", null, 1, 40);
-  
-  const initialData = res.success ? (res.data as any) : [];
-  const initialTotal = res.success ? res.meta.total : 0;
+export const metadata: Metadata = {
+  title: 'Media Library ‹ GoBike Admin',
+  description: 'Manage your website media files',
+};
 
-  // 2. Pass Data to Client Component
+export default async function AdminMediaPage() {
+  // Now initialMedia is strongly typed as Media[] 
+  const initialMedia = await getAllMedia();
+
   return (
-    <MediaLibrary 
-        initialData={initialData} 
-        initialTotal={initialTotal} 
-    />
+    <div className="w-full bg-[#f0f0f1] min-h-screen">
+        <MediaLibraryUI initialMedia={initialMedia} />
+    </div>
   );
 }

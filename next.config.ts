@@ -46,7 +46,17 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'rgy4iw8lybyokbyt.public.blob.vercel-storage.com',
-        pathname: '/**', // Afterpay-এর লোগোর জন্য
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+        pathname: '/**',
       },
     ],
   },

@@ -12,8 +12,7 @@ import {
 import { updateSettingsAction, addPixelAction, uploadKYCAction } from "@/app/actions/frontend/affiliate/_services/settings-service";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-// ✅ Import MediaPicker (Single Selection)
-import { MediaPicker } from "@/components/media/media-picker";
+import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 
 interface Props {
   userId: string; 
@@ -31,6 +30,7 @@ interface Props {
 export default function SettingsForm({ userId, initialData }: Props) {
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<"PAYMENT" | "TRACKING" | "KYC">("PAYMENT");
+  const [openKycPicker, setOpenKycPicker] = useState(false);
 
   // --- 1. Payment Form ---
   const paymentForm = useForm({
@@ -270,20 +270,30 @@ export default function SettingsForm({ userId, initialData }: Props) {
                               </div>
                           </div>
                           
-                          {/* ✅ MEDIA PICKER (Replaces Manual URL Input) */}
                           <div className="space-y-2">
-                              <MediaPicker 
-                                label="Document Image (Front)"
-                                value={kycUrl}
-                                onChange={(url) => {
-                                    kycForm.setValue("url", url, { shouldValidate: true });
-                                }}
-                                onRemove={() => {
-                                    kycForm.setValue("url", "", { shouldValidate: true });
-                                }}
-                              />
-                              {/* Hidden Input to register with React Hook Form validation */}
+                              <div>
+                                {kycUrl ? (
+                                  <div className="flex flex-col gap-2">
+                                    <img src={kycUrl} alt="KYC Document" className="w-24 h-24 object-cover border border-[#c3c4c7] rounded" />
+                                    <div className="flex gap-2">
+                                      <button type="button" onClick={() => setOpenKycPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">Change</button>
+                                      <span className="text-[#c3c4c7]">|</span>
+                                      <button type="button" onClick={() => kycForm.setValue("url", "", { shouldValidate: true })} className="text-[13px] text-[#d63638] hover:underline">Remove</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button type="button" onClick={() => setOpenKycPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">
+                                    Upload Document Image (Front)
+                                  </button>
+                                )}
+                              </div>
                               <input type="hidden" {...kycForm.register("url", { required: "Document image is required" })} />
+                              <MediaPickerModal
+                                open={openKycPicker}
+                                onClose={() => setOpenKycPicker(false)}
+                                onSelect={(items) => { if (items[0]) kycForm.setValue("url", items[0].url, { shouldValidate: true }); }}
+                                title="Select KYC Document"
+                              />
                           </div>
 
                           <div className="pt-2">

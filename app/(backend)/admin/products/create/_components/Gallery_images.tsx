@@ -6,7 +6,8 @@ import { useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { ProductFormData } from "../types";
-import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
+import MediaPickerModal, { PickedMedia } from "@/app/(backend)/admin/media/_components/MediaPickerModal";
+import { MediaSource } from "@prisma/client";
 
 export default function GalleryImages() {
     const { watch, setValue } = useFormContext<ProductFormData>();
@@ -16,14 +17,12 @@ export default function GalleryImages() {
 
     const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
-    const handleSelect = (media: any | any[]) => {
-        const selected = Array.isArray(media) ? media : [media];
-        
-        const newImages = selected.map((m: any) => ({
+    const handleSelect = (items: PickedMedia[]) => {
+        const newImages = items.map(m => ({
             url: m.url,
             mediaId: m.id,
             altText: m.altText || "",
-            id: undefined 
+            id: undefined,
         }));
         
         const existingUrls = galleryImages.map((img: any) => typeof img === 'string' ? img : img.url);
@@ -153,13 +152,14 @@ export default function GalleryImages() {
                 </div>
             )}
 
-            {open && (
-                <MediaSelectorModal 
-                    onClose={() => setOpen(false)}
-                    onSelect={handleSelect}
-                    allowMultiple={true} 
-                />
-            )}
+            <MediaPickerModal
+                open={open}
+                onClose={() => setOpen(false)}
+                onSelect={handleSelect}
+                multiple={true}
+                title="Select Gallery Images"
+                source={MediaSource.PRODUCT}
+            />
         </div>
     );
 }

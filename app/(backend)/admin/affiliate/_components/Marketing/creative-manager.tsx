@@ -7,7 +7,8 @@ import { Edit, Trash2, Image as ImageIcon, Link as LinkIcon, Copy, Plus, FileTex
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { deleteCreativeAction, upsertCreativeAction, trackCreativeUsageAction } from "@/app/actions/backend/affiliate/_services/marketing-assets-service";
-import { MediaPicker } from "@/components/media/media-picker";
+import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
+import { MediaSource } from "@prisma/client";
 
 // ✅ FIXED: Replaced deleted Prisma Model type with our strictly defined JSON structure
 interface CreativeData {
@@ -29,6 +30,7 @@ interface CreativeManagerProps {
 
 export default function CreativeManager({ initialCreatives }: CreativeManagerProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openAssetPicker, setOpenAssetPicker] = useState(false);
   const [editingItem, setEditingItem] = useState<CreativeData | null>(null);
   const [isDeleting, startDelete] = useTransition();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -189,6 +191,7 @@ export default function CreativeManager({ initialCreatives }: CreativeManagerPro
 
 function CreativeModal({ isOpen, onClose, initialData }: any) {
   const [isPending, startTransition] = useTransition();
+  const [openAssetPicker, setOpenAssetPicker] = useState(false);
   
   const form = useForm({
     defaultValues: {
@@ -233,13 +236,30 @@ function CreativeModal({ isOpen, onClose, initialData }: any) {
             <form id="creative-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               
               <div className="border border-[#c3c4c7] p-4 bg-[#f6f7f7]">
-                  <MediaPicker 
-                    label="Asset File (URL)"
-                    value={form.watch("url")}
-                    onChange={(url) => form.setValue("url", url, { shouldValidate: true })}
-                    onRemove={() => form.setValue("url", "")}
-                  />
-                  {form.formState.errors.url && <p className="text-[#d63638] text-[11px] mt-1">File URL is Required</p>}
+                <label className="text-[13px] font-semibold text-[#1d2327] block mb-2">Asset File</label>
+                {form.watch("url") ? (
+                  <div className="flex flex-col gap-2">
+                    <img src={form.watch("url")} alt="Asset" className="w-24 h-24 object-cover border border-[#c3c4c7]" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    <p className="text-[11px] text-[#646970] truncate max-w-xs">{form.watch("url")}</p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setOpenAssetPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">Change</button>
+                      <span className="text-[#c3c4c7]">|</span>
+                      <button type="button" onClick={() => form.setValue("url", "")} className="text-[13px] text-[#d63638] hover:underline">Remove</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setOpenAssetPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">
+                    Select asset file
+                  </button>
+                )}
+                {form.formState.errors.url && <p className="text-[#d63638] text-[11px] mt-1">File URL is Required</p>}
+                <MediaPickerModal
+                  open={openAssetPicker}
+                  onClose={() => setOpenAssetPicker(false)}
+                  onSelect={(items) => { if (items[0]) form.setValue("url", items[0].url, { shouldValidate: true }); }}
+                  title="Select Asset File"
+                  source={MediaSource.AFFILIATE}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

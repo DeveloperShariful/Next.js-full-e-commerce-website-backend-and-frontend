@@ -8,7 +8,7 @@ import { toast } from "react-hot-toast";
 import { ChevronDown, ChevronUp, Trash2, Wand2, MapPin, Box, X, Plus, Settings2, Search, CheckSquare, Square, Filter } from "lucide-react"; 
 import { getLocations } from "@/app/actions/backend/product/product-read";
 import { ProductFormData, Variation } from "../types";
-import { MediaSelectorModal } from "@/components/media/media-selector-modal";
+import MediaPickerModal, { PickedMedia } from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { useGlobalStore } from "@/app/providers/global-store-provider"; 
 import Image from "next/image";
 
@@ -253,18 +253,14 @@ export default function Variations() {
         }
     };
 
-    const handleMediaSelect = (media: any | any[]) => {
+    const handleMediaSelect = (items: PickedMedia[]) => {
         if (mediaModalIndex === null) return;
-
-        const selectedFiles = Array.isArray(media) ? media : [media];
-        const newImagesObj = selectedFiles.map((m: any) => ({
-            url: m.url, mediaId: m.id, altText: m.altText || "", id: undefined 
+        const newImagesObj = items.map(m => ({
+            url: m.url, mediaId: m.id, altText: m.altText || "", id: undefined,
         }));
-
         const currentImages = variations[mediaModalIndex].images || [];
         const existingUrls = currentImages.map((img: any) => typeof img === 'string' ? img : img.url);
-        const uniqueNewImages = newImagesObj.filter((img: any) => !existingUrls.includes(img.url));
-        
+        const uniqueNewImages = newImagesObj.filter(img => !existingUrls.includes(img.url));
         updateVar(mediaModalIndex, 'images', [...currentImages, ...uniqueNewImages]);
         setMediaModalIndex(null);
     };
@@ -588,10 +584,12 @@ export default function Variations() {
             )}
 
             {mediaModalIndex !== null && (
-                <MediaSelectorModal 
+                <MediaPickerModal
+                    open={true}
                     onClose={() => setMediaModalIndex(null)}
                     onSelect={handleMediaSelect}
-                    allowMultiple={false}
+                    multiple={true}
+                    title="Select Variation Images"
                 />
             )}
         </div>

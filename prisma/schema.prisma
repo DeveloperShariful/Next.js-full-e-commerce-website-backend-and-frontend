@@ -137,6 +137,19 @@ enum MediaType {
   VIDEO
   DOCUMENT
   ARCHIVE
+  OTHER
+}
+
+enum MediaSource {
+  GENERAL
+  WARRANTY
+  USER
+  STORE
+  PRODUCT
+  CATEGORY
+  BRAND
+  REVIEW
+  AFFILIATE
 }
 
 enum ShippingMethodType {
@@ -1971,6 +1984,8 @@ model Media {
   filename       String
   originalName   String?
   publicId       String?
+  pathname       String?
+  source         MediaSource          @default(GENERAL)
   width          Int?
   height         Int?
   mimeType       String
@@ -1980,7 +1995,7 @@ model Media {
   description    String?
   folderId       String?
   folder         MediaFolder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  uploadedBy     String
+  uploadedBy     String?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   productImages  ProductImage[]

@@ -3,7 +3,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import ImageUpload from "@/components/media/image-upload"; // Ensure this matches your project
+import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
+import { MediaSource } from "@prisma/client";
 import { CategoryData } from "../types";
 import { toast } from "react-hot-toast";
 import { Loader2 } from "lucide-react";
@@ -33,6 +34,7 @@ export default function CategoryForm({ initialData, categories, onSuccess, isEdi
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openImagePicker, setOpenImagePicker] = useState(false);
 
   useEffect(() => {
     setFormData({
@@ -159,14 +161,27 @@ export default function CategoryForm({ initialData, categories, onSuccess, isEdi
 
         <div>
           <label className="block text-[14px] text-[#2c3338] mb-1">Thumbnail</label>
-          <div className="bg-transparent">
-             <ImageUpload 
-               value={formData.image} 
-               disabled={isSubmitting} 
-               onChange={(url) => setFormData({...formData, image: [url]})} 
-               onRemove={() => setFormData({...formData, image: []})}
-             />
-          </div>
+          {formData.image?.[0] ? (
+            <div className="flex flex-col gap-2">
+              <img src={formData.image[0]} alt="Category thumbnail" className="w-24 h-24 object-cover border border-[#c3c4c7] rounded-sm" />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setOpenImagePicker(true)} className="text-[13px] text-[#2271b1] hover:underline">Change image</button>
+                <span className="text-[#c3c4c7]">|</span>
+                <button type="button" onClick={() => setFormData({...formData, image: []})} className="text-[13px] text-[#d63638] hover:underline">Remove</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setOpenImagePicker(true)} className="text-[13px] text-[#2271b1] hover:underline">
+              Set thumbnail image
+            </button>
+          )}
+          <MediaPickerModal
+            open={openImagePicker}
+            onClose={() => setOpenImagePicker(false)}
+            onSelect={(items) => { if (items[0]) setFormData({...formData, image: [items[0].url]}); }}
+            title="Select Category Thumbnail"
+            source={MediaSource.CATEGORY}
+          />
         </div>
 
         {/* Custom Meta Fields */}

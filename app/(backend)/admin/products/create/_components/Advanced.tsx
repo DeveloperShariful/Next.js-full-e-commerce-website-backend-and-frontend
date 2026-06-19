@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { Plus, Trash2, Settings, ListOrdered, MessageSquare, Link as LinkIcon, Code, LayoutList, AlertTriangle, RefreshCw, X , ImagePlus} from "lucide-react";
 import { ProductFormData } from "../types";
-import { MediaSelectorModal } from "@/components/media/media-selector-modal"; 
+import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import Image from "next/image"; 
 
 export default function Advanced() {
@@ -54,9 +54,9 @@ export default function Advanced() {
         }
     };
 
-    const handleSeoImageSelect = (media: any) => {
-        setValue("seoSchema.ogImage", media.url, { shouldDirty: true });
-        setOpenSeoMedia(false);
+    const handleSeoImageSelect = (items: { url: string }[]) => {
+        if (!items.length) return;
+        setValue("seoSchema.ogImage", items[0].url, { shouldDirty: true });
     };
 
     return (
@@ -256,13 +256,12 @@ export default function Advanced() {
                 )}
             </div>
 
-            {openSeoMedia && (
-                <MediaSelectorModal 
-                    onClose={() => setOpenSeoMedia(false)}
-                    onSelect={handleSeoImageSelect}
-                    allowMultiple={false}
-                />
-            )}
+            <MediaPickerModal
+                open={openSeoMedia}
+                onClose={() => setOpenSeoMedia(false)}
+                onSelect={handleSeoImageSelect}
+                title="Select SEO OG Image"
+            />
         </div>
     );
 }

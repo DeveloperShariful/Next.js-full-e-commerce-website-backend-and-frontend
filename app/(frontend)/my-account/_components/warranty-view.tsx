@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { ShieldCheck, Plus, Trash2, Calendar, FileText, CheckCircle, AlertTriangle, Loader2, X, Save, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { MediaPicker } from "@/components/media/media-picker";
+import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { createWarrantyClaimAction } from "@/app/actions/frontend/my-account/warranty-service";
 
 interface WarrantyClaimData {
@@ -121,6 +121,7 @@ export default function WarrantyView({ initialClaims }: Props) {
 function ClaimFormModal({ isOpen, onClose, onSuccess }: any) {
   const [isPending, startTransition] = useTransition();
   const [mediaUrl, setMediaUrl] = useState("");
+  const [openMediaPicker, setOpenMediaPicker] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     defaultValues: {
@@ -175,12 +176,27 @@ function ClaimFormModal({ isOpen, onClose, onSuccess }: any) {
 
             {/* Media Upload Area */}
             <div className="border border-[#c3c4c7] p-3 bg-[#f6f7f7]">
-                <MediaPicker 
-                  label="Upload Photo/Video Proof (URL) *"
-                  value={mediaUrl}
-                  onChange={(url) => setMediaUrl(url)}
-                  onRemove={() => setMediaUrl("")}
-                />
+              <label className="text-[13px] font-semibold text-[#1d2327] block mb-2">Upload Photo/Video Proof *</label>
+              {mediaUrl ? (
+                <div className="flex flex-col gap-2">
+                  <img src={mediaUrl} alt="Proof" className="w-24 h-24 object-cover border border-[#c3c4c7] rounded" />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setOpenMediaPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">Change</button>
+                    <span className="text-[#c3c4c7]">|</span>
+                    <button type="button" onClick={() => setMediaUrl("")} className="text-[13px] text-[#d63638] hover:underline">Remove</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setOpenMediaPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">
+                  Select proof image
+                </button>
+              )}
+              <MediaPickerModal
+                open={openMediaPicker}
+                onClose={() => setOpenMediaPicker(false)}
+                onSelect={(items) => { if (items[0]) setMediaUrl(items[0].url); }}
+                title="Select Proof Media"
+              />
             </div>
           </form>
         </div>

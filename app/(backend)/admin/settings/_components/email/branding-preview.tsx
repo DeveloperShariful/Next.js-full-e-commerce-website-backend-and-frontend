@@ -102,7 +102,7 @@ export const BrandingPreview = ({
             onChange={e => { onTemplateChange(e.target.value); setPreviewHtml(""); }}
             className="w-full border border-[#8c8f94] rounded-[3px] px-2 py-[6px] text-[13px] text-[#2c3338] focus:border-[#2271b1] focus:outline-none focus:shadow-[0_0_0_1px_#2271b1] bg-white"
           >
-            <option value="">— একটি template বেছে নিন —</option>
+            <option value="">— Select a template —</option>
             {templates.map(t => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
@@ -137,7 +137,7 @@ export const BrandingPreview = ({
               className="ml-auto flex items-center gap-1.5 px-3 py-1 text-[12px] font-semibold border rounded-[3px] cursor-pointer bg-[#2271b1] text-white border-[#2271b1] hover:bg-[#135e96] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? <Loader2 size={12} className="animate-spin" /> : previewHtml ? <RefreshCw size={12} /> : null}
-              {loading ? "Loading..." : previewHtml ? "Refresh" : "Preview করুন"}
+              {loading ? "Loading..." : previewHtml ? "Refresh" : "Preview"}
             </button>
           </div>
 
@@ -145,14 +145,14 @@ export const BrandingPreview = ({
           {!previewHtml && !loading && (
             <div className="border border-dashed border-[#c3c4c7] rounded-[3px] h-[160px] flex flex-col items-center justify-center text-[#646970] gap-2">
               <Monitor size={24} className="text-[#c3c4c7]" />
-              <span className="text-[12px] text-center px-4">Template select করে "Preview করুন" ক্লিক করুন</span>
+              <span className="text-[12px] text-center px-4">Select a template and click "Preview"</span>
             </div>
           )}
 
           {loading && (
             <div className="border border-[#c3c4c7] rounded-[3px] h-[160px] flex items-center justify-center gap-2 text-[#646970] text-[12px]">
               <Loader2 size={18} className="animate-spin text-[#2271b1]" />
-              Preview তৈরি হচ্ছে...
+              Generating preview...
             </div>
           )}
 
@@ -163,7 +163,6 @@ export const BrandingPreview = ({
                   ref={sidebarIframeRef}
                   srcDoc={previewHtml}
                   onLoad={() => autoHeight(sidebarIframeRef)}
-                  scrolling="no"
                   style={{ width: "100%", height: "400px", border: "none", display: "block", overflow: "hidden" }}
                   title="Email Preview — Desktop"
                   sandbox="allow-same-origin"
@@ -174,7 +173,6 @@ export const BrandingPreview = ({
                     ref={sidebarIframeRef}
                     srcDoc={previewHtml}
                     onLoad={() => autoHeight(sidebarIframeRef)}
-                    scrolling="no"
                     style={{
                       width: "375px",
                       height: "400px",
@@ -250,7 +248,6 @@ export const BrandingPreview = ({
                   ref={fullscreenDeskRef}
                   srcDoc={previewHtml}
                   onLoad={() => autoHeight(fullscreenDeskRef)}
-                  scrolling="no"
                   className="w-full rounded-[4px] bg-white"
                   style={{ height: "600px", border: "none", display: "block", overflow: "hidden" }}
                   title="Email Preview Fullscreen — Desktop"
@@ -277,7 +274,6 @@ export const BrandingPreview = ({
                       ref={fullscreenMobRef}
                       srcDoc={previewHtml}
                       onLoad={() => autoHeight(fullscreenMobRef)}
-                      scrolling="no"
                       style={{ width: "370px", height: "700px", border: "none", display: "block", overflow: "hidden" }}
                       title="Email Preview Fullscreen — Mobile"
                       sandbox="allow-same-origin"

@@ -3,6 +3,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { EmailConfiguration, EmailTemplate, EmailLog } from "@prisma/client";
 
 import { ConfigForm } from "./config-form";
@@ -28,7 +29,8 @@ export const EmailSettingsView = ({
   onLogPageChange, 
   refreshData 
 }: Props) => {
-  const [activeTab, setActiveTab] = useState("config");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get("subtab") ?? "config");
 
   const tabs = [
     { id: "config", label: "Configuration & SMTP" },

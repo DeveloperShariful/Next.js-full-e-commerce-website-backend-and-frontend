@@ -1,4 +1,4 @@
-// File: app/(backend)/admin/settings/_components/email/email-log-table.tsx
+﻿// File: app/(backend)/admin/settings/_components/email/email-log-table.tsx
 
 "use client";
 
@@ -26,7 +26,7 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, refreshD
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // সব সিলেক্ট/আনসিলেক্ট
+  // Select / deselect all
   const toggleAll = (checked: boolean) => {
     if (checked) {
       setSelectedIds(logs.map(log => log.id));
@@ -35,7 +35,7 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, refreshD
     }
   };
 
-  // সিঙ্গেল সিলেক্ট
+  // Single select
   const toggleOne = (id: string, checked: boolean) => {
     if (checked) {
       setSelectedIds(prev => [...prev, id]);
@@ -44,7 +44,7 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, refreshD
     }
   };
 
-  // ম্যানুয়াল ডিলেট হ্যান্ডলার
+  // Manual delete handler
   const handleDeleteSelected = async () => {
     if (!confirm(`Delete ${selectedIds.length} logs?`)) return;
     
@@ -60,18 +60,18 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, refreshD
     setIsDeleting(false);
   };
 
-  // রিফ্রেশ + অটো ক্লিনআপ হ্যান্ডলার
+  // Refresh + auto-cleanup handler
   const handleRefreshAndCleanup = async () => {
     setIsRefreshing(true);
     
-    // ১. ৩০ দিনের পুরনো লগ ক্লিন করা (ব্যাকগ্রাউন্ডে)
-    // এটি প্রতিবার রিফ্রেশে অটোমেটিক ক্লিন করবে
+    // 1. Clean logs older than 30 days (in background)
+    // Runs automatically on every refresh
     const cleanupRes = await cleanupOldLogs();
     if (cleanupRes.success && cleanupRes.count && cleanupRes.count > 0) {
         toast.success(`Auto-cleaned ${cleanupRes.count} old logs`);
     }
 
-    // ২. ডাটা রিফ্রেশ
+    // 2. Refresh data
     await refreshData();
     setTimeout(() => setIsRefreshing(false), 800);
   };

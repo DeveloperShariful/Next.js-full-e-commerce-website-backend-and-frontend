@@ -3,9 +3,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { EmailTemplate } from "@prisma/client";
 import { Edit, RefreshCw } from "lucide-react";
-import { TemplateEditModal } from "./template-edit-modal";
 import { syncEmailTemplates } from "@/app/actions/backend/settings/email/email-templates";
 import { toast } from "sonner";
 
@@ -15,14 +15,13 @@ interface Props {
 }
 
 export const TemplateList = ({ templates, refreshData }: Props) => {
-  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     const res = await syncEmailTemplates();
     if (res.success) {
-        await refreshData();
+        refreshData();
         toast.success("Templates synced successfully");
     } else {
         toast.error("Failed to sync templates");
@@ -34,13 +33,13 @@ export const TemplateList = ({ templates, refreshData }: Props) => {
 
   return (
     <div className="w-full text-[13px] text-[#3c434a]">
-        
+
         {/* WP Top Action Bar */}
         <div className="flex justify-between items-center mb-[10px]">
             <span className="text-[13px] text-[#646970]">
                 {templates.length} templates
             </span>
-            <button 
+            <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 className="bg-transparent border border-[#8c8f94] text-[#2271b1] hover:bg-[#f6f7f7] hover:text-[#135e96] rounded-[3px] px-[10px] py-[3px] text-[13px] cursor-pointer min-h-[30px] flex items-center gap-2"
@@ -89,29 +88,18 @@ export const TemplateList = ({ templates, refreshData }: Props) => {
                                 )}
                             </td>
                             <td className="px-[10px] py-[10px] text-right">
-                                <button 
-                                    onClick={() => setEditingTemplate(template)}
-                                    className="bg-transparent border border-[#c3c4c7] text-[#3c434a] hover:bg-[#f6f7f7] hover:border-[#8c8f94] rounded-[3px] px-[10px] py-[3px] text-[13px] cursor-pointer min-h-[30px] inline-flex items-center gap-1"
+                                <Link
+                                    href={`/admin/settings/email/templates/${template.id}/edit`}
+                                    className="bg-transparent border border-[#c3c4c7] text-[#3c434a] hover:bg-[#f6f7f7] hover:border-[#8c8f94] rounded-[3px] px-[10px] py-[3px] text-[13px] cursor-pointer min-h-[30px] inline-flex items-center gap-1 no-underline"
                                 >
                                     <Edit size={14}/> Edit
-                                </button>
+                                </Link>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
         </div>
-
-        {editingTemplate && (
-            <TemplateEditModal 
-                template={editingTemplate} 
-                open={!!editingTemplate} 
-                onClose={() => { 
-                    setEditingTemplate(null); 
-                    refreshData(); 
-                }} 
-            />
-        )}
     </div>
   );
 };

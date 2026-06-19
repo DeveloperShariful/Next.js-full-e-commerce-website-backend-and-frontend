@@ -385,6 +385,15 @@ export async function getEmailTemplates() {
   }
 }
 
+export async function getEmailTemplateById(id: string) {
+  try {
+    const template = await db.emailTemplate.findUnique({ where: { id } });
+    return { success: true, data: template };
+  } catch (error) {
+    return { success: false, error: "Failed to fetch template" };
+  }
+}
+
 export async function syncEmailTemplates() {
     const errors: string[] = [];
 

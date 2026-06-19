@@ -568,8 +568,8 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
           </div>
         </div>
 
-        {/* Unified Search Bar — mobile & desktop */}
-        <div className="flex w-full max-w-[1400px] mx-auto px-4 lg:px-6 pb-3 pt-1 relative" ref={searchRef}>
+        {/* Search Bar — desktop only; mobile search is inside the sidebar drawer */}
+        <div className="hidden lg:flex w-full max-w-[1400px] mx-auto px-6 pb-3 pt-1 relative" ref={searchRef}>
           <div className="w-full lg:max-w-[680px] lg:mx-auto relative">
             <div className="w-full flex items-center gap-2.5 bg-[#f4f4f5] border border-transparent rounded-full px-4 py-2.5 focus-within:bg-white focus-within:border-[#d1d5db] focus-within:shadow-[0_2px_16px_rgba(0,0,0,0.08)] transition-all duration-200">
               <IoSearch size={17} className="text-gray-400 shrink-0" aria-hidden="true" />

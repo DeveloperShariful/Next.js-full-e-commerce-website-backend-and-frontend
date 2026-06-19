@@ -118,11 +118,19 @@ export default function PortalForm() {
                 <h2 className={headingClass}>Register</h2>
                 
                 {regMessage.text && (
-                    <div className={cn("p-3 mb-4 border text-[13px] flex items-center gap-2", 
+                    <div className={cn("p-3 mb-4 border text-[13px] flex items-start gap-2",
                         regMessage.type === 'success' ? 'bg-[#f0f6fc] text-[#00a32a] border-[#00a32a]/30' : 'bg-[#fcf0f1] text-[#d63638] border-[#d63638]/30'
                     )}>
-                        {regMessage.type === 'success' ? <CheckCircle className="w-4 h-4"/> : <ShieldAlert className="w-4 h-4"/>}
-                        {regMessage.text}
+                        {regMessage.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0 mt-0.5"/> : <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5"/>}
+                        <span>
+                          {regMessage.text}
+                          {(regMessage as any).isExistingCustomer && (
+                            <> Use your <strong>existing account password</strong> in the Password field above.</>
+                          )}
+                          {(regMessage as any).alreadyAffiliate && (
+                            <> Use the <strong>Login form</strong> on the right to access your affiliate dashboard.</>
+                          )}
+                        </span>
                     </div>
                 )}
 
@@ -149,13 +157,14 @@ export default function PortalForm() {
                     </div>
                     <div>
                         <label className={labelClass}>Password <span className="text-[#d63638]">*</span></label>
-                        <input 
-                            type="password" required 
+                        <input
+                            type="password" required
                             className={inputClass}
-                            placeholder="Create a password"
+                            placeholder="New password (or existing account password)"
                             value={regPassword}
                             onChange={(e) => setRegPassword(e.target.value)}
                         />
+                        <p className="text-[11px] text-[#646970] mt-1">Already a customer? Enter your existing password to apply as an affiliate.</p>
                     </div>
 
                     {/* WC Style Terms Agreement */}

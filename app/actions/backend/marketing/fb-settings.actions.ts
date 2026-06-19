@@ -59,6 +59,25 @@ export async function getFbSettings() {
 }
 
 // ============================================================================
+// 1B. GET FACEBOOK PRODUCT SYNC STATS
+// ============================================================================
+export async function getFbProductStats() {
+  try {
+    const [syncShow, syncOnly, excluded, total] = await Promise.all([
+      db.product.count({ where: { status: "ACTIVE", deletedAt: null, facebookSyncMode: "SYNC_AND_SHOW" } }),
+      db.product.count({ where: { status: "ACTIVE", deletedAt: null, facebookSyncMode: "SYNC_ONLY" } }),
+      db.product.count({ where: { status: "ACTIVE", deletedAt: null, facebookSyncMode: "EXCLUDED" } }),
+      db.product.count({ where: { status: "ACTIVE", deletedAt: null } }),
+    ]);
+    // products with NULL facebookSyncMode are treated as SYNC_AND_SHOW by default
+    const nullCount = total - syncShow - syncOnly - excluded;
+    return { success: true, data: { syncShow: syncShow + nullCount, syncOnly, excluded, total } };
+  } catch {
+    return { success: false, data: { syncShow: 0, syncOnly: 0, excluded: 0, total: 0 } };
+  }
+}
+
+// ============================================================================
 // 2. UPDATE FACEBOOK SETTINGS
 // ============================================================================
 export async function updateFbSettings(data: FbSettingsData) {

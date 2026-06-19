@@ -5,13 +5,14 @@
 import { useState, useEffect, useTransition } from "react";
 import { toast, Toaster } from "react-hot-toast";
 import { Copy, Check, Info, Settings, HelpCircle, Save } from "lucide-react";
-import { getFbSettings, updateFbSettings, FbSettingsData } from "@/app/actions/backend/marketing/fb-settings.actions";
+import { getFbSettings, updateFbSettings, getFbProductStats, FbSettingsData } from "@/app/actions/backend/marketing/fb-settings.actions";
 
 export default function FacebookSettingsPage() {
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopy] = useState(false);
   const [origin, setOrigin] = useState("");
+  const [productStats, setProductStats] = useState({ syncShow: 0, syncOnly: 0, excluded: 0, total: 0 });
 
   const [formData, setFormData] = useState<FbSettingsData>({
     fbEnabled: false,
@@ -23,10 +24,9 @@ export default function FacebookSettingsPage() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    getFbSettings().then((res) => {
-      if (res.success && res.data) {
-        setFormData(res.data);
-      }
+    Promise.all([getFbSettings(), getFbProductStats()]).then(([settings, stats]) => {
+      if (settings.success && settings.data) setFormData(settings.data);
+      if (stats.success && stats.data) setProductStats(stats.data);
       setIsLoading(false);
     });
   }, []);
@@ -81,6 +81,21 @@ export default function FacebookSettingsPage() {
           <div className="text-[13px] leading-relaxed text-[#1d2327]">
             <strong>Meta Marketing Setup:</strong> Sync your store catalog to Facebook Commerce and install Pixel &amp; Conversions API (CAPI) for advanced tracking.
           </div>
+        </div>
+
+        {/* Product Sync Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "In Catalog", value: productStats.syncShow, color: "#00a32a" },
+            { label: "Sync Only", value: productStats.syncOnly, color: "#dba617" },
+            { label: "Excluded", value: productStats.excluded, color: "#d63638" },
+            { label: "Total Active", value: productStats.total, color: "#2271b1" },
+          ].map(stat => (
+            <div key={stat.label} className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm p-4 text-center">
+              <p className="text-[28px] font-bold m-0" style={{ color: stat.color }}>{stat.value}</p>
+              <p className="text-[12px] text-[#646970] m-0 mt-1">{stat.label}</p>
+            </div>
+          ))}
         </div>
 
         <form onSubmit={handleFormSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

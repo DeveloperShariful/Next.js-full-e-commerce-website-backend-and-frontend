@@ -30,8 +30,9 @@ import LinkedProducts from "./LinkedProducts";
 import BundleItems from "./BundleItems";
 import Description from "./description";
 import ShortDescription from "./short_description";
-import GoogleShopping from "./GoogleShopping"; 
-import { ChannelVisibility } from "./ChannelVisibility"; // 🚀 চ্যানেল ভিজিবিলিটি ইম্পোর্ট
+import GoogleShopping from "./GoogleShopping";
+import Facebook from "./Facebook";
+import { ChannelVisibility } from "./ChannelVisibility";
 
 interface ProductFormProps {
   initialData: ProductFormValues;
@@ -251,7 +252,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                     {id: 'attributes', label: 'Attributes', show: true},
                                     {id: 'variations', label: 'Variations', show: productType === 'VARIABLE'},
                                     {id: 'bundle', label: 'Bundle Items', show: productType === 'BUNDLE'}, 
-                                    {id: 'google-shopping', label: 'Merchant Center', show: true}, 
+                                    {id: 'google-shopping', label: 'Merchant Center', show: true},
+                                    {id: 'facebook', label: 'Facebook', show: true},
                                     {id: 'advanced', label: 'Advanced', show: true},
                                 ].map(tab => tab.show && (
                                     <li key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -272,7 +274,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                 {activeTab === 'attributes' && <Attributes />}
                                 {activeTab === 'variations' && <Variations />}
                                 {activeTab === 'bundle' && <BundleItems />}
-                                {activeTab === 'google-shopping' && <GoogleShopping />} 
+                                {activeTab === 'google-shopping' && <GoogleShopping />}
+                                {activeTab === 'facebook' && <Facebook />}
                                 {activeTab === 'advanced' && <Advanced />}
                                 {activeTab === 'linked' && <LinkedProducts />}
                             </div>

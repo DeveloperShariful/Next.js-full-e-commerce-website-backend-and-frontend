@@ -46,6 +46,16 @@ export default async function CreateProductPage(props: PageProps) {
     soldIndividually: false,
     isPreOrder: false,
     
+    // Facebook default values
+    facebookSyncMode: "SYNC_AND_SHOW",
+    facebookDescription: "",
+    facebookImageType: "PRODUCT_IMAGE",
+    facebookPrice: null,
+    size: "",
+    color: "",
+    material: "",
+    pattern: "",
+
     // গুগল কোর কলাম ডিফল্ট ভ্যালু
     condition: "NEW",
     googleProductCategory: "",
@@ -169,6 +179,16 @@ export default async function CreateProductPage(props: PageProps) {
             altText: img.altText || "",
             id: img.id
         })),
+
+      // Facebook fields mapping
+      facebookSyncMode: product.facebookSyncMode || "SYNC_AND_SHOW",
+      facebookDescription: product.facebookDescription || "",
+      facebookImageType: product.facebookImageType || "PRODUCT_IMAGE",
+      facebookPrice: product.facebookPrice ? Number(product.facebookPrice) : null,
+      size: product.size || "",
+      color: product.color || "",
+      material: product.material || "",
+      pattern: product.pattern || "",
 
       // 🚀 গুগল কোর কলাম এবং মেটাফিল্ড ডাটা ফর্মে ম্যাপিং
       condition: product.condition || "NEW",

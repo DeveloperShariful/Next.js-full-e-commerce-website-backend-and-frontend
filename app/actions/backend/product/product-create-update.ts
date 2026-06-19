@@ -415,6 +415,16 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
                 brand: brandConnect,
 
+                // Facebook / Meta Catalog fields
+                facebookSyncMode: data.facebookSyncMode || null,
+                facebookDescription: data.facebookDescription || null,
+                facebookImageType: data.facebookImageType || "PRODUCT_IMAGE",
+                facebookPrice: data.facebookPrice ?? null,
+                size: data.size || null,
+                color: data.color || null,
+                material: data.material || null,
+                pattern: data.pattern || null,
+
                 // 🚀 গুগল কোর কলামগুলো ডাটাবেজে সেভ করা হচ্ছে
                 condition: data.condition,
                 googleProductCategory: data.googleProductCategory,

@@ -22,42 +22,80 @@ export async function registerAffiliateAction(data: { username: string; email: s
     });
 
     if (existingUser) {
-      return { success: false, message: "A user with this email already exists." };
+      const staffRoles = ["ADMIN", "SUPER_ADMIN", "MANAGER", "EDITOR", "SUPPORT"];
+      if (staffRoles.includes(existingUser.role)) {
+        return { success: false, message: "This email belongs to a staff account and cannot be used for affiliate registration." };
+      }
+
+      // Check if already has affiliate account
+      const existingAffiliate = await db.affiliateAccount.findUnique({
+        where: { userId: existingUser.id },
+      });
+      if (existingAffiliate) {
+        return { success: false, message: "You already have an affiliate account. Please use the Login form.", alreadyAffiliate: true };
+      }
+
+      // Existing customer — verify their password
+      const passwordMatch = existingUser.password
+        ? await bcrypt.compare(password, existingUser.password)
+        : false;
+
+      if (!passwordMatch) {
+        return {
+          success: false,
+          message: "This email is already registered as a customer account. Enter your existing account password to apply as an affiliate.",
+          isExistingCustomer: true,
+        };
+      }
+
+      // Password correct — create AffiliateAccount only (role stays CUSTOMER)
+      const baseSlug = (existingUser.name || username).toLowerCase().replace(/[^a-z0-9]/g, "");
+      const uniqueSlug = `${baseSlug}-${nanoid(4)}`;
+
+      await db.affiliateAccount.create({
+        data: {
+          userId: existingUser.id,
+          slug: uniqueSlug,
+          status: "PENDING",
+        },
+      });
+
+      return {
+        success: true,
+        message: "Affiliate application submitted! Your customer account now has affiliate access. Pending admin approval.",
+        wasCustomer: true,
+      };
     }
 
-    // 2. Hash password securely
+    // 2. Brand new user — hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3. Create User & Affiliate Account in a single transaction (Atomic)
-    const result = await db.$transaction(async (tx) => {
+    // 3. Create User & Affiliate Account atomically (new users keep role as CUSTOMER)
+    const baseSlug = username.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const uniqueSlug = `${baseSlug}-${nanoid(4)}`;
+
+    await db.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           name: username.trim(),
           email: emailNormalized,
-          role: "AFFILIATE", // Force role as Affiliate
+          role: "CUSTOMER",
           password: hashedPassword,
           isActive: true,
-        }
+        },
       });
-
-      // Generate unique affiliate slug
-      const baseSlug = username.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const uniqueSlug = `${baseSlug}-${nanoid(4)}`;
-
-      const affiliate = await tx.affiliateAccount.create({
+      await tx.affiliateAccount.create({
         data: {
           userId: user.id,
           slug: uniqueSlug,
-          status: "PENDING", // Wait for Admin approval
-        }
+          status: "PENDING",
+        },
       });
-
-      return { userId: user.id, affiliateId: affiliate.id };
     });
 
-    return { 
-      success: true, 
-      message: "Registration successful! Your application is pending admin review." 
+    return {
+      success: true,
+      message: "Registration successful! Your application is pending admin review.",
     };
 
   } catch (error: any) {

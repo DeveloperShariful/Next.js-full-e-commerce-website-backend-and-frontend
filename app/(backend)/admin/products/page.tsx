@@ -17,6 +17,7 @@ interface ProductsPageProps {
     category?: string;
     status?: string;
     type?: string;
+    brand?: string;
     limit?: string;
   }>;
 }
@@ -28,7 +29,8 @@ export default async function ProductListPage(props: ProductsPageProps) {
   const categoryFilter = searchParams.category || "";
   const statusFilter = searchParams.status || "";
   const typeFilter = searchParams.type || "";
-  
+  const brandFilter = searchParams.brand || "";
+
   const page = Number(searchParams.page) || 1;
   const limit = Number(searchParams.limit) || 20;
   const skip = (page - 1) * limit;
@@ -37,7 +39,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
     AND: [
       query ? {
         OR: [
-          { name: { search: query.split(" ").join(" & ") } }, 
+          { name: { search: query.split(" ").join(" & ") } },
           { name: { contains: query, mode: 'insensitive' } },
           { sku: { contains: query, mode: 'insensitive' } },
         ]
@@ -49,9 +51,10 @@ export default async function ProductListPage(props: ProductsPageProps) {
       { status: { not: ProductStatus.ARCHIVED } },
 
       typeFilter ? { productType: typeFilter.toUpperCase() as ProductType } : {},
-      
-      // ✅ FIX: Updated from 'category' to 'categories: { some: ... }'
+
       categoryFilter ? { categories: { some: { name: categoryFilter } } } : {},
+
+      brandFilter ? { brand: { name: brandFilter } } : {},
     ]
   };
 

@@ -118,6 +118,12 @@ export async function syncProductToGoogle(productId: string) {
       }
     }
 
+    // Direct product fields override metafields if set
+    if (product.size)     google_size     = product.size;
+    if (product.color)    google_color    = product.color;
+    if (product.material) google_material = product.material;
+    if (product.pattern)  google_pattern  = product.pattern;
+
     const googleProductParams: any = {
       offerId: product.id,
       title: finalTitle,

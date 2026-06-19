@@ -118,6 +118,18 @@ export const parseProductFormData = (formData: FormData) => {
         preOrderMessage: formData.get("preOrderMessage") as string || null,
 
         // ==========================================
+        // FACEBOOK / META CATALOG FIELDS
+        // ==========================================
+        facebookSyncMode: formData.get("facebookSyncMode") as string || null,
+        facebookDescription: formData.get("facebookDescription") as string || null,
+        facebookImageType: formData.get("facebookImageType") as string || "PRODUCT_IMAGE",
+        facebookPrice: formData.get("facebookPrice") ? cleanPrice(formData.get("facebookPrice") as string) : null,
+        size: formData.get("size") as string || null,
+        color: formData.get("color") as string || null,
+        material: formData.get("material") as string || null,
+        pattern: formData.get("pattern") as string || null,
+
+        // ==========================================
         // 🚀 NEW: GOOGLE MERCHANT CENTER FIELDS
         // ==========================================
         condition: conditionInput as ProductCondition,

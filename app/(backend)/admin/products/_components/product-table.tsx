@@ -52,15 +52,17 @@ export default function ProductTable({
     if (query) params.set("query", query);
     else params.delete("query");
     params.set("page", "1");
-    router.push(`/admin/products?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/admin/products?${params.toString()}`);
+    });
   };
 
   const handleApplyFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
-    
+
     if (categoryFilter) params.set("category", categoryFilter);
     else params.delete("category");
-    
+
     if (typeFilter) params.set("type", typeFilter);
     else params.delete("type");
 
@@ -68,7 +70,9 @@ export default function ProductTable({
     else params.delete("brand");
 
     params.set("page", "1");
-    router.push(`/admin/products?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/admin/products?${params.toString()}`);
+    });
   };
 
   const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,7 +197,8 @@ export default function ProductTable({
             className="w-full md:w-[200px] px-2 py-[3px] border border-[#8c8f94] text-[13px] text-[#3c434a] focus:border-[#2271b1] outline-none rounded-l-[3px]"
             placeholder="Search products..."
           />
-          <button type="submit" className="px-3 py-[3px] border border-l-0 border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] text-[13px] hover:bg-[#f0f0f1] transition-colors rounded-r-[3px] whitespace-nowrap">
+          <button type="submit" disabled={isPending} className="px-3 py-[3px] border border-l-0 border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] text-[13px] hover:bg-[#f0f0f1] transition-colors rounded-r-[3px] whitespace-nowrap disabled:opacity-60 flex items-center gap-1">
+            {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
             Search products
           </button>
         </form>
@@ -254,11 +259,13 @@ export default function ProductTable({
               {brands?.map((b, index) => (<option key={b.id || `brand-${index}`} value={b.name}>{b.name}</option>))}
            </select>
 
-           <button 
-             onClick={handleApplyFilters} 
-             className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors whitespace-nowrap"
+           <button
+             onClick={handleApplyFilters}
+             disabled={isPending}
+             className="px-2.5 py-[3px] border border-[#2271b1] bg-[#f6f7f7] text-[#2271b1] rounded-[3px] text-[13px] hover:bg-[#f0f6fc] transition-colors whitespace-nowrap disabled:opacity-60 flex items-center gap-1"
            >
-             Filter
+             {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+             {isPending ? 'Filtering...' : 'Filter'}
            </button>
         </div>
 
@@ -272,7 +279,15 @@ export default function ProductTable({
       </div>
 
       {/* 🚀 WP List Table */}
-      <div className={`bg-white border border-[#c3c4c7] shadow-sm transition-opacity duration-200 mt-2 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+      <div className={`relative bg-white border border-[#c3c4c7] shadow-sm transition-opacity duration-200 mt-2 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
+        {isPending && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70">
+            <div className="flex items-center gap-2 bg-white border border-[#c3c4c7] shadow-md px-4 py-2 rounded-sm text-[13px] text-[#2271b1] font-medium">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Filtering...
+            </div>
+          </div>
+        )}
         <div className="overflow-x-auto ">
           <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[1200px]">
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
@@ -281,16 +296,16 @@ export default function ProductTable({
                     <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
                 </th>
                 <th className="p-2 w-14 border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
-                <th className="p-2 font-medium min-w-[200px]">Name</th>
-                <th className="p-2 font-medium w-32">SKU</th>
-                <th className="p-2 font-medium w-24">Stock</th>
-                <th className="p-2 font-medium w-32">Price</th>
-                <th className="p-2 font-medium w-24">Cost</th>
-                <th className="p-2 font-medium w-40">Categories</th>
-                <th className="p-2 font-medium w-32">Tags</th>
+                <th className="p-2 font-medium min-w-[170px] w-[170px]">Name</th>
+                <th className="p-2 font-medium w-28">SKU</th>
+                <th className="p-2 font-medium w-20">Stock</th>
+                <th className="p-2 font-medium w-28">Price</th>
+                <th className="p-2 font-medium w-14">Cost</th>
+                <th className="p-2 font-medium w-32">Categories</th>
+                <th className="p-2 font-medium w-56">Tags</th>
                 <th className="p-2 font-medium w-12 text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
-                <th className="p-2 font-medium w-40">Date</th>
-                <th className="p-2 font-medium w-32">Brands</th>
+                <th className="p-2 font-medium w-28">Date</th>
+                <th className="p-2 font-medium w-20">Brands</th>
               </tr>
             </thead>
             
@@ -427,14 +442,14 @@ export default function ProductTable({
                   <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
                 </th>
                 <th className="p-2 text-center border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
-                <th className="p-2 font-medium">Name</th>
-                <th className="p-2 font-medium">SKU</th>
-                <th className="p-2 font-medium">Stock</th>
-                <th className="p-2 font-medium">Price</th>
-                <th className="p-2 font-medium">Cost</th>
-                <th className="p-2 font-medium">Categories</th>
-                <th className="p-2 font-medium">Tags</th>
-                <th className="p-2 font-medium text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
+                <th className="p-2 font-medium min-w-[140px] w-[140px]">Name</th>
+                <th className="p-2 font-medium w-28">SKU</th>
+                <th className="p-2 font-medium w-20">Stock</th>
+                <th className="p-2 font-medium w-28">Price</th>
+                <th className="p-2 font-medium w-16">Cost</th>
+                <th className="p-2 font-medium w-32">Categories</th>
+                <th className="p-2 font-medium w-56">Tags</th>
+                <th className="p-2 font-medium w-12 text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
                 <th className="p-2 font-medium">Date</th>
                 <th className="p-2 font-medium">Brands</th>
               </tr>

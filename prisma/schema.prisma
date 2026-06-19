@@ -727,6 +727,17 @@ model Product {
   seoSchema                Json?
   gender                   String?
   ageGroup                 String?
+
+  // Facebook / Google Shopping feed fields
+  facebookSyncMode         String?                // SYNC_AND_SHOW | SYNC_ONLY | EXCLUDED
+  facebookDescription      String?                @db.Text
+  facebookImageType        String?                @default("PRODUCT_IMAGE") // PRODUCT_IMAGE | CUSTOM
+  facebookPrice            Decimal?               @db.Decimal(12, 2)
+  size                     String?
+  color                    String?
+  material                 String?
+  pattern                  String?
+
   viewCount                Int                    @default(0)
   soldCount                Int                    @default(0)
   rating                   Decimal                @default(0) @db.Decimal(3, 2)

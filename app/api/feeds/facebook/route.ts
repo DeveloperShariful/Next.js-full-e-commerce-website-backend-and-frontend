@@ -50,13 +50,62 @@ export async function GET(request: Request) {
       where: {
         status: "ACTIVE",
         deletedAt: null,
+        OR: [
+          { facebookSyncMode: null },
+          { facebookSyncMode: "SYNC_AND_SHOW" },
+          { facebookSyncMode: "SYNC_ONLY" },
+        ],
       },
-      include: {
-        brand: true,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        shortDescription: true,
+        productType: true,
+        condition: true,
+        price: true,
+        salePrice: true,
+        saleStart: true,
+        saleEnd: true,
+        stock: true,
+        trackQuantity: true,
+        featuredImage: true,
+        mpn: true,
+        barcode: true,
+        gender: true,
+        ageGroup: true,
+        googleProductCategory: true,
+        googleTitle: true,
+        googleDescription: true,
+        googleIsBundle: true,
+        customLabels: true,
+        metafields: true,
+        // New Facebook-specific fields
+        facebookSyncMode: true,
+        facebookDescription: true,
+        facebookImageType: true,
+        facebookPrice: true,
+        size: true,
+        color: true,
+        material: true,
+        pattern: true,
+        brand: { select: { name: true } },
         categories: { select: { id: true, name: true, googleCategoryName: true } },
         variants: {
           where: { deletedAt: null },
-          include: { images: true }
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            salePrice: true,
+            stock: true,
+            trackQuantity: true,
+            sku: true,
+            barcode: true,
+            attributes: true,
+            images: { select: { url: true } },
+          }
         }
       },
       orderBy: { createdAt: "desc" },
@@ -77,40 +126,43 @@ export async function GET(request: Request) {
       // 🚀 FIX: ভেরিয়েবলটি একদম লুপের শুরুতে ডিক্লেয়ার করা হয়েছে যাতে সবার জন্য অ্যাভেইলেবল থাকে
       const availabilityStatus = (product.trackQuantity === false || product.stock > 0) ? "in stock" : "out of stock";
       
-      const finalTitle = product.googleTitle && product.googleTitle.trim() !== "" 
-        ? product.googleTitle 
+      const finalTitle = product.googleTitle && product.googleTitle.trim() !== ""
+        ? product.googleTitle
         : product.name;
 
-      const finalDescription = product.googleDescription && product.googleDescription.trim() !== ""
-        ? product.googleDescription
-        : (product.description || product.shortDescription || product.name);
+      // Facebook description > Google description > product description
+      const finalDescription =
+        (product.facebookDescription && product.facebookDescription.trim() !== "") ? product.facebookDescription :
+        (product.googleDescription && product.googleDescription.trim() !== "") ? product.googleDescription :
+        (product.description || product.shortDescription || product.name);
+
+      // Facebook price override
+      const finalPrice = product.facebookPrice ? Number(product.facebookPrice) : Number(product.price);
 
       const categoryName = product.categories.find(c => c.googleCategoryName)?.googleCategoryName || product.googleProductCategory;
       const brandName = product.brand?.name || "GoBike";
 
-      // মেটাফিল্ডস অবজেক্ট ডিকনস্ট্রাকশন
-      let google_size = "";
+      // New direct fields (primary) with metafields fallback
       let google_size_system = "";
       let google_size_type = "";
-      let google_color = "";
-      let google_material = "";
-      let google_pattern = "";
       let google_multipack = "";
       let google_adult_content = false;
       let google_availability_date = "";
 
       if (product.metafields && typeof product.metafields === "object" && !Array.isArray(product.metafields)) {
         const meta = product.metafields as Record<string, any>;
-        google_size = meta.google_size || "";
         google_size_system = meta.google_size_system || "";
         google_size_type = meta.google_size_type || "";
-        google_color = meta.google_color || "";
-        google_material = meta.google_material || "";
-        google_pattern = meta.google_pattern || "";
         google_adult_content = meta.google_adult_content === true;
         google_availability_date = meta.google_availability_date || "";
         google_multipack = meta.google_multipack || "";
       }
+
+      // Facebook-specific fields take priority over Google metafields
+      const feedSize     = product.size     || "";
+      const feedColor    = product.color    || "";
+      const feedMaterial = product.material || "";
+      const feedPattern  = product.pattern  || "";
 
       // ======================================================================
       // 🚀 কন্ডিশন এ: প্রোডাক্টটি যদি ভেরিয়েবল (VARIABLE) হয় (পাবলিক ক্যাটালগ রুলস)
@@ -126,8 +178,8 @@ export async function GET(request: Request) {
             : product.featuredImage;
 
           const varAttrs = variant.attributes as Record<string, string> || {};
-          const varColor = varAttrs.Color || varAttrs.color || varAttrs.Colour || varAttrs.colour || google_color;
-          const varSize = varAttrs.Size || varAttrs.size || google_size;
+          const varColor = varAttrs.Color || varAttrs.color || varAttrs.Colour || varAttrs.colour || feedColor;
+          const varSize  = varAttrs.Size  || varAttrs.size  || feedSize;
 
           xml += `
     <item>
@@ -167,9 +219,9 @@ export async function GET(request: Request) {
           }
 
           if (google_size_system) xml += `      <g:size_system>${escapeXml(google_size_system.toUpperCase())}</g:size_system>\n`;
-          if (google_size_type) xml += `      <g:size_type>${escapeXml(google_size_type.toLowerCase())}</g:size_type>\n`;
-          if (google_material) xml += `      <g:material>${escapeXml(google_material)}</g:material>\n`;
-          if (google_pattern) xml += `      <g:pattern>${escapeXml(google_pattern)}</g:pattern>\n`;
+          if (google_size_type)   xml += `      <g:size_type>${escapeXml(google_size_type.toLowerCase())}</g:size_type>\n`;
+          if (feedMaterial) xml += `      <g:material>${escapeXml(feedMaterial)}</g:material>\n`;
+          if (feedPattern)  xml += `      <g:pattern>${escapeXml(feedPattern)}</g:pattern>\n`;
           if (google_adult_content) xml += `      <g:adult>yes</g:adult>\n`;
           if (product.gender) xml += `      <g:gender>${escapeXml(product.gender.toLowerCase())}</g:gender>\n`;
           if (product.ageGroup) xml += `      <g:age_group>${escapeXml(product.ageGroup.toLowerCase())}</g:age_group>\n`;
@@ -205,10 +257,10 @@ export async function GET(request: Request) {
       <g:condition>${escapeXml(product.condition.toLowerCase())}</g:condition>
       <g:availability>${escapeXml(escapeXml(availabilityStatus))}</g:availability>
       <g:quantity>${product.stock}</g:quantity>
-      <g:price>${Number(product.price).toFixed(2)} AUD</g:price>
+      <g:price>${finalPrice.toFixed(2)} AUD</g:price>
         `;
 
-        if (product.salePrice) {
+        if (product.salePrice && !product.facebookPrice) {
           xml += `      <g:sale_price>${Number(product.salePrice).toFixed(2)} AUD</g:sale_price>\n`;
         }
 
@@ -226,12 +278,12 @@ export async function GET(request: Request) {
           xml += `      <g:age_group>${escapeXml(product.ageGroup.toLowerCase())}</g:age_group>\n`;
         }
 
-        if (google_size) xml += `      <g:size>${escapeXml(google_size)}</g:size>\n`;
+        if (feedSize)     xml += `      <g:size>${escapeXml(feedSize)}</g:size>\n`;
         if (google_size_system) xml += `      <g:size_system>${escapeXml(google_size_system.toUpperCase())}</g:size_system>\n`;
-        if (google_size_type) xml += `      <g:size_type>${escapeXml(google_size_type.toLowerCase())}</g:size_type>\n`;
-        if (google_color) xml += `      <g:color>${escapeXml(google_color)}</g:color>\n`;
-        if (google_material) xml += `      <g:material>${escapeXml(google_material)}</g:material>\n`;
-        if (google_pattern) xml += `      <g:pattern>${escapeXml(google_pattern)}</g:pattern>\n`;
+        if (google_size_type)   xml += `      <g:size_type>${escapeXml(google_size_type.toLowerCase())}</g:size_type>\n`;
+        if (feedColor)    xml += `      <g:color>${escapeXml(feedColor)}</g:color>\n`;
+        if (feedMaterial) xml += `      <g:material>${escapeXml(feedMaterial)}</g:material>\n`;
+        if (feedPattern)  xml += `      <g:pattern>${escapeXml(feedPattern)}</g:pattern>\n`;
         if (google_multipack) xml += `      <g:multipack>${escapeXml(google_multipack)}</g:multipack>\n`;
         if (google_adult_content) xml += `      <g:adult>yes</g:adult>\n`;
         if (google_availability_date) {

@@ -107,6 +107,30 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
     }
   };
 
+  // Per-row pending changes save handler
+  const handleSavePendingChanges = () => {
+    if (Object.keys(pendingChanges).length === 0) return;
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const payload = Object.entries(pendingChanges).map(([productId, status]) => ({
+      productId,
+      status,
+    }));
+
+    startTransition(async () => {
+      const res = await bulkUpdateProductVisibility(payload);
+      if (res.success) {
+        setSuccessMsg(res.message || "Changes saved and synced successfully!");
+        setPendingChanges({});
+        router.refresh();
+      } else {
+        setErrorMsg(res.error || "Failed to save changes.");
+      }
+    });
+  };
+
   // Bulk Apply Handler
   const handleSaveAndSync = () => {
     if (!bulkAction || selectedProductIds.length === 0) return;
@@ -310,7 +334,7 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
           
           {hasPendingChanges && (
             <button
-              onClick={handleSaveAndSync}
+              onClick={handleSavePendingChanges}
               disabled={isPending}
               className="bg-[#2271b1] hover:bg-[#135e96] text-white border-none rounded-[3px] px-4 py-1.5 text-[12px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
             >
@@ -421,7 +445,7 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
             {hasPendingChanges && (
               <div className="flex items-center gap-3">
                 <button
-                  onClick={handleSaveAndSync}
+                  onClick={handleSavePendingChanges}
                   disabled={isPending}
                   className="bg-[#2271b1] hover:bg-[#135e96] text-white border-none rounded-[3px] px-5 py-2 text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
                 >

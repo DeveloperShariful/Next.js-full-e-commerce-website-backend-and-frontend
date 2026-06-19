@@ -113,6 +113,18 @@ export const productSchema = z.object({
   ageGroup: emptyToString,
 
   // ==========================================
+  // FACEBOOK / SHOPPING FEED FIELDS
+  // ==========================================
+  facebookSyncMode: emptyToString,
+  facebookDescription: emptyToString,
+  facebookImageType: emptyToString,
+  facebookPrice: emptyToNumber,
+  size: emptyToString,
+  color: emptyToString,
+  material: emptyToString,
+  pattern: emptyToString,
+
+  // ==========================================
   // 🚀 NEW: GOOGLE MERCHANT CENTER FIELDS
   // ==========================================
   condition: z.enum(["NEW", "REFURBISHED", "USED"]).default("NEW"),

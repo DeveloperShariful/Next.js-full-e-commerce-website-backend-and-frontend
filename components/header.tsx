@@ -37,9 +37,16 @@ async function getUserRole(userId?: string) {
 }
 
 export default async function Header() {
-  const session = await auth(); 
+  const session = await auth();
   const isAffiliate = await getAffiliateStatus(session?.user?.id);
-  const userRole = await getUserRole(session?.user?.id); // 👈 Fetches role safely
+  const userRole = await getUserRole(session?.user?.id);
 
-  return <HeaderClient isAffiliate={isAffiliate} userRole={userRole} />;
+  const initialUser = session?.user ? {
+    id: session.user.id || '',
+    name: session.user.name || null,
+    email: session.user.email || '',
+    image: session.user.image || null,
+  } : null;
+
+  return <HeaderClient isAffiliate={isAffiliate} userRole={userRole} initialUser={initialUser} />;
 }

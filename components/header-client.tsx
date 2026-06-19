@@ -717,19 +717,24 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                     <div key={item.path} className="w-full">
                         <div className="flex items-center justify-between border-b border-[#ececec]">
                             {item.subItems ? (
-                              <button
-                                className={`text-[1rem] font-medium no-underline flex items-center gap-3 bg-transparent w-full text-left cursor-pointer py-2.5 hover:text-black hover:font-bold border-none ${pathname === item.path || pathname.startsWith(item.path + '/') ? 'text-black font-bold' : 'text-[#333]'}`}
-                                onClick={() => {
-                                  if (!openMobileMenusRef.current[item.path]) {
-                                    toggleMobileMenu(item.path);
-                                  } else {
-                                    router.push(item.path);
-                                    closeAllOverlays();
-                                  }
-                                }}
-                              >
-                                {item.label === 'Contact' ? 'Contact us' : item.label}
-                              </button>
+                              openMobileMenus[item.path] ? (
+                                // Submenu open → Link so progress bar fires on click
+                                <Link
+                                  href={item.path}
+                                  className={`text-[1rem] font-medium no-underline flex items-center gap-3 bg-transparent w-full text-left cursor-pointer py-2.5 hover:text-black hover:font-bold ${pathname === item.path || pathname.startsWith(item.path + '/') ? 'text-black font-bold' : 'text-[#333]'}`}
+                                  onClick={closeAllOverlays}
+                                >
+                                  {item.label === 'Contact' ? 'Contact us' : item.label}
+                                </Link>
+                              ) : (
+                                // Submenu closed → button so no progress bar on expand
+                                <button
+                                  className={`text-[1rem] font-medium flex items-center gap-3 bg-transparent w-full text-left cursor-pointer py-2.5 hover:text-black hover:font-bold border-none ${pathname === item.path || pathname.startsWith(item.path + '/') ? 'text-black font-bold' : 'text-[#333]'}`}
+                                  onClick={() => toggleMobileMenu(item.path)}
+                                >
+                                  {item.label === 'Contact' ? 'Contact us' : item.label}
+                                </button>
+                              )
                             ) : (
                             <Link
                                 href={item.path}

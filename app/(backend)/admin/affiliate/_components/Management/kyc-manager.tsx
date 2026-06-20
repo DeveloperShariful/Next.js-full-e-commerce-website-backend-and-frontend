@@ -230,7 +230,7 @@ export default function KycManager({ initialDocuments }: Props) {
         <ReviewModal
           doc={viewingDoc}
           onClose={() => setViewingDoc(null)}
-          onUpdate={(status: string) => {
+          onUpdate={(status: AffiliateKycDocument["status"]) => {
             setDocuments((docs) =>
               docs.map((d) => (d.id === viewingDoc.id ? { ...d, status } : d))
             );
@@ -251,7 +251,7 @@ function ReviewModal({
 }: {
   doc: DocumentWithUser;
   onClose: () => void;
-  onUpdate: (status: string) => void;
+  onUpdate: (status: AffiliateKycDocument["status"]) => void;
 }) {
   const [isPending, startTransition] = useTransition();
 

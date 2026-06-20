@@ -536,7 +536,7 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                           </div>
                           Account Settings
                         </Link>
-                        <Link href="/my-account/orders" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
+                        <Link href="/my-account?tab=orders" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
                           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
                             <IoReceiptOutline size={16} className="text-gray-600" />
                           </div>
@@ -560,6 +560,14 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                           </div>
                           Wallet & Credits
                         </Link>
+                        {!isAffiliate && !isAffiliateRole && (
+                          <Link href="/affiliates/register" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-violet-600 font-medium hover:bg-violet-50 no-underline transition-colors">
+                            <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center shrink-0">
+                              <IoTrendingUpOutline size={16} className="text-violet-600" />
+                            </div>
+                            Affiliate Program
+                          </Link>
+                        )}
                       </div>
                       <div className="mx-4 border-t border-gray-100 py-2">
                         <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-gray-500 hover:bg-gray-50 hover:text-gray-700 text-left bg-transparent border-none cursor-pointer transition-colors">
@@ -862,6 +870,11 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                         <Link href="/my-account/wallet" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
                           <IoWalletOutline size={18} className="shrink-0 text-gray-500" /><span>Wallet & Credits</span>
                         </Link>
+                        {!isAffiliate && !isAffiliateRole && (
+                          <Link href="/affiliates/register" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-violet-600 no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-violet-50 transition-colors">
+                            <IoTrendingUpOutline size={18} className="shrink-0" /><span>Affiliate Program</span>
+                          </Link>
+                        )}
                       </>
                     )}
 
@@ -875,19 +888,40 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                 </div>
               </>
             ) : (
-              <div className="flex flex-col gap-2">
-                <Link href="/sign-in" onClick={closeAllOverlays} className="text-[1.05rem] font-semibold text-white no-underline flex items-center justify-center gap-2 bg-[#111] rounded-xl w-full py-3">
-                  <IoPersonCircleOutline size={20} /><span>Sign In</span>
-                </Link>
-                <Link href="/sign-up" onClick={closeAllOverlays} className="text-[1.05rem] font-medium text-[#333] no-underline flex items-center justify-center gap-2 border border-gray-200 rounded-xl w-full py-3">
-                  Create Account
-                </Link>
-                <div className="border-t border-[#ececec] mt-2 pt-3">
-                  <Link href="/affiliate-portal" onClick={closeAllOverlays} className="text-[1rem] font-medium text-violet-600 no-underline flex items-center gap-3 w-full py-2">
-                    <IoTrendingUpOutline size={20} /><span>Affiliate Program</span>
-                  </Link>
+              <>
+                {/* Not logged in — collapsible Account strip */}
+                <button
+                  onClick={() => setIsMobileAccountOpen(!isMobileAccountOpen)}
+                  className="flex items-center gap-2 w-full py-2 px-3 rounded-lg cursor-pointer border-none text-left bg-gray-100 hover:bg-gray-200 transition-all"
+                  aria-expanded={isMobileAccountOpen}
+                >
+                  <div className="w-[34px] h-[34px] rounded-full bg-gray-300 flex items-center justify-center shrink-0">
+                    <IoPersonOutline size={17} className="text-gray-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[12px] font-bold text-[#111] m-0 leading-tight">Account</p>
+                    <p className="text-[10px] text-gray-500 m-0 leading-tight">Sign in or create account</p>
+                  </div>
+                  <div className="text-gray-400 shrink-0">
+                    {isMobileAccountOpen ? <IoChevronUp size={15} /> : <IoChevronDown size={15} />}
+                  </div>
+                </button>
+
+                {/* Collapsible links */}
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isMobileAccountOpen ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="mt-1 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                    <Link href="/sign-in" onClick={closeAllOverlays} className="text-[0.95rem] font-semibold text-[#111] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
+                      <IoPersonCircleOutline size={18} className="shrink-0 text-gray-600" /><span>Sign In</span>
+                    </Link>
+                    <Link href="/sign-up" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
+                      <IoPersonOutline size={18} className="shrink-0 text-gray-500" /><span>Create Account</span>
+                    </Link>
+                    <Link href="/affiliate-portal" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-violet-600 no-underline flex items-center gap-3 w-full px-4 py-2.5 hover:bg-white transition-colors">
+                      <IoTrendingUpOutline size={18} className="shrink-0" /><span>Affiliate Program</span>
+                    </Link>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
       </div>

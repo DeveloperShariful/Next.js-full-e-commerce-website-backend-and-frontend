@@ -38,6 +38,7 @@ export default async function RegisterPage() {
   }
 
   const serializedUser = serializePrismaData(user);
+  const commissionRate = config?.defaultCommissionRate ?? 10;
 
   return (
     <div className="flex min-h-screen w-full bg-white">
@@ -81,7 +82,7 @@ export default async function RegisterPage() {
       </div>
       <div className="flex-1 flex flex-col justify-center items-center p-6 lg:p-12 overflow-y-auto">
          <div className="w-full max-w-4xl"> 
-             <RegisterForm user={serializedUser} />
+             <RegisterForm user={serializedUser} commissionRate={commissionRate} />
          </div>
       </div>
 

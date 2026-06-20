@@ -117,6 +117,13 @@ export async function createUser(formData: FormData) {
       }
     });
 
+    // Auto-create wallet for every new user
+    await db.wallet.upsert({
+      where: { userId: newUser.id },
+      create: { userId: newUser.id, balance: 0, points: 0 },
+      update: {},
+    });
+
     // ✅ Sync with Affiliate Hub if role is AFFILIATE
     await ensureAffiliateAccount(newUser.id, role, finalName);
 

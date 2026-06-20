@@ -11,6 +11,7 @@ import GeneralTab from "./_components/GeneralTab";
 import ShippingTab from "./_components/ShippingTab";
 import PaymentsTab from "./_components/PaymentsTab";
 import EmailTab from "./_components/EmailTab";
+import MyAccountTab from "./_components/MyAccountTab";
 
 function SettingsContent() {
   const router = useRouter();
@@ -22,6 +23,7 @@ function SettingsContent() {
     { id: "shipping", label: "Shipping" },
     { id: "payments", label: "Payments" },
     { id: "email", label: "Emails" },
+    { id: "my-account", label: "My Account" },
   ];
 
   const handleTabChange = (tabId: string) => {
@@ -73,6 +75,7 @@ function SettingsContent() {
             {activeTab === "shipping" && <ShippingTab />}
             {activeTab === "payments" && <PaymentsTab />}
             {activeTab === "email" && <EmailTab />}
+            {activeTab === "my-account" && <MyAccountTab />}
           </div>
         </div>
 

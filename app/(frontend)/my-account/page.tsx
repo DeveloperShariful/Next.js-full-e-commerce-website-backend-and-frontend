@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { syncUser } from "@/lib/auth-sync";
 import { db } from "@/lib/prisma";
 import { serializePrismaData } from "@/lib/format-data";
+import { getCachedStoreSettings } from "@/lib/global-settings-cache";
+import { parseTabVisibility } from "@/app/actions/backend/settings/my-account/tab-config";
 import AccountMainView from "./_components/account-main-view";
 
 // Services
@@ -28,6 +30,10 @@ export default async function MyAccountPage({
 
   const params = await searchParams;
   const activeTab = params.tab || "dashboard";
+
+  // Admin-controlled tab visibility (from StoreSettings.generalConfig.myAccountTabs)
+  const storeSettings = await getCachedStoreSettings();
+  const tabVisibility = parseTabVisibility(storeSettings?.generalConfig);
 
   const data: any = {};
 
@@ -112,9 +118,10 @@ export default async function MyAccountPage({
             <p className="text-[13px] text-[#50575e]">Loading your account...</p>
         </div>
       }>
-        <AccountMainView 
-          initialData={serializePrismaData(data)} 
-          activeTab={activeTab} 
+        <AccountMainView
+          initialData={serializePrismaData(data)}
+          activeTab={activeTab}
+          tabVisibility={tabVisibility}
         />
       </Suspense>
     </div>

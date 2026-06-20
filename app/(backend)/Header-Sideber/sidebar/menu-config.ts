@@ -1,12 +1,12 @@
 // File: app/(backend)/admin/Header-Sideber/sidebar/menu-config.ts
 
-import { 
+import {
   // আপনার আগের আইকনগুলো...
-  LayoutDashboard, ShoppingCart, Package, Users, 
-  TicketPercent, BarChart3, Settings, 
-  FileText, ShieldCheck, MessageSquare, ScrollText, 
+  LayoutDashboard, ShoppingCart, Package, Users,
+  TicketPercent, BarChart3, Settings,
+  FileText, ShieldCheck, MessageSquare, ScrollText,
   Undo2, Megaphone, Truck, MedalIcon, MessageCircle,
-  Handshake, Link, Network, UserPlus, Facebook
+  Handshake, Link, Network, UserPlus, Facebook, Wallet, RefreshCw, Heart
 } from "lucide-react";
 import { Role } from "@prisma/client";
 
@@ -68,6 +68,8 @@ export const sidebarConfig: SidebarGroup[] = [
       { name: "Refunds", href: "/admin/refunds", icon: Undo2, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
       { name: "Support Ticket", href: "/admin/support", icon: MessageSquare },
       { name: "Warranty-Cliem", href: "/admin/warranty-claims", icon: Megaphone },
+      { name: "Wallet", href: "/admin/wallet", icon: Wallet, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+      { name: "Subscriptions", href: "/admin/subscriptions", icon: RefreshCw, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
     ]
   },
   {
@@ -87,6 +89,7 @@ export const sidebarConfig: SidebarGroup[] = [
       { name: "Coupons", href: "/admin/coupons", icon: TicketPercent , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]},
       { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { name: "Wishlist Report", href: "/admin/wishlist-report", icon: Heart, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
     ] 
   },
   {

@@ -20,8 +20,12 @@ export async function registerUser(formData: FormData) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await db.user.create({
+    const newUser = await db.user.create({
       data: { name, email, password: hashedPassword },
+    });
+
+    await db.wallet.create({
+      data: { userId: newUser.id, balance: 0, points: 0 },
     });
 
   } catch (error) {

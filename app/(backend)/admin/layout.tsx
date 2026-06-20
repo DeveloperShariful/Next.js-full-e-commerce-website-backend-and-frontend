@@ -116,7 +116,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         
         <div className="flex flex-1 overflow-hidden">
           <AdminSidebar user={adminUser} />
-          <main className="flex-1 overflow-y-auto p-2 md:p-4 scrollbar-thin scrollbar-thumb-[#c3c4c7] scrollbar-track-transparent">    
+          <main className="flex-1 overflow-y-auto  scrollbar-thin scrollbar-thumb-[#c3c4c7] scrollbar-track-transparent">    
             {children}
           </main>
         </div>

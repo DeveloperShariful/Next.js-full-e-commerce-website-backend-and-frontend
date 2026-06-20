@@ -1,16 +1,24 @@
 // File: app/(backend)/admin/affiliate/_components/Marketing/creative-manager.tsx
-
 "use client";
 
 import { useState, useTransition } from "react";
-import { Edit, Trash2, Image as ImageIcon, Link as LinkIcon, Copy, Plus, FileText, Check, X, Loader2, Save, BarChart3, Info } from "lucide-react";
+import {
+  Edit, Trash2, Image as ImageIcon, Link as LinkIcon,
+  Copy, Plus, FileText, Check, X, Loader2, Save, BarChart3
+} from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
-import { deleteCreativeAction, upsertCreativeAction, trackCreativeUsageAction } from "@/app/actions/backend/affiliate/_services/marketing-assets-service";
+import { cn } from "@/lib/utils";
+import {
+  deleteCreativeAction,
+  upsertCreativeAction,
+  trackCreativeUsageAction,
+} from "@/app/actions/backend/affiliate/_services/marketing-assets-service";
 import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { MediaSource } from "@prisma/client";
 
-// ✅ FIXED: Replaced deleted Prisma Model type with our strictly defined JSON structure
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface CreativeData {
   id: string;
   title: string;
@@ -21,303 +29,401 @@ interface CreativeData {
   height?: number | null;
   isActive: boolean;
   description?: string | null;
-  usageCount?: number; // Simulated count since DB table is gone
+  usageCount?: number;
 }
 
-interface CreativeManagerProps {
+interface Props {
   initialCreatives: CreativeData[];
 }
 
-export default function CreativeManager({ initialCreatives }: CreativeManagerProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [openAssetPicker, setOpenAssetPicker] = useState(false);
-  const [editingItem, setEditingItem] = useState<CreativeData | null>(null);
-  const [isDeleting, startDelete] = useTransition();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+type FilterType = "ALL" | "IMAGE" | "VIDEO" | "DOCUMENT";
 
-  const handleCreate = () => {
-    setEditingItem(null);
-    setIsModalOpen(true);
-  };
+// ── Main Component ────────────────────────────────────────────────────────────
 
-  const handleEdit = (item: CreativeData) => {
-    setEditingItem(item);
-    setIsModalOpen(true);
-  };
+export default function CreativeManager({ initialCreatives }: Props) {
+  const [isModalOpen, setIsModalOpen]   = useState(false);
+  const [editingItem, setEditingItem]   = useState<CreativeData | null>(null);
+  const [isDeleting, startDelete]       = useTransition();
+  const [copiedId, setCopiedId]         = useState<string | null>(null);
+  const [filter, setFilter]             = useState<FilterType>("ALL");
+
+  const filtered = filter === "ALL"
+    ? initialCreatives
+    : initialCreatives.filter((c) => c.type === filter);
+
+  const countOf = (t: FilterType) =>
+    t === "ALL" ? initialCreatives.length : initialCreatives.filter((c) => c.type === t).length;
+
+  const handleCreate = () => { setEditingItem(null); setIsModalOpen(true); };
+  const handleEdit   = (item: CreativeData) => { setEditingItem(item); setIsModalOpen(true); };
 
   const handleDelete = (id: string) => {
-    if (!confirm("Are you sure you want to delete this asset? Links using it will break.")) return;
-    
+    if (!confirm("Delete this asset? Any links using it will break.")) return;
     startDelete(async () => {
-      const result = await deleteCreativeAction(id);
-      if (result.success) {
-        toast.success(result.message);
-        window.location.reload(); // Refresh to get updated JSON
-      } else {
-        toast.error(result.message);
-      }
+      const res = await deleteCreativeAction(id);
+      if (res.success) { toast.success(res.message); window.location.reload(); }
+      else toast.error(res.message);
     });
   };
 
-  const handleCopy = async (text: string, id: string) => {
+  const handleCopy = async (url: string, id: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(url);
       setCopiedId(id);
-      toast.success("Asset URL copied!");
-      
-      await trackCreativeUsageAction(id, "ADMIN_ACTION"); 
-
+      toast.success("URL copied!");
+      await trackCreativeUsageAction(id, "ADMIN_ACTION");
       setTimeout(() => setCopiedId(null), 2000);
-    } catch (err) {
+    } catch {
       toast.error("Failed to copy");
     }
   };
 
+  const FILTER_TABS: { key: FilterType; label: string }[] = [
+    { key: "ALL",      label: "All"       },
+    { key: "IMAGE",    label: "Images"    },
+    { key: "VIDEO",    label: "Videos"    },
+    { key: "DOCUMENT", label: "Documents" },
+  ];
+
   return (
-    <div className="font-sans text-[#1d2327]">
-      
-      {/* WP Admin Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-4">
-        <div>
-          <h1 className="text-[22px] font-normal text-[#1d2327] m-0 flex items-center gap-2">
-             <ImageIcon className="w-5 h-5 text-[#50575e]" /> Marketing Assets
-          </h1>
-          <p className="text-[13px] text-[#50575e] m-0 mt-0.5">Banners and promotional links for your partners.</p>
+    <div className="w-full space-y-4 animate-in fade-in duration-500 pb-20">
+
+      {/* Filter tabs + Add New — WP style */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[#c3c4c7]">
+        <div className="flex flex-wrap items-center gap-0 text-[13px]">
+          {FILTER_TABS.map((tab, idx) => (
+            <span key={tab.key} className="flex items-center">
+              {idx > 0 && <span className="text-[#c3c4c7] px-2">|</span>}
+              <button
+                onClick={() => setFilter(tab.key)}
+                className={cn(
+                  "px-0 py-1",
+                  filter === tab.key
+                    ? "font-semibold text-[#1d2327]"
+                    : "text-[#2271b1] hover:text-[#135e96] hover:underline"
+                )}
+              >
+                {tab.label} ({countOf(tab.key)})
+              </button>
+            </span>
+          ))}
         </div>
-        <button 
-            onClick={handleCreate} 
-            className="flex items-center gap-1.5 border border-[#2271b1] bg-[#2271b1] text-white px-3 py-1 text-[13px] rounded-sm hover:bg-[#135e96] hover:border-[#135e96] transition-colors cursor-pointer shadow-sm"
+        <button
+          onClick={handleCreate}
+          className="flex items-center gap-1.5 h-8 px-3 bg-[#2271b1] hover:bg-[#135e96] text-white text-[13px] rounded transition-colors self-start sm:self-auto"
         >
           <Plus className="w-3.5 h-3.5" /> Add New Asset
         </button>
       </div>
 
-      <div className="bg-white border border-[#c3c4c7] shadow-sm p-4 min-h-[400px]">
-        {initialCreatives.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 bg-[#f0f0f1] border border-dashed border-[#c3c4c7]">
-            <Info className="h-8 w-8 text-[#8c8f94] mb-2" />
-            <p className="text-[13px] text-[#50575e] font-semibold m-0">No creative assets found.</p>
-            <p className="text-[12px] text-[#8c8f94] mt-1 m-0">Upload banners or files to help affiliates promote your brand.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {initialCreatives.map((item) => (
-              <div key={item.id} className="group border border-[#c3c4c7] bg-white flex flex-col hover:border-[#8c8f94] transition-colors shadow-sm">
-                
-                <div className="aspect-video bg-[#f0f0f1] relative flex items-center justify-center overflow-hidden border-b border-[#c3c4c7]">
-                  {item.type === "IMAGE" ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img 
-                      src={item.url} 
-                      alt={item.title} 
-                      className="w-full h-full object-contain p-2"
-                      loading="lazy"
-                    />
-                  ) : item.type === "VIDEO" ? (
-                    <div className="text-[#50575e] flex flex-col items-center">
-                        <div className="p-2 bg-white border border-[#c3c4c7] rounded-sm shadow-sm mb-1"><LinkIcon className="w-4 h-4" /></div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Video Asset</span>
+      {/* Grid */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 bg-white border border-dashed border-[#c3c4c7]">
+          <ImageIcon className="w-10 h-10 text-[#c3c4c7] mb-3" />
+          <p className="text-[13px] font-semibold text-[#1d2327] m-0">No creative assets found.</p>
+          <p className="text-[12px] text-[#8c8f94] mt-1">Upload banners or files to help affiliates promote your brand.</p>
+          <button
+            onClick={handleCreate}
+            className="mt-4 flex items-center gap-1.5 h-8 px-3 bg-[#2271b1] hover:bg-[#135e96] text-white text-[13px] rounded transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add First Asset
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {filtered.map((item) => (
+            <div
+              key={item.id}
+              className="group border border-[#c3c4c7] bg-white flex flex-col hover:border-[#2271b1]/40 hover:shadow-sm transition-all"
+            >
+              {/* Preview */}
+              <div className="aspect-video bg-[#f0f0f1] relative flex items-center justify-center overflow-hidden border-b border-[#c3c4c7]">
+                {item.type === "IMAGE" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.url}
+                    alt={item.title}
+                    className="w-full h-full object-contain p-2"
+                    loading="lazy"
+                  />
+                ) : item.type === "VIDEO" ? (
+                  <div className="flex flex-col items-center gap-1 text-[#50575e]">
+                    <div className="p-2 bg-white border border-[#c3c4c7] shadow-sm">
+                      <LinkIcon className="w-4 h-4" />
                     </div>
-                  ) : (
-                    <div className="text-[#50575e] flex flex-col items-center">
-                        <FileText className="w-6 h-6 mb-1" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Document</span>
-                    </div>
-                  )}
-                  
-                  {/* Hover Actions WP Style */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[1px]">
-                    <button
-                      onClick={() => handleEdit(item)}
-                      className="p-1.5 bg-white border border-[#c3c4c7] text-[#1d2327] hover:bg-[#f0f0f1] shadow-sm rounded-sm"
-                      title="Edit"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      disabled={isDeleting}
-                      className="p-1.5 bg-white border border-[#c3c4c7] text-[#d63638] hover:bg-[#fcf0f1] hover:border-[#d63638]/30 shadow-sm rounded-sm"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <span className="text-[10px] font-semibold text-[#646970]">Video Asset</span>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-[#50575e]">
+                    <FileText className="w-6 h-6" />
+                    <span className="text-[10px] font-semibold text-[#646970]">Document</span>
+                  </div>
+                )}
 
-                <div className="p-3 flex-1 flex flex-col gap-2">
-                  <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-semibold text-[#2271b1] hover:underline cursor-pointer truncate text-[13px] m-0 flex-1" title={item.title} onClick={() => handleEdit(item)}>
-                        {item.title}
-                    </h3>
-                    <span className={`text-[9px] px-1 py-0.5 border font-bold uppercase ${item.isActive ? 'bg-[#f0f6fc] text-[#00a32a] border-[#00a32a]/30' : 'bg-[#f0f0f1] text-[#50575e] border-[#c3c4c7]'}`}>
-                        {item.isActive ? "Active" : "Draft"}
-                    </span>
-                  </div>
-                  
-                  <div className="text-[11px] text-[#50575e] flex items-center justify-between">
-                    <span>{item.width && item.height ? `${item.width}x${item.height}px` : "Responsive"}</span>
-                    <span className="flex items-center gap-1">
-                        <BarChart3 className="w-3 h-3"/> {item.usageCount || 0} Uses
-                    </span>
-                  </div>
-
-                  <div className="mt-auto pt-2 border-t border-[#f0f0f1]">
-                    <button 
-                        onClick={() => handleCopy(item.url, item.id)}
-                        className="flex items-center justify-center gap-1.5 w-full text-[12px] font-semibold text-[#2c3338] bg-[#f0f0f1] border border-[#8c8f94] hover:bg-[#e6e6e6] py-1 rounded-sm transition-colors"
-                    >
-                        {copiedId === item.id ? <Check className="w-3 h-3 text-[#00a32a]" /> : <Copy className="w-3 h-3" />}
-                        {copiedId === item.id ? "Copied" : "Copy URL"}
-                    </button>
-                  </div>
+                {/* Hover overlay — edit / delete */}
+                <div className="absolute inset-0 bg-[#1d2327]/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => handleEdit(item)}
+                    title="Edit"
+                    className="p-1.5 bg-white border border-[#c3c4c7] text-[#1d2327] hover:bg-[#f0f0f1] shadow-sm"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    disabled={isDeleting}
+                    title="Delete"
+                    className="p-1.5 bg-white border border-[#d63638]/30 text-[#d63638] hover:bg-[#fcebec] shadow-sm disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              {/* Card body */}
+              <div className="p-3 flex-1 flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-2">
+                  <button
+                    onClick={() => handleEdit(item)}
+                    className="font-semibold text-[13px] text-[#2271b1] hover:underline text-left truncate flex-1"
+                    title={item.title}
+                  >
+                    {item.title}
+                  </button>
+                  <span className={cn(
+                    "text-[9px] px-1.5 py-0.5 border font-semibold uppercase shrink-0 rounded",
+                    item.isActive
+                      ? "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/30"
+                      : "bg-[#f0f0f1] text-[#50575e] border-[#c3c4c7]"
+                  )}>
+                    {item.isActive ? "Active" : "Draft"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-[#50575e]">
+                  <span>{item.width && item.height ? `${item.width}×${item.height}px` : "Responsive"}</span>
+                  <span className="flex items-center gap-1">
+                    <BarChart3 className="w-3 h-3" /> {item.usageCount ?? 0} Uses
+                  </span>
+                </div>
+
+                {/* Copy URL button */}
+                <div className="mt-auto pt-2 border-t border-[#f0f0f1]">
+                  <button
+                    onClick={() => handleCopy(item.url, item.id)}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 w-full h-7 text-[12px] font-medium border rounded transition-colors",
+                      copiedId === item.id
+                        ? "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/30"
+                        : "bg-[#f6f7f7] text-[#1d2327] border-[#c3c4c7] hover:bg-[#e8e8e8] hover:border-[#8c8f94]"
+                    )}
+                  >
+                    {copiedId === item.id
+                      ? <><Check className="w-3 h-3" /> Copied!</>
+                      : <><Copy className="w-3 h-3" /> Copy URL</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {isModalOpen && (
-        <CreativeModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialData={editingItem} />
+        <CreativeModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          initialData={editingItem}
+        />
       )}
     </div>
   );
 }
 
-// ============================================================================
-// WP STYLE MODAL FORM
-// ============================================================================
+// ── Modal ─────────────────────────────────────────────────────────────────────
 
-function CreativeModal({ isOpen, onClose, initialData }: any) {
+function CreativeModal({
+  isOpen,
+  onClose,
+  initialData,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  initialData: CreativeData | null;
+}) {
   const [isPending, startTransition] = useTransition();
-  const [openAssetPicker, setOpenAssetPicker] = useState(false);
-  
+  const [openPicker, setOpenPicker]   = useState(false);
+
   const form = useForm({
     defaultValues: {
-      title: initialData?.title || "",
-      type: initialData?.type || "IMAGE",
-      url: initialData?.url || "",
-      targetUrl: initialData?.targetUrl || "",
-      width: initialData?.width || undefined,
-      height: initialData?.height || undefined,
-      isActive: initialData?.isActive ?? true,
+      id:          initialData?.id,
+      title:       initialData?.title       || "",
+      type:        initialData?.type        || "IMAGE",
+      url:         initialData?.url         || "",
+      targetUrl:   initialData?.targetUrl   || "",
+      width:       initialData?.width       ?? undefined,
+      height:      initialData?.height      ?? undefined,
+      isActive:    initialData?.isActive    ?? true,
       description: initialData?.description || "",
-      id: initialData?.id
     },
   });
 
-  const onSubmit = (data: any) => {
+  const watchedUrl = form.watch("url");
+
+  const onSubmit = (data: Parameters<typeof upsertCreativeAction>[0]) => {
     startTransition(async () => {
-      const result = await upsertCreativeAction(data);
-      if (result.success) {
-        toast.success(result.message);
-        onClose();
-        window.location.reload(); 
-      } else {
-        toast.error(result.message);
-      }
+      const res = await upsertCreativeAction(data);
+      if (res.success) { toast.success(res.message); onClose(); window.location.reload(); }
+      else toast.error(res.message);
     });
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-sans text-[#1d2327]">
-      <div className="bg-[#f0f0f1] border border-[#c3c4c7] shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
-        <div className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center bg-white shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 font-sans text-[#1d2327]">
+      <div className="bg-white border border-[#c3c4c7] shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center bg-[#f6f7f7] shrink-0">
           <h3 className="text-[14px] font-semibold text-[#1d2327] m-0">
             {initialData ? "Edit Asset" : "Add Marketing Asset"}
           </h3>
-          <button onClick={onClose} className="text-[#50575e] hover:text-[#d63638] focus:outline-none"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-1 text-[#50575e] hover:text-[#d63638] transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="p-4 overflow-y-auto bg-white">
-            <form id="creative-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              
-              <div className="border border-[#c3c4c7] p-4 bg-[#f6f7f7]">
-                <label className="text-[13px] font-semibold text-[#1d2327] block mb-2">Asset File</label>
-                {form.watch("url") ? (
-                  <div className="flex flex-col gap-2">
-                    <img src={form.watch("url")} alt="Asset" className="w-24 h-24 object-cover border border-[#c3c4c7]" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    <p className="text-[11px] text-[#646970] truncate max-w-xs">{form.watch("url")}</p>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setOpenAssetPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">Change</button>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <form id="creative-form" onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
+
+            {/* File picker */}
+            <div className="border border-[#c3c4c7] p-3 bg-[#f6f7f7]">
+              <label className="text-[13px] font-semibold text-[#1d2327] block mb-2">Asset File</label>
+              {watchedUrl ? (
+                <div className="flex items-start gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={watchedUrl}
+                    alt="preview"
+                    className="w-20 h-20 object-cover border border-[#c3c4c7] bg-white shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-[#646970] truncate mb-2">{watchedUrl}</p>
+                    <div className="flex items-center gap-2 text-[13px]">
+                      <button type="button" onClick={() => setOpenPicker(true)} className="text-[#2271b1] hover:underline">Change</button>
                       <span className="text-[#c3c4c7]">|</span>
-                      <button type="button" onClick={() => form.setValue("url", "")} className="text-[13px] text-[#d63638] hover:underline">Remove</button>
+                      <button type="button" onClick={() => form.setValue("url", "")} className="text-[#d63638] hover:underline">Remove</button>
                     </div>
                   </div>
-                ) : (
-                  <button type="button" onClick={() => setOpenAssetPicker(true)} className="text-[13px] text-[#2271b1] hover:underline">
-                    Select asset file
-                  </button>
-                )}
-                {form.formState.errors.url && <p className="text-[#d63638] text-[11px] mt-1">File URL is Required</p>}
-                <MediaPickerModal
-                  open={openAssetPicker}
-                  onClose={() => setOpenAssetPicker(false)}
-                  onSelect={(items) => { if (items[0]) form.setValue("url", items[0].url, { shouldValidate: true }); }}
-                  title="Select Asset File"
-                  source={MediaSource.AFFILIATE}
-                />
-              </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setOpenPicker(true)}
+                  className="flex items-center gap-2 h-8 px-3 bg-white border border-[#c3c4c7] text-[#2271b1] text-[13px] rounded hover:bg-[#f0f6fc] hover:border-[#2271b1] transition-colors"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" /> Select file from Media Library
+                </button>
+              )}
+              <MediaPickerModal
+                open={openPicker}
+                onClose={() => setOpenPicker(false)}
+                onSelect={(items) => {
+                  if (items[0]) form.setValue("url", items[0].url, { shouldValidate: true });
+                }}
+                title="Select Asset File"
+                source={MediaSource.AFFILIATE}
+              />
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Title</label>
-                    <input
-                      {...form.register("title", { required: true })}
-                      className="w-full border border-[#8c8f94] rounded-sm px-2 py-1.5 text-[13px] focus:border-[#2271b1] outline-none"
-                      placeholder="e.g. Summer Banner"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Type</label>
-                    <select {...form.register("type")} className="w-full border border-[#8c8f94] rounded-sm px-2 py-1.5 text-[13px] bg-white focus:border-[#2271b1] outline-none">
-                        <option value="IMAGE">Image</option>
-                        <option value="VIDEO">Video</option>
-                        <option value="DOCUMENT">Document</option>
-                    </select>
-                  </div>
-              </div>
-
+            {/* Title + Type */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Target URL (Optional)</label>
+                <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Title</label>
                 <input
-                  {...form.register("targetUrl")}
-                  placeholder="https://myshop.com/promo"
-                  className="w-full border border-[#8c8f94] rounded-sm px-2 py-1.5 text-[13px] focus:border-[#2271b1] outline-none"
+                  {...form.register("title", { required: true })}
+                  className="w-full h-8 border border-[#c3c4c7] rounded px-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]/20"
+                  placeholder="e.g. Summer Banner"
                 />
-                <p className="text-[11px] text-[#8c8f94] mt-1 m-0">Where should the user go when they click this banner?</p>
               </div>
+              <div>
+                <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Type</label>
+                <select
+                  {...form.register("type")}
+                  className="w-full h-8 border border-[#c3c4c7] rounded px-2 text-[13px] bg-white outline-none focus:border-[#2271b1]"
+                >
+                  <option value="IMAGE">Image</option>
+                  <option value="VIDEO">Video</option>
+                  <option value="DOCUMENT">Document</option>
+                </select>
+              </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Width (px)</label>
-                  <input type="number" {...form.register("width")} className="w-full border border-[#8c8f94] rounded-sm px-2 py-1.5 text-[13px] focus:border-[#2271b1] outline-none" placeholder="e.g. 728"/>
-                </div>
-                <div>
-                  <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Height (px)</label>
-                  <input type="number" {...form.register("height")} className="w-full border border-[#8c8f94] rounded-sm px-2 py-1.5 text-[13px] focus:border-[#2271b1] outline-none" placeholder="e.g. 90"/>
-                </div>
-              </div>
+            {/* Target URL */}
+            <div>
+              <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Target URL <span className="font-normal text-[#8c8f94]">(Optional)</span></label>
+              <input
+                {...form.register("targetUrl")}
+                placeholder="https://myshop.com/promo"
+                className="w-full h-8 border border-[#c3c4c7] rounded px-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]/20"
+              />
+              <p className="text-[11px] text-[#8c8f94] mt-1">Where should the user go when clicking this banner?</p>
+            </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <input type="checkbox" id="isActive" className="w-4 h-4 rounded-sm border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]" {...form.register("isActive")} />
-                <label htmlFor="isActive" className="text-[13px] font-semibold text-[#1d2327] cursor-pointer select-none">
-                  Make Visible Immediately
-                </label>
+            {/* Dimensions */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Width (px)</label>
+                <input
+                  type="number"
+                  {...form.register("width")}
+                  placeholder="e.g. 728"
+                  className="w-full h-8 border border-[#c3c4c7] rounded px-2 text-[13px] outline-none focus:border-[#2271b1]"
+                />
               </div>
-            </form>
+              <div>
+                <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Height (px)</label>
+                <input
+                  type="number"
+                  {...form.register("height")}
+                  placeholder="e.g. 90"
+                  className="w-full h-8 border border-[#c3c4c7] rounded px-2 text-[13px] outline-none focus:border-[#2271b1]"
+                />
+              </div>
+            </div>
+
+            {/* Active toggle */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="creativeIsActive"
+                {...form.register("isActive")}
+                className="w-4 h-4 rounded border-[#c3c4c7] text-[#2271b1] focus:ring-[#2271b1] cursor-pointer"
+              />
+              <label htmlFor="creativeIsActive" className="text-[13px] text-[#1d2327] cursor-pointer select-none">
+                Make visible to affiliates immediately
+              </label>
+            </div>
+          </form>
         </div>
 
-        <div className="p-3 border-t border-[#c3c4c7] bg-[#f0f0f1] flex justify-end gap-2 shrink-0">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 border border-[#8c8f94] bg-[#f0f0f1] text-[#2c3338] text-[13px] rounded-sm hover:bg-[#e6e6e6]">Cancel</button>
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-[#c3c4c7] bg-[#f6f7f7] flex justify-end gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 px-3 border border-[#c3c4c7] bg-white text-[#1d2327] text-[13px] rounded hover:bg-[#f0f0f1] transition-colors"
+          >
+            Cancel
+          </button>
           <button
             type="submit"
             form="creative-form"
             disabled={isPending}
-            className="flex items-center gap-1.5 px-4 py-1.5 border border-[#2271b1] bg-[#2271b1] text-white text-[13px] rounded-sm hover:bg-[#135e96] disabled:opacity-50"
+            className="h-8 px-4 bg-[#2271b1] hover:bg-[#135e96] text-white text-[13px] rounded transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             Save Asset

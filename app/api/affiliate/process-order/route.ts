@@ -55,6 +55,21 @@ export async function POST(req: Request) {
        await auditService.systemLog("INFO", "IDEMPOTENCY", `Order ${orderId} already processed. Skipping.`, { idempotencyKey });
        return NextResponse.json({ success: true, message: "Already processed (Idempotent)" });
     }
+
+    // Skip commission for orders that cannot earn affiliate credit.
+    const orderForStatus = await db.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+    if (!orderForStatus) {
+      return NextResponse.json({ success: false, error: "ORDER_NOT_FOUND" }, { status: 404 });
+    }
+    const NON_COMMISSIONABLE = ["CANCELLED", "REFUNDED", "FAILED", "RETURNED"];
+    if (NON_COMMISSIONABLE.includes(orderForStatus.status)) {
+      await auditService.systemLog("INFO", "AFFILIATE_ENGINE", `Order ${orderId} skipped — status: ${orderForStatus.status}`, {});
+      return NextResponse.json({ success: false, message: `Order status ${orderForStatus.status} — commission skipped.` });
+    }
+
     const result = await processOrder(orderId);
 
     const duration = Date.now() - start;

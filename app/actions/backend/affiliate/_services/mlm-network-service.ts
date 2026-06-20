@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { Prisma, MLMBasis } from "@prisma/client";
-import { getCachedMLMConfig } from "@/lib/settings-cache";
+import { getCachedMLMConfig } from "@/lib/global-settings-cache";
 import { DecimalMath } from "@/lib/decimal-math";
 import { ActionResponse, NetworkNode } from "../types";
 import { z } from "zod";

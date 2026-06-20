@@ -19,10 +19,9 @@ import * as productRateService from "@/app/actions/backend/affiliate/_services/p
 import * as kycService from "@/app/actions/backend/affiliate/_services/kyc-service";
 import * as ledgerService from "@/app/actions/backend/affiliate/_services/ledger-service";
 import * as analyticsService from "@/app/actions/backend/affiliate/_services/dashboard-service";
-import * as groupService from "@/app/actions/backend/affiliate/_services/group-service";
 import * as couponTagService from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 import * as logService from "@/app/actions/backend/affiliate/_services/log-service"; 
-import { getCachedMLMConfig } from "@/lib/settings-cache"; // ✅ FIXED: Imported JSON Cache for MLM
+import { getCachedMLMConfig } from "@/lib/global-settings-cache";
 import { serializePrismaData } from "@/lib/format-data"; 
 
 export const metadata = {
@@ -51,6 +50,14 @@ export default async function AffiliateMasterPage({
   try {
     data.config = await configService.getSettings();
 
+    // Sidebar badge counts — always fetched regardless of current view
+    const [pendingPayoutsCount, pendingKycCount, highRiskCount] = await Promise.all([
+      db.affiliatePayout.count({ where: { status: "PENDING" } }),
+      db.affiliateAccount.count({ where: { kycStatus: "PENDING" } }),
+      db.affiliateAccount.count({ where: { riskScore: { gt: 50 } } }),
+    ]);
+    data.counts = { payouts: pendingPayoutsCount, kyc: pendingKycCount, fraud: highRiskCount };
+
     switch (currentView) {
       case "overview":
         const [
@@ -78,24 +85,26 @@ export default async function AffiliateMasterPage({
         };
         break;
       
-      case "partners": 
-        const [usersData, groupsList, tagsList] = await Promise.all([
+      case "partners":
+        const [usersData, tagsList] = await Promise.all([
           accountService.getAffiliates(page, 20, params.status as any, search),
-          groupService.getAllGroups(),
-          couponTagService.getAllTags() 
+          couponTagService.getAllTags()
         ]);
-        
+
         data.partners = {
           users: usersData,
-          groups: groupsList,
           tags: tagsList,
-          defaultRate: data.config?.commissionRate ?? null ,
+          defaultRate: data.config?.commissionRate ?? null,
           defaultType: data.config?.commissionType ?? "PERCENTAGE"
         };
         break;
 
       case "payouts":
-        data.payouts = await payoutService.getPayouts(page, 20, params.status as any);
+        const [payoutsResult, ledgerResult] = await Promise.all([
+          payoutService.getPayouts(page, 20, params.status as any),
+          ledgerService.getLedgerHistory(page, 20),
+        ]);
+        data.payouts = { payouts: payoutsResult, ledger: ledgerResult };
         break;
 
       case "tiers":
@@ -110,12 +119,12 @@ export default async function AffiliateMasterPage({
         data.creatives = await marketingService.getAllCreatives();
         break;
 
-      case "contests":
-        data.contests = await engagementService.getContests();
-        break;
-
       case "campaigns":
-        data.campaigns = await engagementService.getAllCampaigns(page, 20, search);
+        const [campaignsResult, contestsResult] = await Promise.all([
+          engagementService.getAllCampaigns(page, 20, search),
+          engagementService.getContests(),
+        ]);
+        data.campaigns = { campaigns: campaignsResult, contests: contestsResult };
         break;
 
       case "announcements":
@@ -150,21 +159,17 @@ export default async function AffiliateMasterPage({
         data.kyc = await kycService.getDocuments(page, 20, params.status);
         break;
 
-      case "ledger":
-        data.ledger = await ledgerService.getLedgerHistory(page, 20);
-        break;
-        
       case "general":
         // ✅ FIXED: Fetch MLM config from JSON Cache instead of deleted Table
         data.mlmConfig = await getCachedMLMConfig();
         break;
         
-      case "tags":
-        data.tags = await couponTagService.getAllTags();
-        break;
-        
       case "coupons":
-        data.coupons = await couponTagService.getAllAffiliateCoupons(); 
+        const [couponsResult, tagsResult] = await Promise.all([
+          couponTagService.getAllAffiliateCoupons(),
+          couponTagService.getAllTags(),
+        ]);
+        data.coupons = { coupons: couponsResult, tags: tagsResult };
         break;
 
       case "logs": 
@@ -204,9 +209,10 @@ export default async function AffiliateMasterPage({
             <p className="text-[#50575e] max-w-md mt-2">{data.error}</p>
           </div>
         ) : (
-          <AffiliateMainView 
-            initialData={serializePrismaData(data)} 
-            currentView={currentView} 
+          <AffiliateMainView
+            initialData={serializePrismaData(data)}
+            currentView={currentView}
+            counts={data.counts}
           />
         )}
       </Suspense>

@@ -9,17 +9,16 @@ import {
   ChevronRight, ArrowUpDown, Tag, CreditCard, Ticket, 
   Copy, ExternalLink, Calendar, Trophy, Mail, 
   AlertTriangle, DollarSign, Briefcase, Eye, X, UserCheck, UserX,
-  Percent, Layers, AlertCircle
+  Percent
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { AffiliateUserTableItem } from "@/app/actions/backend/affiliate/types";
-import { 
-  approveAffiliateAction, 
-  rejectAffiliateAction, 
-  bulkStatusAction, 
-  bulkGroupAction, 
+import {
+  approveAffiliateAction,
+  rejectAffiliateAction,
+  bulkStatusAction,
   bulkTagAction,
   updateCommissionAction
 } from "@/app/actions/backend/affiliate/_services/account-service";
@@ -43,8 +42,7 @@ interface Props {
   totalEntries: number;
   totalPages: number;
   currentPage: number;
-  groups?: { id: string, name: string }[];
-  tags?: { id: string, name: string }[];
+  tags?: { id: string; name: string }[];
   defaultRate?: number | null;
   defaultType?: "PERCENTAGE" | "FIXED";
 }
@@ -56,13 +54,12 @@ type SortDirection = 'asc' | 'desc';
 // MAIN COMPONENT
 // ==================================================================================
 
-export default function AffiliateUsersTable({ 
-  data, 
-  totalEntries, 
-  totalPages, 
-  currentPage, 
-  groups = [], 
-  tags = [] ,
+export default function AffiliateUsersTable({
+  data,
+  totalEntries,
+  totalPages,
+  currentPage,
+  tags = [],
   defaultRate = 10,
   defaultType = "PERCENTAGE"
 }: Props) {
@@ -183,12 +180,6 @@ export default function AffiliateUsersTable({
                 res = await bulkStatusAction(ids, "ACTIVE");
             } else if (bulkActionType === "REJECT") {
                 res = await bulkStatusAction(ids, "REJECTED");
-            } else if (bulkActionType === "ASSIGN_GROUP") {
-                if (!targetPayload) {
-                    toast.error("Please select a group");
-                    return;
-                }
-                res = await bulkGroupAction(ids, targetPayload);
             } else if (bulkActionType === "ADD_TAG") {
                 if (!targetPayload) {
                     toast.error("Please select a tag");
@@ -282,393 +273,342 @@ export default function AffiliateUsersTable({
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-500 pb-20">
       
-      {/* 1. TOP TABS & EXPORT */}
-      <div className="flex flex-col sm:flex-row justify-between items-end border-b border-gray-200">
-        <div className="flex gap-4 overflow-x-auto w-full sm:w-auto no-scrollbar">
-          <TabButton 
-            label="All Affiliates" 
-            count={totalEntries} 
-            isActive={activeTab === "ALL"} 
-            onClick={() => handleTabChange("ALL")} 
-          />
-          <TabButton 
-            label="Approved" 
-            count={searchParams.get("status") === "ACTIVE" ? totalEntries : undefined}
-            isActive={activeTab === "ACTIVE"} 
-            onClick={() => handleTabChange("ACTIVE")} 
-            activeColor="text-green-700 border-green-600 bg-green-50/50"
-          />
-          <TabButton 
-            label="Pending" 
-            count={searchParams.get("status") === "PENDING" ? totalEntries : undefined}
-            isActive={activeTab === "PENDING"} 
-            onClick={() => handleTabChange("PENDING")} 
-            activeColor="text-orange-600 border-orange-600 bg-orange-50/50"
-          />
-          <TabButton 
-            label="Rejected" 
-            count={searchParams.get("status") === "REJECTED" ? totalEntries : undefined}
-            isActive={activeTab === "REJECTED"} 
-            onClick={() => handleTabChange("REJECTED")} 
-            activeColor="text-red-600 border-red-600 bg-red-50/50"
-          />
+      {/* 1. TOP TABS — WooCommerce pipe-separated text links */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[#c3c4c7]">
+        <div className="flex flex-wrap items-center gap-0 text-[13px]">
+          <button onClick={() => handleTabChange("ALL")} className={cn("px-0 py-1", activeTab === "ALL" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#135e96] hover:underline")}>
+            All ({totalEntries})
+          </button>
+          <span className="text-[#c3c4c7] px-2">|</span>
+          <button onClick={() => handleTabChange("ACTIVE")} className={cn("px-0 py-1", activeTab === "ACTIVE" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#135e96] hover:underline")}>
+            Approved{searchParams.get("status") === "ACTIVE" && ` (${totalEntries})`}
+          </button>
+          <span className="text-[#c3c4c7] px-2">|</span>
+          <button onClick={() => handleTabChange("PENDING")} className={cn("px-0 py-1", activeTab === "PENDING" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#135e96] hover:underline")}>
+            Pending{searchParams.get("status") === "PENDING" && ` (${totalEntries})`}
+          </button>
+          <span className="text-[#c3c4c7] px-2">|</span>
+          <button onClick={() => handleTabChange("REJECTED")} className={cn("px-0 py-1", activeTab === "REJECTED" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#135e96] hover:underline")}>
+            Rejected{searchParams.get("status") === "REJECTED" && ` (${totalEntries})`}
+          </button>
         </div>
-        <div className="py-2 hidden sm:block">
-           <button 
-             onClick={handleExportCSV}
-             className="text-xs font-medium text-gray-600 hover:text-black flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-all shadow-sm"
-           >
-             <Download className="w-3.5 h-3.5" /> Export Report
-           </button>
-        </div>
+        <button onClick={handleExportCSV} className="text-[13px] text-[#2271b1] hover:text-[#135e96] flex items-center gap-1.5 px-3 py-1 bg-white border border-[#c3c4c7] rounded hover:bg-[#f0f0f1] transition-colors self-start sm:self-auto">
+          <Download className="w-3.5 h-3.5" /> Export Report
+        </button>
       </div>
 
-      {/* 2. ACTION BAR */}
-      <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-col xl:flex-row gap-4 justify-between items-center shadow-sm">
-        
+      {/* 2. ACTION BAR — WP toolbar style */}
+      <div className="bg-[#f6f7f7] border border-[#c3c4c7] p-2 flex flex-col lg:flex-row gap-3 justify-between items-start lg:items-center">
+
         {/* Left: Bulk Actions */}
-        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-          <div className={cn("flex items-center gap-2 transition-all duration-300", selectedIds.size > 0 ? "opacity-100 translate-y-0" : "opacity-50 pointer-events-none grayscale")}>
-            <div className="relative">
-                <select 
-                    className="h-9 bg-gray-50 border border-gray-300 text-gray-900 text-xs font-medium rounded-lg focus:ring-black focus:border-black block w-40 px-2.5 outline-none shadow-sm cursor-pointer hover:bg-gray-100 transition-colors"
-                    value={bulkActionType}
-                    onChange={(e) => {
-                        setBulkActionType(e.target.value);
-                        setTargetPayload(""); 
-                    }}
-                >
-                    <option value="">Bulk Actions ({selectedIds.size})</option>
-                    <option value="APPROVE">✅ Mark Active</option>
-                    <option value="REJECT">❌ Reject Selected</option>
-                    <option value="ASSIGN_GROUP">📂 Assign Group</option>
-                    <option value="ADD_TAG">🏷️ Add Tag</option>
-                </select>
-            </div>
-
-            {/* Dynamic Secondary Select: Groups */}
-            {bulkActionType === "ASSIGN_GROUP" && (
-              <select 
-                className="h-9 bg-white border border-gray-300 text-gray-900 text-xs rounded-lg focus:ring-black focus:border-black block w-40 px-2.5 outline-none shadow-sm animate-in fade-in slide-in-from-left-2"
-                value={targetPayload}
-                onChange={(e) => setTargetPayload(e.target.value)}
-              >
-                <option value="">Select Group...</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <select
+            className={cn(
+              "h-8 bg-white border border-[#c3c4c7] text-[#1d2327] text-[13px] rounded px-2 outline-none focus:border-[#2271b1] cursor-pointer hover:border-[#2271b1] transition-colors",
+              selectedIds.size === 0 && "opacity-60"
             )}
+            value={bulkActionType}
+            onChange={(e) => { setBulkActionType(e.target.value); setTargetPayload(""); }}
+          >
+            <option value="">Bulk Actions ({selectedIds.size})</option>
+            <option value="APPROVE">Mark Active</option>
+            <option value="REJECT">Reject Selected</option>
+            <option value="ADD_TAG">Add Tag</option>
+          </select>
 
-            {/* Dynamic Secondary Select: Tags */}
-            {bulkActionType === "ADD_TAG" && (
-              <select 
-                className="h-9 bg-white border border-gray-300 text-gray-900 text-xs rounded-lg focus:ring-black focus:border-black block w-40 px-2.5 outline-none shadow-sm animate-in fade-in slide-in-from-left-2"
-                value={targetPayload}
-                onChange={(e) => setTargetPayload(e.target.value)}
-              >
-                <option value="">Select Tag...</option>
-                {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            )}
+          {bulkActionType === "ADD_TAG" && (
+            <select className="h-8 bg-white border border-[#c3c4c7] text-[#1d2327] text-[13px] rounded px-2 outline-none focus:border-[#2271b1]" value={targetPayload} onChange={(e) => setTargetPayload(e.target.value)}>
+              <option value="">Select Tag...</option>
+              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
 
-            <button 
-                onClick={executeBulkAction}
-                disabled={isPending || selectedIds.size === 0 || !bulkActionType}
-                className="h-9 px-4 bg-gray-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex items-center gap-2 active:scale-95"
-            >
-                {isPending ? <Loader2 className="w-3 h-3 animate-spin"/> : "Apply"}
-            </button>
-          </div>
-          
+          <button
+            onClick={executeBulkAction}
+            disabled={isPending || selectedIds.size === 0 || !bulkActionType}
+            className="h-8 px-4 bg-[#2271b1] hover:bg-[#135e96] text-white rounded text-[13px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Apply"}
+          </button>
+
           {selectedIds.size === 0 && (
-             <span className="text-xs text-gray-400 italic pl-2 border-l ml-2">Select items to enable actions</span>
+            <span className="text-[12px] text-[#646970] italic">Select items to enable actions</span>
           )}
         </div>
 
         {/* Right: Search */}
-        <div className="flex items-center gap-3 w-full xl:w-auto">
-          <div className="relative w-full sm:w-72 group">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search className="w-4 h-4 text-gray-400 group-focus-within:text-black transition-colors" />
+        <div className="flex items-center gap-2 w-full lg:w-auto">
+          <div className="relative w-full lg:w-64">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
+              <Search className="w-3.5 h-3.5 text-[#8c8f94]" />
             </div>
-            <input 
-              type="text" 
-              className="block w-full p-2 pl-10 text-xs text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:ring-1 focus:ring-black focus:border-black outline-none shadow-sm transition-all h-9" 
-              placeholder="Search affiliate, email, or slug..." 
+            <input
+              type="text"
+              className="block w-full h-8 pl-8 pr-3 text-[13px] text-[#1d2327] border border-[#c3c4c7] bg-white rounded outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]/20 transition-colors placeholder:text-[#8c8f94]"
+              placeholder="Search affiliate, email, or slug..."
               defaultValue={searchParams.get("search") || ""}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSearch(e.currentTarget.value);
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSearch(e.currentTarget.value); }}
             />
           </div>
-          <button className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-gray-600 h-9 w-9 flex items-center justify-center" title="Filter Options">
-            <Filter className="w-4 h-4" />
+          <button className="h-8 w-8 bg-white border border-[#c3c4c7] rounded hover:bg-[#f0f0f1] transition-colors text-[#646970] flex items-center justify-center" title="Filter Options">
+            <Filter className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* 3. DATA GRID (THE MAIN TABLE) */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden ring-1 ring-black/5">
-        <div className="overflow-x-auto min-h-[500px]">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50/80 border-b border-gray-200 font-bold tracking-wider">
-              <tr>
-                <th scope="col" className="p-4 w-10">
-                  <div className="flex items-center">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 text-black bg-white border-gray-300 rounded focus:ring-black focus:ring-2 cursor-pointer transition-all"
-                      checked={data.length > 0 && selectedIds.size === data.length}
-                      onChange={handleSelectAll}
-                    />
-                  </div>
+      {/* 3. TABLE — WP/WooCommerce style */}
+      <div className="bg-white border border-[#c3c4c7] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] text-left border-collapse">
+            <thead>
+              <tr className="border-b border-[#c3c4c7]">
+                <th scope="col" className="px-3 py-2 bg-[#f6f7f7] w-10">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-[#c3c4c7] text-[#2271b1] focus:ring-[#2271b1] cursor-pointer"
+                    checked={data.length > 0 && selectedIds.size === data.length}
+                    onChange={handleSelectAll}
+                  />
                 </th>
                 <SortableHeader label="Affiliate" field="name" currentSort={sortField} currentDir={sortDirection} onSort={handleSort} />
-                <th scope="col" className="px-6 py-3">Commission Rate</th>
+                <th scope="col" className="px-3 py-2 text-[13px] font-semibold text-[#1d2327] bg-[#f6f7f7] whitespace-nowrap">Commission</th>
                 <SortableHeader label="Status" field="status" currentSort={sortField} currentDir={sortDirection} onSort={handleSort} />
-                <th scope="col" className="px-6 py-3">Performance</th>
-                <th scope="col" className="px-6 py-3 min-w-[180px]">Net Revenue</th>
-                <th scope="col" className="px-6 py-3">Tags & Coupons</th>
+                <th scope="col" className="px-3 py-2 text-[13px] font-semibold text-[#1d2327] bg-[#f6f7f7] whitespace-nowrap">Performance</th>
+                <th scope="col" className="px-3 py-2 text-[13px] font-semibold text-[#1d2327] bg-[#f6f7f7] whitespace-nowrap min-w-[160px]">Net Revenue</th>
+                <th scope="col" className="px-3 py-2 text-[13px] font-semibold text-[#1d2327] bg-[#f6f7f7] whitespace-nowrap">Tags & Coupons</th>
                 <SortableHeader label="Wallet" field="balance" currentSort={sortField} currentDir={sortDirection} onSort={handleSort} align="right" />
-                <th scope="col" className="px-6 py-3 text-center w-14">Options</th>
+                <th scope="col" className="px-3 py-2 bg-[#f6f7f7] text-center w-12"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {sortedData.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-16 text-center">
-                    <div className="flex flex-col items-center justify-center gap-3 text-gray-400 animate-in fade-in slide-in-from-bottom-4">
-                      <div className="bg-gray-50 p-4 rounded-full">
-                        <Users className="w-10 h-10 opacity-30 text-gray-500" />
-                      </div>
-                      <p className="text-sm font-medium text-gray-600">No affiliates found.</p>
-                      <p className="text-xs max-w-xs mx-auto text-gray-400">Try adjusting your filters or search query.</p>
-                      <button onClick={() => router.push(pathname)} className="text-blue-600 hover:underline text-xs font-bold mt-2">Reset Filters</button>
+                  <td colSpan={9} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-3 text-[#646970]">
+                      <Users className="w-10 h-10 text-[#c3c4c7]" />
+                      <p className="text-[13px] font-medium text-[#1d2327]">No affiliates found.</p>
+                      <p className="text-[12px] text-[#8c8f94]">Try adjusting your filters or search query.</p>
+                      <button onClick={() => router.push(pathname)} className="text-[#2271b1] hover:text-[#135e96] text-[13px] hover:underline mt-1">Reset Filters</button>
                     </div>
                   </td>
                 </tr>
               ) : (
-                sortedData.map((user) => {
+                sortedData.map((user, idx) => {
                   const commInfo = getCommissionDisplay(user);
-                  
                   return (
-                  <tr key={user.id} className="bg-white hover:bg-gray-50/60 transition-colors group">
-                    <td className="p-4 w-4">
-                      <div className="flex items-center">
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 text-black bg-white border-gray-300 rounded focus:ring-black focus:ring-2 cursor-pointer transition-all"
+                    <tr key={user.id} className={cn(
+                      "border-b border-[#f0f0f1] hover:bg-[#eaecf0] transition-colors group",
+                      idx % 2 === 0 ? "bg-white" : "bg-[#f9f9f9]"
+                    )}>
+
+                      {/* Checkbox */}
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-[#c3c4c7] text-[#2271b1] focus:ring-[#2271b1] cursor-pointer"
                           checked={selectedIds.has(user.id)}
                           onChange={() => handleSelectOne(user.id)}
                         />
-                      </div>
-                    </td>
-                    
-                    {/* Affiliate Identity */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                          {user.avatar ? (
-                            <img src={user.avatar} className="w-full h-full object-cover" alt={user.name} />
-                          ) : (
-                            <span className="font-bold text-gray-500 text-sm">{user.name.charAt(0).toUpperCase()}</span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => openDetails(user)} className="text-sm font-bold text-gray-900 truncate hover:text-blue-600 hover:underline transition-colors text-left">
+                      </td>
+
+                      {/* Affiliate Identity */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-start gap-2.5 min-w-[180px]">
+                          <div className="w-9 h-9 rounded-full bg-[#f0f0f1] border border-[#dcdcde] flex items-center justify-center shrink-0 overflow-hidden">
+                            {user.avatar
+                              ? <img src={user.avatar} className="w-full h-full object-cover" alt={user.name} />
+                              : <span className="font-bold text-[#646970] text-sm">{user.name.charAt(0).toUpperCase()}</span>
+                            }
+                          </div>
+                          <div className="min-w-0 flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => openDetails(user)} className="text-[13px] font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline truncate text-left">
                                 {user.name}
-                            </button>
-                            {user.riskScore > 50 && (
-                                <div title={`High Risk Score: ${user.riskScore}/100`} className="cursor-help bg-red-50 p-0.5 rounded border border-red-100 animate-pulse">
-                                    <ShieldAlert className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                                </div>
+                              </button>
+                              {user.riskScore > 50 && (
+                                <span title={`High Risk: ${user.riskScore}/100`}>
+                                  <ShieldAlert className="w-3.5 h-3.5 text-[#d63638]" />
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-[#50575e] truncate flex items-center gap-1">
+                              <Mail className="w-3 h-3" /> {user.email}
+                            </span>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              <span className="text-[10px] font-mono text-[#646970] bg-[#f0f0f1] px-1.5 py-0.5 rounded border border-[#dcdcde]">#{user.slug}</span>
+                              <span className={cn(
+                                "text-[10px] font-medium px-1.5 py-0.5 rounded border flex items-center gap-0.5",
+                                user.tierName === "Default" || !user.tierName
+                                  ? "bg-[#f0f0f1] text-[#646970] border-[#dcdcde]"
+                                  : "bg-[#fcf9e8] text-[#9a6700] border-[#dba617]/30"
+                              )}>
+                                <Trophy className="w-2.5 h-2.5" /> {user.tierName || "Starter"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Commission Rate */}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className={cn(
+                            "text-[12px] font-semibold px-2 py-0.5 rounded border w-fit",
+                            commInfo.isCustom ? "bg-[#f0e6ff] text-[#7928ca] border-[#d8b4fe]"
+                              : "bg-[#f0f0f1] text-[#1d2327] border-[#dcdcde]"
+                          )}>
+                            {commInfo.main}
+                          </span>
+                          <span className="text-[11px] text-[#8c8f94]">{commInfo.sub}</span>
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-3 py-3">
+                        <span className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase border",
+                          user.status === "ACTIVE" ? "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/30" :
+                          user.status === "PENDING" ? "bg-[#fcf9e8] text-[#9a6700] border-[#dba617]/30" :
+                          user.status === "SUSPENDED" ? "bg-[#fcebec] text-[#d63638] border-[#d63638]/30" :
+                          "bg-[#f0f0f1] text-[#646970] border-[#dcdcde]"
+                        )}>
+                          {user.status}
+                        </span>
+                      </td>
+
+                      {/* Performance */}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <CheckCircle className="w-3 h-3 text-[#00a32a]" />
+                            <span className="text-[13px] font-semibold text-[#1d2327]">{user.referralCount}</span>
+                            <span className="text-[11px] text-[#50575e]">sales</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <ExternalLink className="w-3 h-3 text-[#2271b1]" />
+                            <span className="text-[12px] text-[#50575e]">{user.visitCount}</span>
+                            <span className="text-[11px] text-[#50575e]">clicks</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Net Revenue */}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-1 text-[12px]">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-[#50575e]">Gross Sales:</span>
+                            <span className="text-[#1d2327] font-medium">{formatPrice(user.salesTotal)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-[#50575e]">Commission:</span>
+                            <span className="text-[#d63638]">({formatPrice(user.commissionTotal)})</span>
+                          </div>
+                          <div className="border-t border-[#dcdcde] pt-1 flex justify-between gap-4">
+                            <span className="text-[#1d2327] font-semibold">Net Profit:</span>
+                            <span className="font-semibold text-[#00a32a]">{formatPrice(user.netRevenue)}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Tags & Coupons */}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-1.5">
+                          {user.coupons.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {user.coupons.slice(0, 1).map((c, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#fdf2f8] text-[#c026d3] border border-[#e879f9]/30 text-[11px] font-mono">
+                                  <Ticket className="w-2.5 h-2.5" /> {c}
+                                </span>
+                              ))}
+                              {user.coupons.length > 1 && <span className="text-[11px] text-[#646970] bg-[#f0f0f1] px-1.5 rounded border border-[#dcdcde]">+{user.coupons.length - 1}</span>}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-[#8c8f94] italic flex items-center gap-1"><Ticket className="w-3 h-3" /> No coupons</span>
+                          )}
+                          <div className="flex flex-wrap gap-1">
+                            {user.tags.length > 0 ? user.tags.slice(0, 2).map((t, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#f0f6fc] text-[#2271b1] border border-[#c8d7e1] text-[11px]">
+                                <Tag className="w-2.5 h-2.5" /> {t}
+                              </span>
+                            )) : (
+                              <span className="text-[11px] text-[#8c8f94] italic">No tags</span>
                             )}
                           </div>
-                          <span className="text-[11px] text-gray-500 truncate font-mono mt-0.5 flex items-center gap-1">
-                            <Mail className="w-3 h-3"/> {user.email}
-                          </span>
-                          <div className="flex items-center gap-1.5 mt-1.5">
-                            <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
-                                #{user.slug}
-                            </span>
-                            <span className={cn( "text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 uppercase tracking-wide", user.tierName === "Default" || !user.tierName 
-                              ? "bg-gray-50 text-gray-500 border-gray-200" 
-                              : "bg-yellow-50 text-yellow-700 border-yellow-200" 
-                              )}>
-                              <Trophy className="w-3 h-3" /> 
-                              {user.tierName || "Starter"}
-                            </span>
-                          </div>
                         </div>
-                      </div>
-                    </td>
-                    {/* Commission Rate */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col items-start gap-1">
-                        <span className={cn( "text-xs font-bold px-2 py-0.5 rounded border shadow-sm", commInfo.isCustom ? "bg-purple-100 text-purple-700 border-purple-200" : commInfo.isDefault 
-                          ? "bg-gray-50 text-gray-700 border-gray-200" : "bg-blue-50 text-blue-700 border-blue-200" )}> {commInfo.main}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-medium">
-                          {commInfo.sub}
-                        </span>
-                      </div>
-                    </td>
-                    {/* Status */}
-                   <td className="px-6 py-4">
-                      <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border shadow-sm",
-                        user.status === "ACTIVE" ? "bg-green-50 text-green-700 border-green-200" :
-                        user.status === "PENDING" ? "bg-orange-50 text-orange-700 border-orange-200 animate-pulse" :
-                        user.status === "SUSPENDED" ? "bg-red-50 text-red-700 border-red-200" :"bg-gray-100 text-gray-600 border-gray-200" 
-                       )}>
-                       {user.status}
-                     </span>
-                    </td>
-                    {/* Stats */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5" title="Total Conversions">
-                            <CheckCircle className="w-3 h-3 text-green-500" />
-                            <span className="text-sm font-bold text-gray-900">{user.referralCount}</span>
-                            <span className="text-[10px] text-gray-400">sales</span>
-                        </div>
-                        <div className="flex items-center gap-1.5" title="Total Clicks">
-                            <ExternalLink className="w-3 h-3 text-blue-400" />
-                            <span className="text-xs text-gray-600">{user.visitCount}</span>
-                            <span className="text-[10px] text-gray-400">clicks</span>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Net Revenue */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1.5 w-full max-w-[180px] bg-gray-50/50 p-2 rounded-lg border border-gray-100">
-                        <div className="flex justify-between items-center text-[10px]">
-                          <span className="text-gray-500">Gross Sales:</span>
-                          <span className="font-medium text-gray-700">{formatPrice(user.salesTotal)}</span>
+                      {/* Wallet */}
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="font-mono font-semibold text-[13px] text-[#1d2327]">{formatPrice(user.balance)}</span>
+                          <span className="text-[11px] text-[#50575e]">Lifetime: {formatPrice(user.totalEarnings)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[10px]">
-                          <span className="text-gray-500">Commission:</span>
-                          <span className="font-medium text-red-600">({formatPrice(user.commissionTotal)})</span>
-                        </div>
-                        <div className="h-px bg-gray-200 w-full my-0.5"></div>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-700 font-bold">Net Profit:</span>
-                          <span className="font-bold text-emerald-700">{formatPrice(user.netRevenue)}</span>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Coupons & Tags */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-2 items-start">
-                        {user.coupons.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {user.coupons.slice(0, 1).map((c, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 border border-pink-100 text-[10px] font-medium font-mono">
-                                <Ticket className="w-3 h-3" /> {c}
-                              </span>
-                            ))}
-                            {user.coupons.length > 1 && <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 rounded border">+{user.coupons.length - 1}</span>}
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-gray-400 italic flex items-center gap-1"><Ticket className="w-3 h-3"/> No coupons</span>
-                        )}
-                        
-                        <div className="flex flex-wrap gap-1">
-                          {user.tags.length > 0 ? user.tags.slice(0, 2).map((t, i) => (
-                            <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 text-[10px]">
-                              <Tag className="w-3 h-3" /> {t}
-                            </span>
-                          )) : (
-                            <span className="text-[10px] text-gray-400 italic">No tags</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Balance */}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex flex-col items-end">
-                        <div className="font-mono font-bold text-sm text-gray-900 bg-gray-100 px-2 py-0.5 rounded w-fit">
-                            {formatPrice(user.balance)}
-                        </div>
-                        <span className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
-                            Lifetime: {formatPrice(user.totalEarnings)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Actions Menu */}
-                    <td className="px-6 py-4 text-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button disabled={isPending} className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-black/5">
-                            {isPending ? <Loader2 className="w-4 h-4 animate-spin"/> : <MoreVertical className="w-4 h-4" />}
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 shadow-xl border-gray-200 p-1">
-                          <DropdownMenuLabel className="text-xs font-bold text-gray-500 uppercase px-2 py-1.5">Manage Affiliate</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => openDetails(user)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50">
-                            <Eye className="w-3.5 h-3.5 mr-2 text-gray-500" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setEditingCommissionUser(user); }} 
-                            className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50"
->
-                          <Percent className="w-3.5 h-3.5 mr-2 text-gray-500" /> Set Commission Rate
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem onClick={() => setPayingUser(user)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded hover:bg-gray-50 focus:bg-gray-50"
->
-                          <CreditCard className="w-3.5 h-3.5 mr-2 text-gray-500" /> Pay / Bonus
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuSeparator />
-                          
-                          {user.status !== "ACTIVE" && (
-                            <DropdownMenuItem onClick={() => handleApprove(user.id)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded text-green-700 hover:bg-green-50 focus:bg-green-50 focus:text-green-800">
-                              <UserCheck className="w-3.5 h-3.5 mr-2" /> Approve Account
+                      {/* Options dropdown */}
+                      <td className="px-3 py-3 text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button disabled={isPending} className="p-1.5 text-[#646970] hover:text-[#1d2327] hover:bg-[#f0f0f1] rounded transition-colors outline-none">
+                              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48 border-[#c3c4c7] shadow-lg p-1">
+                            <DropdownMenuLabel className="text-[11px] font-semibold text-[#646970] uppercase px-2 py-1">Manage Affiliate</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-[#dcdcde]" />
+                            <DropdownMenuItem onClick={() => openDetails(user)} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#1d2327] hover:bg-[#f0f6fc] hover:text-[#2271b1] focus:bg-[#f0f6fc]">
+                              <Eye className="w-3.5 h-3.5 mr-2 text-[#646970]" /> View Details
                             </DropdownMenuItem>
-                          )}
-                          
-                          {user.status !== "REJECTED" && (
-                            <DropdownMenuItem onClick={() => handleReject(user.id)} className="cursor-pointer text-xs font-medium px-2 py-2 rounded text-red-700 hover:bg-red-50 focus:bg-red-50 focus:text-red-800">
-                              <UserX className="w-3.5 h-3.5 mr-2" /> Reject Account
+                            <DropdownMenuItem onClick={() => setEditingCommissionUser(user)} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#1d2327] hover:bg-[#f0f6fc] hover:text-[#2271b1] focus:bg-[#f0f6fc]">
+                              <Percent className="w-3.5 h-3.5 mr-2 text-[#646970]" /> Set Commission Rate
                             </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                  )
+                            <DropdownMenuItem onClick={() => setPayingUser(user)} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#1d2327] hover:bg-[#f0f6fc] hover:text-[#2271b1] focus:bg-[#f0f6fc]">
+                              <CreditCard className="w-3.5 h-3.5 mr-2 text-[#646970]" /> Pay / Bonus
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-[#dcdcde]" />
+                            {user.status !== "ACTIVE" && (
+                              <DropdownMenuItem onClick={() => handleApprove(user.id)} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#00a32a] hover:bg-[#edfaef] focus:bg-[#edfaef]">
+                                <UserCheck className="w-3.5 h-3.5 mr-2" /> Approve Account
+                              </DropdownMenuItem>
+                            )}
+                            {user.status !== "REJECTED" && (
+                              <DropdownMenuItem onClick={() => handleReject(user.id)} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#d63638] hover:bg-[#fcebec] focus:bg-[#fcebec]">
+                                <UserX className="w-3.5 h-3.5 mr-2" /> Reject Account
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
                 })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* 4. FOOTER PAGINATION */}
-        <div className="bg-white border-t border-gray-200 p-4 flex items-center justify-between">
-          <div className="text-xs text-gray-500">
-            Showing <span className="font-bold text-gray-900">{data.length}</span> of <span className="font-bold text-gray-900">{totalEntries}</span> affiliates
+        {/* 4. PAGINATION — WP style */}
+        <div className="border-t border-[#c3c4c7] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white">
+          <div className="text-[13px] text-[#646970]">
+            Showing <span className="font-semibold text-[#1d2327]">{data.length}</span> of <span className="font-semibold text-[#1d2327]">{totalEntries}</span> affiliates
           </div>
-          <div className="flex items-center gap-2">
-            <button 
-              disabled={currentPage <= 1} 
+          <div className="flex items-center gap-1.5">
+            <button
+              disabled={currentPage <= 1}
               onClick={() => handlePageChange(currentPage - 1)}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+              className="flex items-center gap-1 px-3 py-1 text-[13px] text-[#2271b1] bg-white border border-[#c3c4c7] rounded hover:bg-[#f0f0f1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              <ChevronLeft className="w-3 h-3" /> Previous
+              <ChevronLeft className="w-3.5 h-3.5" /> Previous
             </button>
-            <span className="text-xs font-medium text-gray-900 px-2">
-                Page {currentPage} of {totalPages}
+            <span className="text-[13px] text-[#646970] px-3">
+              Page {currentPage} of {totalPages}
             </span>
-            <button 
-              disabled={currentPage >= totalPages} 
+            <button
+              disabled={currentPage >= totalPages}
               onClick={() => handlePageChange(currentPage + 1)}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+              className="flex items-center gap-1 px-3 py-1 text-[13px] text-[#2271b1] bg-white border border-[#c3c4c7] rounded hover:bg-[#f0f0f1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              Next <ChevronRight className="w-3 h-3" />
+              Next <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -705,12 +645,12 @@ export default function AffiliateUsersTable({
 
 function SortableHeader({ label, field, currentSort, currentDir, onSort, align = 'left' }: any) {
     return (
-        <th scope="col" className={cn("px-6 py-3 cursor-pointer group select-none", align === 'right' && "text-right")}>
-            <div className={cn("flex items-center gap-1.5", align === 'right' && "justify-end")} onClick={() => onSort(field)}>
+        <th scope="col" className={cn("px-3 py-2 text-[13px] font-semibold text-[#1d2327] bg-[#f6f7f7] whitespace-nowrap cursor-pointer group select-none", align === 'right' && "text-right")}>
+            <div className={cn("flex items-center gap-1", align === 'right' && "justify-end")} onClick={() => onSort(field)}>
                 {label}
                 <ArrowUpDown className={cn(
                     "w-3 h-3 transition-colors",
-                    currentSort === field ? "text-black" : "text-gray-300 group-hover:text-gray-500"
+                    currentSort === field ? "text-[#2271b1]" : "text-[#c3c4c7] group-hover:text-[#50575e]"
                 )} />
             </div>
         </th>
@@ -733,27 +673,6 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
-function TabButton({ label, count, isActive, onClick, activeColor = "text-black border-black" }: any) {
-    return (
-        <button
-            onClick={onClick}
-            className={cn(
-                "pb-2 text-sm font-medium border-b-2 transition-all flex items-center gap-2 px-1 whitespace-nowrap",
-                isActive ? activeColor : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200"
-            )}
-        >
-            {label}
-            {count !== undefined && (
-                <span className={cn(
-                    "text-[10px] px-1.5 py-0.5 rounded-full min-w-[20px] text-center font-bold",
-                    isActive ? "bg-black text-white" : "bg-gray-100 text-gray-600"
-                )}>
-                    {count}
-                </span>
-            )}
-        </button>
-    );
-}
 
 // --- DETAILS DRAWER COMPONENT ---
 function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
@@ -835,10 +754,6 @@ function DetailsDrawer({ isOpen, onClose, user, formatPrice }: any) {
                                 <p className="font-bold text-gray-900 mt-1 flex items-center gap-1.5">
                                     <Users className="w-4 h-4 text-indigo-500"/> {user.tierName}
                                 </p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 font-medium uppercase mb-1">Group Assignment</p>
-                                <p className="font-medium text-gray-900 mt-1">{user.groupName || "Default Group"}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 font-medium uppercase mb-1">Fraud Risk Score</p>

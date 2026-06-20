@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { DecimalMath } from "@/lib/decimal-math";
-import { getCachedAffiliateSettings, getCachedGlobalRules } from "@/lib/settings-cache";
+import { getCachedAffiliateSettings, getCachedGlobalRules } from "@/lib/global-settings-cache";
 import { distributeMLMCommission } from "./_services/mlm-network-service";
 import { detectSelfReferral, checkVelocity } from "./_services/fraud-service";
 import { auditService } from "@/lib/audit-service";

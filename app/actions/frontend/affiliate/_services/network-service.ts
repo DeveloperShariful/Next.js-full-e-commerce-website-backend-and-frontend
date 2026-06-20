@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { getCachedMLMConfig } from "@/lib/settings-cache"; // ✅ FIXED: Importing the cached JSON config
+import { getCachedMLMConfig } from "@/lib/global-settings-cache";
 
 export interface NetworkNode {
   id: string;

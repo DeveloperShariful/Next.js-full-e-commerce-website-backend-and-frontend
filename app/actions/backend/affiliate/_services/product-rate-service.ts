@@ -41,11 +41,11 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
       orderBy: { createdAt: "desc" },
       include: {
         product: {
-          select: { 
-            id: true, 
-            name: true, 
-            slug: true, 
-            price: true, 
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            price: true,
             images: true,
             affiliateCommissionRate: true,
             affiliateCommissionType: true
@@ -53,8 +53,10 @@ export async function getAllRates(page: number = 1, limit: number = 20, search?:
         },
         affiliate: {
           select: { id: true, slug: true, user: { select: { name: true, email: true } } }
+        },
+        tier: {
+          select: { id: true, name: true, color: true }
         }
-        // ✅ FIXED: Removed Group inclusion
       }
     })
   ]);
@@ -92,14 +94,14 @@ export async function upsertRateAction(data: {
   type: CommissionType;
   isDisabled: boolean;
   affiliateId?: string | null;
-  // groupId?: string | null; ✅ Removed
+  tierId?: string | null;
 }): Promise<ActionResponse> {
   try {
     const actor = await protectAction("MANAGE_CONFIGURATION");
     const rateDecimal = DecimalMath.toDecimal(data.rate);
 
     const productExists = await db.product.findFirst({
-        where: { id: data.productId, deletedAt: null }
+      where: { id: data.productId, deletedAt: null }
     });
     if (!productExists) return { success: false, message: "Product not found or deleted." };
 
@@ -108,7 +110,7 @@ export async function upsertRateAction(data: {
       type: data.type,
       isDisabled: data.isDisabled,
       affiliateId: data.affiliateId || null,
-      // groupId removed
+      tierId: data.tierId || null,
     };
 
     if (data.id) {
@@ -116,36 +118,43 @@ export async function upsertRateAction(data: {
         where: { id: data.id },
         data: payload
       });
-    } 
-    else {
-      if (data.affiliateId) {
-        // ✅ FIXED: Only using Unique index for Affiliate since Group index is removed
-        await db.affiliateProductRate.upsert({
-          where: {
-            productId_affiliateId: {
-              productId: data.productId,
-              affiliateId: data.affiliateId
-            }
-          },
-          create: { productId: data.productId, ...payload },
-          update: payload
+    } else if (data.affiliateId) {
+      await db.affiliateProductRate.upsert({
+        where: {
+          productId_affiliateId: {
+            productId: data.productId,
+            affiliateId: data.affiliateId
+          }
+        },
+        create: { productId: data.productId, ...payload },
+        update: payload
+      });
+    } else if (data.tierId) {
+      await db.affiliateProductRate.upsert({
+        where: {
+          productId_tierId: {
+            productId: data.productId,
+            tierId: data.tierId
+          }
+        },
+        create: { productId: data.productId, ...payload },
+        update: payload
+      });
+    } else {
+      // Global override (no affiliate, no tier)
+      const existingGlobal = await db.affiliateProductRate.findFirst({
+        where: { productId: data.productId, affiliateId: null, tierId: null }
+      });
+
+      if (existingGlobal) {
+        await db.affiliateProductRate.update({
+          where: { id: existingGlobal.id },
+          data: payload
         });
       } else {
-        // ✅ FIXED: Global rate update (null affiliateId)
-        const existingGlobal = await db.affiliateProductRate.findFirst({
-          where: { productId: data.productId, affiliateId: null }
+        await db.affiliateProductRate.create({
+          data: { productId: data.productId, ...payload }
         });
-
-        if (existingGlobal) {
-          await db.affiliateProductRate.update({
-            where: { id: existingGlobal.id },
-            data: payload
-          });
-        } else {
-          await db.affiliateProductRate.create({
-            data: { productId: data.productId, ...payload }
-          });
-        }
       }
     }
 

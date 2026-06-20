@@ -152,40 +152,127 @@ const MLMConfigZod = z.object({
 
 export const getCachedMLMConfig = unstable_cache(
   async () => {
-    try {
-      const settings = await db.storeSettings.findUnique({
-        where: { id: "settings" },
-        select: { mlmConfig: true },
-      });
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { mlmConfig: true },
+    });
 
-      // 100% Strict parsing without 'any' or 'as'
-      const parsedData = MLMConfigZod.safeParse(settings?.mlmConfig);
-      const config = parsedData.success ? parsedData.data : MLMConfigZod.parse({});
+    const parsedData = MLMConfigZod.safeParse(settings?.mlmConfig);
+    const config = parsedData.success ? parsedData.data : MLMConfigZod.parse({});
 
-      return {
-        id: "mlm_config", // Mocking ID for backward compatibility
-        isEnabled: config.isEnabled,
-        maxLevels: config.maxLevels,
-        commissionBasis: config.commissionBasis,
-        levelRates: config.levelRates,
-      };
-    } catch (error) {
-      console.error("⚠️ Cache Error (MLMConfig):", error);
-      return {
-        id: "mlm_config",
-        isEnabled: false,
-        maxLevels: 3,
-        commissionBasis: "SALES_AMOUNT",
-        levelRates: { "1": 10, "2": 5, "3": 2 },
-      };
-    }
+    return {
+      isEnabled: config.isEnabled,
+      maxLevels: config.maxLevels,
+      commissionBasis: config.commissionBasis,
+      levelRates: config.levelRates,
+    };
   },
-  ["mlm-config-cache-key"],
-  { tags: ["store-settings", "mlm-config"], revalidate: 86400 } // ✅ Tags updated to invalidate when settings change
+  ["mlm-config-cache"],
+  { tags: ["settings", "mlm-config"], revalidate: 3600 }
 );
 
 // ============================================================================
-// 9. 🚀 AFFILIATE STATUS (REQUEST DEDUPLICATION)
+// 9. AFFILIATE PROGRAM SETTINGS CACHE
+// ট্যাগ: 'affiliate-config'
+// ============================================================================
+
+const AffiliateConfigZod = z.object({
+  programName: z.string().optional().default("Affiliate Program"),
+  commissionRate: z.number().optional().default(10),
+  commissionType: z.enum(["PERCENTAGE", "FIXED"]).optional().default("PERCENTAGE"),
+  excludeShipping: z.boolean().optional().default(true),
+  excludeTax: z.boolean().optional().default(true),
+  cookieDuration: z.number().optional().default(30),
+  allowSelfReferral: z.boolean().optional().default(false),
+  holdingPeriod: z.number().optional().default(14),
+  autoApprovePayout: z.boolean().optional().default(false),
+  isLifetimeLinkOnPurchase: z.boolean().optional().default(false),
+  zeroValueReferrals: z.boolean().optional().default(false),
+  clickDedupWindowMinutes: z.number().optional().default(1),
+});
+
+const GeneralConfigZod = z.object({
+  enableAffiliateProgram: z.boolean().optional().default(false),
+});
+
+export const getCachedAffiliateSettings = unstable_cache(
+  async () => {
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { affiliateConfig: true, generalConfig: true },
+    });
+
+    const affParse = AffiliateConfigZod.safeParse(settings?.affiliateConfig);
+    const genParse = GeneralConfigZod.safeParse(settings?.generalConfig);
+
+    const affConfig = affParse.success ? affParse.data : AffiliateConfigZod.parse({});
+    const genConfig = genParse.success ? genParse.data : GeneralConfigZod.parse({});
+
+    return {
+      isActive: genConfig.enableAffiliateProgram,
+      programName: affConfig.programName,
+      commissionRate: affConfig.commissionRate,
+      commissionType: affConfig.commissionType,
+      excludeShipping: affConfig.excludeShipping,
+      excludeTax: affConfig.excludeTax,
+      cookieDuration: affConfig.cookieDuration,
+      allowSelfReferral: affConfig.allowSelfReferral,
+      holdingPeriod: affConfig.holdingPeriod,
+      autoApprovePayout: affConfig.autoApprovePayout,
+      isLifetimeLinkOnPurchase: affConfig.isLifetimeLinkOnPurchase,
+      zeroValueReferrals: affConfig.zeroValueReferrals,
+      clickDedupWindowMinutes: affConfig.clickDedupWindowMinutes,
+    };
+  },
+  ["affiliate-settings-cache"],
+  { tags: ["settings", "affiliate-config"], revalidate: 3600 }
+);
+
+// ============================================================================
+// 10. FRAUD RULES CACHE
+// ট্যাগ: 'fraud-rules'
+// ============================================================================
+
+const FraudRuleZod = z.object({
+  type: z.enum(["IP_CLICK_LIMIT", "CONVERSION_RATE_LIMIT", "ORDER_VALUE_LIMIT", "BLACKLIST_COUNTRY"]),
+  value: z.string(),
+  action: z.enum(["BLOCK", "FLAG", "SUSPEND"]),
+  reason: z.string().optional(),
+});
+
+const FraudRulesArrayZod = z.array(FraudRuleZod).default([]);
+
+export const getCachedFraudRules = unstable_cache(
+  async () => {
+    const settings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { affiliateFraudRules: true },
+    });
+
+    const parsedRules = FraudRulesArrayZod.safeParse(settings?.affiliateFraudRules);
+    return parsedRules.success ? parsedRules.data : [];
+  },
+  ["fraud-rules-cache"],
+  { tags: ["settings", "fraud-rules"], revalidate: 3600 }
+);
+
+// ============================================================================
+// 11. GLOBAL COMMISSION RULES CACHE
+// ট্যাগ: 'commission-rules'
+// ============================================================================
+export const getCachedGlobalRules = unstable_cache(
+  async () => {
+    return await db.affiliateCommissionRule.findMany({
+      where: { isActive: true },
+      orderBy: { priority: "desc" },
+    });
+  },
+  ["commission-rules-cache"],
+  { tags: ["commission-rules"], revalidate: 3600 }
+);
+
+// ============================================================================
+// 12. 🚀 AFFILIATE STATUS (REQUEST DEDUPLICATION)
 // ============================================================================
 export const getAffiliateStatusSafe = cache(async (userId?: string) => {
   try {

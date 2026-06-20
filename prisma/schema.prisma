@@ -2370,6 +2370,7 @@ model AffiliateTier {
   isDefault       Boolean            @default(false)
   payoutDelayDays Int                @default(30)
   affiliates      AffiliateAccount[]
+  productRates    AffiliateProductRate[]
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -2540,20 +2541,24 @@ model AffiliateLink {
 }
 
 model AffiliateProductRate {
-  id             String           @id @default(uuid())
+  id             String            @id @default(uuid())
   productId      String
-  product        Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
   affiliateId    String?
   affiliate      AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  rate           Decimal          @db.Decimal(12, 4)
-  type           CommissionType   @default(FIXED) 
-  isDisabled     Boolean          @default(false)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  
+  tierId         String?
+  tier           AffiliateTier?    @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  rate           Decimal           @db.Decimal(12, 4)
+  type           CommissionType    @default(FIXED)
+  isDisabled     Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
   @@unique([productId, affiliateId])
+  @@unique([productId, tierId])
   @@index([productId])
   @@index([affiliateId])
+  @@index([tierId])
 }
 
 // ==========================================

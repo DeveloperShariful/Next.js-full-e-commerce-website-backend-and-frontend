@@ -4,43 +4,99 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { AffiliateProductRate, CommissionType } from "@prisma/client";
-import { Plus, Search, Edit, Trash2, X, Loader2, Package, User, Users, CheckCircle, Ban, DollarSign, Percent, AlertCircle } from "lucide-react";
+import { CommissionType, Prisma } from "@prisma/client";
+import {
+  Plus, Search, X, Loader2, Package,
+  User, Users, CheckCircle, Ban, Percent, AlertCircle, Trophy,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { deleteRateAction, upsertRateAction, searchProducts } from "@/app/actions/backend/affiliate/_services/product-rate-service";
+import {
+  deleteRateAction,
+  upsertRateAction,
+  searchProducts,
+} from "@/app/actions/backend/affiliate/_services/product-rate-service";
 import { searchAffiliatesForDropdown } from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
-import { getAllGroups } from "@/app/actions/backend/affiliate/_services/group-service";
+import { getAllTiers } from "@/app/actions/backend/affiliate/_services/tier-service";
 
-interface ProductRateWithRelations extends AffiliateProductRate {
-  product: { 
-      id: string; 
-      name: string; 
-      price: any; 
-      affiliateCommissionRate: any; 
-      affiliateCommissionType: any; 
-  };
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ProductInfo {
+  id: string;
+  name: string;
+  price: Prisma.Decimal | number | string;
+  affiliateCommissionRate: Prisma.Decimal | number | string | null;
+  affiliateCommissionType: CommissionType | null;
+}
+
+interface TierInfo {
+  id: string;
+  name: string;
+  color?: string | null;
+}
+
+interface ProductRateWithRelations {
+  id: string;
+  productId: string;
+  rate: Prisma.Decimal | number | string;
+  type: CommissionType;
+  isDisabled: boolean;
+  affiliateId: string | null;
+  tierId: string | null;
+  product: ProductInfo;
   affiliate?: { id: string; slug: string; user: { name: string | null } } | null;
-  group?: { id: string; name: string } | null;
+  tier?: TierInfo | null;
+}
+
+interface ProductSearchResult {
+  id: string;
+  name: string;
+  price: Prisma.Decimal | number | string;
+  affiliateCommissionRate?: Prisma.Decimal | number | string | null;
+}
+
+interface TargetSearchResult {
+  id: string;
+  name: string;
+  sub?: string;
+  color?: string | null;
+}
+
+interface RateFormData {
+  productId: string;
+  targetType: "GLOBAL" | "AFFILIATE" | "TIER";
+  targetId: string;
+  rate: number | string;
+  type: CommissionType;
+  isDisabled: boolean;
+}
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialData: ProductRateWithRelations | null;
+  onSuccess: () => void;
 }
 
 interface Props {
   initialRates: ProductRateWithRelations[];
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function ProductRateManager({ initialRates }: Props) {
   const [rates, setRates] = useState(initialRates);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRate, setEditingRate] = useState<ProductRateWithRelations | null>(null);
   const [search, setSearch] = useState("");
-  
-  const { formatPrice, symbol } = useGlobalStore();
 
-  const filteredRates = rates.filter(r => 
+  const { formatPrice } = useGlobalStore();
+
+  const filteredRates = rates.filter((r) =>
     r.product.name.toLowerCase().includes(search.toLowerCase()) ||
     r.affiliate?.user.name?.toLowerCase().includes(search.toLowerCase()) ||
-    r.group?.name.toLowerCase().includes(search.toLowerCase())
+    r.tier?.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleCreate = () => {
@@ -54,425 +110,648 @@ export default function ProductRateManager({ initialRates }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if(!confirm("Remove this commission override?")) return;
-    
+    if (!confirm("Remove this commission override?")) return;
     const res = await deleteRateAction(id);
-    if(res.success) {
-        setRates(prev => prev.filter(r => r.id !== id));
-        toast.success(res.message);
+    if (res.success) {
+      setRates((prev) => prev.filter((r) => r.id !== id));
+      toast.success(res.message);
     } else {
-        toast.error(res.message);
+      toast.error(res.message);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-         <div className="relative w-full sm:w-96">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input 
-              placeholder="Search product, affiliate..." 
-              className="pl-9 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-         </div>
-         <button 
-            onClick={handleCreate}
-            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all shadow-sm"
-         >
-            <Plus className="w-4 h-4" /> Add New Rate
-         </button>
+    <div className="space-y-0">
+      {/* ── WP Toolbar ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#c3c4c7]">
+        <p className="text-[13px] text-[#50575e]">
+          Product-level overrides take priority over global and tier rates.
+          <span className="hidden sm:inline">
+            {" "}{rates.length} override{rates.length !== 1 ? "s" : ""} defined.
+          </span>
+        </p>
+        <button
+          onClick={handleCreate}
+          className="inline-flex items-center gap-1.5 bg-[#2271b1] hover:bg-[#135e96] text-white text-[13px] font-medium px-3 py-[5px] rounded border border-[#135e96] transition-colors whitespace-nowrap shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add Override
+        </button>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase text-xs font-semibold">
-             <tr>
-                <th className="px-6 py-3">Product</th>
-                <th className="px-6 py-3">Target</th>
-                <th className="px-6 py-3">Override Rate</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Actions</th>
-             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-             {filteredRates.length === 0 ? (
-                <tr>
-                    <td colSpan={5} className="p-12 text-center text-gray-500 flex flex-col items-center">
-                        <Package className="w-10 h-10 text-gray-300 mb-2"/>
-                        <p>No product overrides defined.</p>
-                    </td>
-                </tr>
-             ) : (
-                filteredRates.map(rate => (
-                   <tr key={rate.id} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="px-6 py-4">
-                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gray-100 rounded-lg border">
-                                <Package className="w-4 h-4 text-gray-500" />
-                            </div>
-                            <div>
-                                <span className="font-medium text-gray-900 block">{rate.product.name}</span>
-                                <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                                    Price: {formatPrice(rate.product.price)} • Default: 
-                                    {rate.product.affiliateCommissionRate 
-                                        ? `${Number(rate.product.affiliateCommissionRate)}${rate.product.affiliateCommissionType === 'PERCENTAGE' ? '%' : symbol}` 
-                                        : 'Global'}
-                                </span>
-                            </div>
-                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                         {rate.affiliate ? (
-                            <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50 px-2 py-1 rounded-md w-fit text-xs font-bold border border-blue-100">
-                                <User className="w-3 h-3" /> {rate.affiliate.user.name}
-                            </div>
-                         ) : rate.group ? (
-                            <div className="flex items-center gap-1.5 text-purple-700 bg-purple-50 px-2 py-1 rounded-md w-fit text-xs font-bold border border-purple-100">
-                                <Users className="w-3 h-3" /> {rate.group.name}
-                            </div>
-                         ) : (
-                            <span className="text-gray-500 italic text-xs bg-gray-100 px-2 py-1 rounded border">Global Override</span>
-                         )}
-                      </td>
-                      <td className="px-6 py-4">
-                         {rate.isDisabled ? (
-                            <span className="text-gray-400 line-through text-xs">Commission Disabled</span>
-                         ) : (
-                            <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded border">
-                                    {rate.type === "FIXED" ? symbol : ""}{Number(rate.rate)}{rate.type === "PERCENTAGE" ? "%" : ""}
-                                </span>
-                            </div>
-                         )}
-                      </td>
-                      <td className="px-6 py-4">
-                         {rate.isDisabled ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-100">
-                                <Ban className="w-3 h-3" /> Disabled
-                            </span>
-                         ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-50 text-green-600 border border-green-100">
-                                <CheckCircle className="w-3 h-3" /> Active
-                            </span>
-                         )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                         <div className="flex justify-end gap-2 transition-opacity">
-                            <button onClick={() => handleEdit(rate)} className="p-2 text-gray-500 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"><Edit className="w-4 h-4" /></button>
-                            <button onClick={() => handleDelete(rate.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                         </div>
-                      </td>
-                   </tr>
-                ))
-             )}
-          </tbody>
-        </table>
+      {/* ── Search ─────────────────────────────────────────────────────────── */}
+      <div className="pt-3 pb-2">
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#646970]" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search product, affiliate, tier…"
+            className="w-full pl-8 pr-3 py-[5px] text-[13px] border border-[#8c8f94] rounded bg-white text-[#1d2327] placeholder-[#646970] focus:outline-none focus:border-[#2271b1] focus:ring-[3px] focus:ring-[#2271b1]/25"
+          />
+        </div>
       </div>
+
+      {/* ── WP Widefat Table ───────────────────────────────────────────────── */}
+      <div className="border border-[#c3c4c7] rounded-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] text-[#1d2327]">
+            <thead>
+              <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7]">
+                <th className="text-left px-3 py-2 font-semibold text-[#1d2327] whitespace-nowrap">
+                  Product
+                </th>
+                <th className="text-left px-3 py-2 font-semibold text-[#1d2327] whitespace-nowrap hidden md:table-cell">
+                  Applies To
+                </th>
+                <th className="text-left px-3 py-2 font-semibold text-[#1d2327] whitespace-nowrap">
+                  Override Rate
+                </th>
+                <th className="text-left px-3 py-2 font-semibold text-[#1d2327] whitespace-nowrap hidden sm:table-cell">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRates.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-10 text-center text-[#50575e]">
+                    <div className="flex flex-col items-center gap-2">
+                      <Package className="w-8 h-8 text-[#c3c4c7]" />
+                      <span>
+                        {search
+                          ? "No overrides match your search."
+                          : "No product overrides defined yet."}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredRates.map((rate, idx) => (
+                  <tr
+                    key={rate.id}
+                    className={cn(
+                      "group border-b border-[#c3c4c7] last:border-0 hover:bg-[#eaecf0] transition-colors",
+                      idx % 2 === 0 ? "bg-white" : "bg-[#f9f9f9]"
+                    )}
+                  >
+                    {/* Product */}
+                    <td className="px-3 py-2 align-middle">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <Package className="w-4 h-4 text-[#646970] shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="font-medium text-[#1d2327] block truncate max-w-[160px] sm:max-w-[240px]">
+                            {rate.product.name}
+                          </span>
+                          <span className="text-[11px] text-[#646970]">
+                            Price: {formatPrice(Number(rate.product.price))}
+                            {rate.product.affiliateCommissionRate && (
+                              <>
+                                {" "}· Default:{" "}
+                                {Number(rate.product.affiliateCommissionRate)}
+                                {rate.product.affiliateCommissionType === "PERCENTAGE" ? "%" : ""}
+                              </>
+                            )}
+                          </span>
+                          {/* Row actions */}
+                          <div className="flex items-center gap-2 mt-0.5 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleEdit(rate)}
+                              className="text-[#2271b1] hover:text-[#135e96] hover:underline text-[12px]"
+                            >
+                              Edit
+                            </button>
+                            <span className="text-[#c3c4c7]">|</span>
+                            <button
+                              onClick={() => handleDelete(rate.id)}
+                              className="text-[#d63638] hover:text-[#b32d2e] hover:underline text-[12px]"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Applies To */}
+                    <td className="px-3 py-2 align-middle hidden md:table-cell">
+                      {rate.affiliate ? (
+                        <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#2271b1] bg-[#f0f6fc] border border-[#2271b1]/20 px-2 py-0.5 rounded">
+                          <User className="w-3 h-3" />
+                          {rate.affiliate.user.name ?? rate.affiliate.slug}
+                        </span>
+                      ) : rate.tier ? (
+                        <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#7c3aed] bg-[#f5f3ff] border border-[#7c3aed]/20 px-2 py-0.5 rounded">
+                          {rate.tier.color ? (
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: rate.tier.color }}
+                            />
+                          ) : (
+                            <Trophy className="w-3 h-3" />
+                          )}
+                          {rate.tier.name}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[12px] text-[#50575e] bg-[#f6f7f7] border border-[#c3c4c7] px-2 py-0.5 rounded">
+                          <Users className="w-3 h-3" />
+                          Global
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Override Rate */}
+                    <td className="px-3 py-2 align-middle">
+                      {rate.isDisabled ? (
+                        <span className="text-[#50575e] line-through text-[12px]">Disabled</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 text-[12px] font-bold bg-[#edfaef] text-[#00a32a] border border-[#00a32a]/30 px-1.5 py-0.5 rounded">
+                          {rate.type === "FIXED" ? (
+                            <>{Number(rate.rate).toFixed(2)}</>
+                          ) : (
+                            <>{Number(rate.rate)}<Percent className="w-2.5 h-2.5" /></>
+                          )}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-3 py-2 align-middle hidden sm:table-cell">
+                      {rate.isDisabled ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#d63638] bg-[#fcf0f1] border border-[#d63638]/30 px-1.5 py-0.5 rounded">
+                          <Ban className="w-3 h-3" />
+                          Disabled
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#00a32a] bg-[#edfaef] border border-[#00a32a]/30 px-1.5 py-0.5 rounded">
+                          <CheckCircle className="w-3 h-3" />
+                          Active
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {filteredRates.length > 0 && (
+        <p className="text-[12px] text-[#646970] pt-1">
+          {filteredRates.length} item{filteredRates.length !== 1 ? "s" : ""}
+          {search ? " found" : ""}
+        </p>
+      )}
 
       {isModalOpen && (
-         <RateModal 
-            isOpen={isModalOpen} 
-            onClose={() => setIsModalOpen(false)} 
-            initialData={editingRate}
-            onSuccess={() => {
-                setIsModalOpen(false);
-                window.location.reload(); 
-            }}
-         />
+        <RateModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          initialData={editingRate}
+          onSuccess={() => {
+            setIsModalOpen(false);
+            window.location.reload();
+          }}
+        />
       )}
     </div>
   );
 }
-// model
-function RateModal({ isOpen, onClose, initialData, onSuccess }: any) {
-    const [isPending, startTransition] = useTransition();
-    
-    // Form Setup
-    const { register, handleSubmit, watch, setValue } = useForm({
-        defaultValues: {
-            productId: initialData?.productId || "",
-            targetType: initialData?.affiliateId ? "AFFILIATE" : initialData?.groupId ? "GROUP" : "GLOBAL",
-            targetId: initialData?.affiliateId || initialData?.groupId || "",
-            rate: initialData?.rate ? Number(initialData.rate) : "",
-            type: initialData?.type || "PERCENTAGE",
-            isDisabled: initialData?.isDisabled || false
-        }
-    });
 
-    const { symbol } = useGlobalStore();
-    const currency = symbol || "$";
-    const targetType = watch("targetType");
-    const [prodSearchTerm, setProdSearchTerm] = useState("");
-    const [prodResults, setProdResults] = useState<any[]>([]);
-    const [isSearchingProd, setIsSearchingProd] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState<any>(initialData?.product || null);
-    const [targetSearchTerm, setTargetSearchTerm] = useState("");
-    const [targetResults, setTargetResults] = useState<any[]>([]);
-    const [isSearchingTarget, setIsSearchingTarget] = useState(false);
-    const initialTargetName = initialData?.affiliate 
-        ? initialData.affiliate.user.name 
-        : initialData?.group 
-            ? initialData.group.name 
-            : null;
-    const [selectedTarget, setSelectedTarget] = useState<{id: string, name: string, sub?: string} | null>(
-        initialTargetName ? { id: initialData?.affiliateId || initialData?.groupId, name: initialTargetName } : null
-    );
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(async () => {
-            if (prodSearchTerm && prodSearchTerm.length > 1) {
-                setIsSearchingProd(true);
-                const results = await searchProducts(prodSearchTerm);
-                setProdResults(results);
-                setIsSearchingProd(false);
-            } else {
-                setProdResults([]);
-            }
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [prodSearchTerm]);
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
-    useEffect(() => {
-        if (targetType === "GLOBAL") {
-            setSelectedTarget(null);
-            setValue("targetId", "");
-        }
-    }, [targetType, setValue]);
+function RateModal({ isOpen, onClose, initialData, onSuccess }: ModalProps) {
+  const [isPending, startTransition] = useTransition();
+  const { symbol } = useGlobalStore();
 
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(async () => {
-            if (targetSearchTerm && targetSearchTerm.length > 0) { 
-                setIsSearchingTarget(true);
-                
-                if (targetType === "AFFILIATE") {
-                    const results = await searchAffiliatesForDropdown(targetSearchTerm);
-                    setTargetResults(results.map(r => ({
-                        id: r.id,
-                        name: r.user.name || "Unknown",
-                        sub: r.user.email
-                    })));
-                } else if (targetType === "GROUP") {
-                    const results = await getAllGroups(); 
-                    const filtered = results.filter(g => g.name.toLowerCase().includes(targetSearchTerm.toLowerCase()));
-                    setTargetResults(filtered.map(g => ({
-                        id: g.id,
-                        name: g.name,
-                        sub: `${g._count?.affiliates || 0} members`
-                    })));
-                }
-                
-                setIsSearchingTarget(false);
-            } else {
-                setTargetResults([]);
-            }
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [targetSearchTerm, targetType]);
-    const selectProduct = (product: any) => {
-        setValue("productId", product.id);
-        setSelectedProduct(product);
-        setProdSearchTerm("");
+  const { register, handleSubmit, watch, setValue } = useForm<RateFormData>({
+    defaultValues: {
+      productId: initialData?.productId ?? "",
+      targetType: initialData?.affiliateId
+        ? "AFFILIATE"
+        : initialData?.tierId
+        ? "TIER"
+        : "GLOBAL",
+      targetId: initialData?.affiliateId ?? initialData?.tierId ?? "",
+      rate: initialData?.rate ? Number(initialData.rate) : "",
+      type: initialData?.type ?? "FIXED",
+      isDisabled: initialData?.isDisabled ?? false,
+    },
+  });
+
+  const targetType = watch("targetType");
+  const commissionType = watch("type");
+  const isDisabled = watch("isDisabled");
+
+  // ── Product search ───────────────────────────────────────────────────────
+  const [prodSearchTerm, setProdSearchTerm] = useState("");
+  const [prodResults, setProdResults] = useState<ProductSearchResult[]>([]);
+  const [isSearchingProd, setIsSearchingProd] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductSearchResult | null>(
+    initialData?.product
+      ? { id: initialData.product.id, name: initialData.product.name, price: initialData.product.price }
+      : null
+  );
+
+  // ── Target search ────────────────────────────────────────────────────────
+  const [targetSearchTerm, setTargetSearchTerm] = useState("");
+  const [targetResults, setTargetResults] = useState<TargetSearchResult[]>([]);
+  const [isSearchingTarget, setIsSearchingTarget] = useState(false);
+
+  const initialTargetName = initialData?.affiliate
+    ? initialData.affiliate.user.name
+    : initialData?.tier?.name ?? null;
+  const initialTargetId = initialData?.affiliateId ?? initialData?.tierId ?? null;
+
+  const [selectedTarget, setSelectedTarget] = useState<TargetSearchResult | null>(
+    initialTargetName && initialTargetId
+      ? { id: initialTargetId, name: initialTargetName }
+      : null
+  );
+
+  // Product search debounce
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (prodSearchTerm.length > 1) {
+        setIsSearchingProd(true);
+        const results = await searchProducts(prodSearchTerm);
+        setProdResults(results);
+        setIsSearchingProd(false);
+      } else {
         setProdResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [prodSearchTerm]);
+
+  // Reset target when targetType changes
+  useEffect(() => {
+    if (targetType === "GLOBAL") {
+      setSelectedTarget(null);
+      setTargetSearchTerm("");
+      setValue("targetId", "");
+    }
+    setTargetResults([]);
+  }, [targetType, setValue]);
+
+  // Target search debounce
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (!targetSearchTerm) {
+        setTargetResults([]);
+        return;
+      }
+      setIsSearchingTarget(true);
+      if (targetType === "AFFILIATE") {
+        const res = await searchAffiliatesForDropdown(targetSearchTerm);
+        setTargetResults(
+          res.map((r) => ({
+            id: r.id,
+            name: r.user.name ?? "Unknown",
+            sub: r.user.email,
+          }))
+        );
+      } else if (targetType === "TIER") {
+        const tiers = await getAllTiers();
+        setTargetResults(
+          tiers
+            .filter((t) => t.name.toLowerCase().includes(targetSearchTerm.toLowerCase()))
+            .map((t) => ({
+              id: t.id,
+              name: t.name,
+              sub: `${t._count?.affiliates ?? 0} members`,
+              color: t.color,
+            }))
+        );
+      }
+      setIsSearchingTarget(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [targetSearchTerm, targetType]);
+
+  const selectProduct = (p: ProductSearchResult) => {
+    setValue("productId", p.id);
+    setSelectedProduct(p);
+    setProdSearchTerm("");
+    setProdResults([]);
+  };
+
+  const clearProduct = () => {
+    setValue("productId", "");
+    setSelectedProduct(null);
+  };
+
+  const selectTarget = (item: TargetSearchResult) => {
+    setValue("targetId", item.id);
+    setSelectedTarget(item);
+    setTargetSearchTerm("");
+    setTargetResults([]);
+  };
+
+  const clearTarget = () => {
+    setSelectedTarget(null);
+    setValue("targetId", "");
+  };
+
+  const onSubmit = (data: RateFormData) => {
+    const payload = {
+      id: initialData?.id,
+      productId: data.productId,
+      rate: Number(data.rate),
+      type: data.type,
+      isDisabled: data.isDisabled,
+      affiliateId: data.targetType === "AFFILIATE" ? data.targetId : null,
+      tierId: data.targetType === "TIER" ? data.targetId : null,
     };
-    const selectTarget = (item: any) => {setValue("targetId", item.id); setSelectedTarget(item);setTargetSearchTerm(""); setTargetResults([]);
-    };
-    const onSubmit = (data: any) => {
-        const payload = {
-            id: initialData?.id,
-            productId: data.productId,
-            rate: Number(data.rate),
-            type: data.type,
-            isDisabled: data.isDisabled,
-            affiliateId: data.targetType === "AFFILIATE" ? data.targetId : null,
-            groupId: data.targetType === "GROUP" ? data.targetId : null,
-        };
 
-        startTransition(async () => {
-            const res = await upsertRateAction(payload);
-            if(res.success) {
-                toast.success(res.message);
-                onSuccess();
-            } else {
-                toast.error(res.message);
-            }
-        });
-    };
+    startTransition(async () => {
+      const res = await upsertRateAction(payload);
+      if (res.success) {
+        toast.success(res.message);
+        onSuccess();
+      } else {
+        toast.error(res.message);
+      }
+    });
+  };
 
-    if(!isOpen) return null;
+  if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                
-                {/* Header */}
-                <div className="px-6 py-5 border-b flex justify-between items-center bg-gray-50/50 shrink-0">
-                    <div>
-                        <h3 className="font-bold text-gray-900 text-lg">{initialData ? "Edit Commission Rule" : "Add Product Rule"}</h3>
-                        <p className="text-xs text-gray-500 mt-1">Set custom commission rates for specific products.</p>
-                    </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
-                </div>
-                
-                <form onSubmit={handleSubmit(onSubmit)} className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
-                    
-                    {/* 1. PRODUCT SEARCH SECTION */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-700 uppercase flex justify-between">
-                            Target Product
-                            {selectedProduct && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Selected</span>}
-                        </label>
-                        
-                        {!selectedProduct ? (
-                            <div className="relative">
-                                <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                                <input 
-                                    type="text"
-                                    value={prodSearchTerm}
-                                    onChange={(e) => setProdSearchTerm(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all" 
-                                    placeholder="Type product name..." 
-                                    autoFocus
-                                />
-                                {isSearchingProd && <div className="absolute right-3 top-3"><Loader2 className="w-4 h-4 animate-spin text-gray-400" /></div>}
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-white w-full max-w-xl rounded border border-[#c3c4c7] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
 
-                                {prodResults.length > 0 && (
-                                    <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-2 max-h-60 overflow-y-auto divide-y divide-gray-50">
-                                        {prodResults.map((prod) => (
-                                            <button key={prod.id} type="button" onClick={() => selectProduct(prod)} className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center justify-between group">
-                                                <div>
-                                                    <span className="text-sm font-medium text-gray-900 block">{prod.name}</span>
-                                                    <span className="text-[10px] text-gray-500 font-mono">Price: {currency}{prod.price}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-white rounded border border-blue-100"><Package className="w-5 h-5 text-blue-600" /></div>
-                                    <div>
-                                        <h4 className="text-sm font-bold text-gray-900">{selectedProduct.name}</h4>
-                                        <p className="text-[11px] text-gray-500 font-mono">ID: {selectedProduct.id}</p>
-                                    </div>
-                                </div>
-                                <button type="button" onClick={() => { setValue("productId", ""); setSelectedProduct(null); }} className="text-xs text-red-500 hover:text-red-700 font-medium hover:underline px-2">Change</button>
-                            </div>
-                        )}
-                        <input type="hidden" {...register("productId", { required: true })} />
-                        {!selectedProduct && <p className="text-[10px] text-red-500 animate-pulse">* Product selection is required.</p>}
-                    </div>
-
-                    <div className="h-px bg-gray-100 w-full" />
-
-                    {/* 2. RULE CONFIGURATION */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        
-                        {/* Left Column: Target Selection */}
-                        <div className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-gray-700 uppercase">Apply Rule To</label>
-                                <select {...register("targetType")} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-black/5 outline-none transition-all">
-                                    <option value="GLOBAL">Everyone (Global Override)</option>
-                                    <option value="AFFILIATE">Specific Affiliate Only</option>
-                                    <option value="GROUP">Specific Group Only</option>
-                                </select>
-                            </div>
-
-                            {/* DYNAMIC TARGET SEARCH */}
-                            {targetType !== "GLOBAL" && (
-                                <div className="space-y-1.5 animate-in slide-in-from-top-1">
-                                    <label className="text-xs font-bold text-gray-700 uppercase">
-                                        Search {targetType === "AFFILIATE" ? "Affiliate" : "Group"}
-                                    </label>
-                                    
-                                    {!selectedTarget ? (
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                                            <input 
-                                                type="text"
-                                                value={targetSearchTerm}
-                                                onChange={(e) => setTargetSearchTerm(e.target.value)}
-                                                className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none" 
-                                                placeholder={`Type ${targetType.toLowerCase()} name...`}
-                                            />
-                                            {isSearchingTarget && <div className="absolute right-3 top-3"><Loader2 className="w-4 h-4 animate-spin text-gray-400" /></div>}
-
-                                            {targetResults.length > 0 && (
-                                                <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-2 max-h-48 overflow-y-auto divide-y divide-gray-50">
-                                                    {targetResults.map((item) => (
-                                                        <button key={item.id} type="button" onClick={() => selectTarget(item)} className="w-full text-left px-4 py-2 hover:bg-purple-50 transition-colors">
-                                                            <span className="text-sm font-medium text-gray-900 block">{item.name}</span>
-                                                            <span className="text-[10px] text-gray-500">{item.sub}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center justify-between p-2.5 bg-purple-50 border border-purple-100 rounded-lg">
-                                            <div className="flex items-center gap-2">
-                                                {targetType === "AFFILIATE" ? <User className="w-4 h-4 text-purple-600"/> : <Users className="w-4 h-4 text-purple-600"/>}
-                                                <span className="text-sm font-bold text-purple-900">{selectedTarget.name}</span>
-                                            </div>
-                                            <button type="button" onClick={() => { setSelectedTarget(null); setValue("targetId", ""); }} className="text-xs text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button>
-                                        </div>
-                                    )}
-                                    <input type="hidden" {...register("targetId", { required: targetType !== "GLOBAL" })} />
-                                    {!selectedTarget && <p className="text-[10px] text-red-500">* Selection required.</p>}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Right Column: Rate & Logic */}
-                        <div className="space-y-4">
-                             <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-gray-700 uppercase">Commission Rate</label>
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <span className="absolute left-3 top-2.5 text-gray-500 font-bold text-sm">
-                                            {watch("type") === "FIXED" ? currency : <Percent className="w-3.5 h-3.5" />}
-                                        </span>
-                                        <input 
-                                            type="number" 
-                                            step="0.01" 
-                                            {...register("rate")} 
-                                            disabled={watch("isDisabled")}
-                                            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-black/5 outline-none font-bold disabled:bg-gray-50 disabled:text-gray-400" 
-                                            placeholder="10" 
-                                        />
-                                    </div>
-                                    <select 
-                                        {...register("type")} 
-                                        className="w-28 border border-gray-300 rounded-lg px-2 py-2.5 text-sm bg-white focus:ring-2 focus:ring-black/5 outline-none font-medium"
-                                    >
-                                        <option value="PERCENTAGE">% Percent</option>
-                                        <option value="FIXED">$ Fixed</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center gap-3 mt-2">
-                                <input type="checkbox" id="isDisabled" {...register("isDisabled")} className="w-4 h-4 rounded border-gray-400 text-red-600 focus:ring-red-500 cursor-pointer" />
-                                <label htmlFor="isDisabled" className="text-xs font-bold text-gray-700 cursor-pointer select-none flex-1">
-                                    Disable Commission
-                                    <span className="block text-[10px] text-gray-400 font-normal">Affiliates earn 0 commission on this item.</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white">
-                        <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                        <button type="submit" disabled={isPending} className="px-8 py-2.5 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 flex items-center gap-2 shadow-lg active:scale-95 transition-all">
-                            {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
-                            Save Rule
-                        </button>
-                    </div>
-                </form>
-            </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] shrink-0">
+          <div>
+            <h3 className="text-[14px] font-semibold text-[#1d2327]">
+              {initialData ? "Edit Override" : "Add Product Override"}
+            </h3>
+            <p className="text-[12px] text-[#50575e]">
+              Set a custom commission rate for a specific product.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 text-[#646970] hover:text-[#1d2327] transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-    );
+
+        <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto">
+          <div className="p-4 space-y-4">
+
+            {/* ── 1. Product Search ──────────────────────────────────────────── */}
+            <div className="space-y-1.5">
+              <label className="block text-[12px] font-semibold text-[#1d2327]">
+                Target Product <span className="text-[#d63638]">*</span>
+              </label>
+
+              {!selectedProduct ? (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#646970]" />
+                  <input
+                    type="text"
+                    value={prodSearchTerm}
+                    onChange={(e) => setProdSearchTerm(e.target.value)}
+                    placeholder="Type product name…"
+                    autoFocus
+                    className="w-full pl-8 pr-8 py-[6px] text-[13px] border border-[#8c8f94] rounded bg-white text-[#1d2327] placeholder-[#646970] focus:outline-none focus:border-[#2271b1] focus:ring-[3px] focus:ring-[#2271b1]/25"
+                  />
+                  {isSearchingProd && (
+                    <Loader2 className="absolute right-2.5 top-2 w-3.5 h-3.5 animate-spin text-[#646970]" />
+                  )}
+                  {prodResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-[#c3c4c7] rounded shadow-lg max-h-52 overflow-y-auto">
+                      {prodResults.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => selectProduct(p)}
+                          className="w-full text-left px-3 py-2 hover:bg-[#f0f6fc] border-b border-[#f0f0f1] last:border-0 transition-colors"
+                        >
+                          <span className="text-[13px] font-medium text-[#1d2327] block">{p.name}</span>
+                          <span className="text-[11px] text-[#646970]">
+                            Price: {symbol}{Number(p.price).toFixed(2)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-2.5 bg-[#f0f6fc] border border-[#2271b1]/30 rounded">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Package className="w-4 h-4 text-[#2271b1] shrink-0" />
+                    <div className="min-w-0">
+                      <span className="text-[13px] font-semibold text-[#1d2327] block truncate">
+                        {selectedProduct.name}
+                      </span>
+                      <span className="text-[11px] text-[#646970]">
+                        Price: {symbol}{Number(selectedProduct.price).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearProduct}
+                    className="text-[12px] text-[#2271b1] hover:text-[#135e96] hover:underline shrink-0 ml-2"
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+              <input type="hidden" {...register("productId", { required: true })} />
+              {!selectedProduct && (
+                <p className="text-[11px] text-[#646970] flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 text-[#9a6700]" />
+                  Product selection is required.
+                </p>
+              )}
+            </div>
+
+            <div className="border-t border-[#c3c4c7]" />
+
+            {/* ── 2. Apply To ────────────────────────────────────────────────── */}
+            <div className="space-y-1.5">
+              <label className="block text-[12px] font-semibold text-[#1d2327]">
+                Apply Override To
+              </label>
+              <select
+                {...register("targetType")}
+                className="w-full border border-[#8c8f94] rounded bg-white px-3 py-[6px] text-[13px] text-[#1d2327] focus:outline-none focus:border-[#2271b1] focus:ring-[3px] focus:ring-[#2271b1]/25"
+              >
+                <option value="GLOBAL">Everyone (Global Override)</option>
+                <option value="AFFILIATE">Specific Affiliate Only</option>
+                <option value="TIER">Specific Tier Only</option>
+              </select>
+            </div>
+
+            {/* ── 3. Target Search (Affiliate / Tier) ────────────────────────── */}
+            {targetType !== "GLOBAL" && (
+              <div className="space-y-1.5">
+                <label className="block text-[12px] font-semibold text-[#1d2327]">
+                  Search {targetType === "AFFILIATE" ? "Affiliate" : "Tier"}{" "}
+                  <span className="text-[#d63638]">*</span>
+                </label>
+
+                {!selectedTarget ? (
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#646970]" />
+                    <input
+                      type="text"
+                      value={targetSearchTerm}
+                      onChange={(e) => setTargetSearchTerm(e.target.value)}
+                      placeholder={
+                        targetType === "AFFILIATE"
+                          ? "Type affiliate name or email…"
+                          : "Type tier name…"
+                      }
+                      className="w-full pl-8 pr-8 py-[6px] text-[13px] border border-[#8c8f94] rounded bg-white text-[#1d2327] placeholder-[#646970] focus:outline-none focus:border-[#2271b1] focus:ring-[3px] focus:ring-[#2271b1]/25"
+                    />
+                    {isSearchingTarget && (
+                      <Loader2 className="absolute right-2.5 top-2 w-3.5 h-3.5 animate-spin text-[#646970]" />
+                    )}
+                    {targetResults.length > 0 && (
+                      <div className="absolute z-20 mt-1 w-full bg-white border border-[#c3c4c7] rounded shadow-lg max-h-48 overflow-y-auto">
+                        {targetResults.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => selectTarget(item)}
+                            className="w-full text-left px-3 py-2 hover:bg-[#f0f6fc] border-b border-[#f0f0f1] last:border-0 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              {targetType === "TIER" && item.color && (
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: item.color }}
+                                />
+                              )}
+                              <span className="text-[13px] font-medium text-[#1d2327]">
+                                {item.name}
+                              </span>
+                            </div>
+                            {item.sub && (
+                              <span className="text-[11px] text-[#646970] ml-0 pl-0">
+                                {item.sub}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 bg-[#f6f7f7] border border-[#c3c4c7] rounded">
+                    <div className="flex items-center gap-2">
+                      {targetType === "AFFILIATE" ? (
+                        <User className="w-3.5 h-3.5 text-[#2271b1]" />
+                      ) : (
+                        <Trophy className="w-3.5 h-3.5 text-[#7c3aed]" />
+                      )}
+                      <span className="text-[13px] font-medium text-[#1d2327]">
+                        {selectedTarget.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearTarget}
+                      className="text-[#646970] hover:text-[#d63638] transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="hidden"
+                  {...register("targetId", { required: true })}
+                />
+                {!selectedTarget && (
+                  <p className="text-[11px] text-[#646970] flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 text-[#9a6700]" />
+                    {targetType === "AFFILIATE" ? "Affiliate" : "Tier"} selection is required.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="border-t border-[#c3c4c7]" />
+
+            {/* ── 4. Commission Rate ─────────────────────────────────────────── */}
+            <div className="space-y-1.5">
+              <label className="block text-[12px] font-semibold text-[#1d2327]">
+                Commission Rate
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-2.5 top-[7px] text-[#50575e] text-[13px] font-medium select-none">
+                    {commissionType === "FIXED" ? symbol : "%"}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register("rate")}
+                    disabled={isDisabled}
+                    placeholder="10"
+                    className="w-full pl-7 pr-3 py-[6px] text-[13px] border border-[#8c8f94] rounded bg-white text-[#1d2327] font-medium disabled:bg-[#f6f7f7] disabled:text-[#8c8f94] focus:outline-none focus:border-[#2271b1] focus:ring-[3px] focus:ring-[#2271b1]/25"
+                  />
+                </div>
+                <select
+                  {...register("type")}
+                  className="w-28 border border-[#8c8f94] rounded bg-white px-2 py-[6px] text-[13px] text-[#1d2327] focus:outline-none focus:border-[#2271b1] focus:ring-[3px] focus:ring-[#2271b1]/25"
+                >
+                  <option value="FIXED">Fixed ({symbol})</option>
+                  <option value="PERCENTAGE">Percent (%)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* ── 5. Disable Commission ──────────────────────────────────────── */}
+            <div className="flex items-start gap-2.5 p-3 bg-[#f6f7f7] border border-[#c3c4c7] rounded">
+              <input
+                type="checkbox"
+                id="isDisabled"
+                {...register("isDisabled")}
+                className="mt-0.5 w-4 h-4 rounded border-[#8c8f94] text-[#d63638] cursor-pointer"
+              />
+              <label
+                htmlFor="isDisabled"
+                className="text-[13px] text-[#1d2327] cursor-pointer select-none flex-1"
+              >
+                Disable commission on this product
+                <span className="block text-[11px] text-[#50575e] mt-0.5">
+                  Affiliates earn $0 commission for this product regardless of other rules.
+                </span>
+              </label>
+            </div>
+
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 px-4 py-3 bg-[#f6f7f7] border-t border-[#c3c4c7] shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-[6px] text-[13px] text-[#50575e] bg-white border border-[#c3c4c7] rounded hover:bg-[#f0f0f1] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-4 py-[6px] text-[13px] font-medium text-white bg-[#2271b1] hover:bg-[#135e96] border border-[#135e96] rounded transition-colors disabled:opacity-60"
+            >
+              {isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+              {initialData ? "Update Override" : "Save Override"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }

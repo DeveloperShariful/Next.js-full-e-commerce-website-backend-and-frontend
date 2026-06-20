@@ -4,41 +4,45 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { 
-  LayoutDashboard, CreditCard, Settings, Trophy, Calculator, 
-  Image as ImageIcon, Network, ShieldAlert, Code2, 
-  Megaphone, Globe, ScrollText, Package, ShieldCheck, Menu, X, Loader2, Ticket, Tag,
-  Users, Terminal 
+import {
+  LayoutDashboard, CreditCard, Settings, Trophy, Calculator,
+  Image as ImageIcon, Network, ShieldAlert, Code2,
+  Megaphone, Globe, Package, ShieldCheck, Menu, X, Loader2, Ticket, Tag,
+  Users, Terminal
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationCenter } from "./notification-center";
 import AnalyticsDashboard from "./analytics-dashboard";
-import PartnersManager from "./Management/partners-manager"; 
-import PayoutsTable from "./Management/payouts-table";
+import PartnersManager from "./Management/partners-manager";
+import FinanceManager from "./Management/finance-manager";
 import KycManager from "./Management/kyc-manager";
-import LedgerTable from "./Management/ledger-table";
 import CreativeList from "./Marketing/creative-manager";
-import ContestList from "./Marketing/contest-manager";
-import CampaignList from "./Marketing/campaign-manager";
-import CouponManager from "./Marketing/coupon-manager";
+import CampaignsContestsManager from "./Marketing/campaigns-contests-manager";
+import CouponTagManager from "./Marketing/coupon-tag-manager";
 import AnnouncementManager from "./Marketing/announcement-manager";
 import NetworkTree from "./Configuration/mlm-network-manager";
-import FraudRuleManager from "./Configuration/fraud-rule-manager"; 
+import FraudRuleManager from "./Configuration/fraud-rule-manager";
 import TierList from "./Configuration/tier-manager";
 import RuleList from "./Configuration/commission-rule-management";
 import DomainList from "./Configuration/domain-manager";
 import PixelList from "./Configuration/pixel-manager";
 import ProductRateManager from "./Configuration/product-rate-manager";
 import AffiliateGeneralConfigForm from "./Configuration/general-config-manager";
-import TagManager from "./Configuration/tag-manager";
 import LogViewer from "./log-viewer";
+
+interface SidebarCounts {
+  payouts?: number;
+  kyc?: number;
+  fraud?: number;
+}
 
 interface Props {
   initialData: any;
   currentView: string;
+  counts?: SidebarCounts;
 }
 
-export default function AffiliateMainView({ initialData, currentView }: Props) {
+export default function AffiliateMainView({ initialData, currentView, counts }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -53,223 +57,329 @@ export default function AffiliateMainView({ initialData, currentView }: Props) {
     setActiveTab(view);
     setIsMobileMenuOpen(false);
     startTransition(() => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("view", view);
-        params.delete("page");
-        params.delete("search");
-        params.delete("status");
-        router.push(`/admin/affiliate?${params.toString()}`);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("view", view);
+      params.delete("page");
+      params.delete("search");
+      params.delete("status");
+      router.push(`/admin/affiliate?${params.toString()}`);
     });
   };
+
   const MENU_ITEMS = [
-    { section: "Analytics", items: [
+    {
+      section: "Analytics",
+      items: [
         { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-    ]},
-    { section: "Management", items: [
-        { id: "partners", label: "Partner Management", icon: Users },
-        { id: "payouts", label: "Payouts", icon: CreditCard },
-        { id: "ledger", label: "Financial Ledger", icon: ScrollText },
-        { id: "kyc", label: "KYC Verification", icon: ShieldCheck },
-    ]},
-    { section: "Marketing", items: [
-        { id: "campaigns", label: "Campaigns", icon: Megaphone },
+      ],
+    },
+    {
+      section: "Management",
+      items: [
+        { id: "partners", label: "Partners", icon: Users },
+        { id: "payouts", label: "Payouts & Ledger", icon: CreditCard, badgeKey: "payouts" as keyof SidebarCounts },
+        { id: "kyc", label: "KYC Verification", icon: ShieldCheck, badgeKey: "kyc" as keyof SidebarCounts },
+      ],
+    },
+    {
+      section: "Marketing",
+      items: [
+        { id: "campaigns", label: "Programs", icon: Megaphone },
         { id: "creatives", label: "Creatives & Assets", icon: ImageIcon },
-        { id: "contests", label: "Sales Contests", icon: Trophy },
         { id: "announcements", label: "Announcements", icon: Megaphone },
         { id: "coupons", label: "Coupons", icon: Ticket },
-    ]},
-    { section: "Configuration", items: [
+      ],
+    },
+    {
+      section: "Configuration",
+      items: [
         { id: "tiers", label: "Tiers & Ranks", icon: Trophy },
         { id: "rules", label: "Commission Rules", icon: Calculator },
         { id: "product-rates", label: "Item Overrides", icon: Package },
         { id: "network", label: "MLM Network", icon: Network },
-        { id: "fraud", label: "Fraud Shield", icon: ShieldAlert },
+        { id: "fraud", label: "Fraud Shield", icon: ShieldAlert, badgeKey: "fraud" as keyof SidebarCounts },
         { id: "domains", label: "Custom Domains", icon: Globe },
         { id: "pixels", label: "Tracking Pixels", icon: Code2 },
-        { id: "tags", label: "System Tags", icon: Tag },
         { id: "general", label: "System Settings", icon: Settings },
+      ],
+    },
+    {
+      section: "System",
+      items: [
         { id: "logs", label: "Activity Logs", icon: Terminal },
-    ]}
+      ],
+    },
   ];
+
+  const isProgramActive = !!(initialData?.config?.isActive);
+  const currentLabel = MENU_ITEMS.flatMap((s) => s.items).find((m) => m.id === activeTab)?.label || "Dashboard";
 
   const ActiveComponent = () => {
     if (!initialData) return null;
 
     switch (activeTab) {
-      // =========================================================
-      // 1. Unified Dashboard (Merged View)
-      // =========================================================
-      case "overview": 
+      case "overview":
         return initialData.dashboard ? (
-          <AnalyticsDashboard 
-              kpi={initialData.dashboard.kpi} 
-              charts={initialData.dashboard.charts} 
-              topProducts={initialData.dashboard.topProducts} 
-              trafficSources={initialData.dashboard.trafficSources} 
-              topAffiliates={initialData.dashboard.topAffiliates} 
-              monthlyStats={initialData.dashboard.monthlyStats}
+          <AnalyticsDashboard
+            kpi={initialData.dashboard.kpi}
+            charts={initialData.dashboard.charts}
+            topProducts={initialData.dashboard.topProducts}
+            trafficSources={initialData.dashboard.trafficSources}
+            topAffiliates={initialData.dashboard.topAffiliates}
+            monthlyStats={initialData.dashboard.monthlyStats}
           />
         ) : null;
 
-      // =========================================================
-      // 2. Management Modules
-      // =========================================================
-      
-      case "partners": return initialData.partners ? (
-        <PartnersManager 
+      case "partners":
+        return initialData.partners ? (
+          <PartnersManager
             usersData={initialData.partners.users.affiliates}
             totalEntries={initialData.partners.users.total}
             totalPages={initialData.partners.users.totalPages}
             currentPage={Number(searchParams.get("page")) || 1}
-            groupsData={initialData.partners.groups}
             tags={initialData.partners.tags}
             defaultRate={initialData.partners.defaultRate}
-            defaultType={initialData.partners.defaultType} 
-        />
-      ) : null;
-      
-      case "payouts": return initialData.payouts ? <PayoutsTable data={initialData.payouts.items} totalEntries={initialData.payouts.total} totalPages={initialData.payouts.totalPages} currentPage={Number(searchParams.get("page")) || 1} /> : null;
-      case "ledger": return initialData.ledger ? <LedgerTable data={initialData.ledger.transactions} totalEntries={initialData.ledger.total} totalPages={initialData.ledger.totalPages} currentPage={Number(searchParams.get("page")) || 1} /> : null;
-      case "kyc": return initialData.kyc ? <KycManager initialDocuments={initialData.kyc.documents} /> : null;
+            defaultType={initialData.partners.defaultType}
+          />
+        ) : null;
 
-      // =========================================================
-      // 3. Marketing Tools
-      // =========================================================
-      
-      case "campaigns": return initialData.campaigns ? <CampaignList data={initialData.campaigns.campaigns} totalEntries={initialData.campaigns.total} /> : null;
-      case "creatives": return initialData.creatives ? <CreativeList initialCreatives={initialData.creatives} /> : null;
-      case "contests": return initialData.contests ? <ContestList initialContests={initialData.contests} /> : null;
-      case "announcements": return initialData.announcements ? <AnnouncementManager initialData={initialData.announcements.announcements} /> : null;
+      case "payouts":
+        return initialData.payouts ? (
+          <FinanceManager
+            payoutsData={initialData.payouts.payouts}
+            ledgerData={initialData.payouts.ledger}
+            currentPage={Number(searchParams.get("page")) || 1}
+          />
+        ) : null;
 
-      // =========================================================
-      // 4. System Configuration
-      // =========================================================
-      
-      case "tiers": return initialData.tiers ? <TierList initialTiers={initialData.tiers} /> : null;
-      case "rules": return initialData.rules ? <RuleList initialRules={initialData.rules} /> : null;
-      case "product-rates": return initialData.rates ? <ProductRateManager initialRates={initialData.rates.rates} /> : null;
-      case "network": return initialData.network ? <div className="overflow-x-auto"><NetworkTree nodes={initialData.network} /></div> : null;
-      case "fraud": return initialData.fraud ? <div className="space-y-6"><div className="p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm flex items-center gap-2"><ShieldAlert className="w-4 h-4"/> <strong>Live Monitor:</strong> {initialData.fraud.highRisk.length} High Risk Users Detected.</div><FraudRuleManager initialRules={initialData.fraud.rules} /></div> : null;
-      case "domains": return initialData.domains ? <DomainList initialDomains={initialData.domains} /> : null;
-      case "pixels": return initialData.pixels ? <PixelList pixels={initialData.pixels} /> : null;
-      case "tags": return initialData.tags ? <TagManager initialTags={initialData.tags} /> : null;
-      case "coupons": return initialData.coupons ? <CouponManager initialCoupons={initialData.coupons} /> : null; 
-      case "logs": return initialData.logs ? (
-        <LogViewer 
-          auditData={initialData.logs.audit} 
-          systemData={initialData.logs.system} 
-          currentPage={Number(searchParams.get("page")) || 1}
-          currentTab={initialData.logs.currentTab}
-        />
-      ) : null;
+      case "kyc":
+        return initialData.kyc ? <KycManager initialDocuments={initialData.kyc.documents} /> : null;
 
-      case "general": return initialData.config ? (
-        <AffiliateGeneralConfigForm 
-            initialData={initialData.config} 
-            mlmInitialData={initialData.mlmConfig || { isEnabled: false, maxLevels: 3, levelRates: {"1": 10}, commissionBasis: "SALES_AMOUNT" }}
-        /> 
-      ) : null;
-      
-      default: return null;
+      case "campaigns":
+        return initialData.campaigns ? (
+          <CampaignsContestsManager
+            campaignsData={initialData.campaigns.campaigns}
+            contestsData={initialData.campaigns.contests}
+          />
+        ) : null;
+
+      case "creatives":
+        return initialData.creatives ? <CreativeList initialCreatives={initialData.creatives} /> : null;
+
+      case "announcements":
+        return initialData.announcements ? (
+          <AnnouncementManager initialData={initialData.announcements.announcements} />
+        ) : null;
+
+      case "tiers":
+        return initialData.tiers ? <TierList initialTiers={initialData.tiers} /> : null;
+
+      case "rules":
+        return initialData.rules ? <RuleList initialRules={initialData.rules} /> : null;
+
+      case "product-rates":
+        return initialData.rates ? <ProductRateManager initialRates={initialData.rates.rates} /> : null;
+
+      case "network":
+        return initialData.network ? (
+          <div className="overflow-x-auto">
+            <NetworkTree nodes={initialData.network} />
+          </div>
+        ) : null;
+
+      case "fraud":
+        return initialData.fraud ? (
+          <div className="space-y-6">
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4" />
+              <strong>Live Monitor:</strong> {initialData.fraud.highRisk.length} High Risk Users Detected.
+            </div>
+            <FraudRuleManager initialRules={initialData.fraud.rules} />
+          </div>
+        ) : null;
+
+      case "domains":
+        return initialData.domains ? <DomainList initialDomains={initialData.domains} /> : null;
+
+      case "pixels":
+        return initialData.pixels ? <PixelList pixels={initialData.pixels} /> : null;
+
+      case "coupons":
+        return initialData.coupons ? (
+          <CouponTagManager
+            couponsData={initialData.coupons.coupons}
+            tagsData={initialData.coupons.tags}
+          />
+        ) : null;
+
+      case "logs":
+        return initialData.logs ? (
+          <LogViewer
+            auditData={initialData.logs.audit}
+            systemData={initialData.logs.system}
+            currentPage={Number(searchParams.get("page")) || 1}
+            currentTab={initialData.logs.currentTab}
+          />
+        ) : null;
+
+      case "general":
+        return initialData.config ? (
+          <AffiliateGeneralConfigForm
+            initialData={initialData.config}
+            mlmInitialData={
+              initialData.mlmConfig || {
+                isEnabled: false,
+                maxLevels: 3,
+                levelRates: { "1": 10 },
+                commissionBasis: "SALES_AMOUNT",
+              }
+            }
+          />
+        ) : null;
+
+      default:
+        return null;
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row w-full min-h-screen bg-gray-50/30">
-      
-      {/* MOBILE HEADER */}
-      <div className="lg:hidden w-full bg-white border-b border-gray-200 h-16  flex justify-between items-center sticky top-0 z-20 shadow-sm">
-        <span className="font-bold text-gray-800 flex items-center gap-2">
-           <Settings className="w-5 h-5 text-indigo-600"/>
-           Affiliate Admin
+    <div
+      className="relative flex flex-col w-full min-h-screen bg-[#f0f0f1] text-[#1d2327]"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif' }}
+    >
+
+      {/* Sticky header */}
+      <div className="w-full bg-[#f6f7f7] border-b border-[#dcdcde] h-12 px-4 flex justify-between items-center sticky top-0 z-20">
+        <span className="font-semibold text-[#1d2327] flex items-center gap-2 text-[14px]">
+          <Network className="w-4 h-4 text-[#2271b1]" />
+          Affiliate Hub
+          <span className="hidden lg:inline text-[#646970] font-normal text-[13px]">
+            / {currentLabel}
+          </span>
         </span>
-        
         <div className="flex items-center gap-3">
+          <span className={cn(
+            "text-[11px] font-bold px-2 py-0.5 rounded-full border hidden sm:inline-flex items-center gap-1.5",
+            isProgramActive
+              ? "bg-[#00a32a]/15 text-[#00a32a] border-[#00a32a]/30"
+              : "bg-[#d63638]/15 text-[#d63638] border-[#d63638]/30"
+          )}>
+            <span className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              isProgramActive ? "bg-[#00a32a] animate-pulse" : "bg-[#d63638]"
+            )} />
+            {isProgramActive ? "Program Active" : "Program Inactive"}
+          </span>
+          <div className="hidden lg:block">
             <NotificationCenter />
-            <button 
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-                className="p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-            >
-            {isMobileMenuOpen ? <X className="w-5 h-5"/> : <Menu className="w-5 h-5"/>}
-            </button>
+          </div>
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="lg:hidden p-2 text-[#646970] hover:text-[#1d2327] transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
-      {/* SIDEBAR NAVIGATION */}
-      <aside className={cn(
-        "fixed top-16 left-0 bottom-0 z-30 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-auto lg:top-0 lg:z-0 overflow-y-auto custom-scrollbar shadow-xl lg:shadow-none pb-20",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className=" border-b border-gray-100 hidden lg:flex justify-between items-center bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
-          <div>
-            <h2 className="font-extrabold text-lg text-gray-900 tracking-tight">Affiliate Hub</h2>
-            <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">Enterprise Control</p>
+      {/* Mobile backdrop — absolute on outer div so it covers header too */}
+      {isMobileMenuOpen && (
+        <div
+          className="lg:hidden absolute inset-0 z-30 bg-black/50"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Content row — no `relative` so sidebar's `absolute` goes to outer div */}
+      <div className="flex-1 lg:flex lg:flex-row">
+
+        {/* Sidebar:
+            mobile  → absolute top-0 left-0 bottom-0 (relative to outer div, covers header)
+            desktop → sticky in flex flow */}
+        <aside className={cn(
+          "absolute top-0 left-0 bottom-0 z-40 w-[240px] bg-[#f6f7f7] overflow-y-auto custom-scrollbar shadow-xl transform transition-transform duration-200",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+          "lg:static lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] lg:w-[200px] lg:shrink-0 lg:shadow-none lg:translate-x-0 lg:z-0 lg:border-r lg:border-[#dcdcde]"
+        )}>
+
+          {/* Mobile sidebar header */}
+          <div className="lg:hidden flex items-center justify-between px-4 h-12 border-b border-[#dcdcde]">
+            <span className="text-[#1d2327] font-semibold text-[13px] flex items-center gap-2">
+              <Network className="w-4 h-4 text-[#2271b1]" /> Affiliate Hub
+            </span>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-1.5 text-[#646970] hover:text-[#1d2327] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        </div>
-        
-        <div className="p-4 space-y-6">
-          {MENU_ITEMS.map((section, idx) => (
-            <div key={idx}>
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 pl-2">{section.section}</h4>
+
+          {/* Menu sections */}
+          <nav className="pb-20 pt-1">
+            {MENU_ITEMS.map((section, idx) => (
+              <div key={idx} className="mb-1">
+                <div className="px-4 pt-4 pb-1.5">
+                  <span className="text-[10px] font-bold text-[#646970] uppercase tracking-widest">
+                    {section.section}
+                  </span>
+                </div>
                 <div className="space-y-0.5">
-                    {section.items.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.id;
-                        return (
-                        <button
-                            key={item.id}
-                            onClick={() => handleTabChange(item.id)}
-                            className={cn(
-                            "flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 group relative",
-                            isActive 
-                                ? "bg-gray-900 text-white shadow-md" 
-                                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                            )}
-                        >
-                            <Icon className={cn("w-4 h-4", isActive ? "text-indigo-400" : "text-gray-400 group-hover:text-gray-600")} />
-                            {item.label}
-                            {isActive && <span className="absolute right-2 w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span>}
-                        </button>
-                        );
-                    })}
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    const badgeCount = item.badgeKey ? (counts?.[item.badgeKey] ?? 0) : 0;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleTabChange(item.id)}
+                        className={cn(
+                          "flex items-center gap-3 w-full px-4 py-[7px] text-[13px] transition-colors group text-left",
+                          isActive
+                            ? "bg-[#2271b1] text-white font-semibold"
+                            : "text-[#3c434a] hover:bg-[#e8e8e8] hover:text-[#1d2327]"
+                        )}
+                      >
+                        <Icon className={cn(
+                          "w-4 h-4 shrink-0",
+                          isActive ? "text-white" : "text-[#646970] group-hover:text-[#2271b1]"
+                        )} />
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {badgeCount > 0 && (
+                          <span className={cn(
+                            "text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shrink-0",
+                            isActive ? "bg-white/25 text-white" : "bg-[#d63638] text-white"
+                          )}>
+                            {badgeCount > 99 ? "99+" : badgeCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-            </div>
-          ))}
-        </div>
-      </aside>
+              </div>
+            ))}
+          </nav>
+        </aside>
 
-      {/* CONTENT AREA */}
-      <main className="flex-1 w-full relative min-h-screen ">
-        
-        {/* Desktop Top Bar */}
-        <header className="hidden lg:flex h-16 bg-white border-b border-gray-200 px-8 justify-between items-center ">
-            <h1 className="text-xl font-bold text-gray-800">
-                {MENU_ITEMS.flatMap(s => s.items).find(m => m.id === activeTab)?.label}
-            </h1>
-            <div className="flex items-center gap-4">
-                <div className="text-right">
-                    <p className="text-xs font-bold text-gray-900">System Admin</p>
-                    <p className="text-[10px] text-gray-500">Full Access</p>
-                </div>
-                <NotificationCenter />
+        {/* Main content */}
+        <main className="flex-1 min-w-0 relative bg-[#f0f0f1]">
+          {isPending && (
+            <div className="absolute inset-0 bg-[#f0f0f1]/60 z-20 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="w-8 h-8 animate-spin text-[#2271b1]" />
+                <p className="text-[12px] text-[#50575e]">Loading module...</p>
+              </div>
             </div>
-        </header>
-
-        {isPending && (
-            <div className="absolute inset-0 bg-white/60 z-20 flex items-center justify-center backdrop-blur-[1px]">
-                <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                    <p className="text-xs font-medium text-gray-500 animate-pulse">Loading Module...</p>
-                </div>
-            </div>
-        )}
-
-        <div className={cn(" transition-opacity duration-300 ease-in-out", isPending ? "opacity-50" : "opacity-100")}>
-            <div className="w-full">
-                <ActiveComponent />
-            </div>
-        </div>
-      </main>
+          )}
+          <div className={cn(
+            "py-3 px-1 sm:px-4 md:px-1 md:py-3 transition-opacity duration-200",
+            isPending ? "opacity-50" : "opacity-100"
+          )}>
+            <ActiveComponent />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

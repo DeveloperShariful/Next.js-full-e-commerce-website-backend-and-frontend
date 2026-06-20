@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
+import { getCachedAffiliateSettings } from "@/lib/global-settings-cache";
 
 export async function POST(req: Request) {
   try {
@@ -21,14 +22,18 @@ export async function POST(req: Request) {
     }
     const ip = req.headers.get("x-forwarded-for") || "unknown";
     const userAgent = req.headers.get("user-agent") || "unknown";
+
+    const affSettings = await getCachedAffiliateSettings();
+    const dedupWindowMs = (affSettings.clickDedupWindowMinutes ?? 1) * 60 * 1000;
+
     const recentClick = await db.affiliateClick.findFirst({
       where: {
         affiliateId: affiliate.id,
         ipAddress: ip,
         createdAt: {
-          gte: new Date(Date.now() - 1000 * 60) 
-        }
-      }
+          gte: new Date(Date.now() - dedupWindowMs),
+        },
+      },
     });
 
     if (recentClick) {

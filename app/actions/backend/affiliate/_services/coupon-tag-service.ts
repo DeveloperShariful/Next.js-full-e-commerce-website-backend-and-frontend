@@ -17,13 +17,11 @@ export async function getAllAffiliateCoupons() {
   await protectAction("MANAGE_PARTNERS");
 
   const coupons = await db.discount.findMany({
-    where: {
-      affiliateId: { not: null }
-    },
     include: {
       affiliate: {
         select: {
           id: true,
+          slug: true,
           user: { select: { name: true, email: true } }
         }
       }

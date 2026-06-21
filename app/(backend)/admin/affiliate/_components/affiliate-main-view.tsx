@@ -6,8 +6,8 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard, CreditCard, Settings, Trophy, Calculator,
-  Image as ImageIcon, Network, ShieldAlert, Code2,
-  Megaphone, Globe, Package, ShieldCheck, Menu, X, Loader2, Ticket, Tag,
+  Image as ImageIcon, Network, ShieldAlert,
+  Megaphone, Package, ShieldCheck, Menu, X, Loader2, Ticket,
   Users, Terminal
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,12 +20,9 @@ import CreativeList from "./Marketing/creative-manager";
 import CampaignsContestsManager from "./Marketing/campaigns-contests-manager";
 import CouponTagManager from "./Marketing/coupon-tag-manager";
 import AnnouncementManager from "./Marketing/announcement-manager";
-import NetworkTree from "./Configuration/mlm-network-manager";
 import FraudRuleManager from "./Configuration/fraud-rule-manager";
 import TierList from "./Configuration/tier-manager";
 import RuleList from "./Configuration/commission-rule-management";
-import DomainList from "./Configuration/domain-manager";
-import PixelList from "./Configuration/pixel-manager";
 import ProductRateManager from "./Configuration/product-rate-manager";
 import AffiliateGeneralConfigForm from "./Configuration/general-config-manager";
 import LogViewer from "./log-viewer";
@@ -96,10 +93,7 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
         { id: "tiers", label: "Tiers & Ranks", icon: Trophy },
         { id: "rules", label: "Commission Rules", icon: Calculator },
         { id: "product-rates", label: "Item Overrides", icon: Package },
-        { id: "network", label: "MLM Network", icon: Network },
         { id: "fraud", label: "Fraud Shield", icon: ShieldAlert, badgeKey: "fraud" as keyof SidebarCounts },
-        { id: "domains", label: "Custom Domains", icon: Globe },
-        { id: "pixels", label: "Tracking Pixels", icon: Code2 },
         { id: "general", label: "System Settings", icon: Settings },
       ],
     },
@@ -180,29 +174,16 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
       case "product-rates":
         return initialData.rates ? <ProductRateManager initialRates={initialData.rates.rates} /> : null;
 
-      case "network":
-        return initialData.network ? (
-          <div className="overflow-x-auto">
-            <NetworkTree nodes={initialData.network} />
-          </div>
-        ) : null;
-
       case "fraud":
         return initialData.fraud ? (
-          <div className="space-y-6">
-            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-800 text-sm flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4" />
-              <strong>Live Monitor:</strong> {initialData.fraud.highRisk.length} High Risk Users Detected.
-            </div>
-            <FraudRuleManager initialRules={initialData.fraud.rules} />
-          </div>
+          <FraudRuleManager
+            initialRules={initialData.fraud.rules}
+            highRisk={initialData.fraud.highRisk}
+            flagged={initialData.fraud.flagged}
+            stats={initialData.fraud.stats}
+            alerts={initialData.fraud.alerts}
+          />
         ) : null;
-
-      case "domains":
-        return initialData.domains ? <DomainList initialDomains={initialData.domains} /> : null;
-
-      case "pixels":
-        return initialData.pixels ? <PixelList pixels={initialData.pixels} /> : null;
 
       case "coupons":
         return initialData.coupons ? (
@@ -224,17 +205,7 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
 
       case "general":
         return initialData.config ? (
-          <AffiliateGeneralConfigForm
-            initialData={initialData.config}
-            mlmInitialData={
-              initialData.mlmConfig || {
-                isEnabled: false,
-                maxLevels: 3,
-                levelRates: { "1": 10 },
-                commissionBasis: "SALES_AMOUNT",
-              }
-            }
-          />
+          <AffiliateGeneralConfigForm initialData={initialData.config} />
         ) : null;
 
       default:

@@ -110,7 +110,6 @@ enum TransactionType {
   AUTHORIZATION
   CAPTURE
   AFFILIATE_COMMISSION
-  MLM_BONUS
   PAYOUT_DEDUCTION
   ADJUSTMENT
 }
@@ -266,11 +265,6 @@ enum FraudAction {
   BLOCK
   FLAG
   SUSPEND
-}
-
-enum MLMBasis {
-  SALES_AMOUNT
-  PROFIT
 }
 
 enum AnnouncementType {
@@ -1637,7 +1631,6 @@ model StoreSettings {
   
   // 👇 Affiliate System JSON Configs (৫টি টেবিলের কাজ এখানে)
   affiliateConfig          Json?
-  mlmConfig                Json?               
   affiliateFraudRules      Json?               
   affiliateContests        Json?               
   affiliateCreatives       Json?   // 🆕 Replaced AffiliateCreative & Usage [{ title, type, url }]
@@ -2311,7 +2304,6 @@ model AffiliateAccount {
   // 👇 JSON & Array Fields 
   settings        Json?            
   kycDocuments    Json?            // Replaces AffiliateDocument model
-  pixels          Json?            // Replaces AffiliatePixel model
   tags            String[]         // Replaces AffiliateTag & AffiliateGroup (Group functionality)
   bankDetails     Json?
   
@@ -2325,18 +2317,11 @@ model AffiliateAccount {
   // Relations
   tierId            String?
   tier              AffiliateTier?    @relation(fields: [tierId], references: [id], onDelete: SetNull)
-  parentId          String?
-  parent            AffiliateAccount? @relation("AffiliateMLM", fields: [parentId], references: [id], onDelete: SetNull)
-  downlines         AffiliateAccount[] @relation("AffiliateMLM")
-  
-  mlmPath           String?          
-  mlmLevel          Int              @default(0)
-  
+
   referrals         Referral[]
   customerReferrals User[]           @relation("CustomerReferral")
   clicks            AffiliateClick[]
   payouts           AffiliatePayout[]
-  domains           AffiliateDomain[]
   orders            Order[]          @relation("OrderAffiliate")
   coupons           Discount[]
   analyticsSummaries AffiliateAnalyticsSummary[]
@@ -2349,10 +2334,7 @@ model AffiliateAccount {
 
   @@index([slug])
   @@index([status])
-  @@index([parentId])
   @@index([customSlug])
-  @@index([mlmPath])
-  @@index([mlmLevel])
   @@index([tierId])
 }
 
@@ -2441,11 +2423,9 @@ model Referral {
   tierSnapshot    String?
   commissionType  CommissionType   @default(PERCENTAGE)
   commissionRate  Decimal          @db.Decimal(5, 2)
-  isMlmReward     Boolean          @default(false)
   isLifetime      Boolean          @default(false)
-  isManual        Boolean          @default(false) 
+  isManual        Boolean          @default(false)
   adminNote       String?
-  fromDownlineId  String?
   metadata        Json?
   availableAt     DateTime?
   productsBreakdown Json?
@@ -2455,9 +2435,8 @@ model Referral {
   isRecurring       Boolean   @default(false)    
   recurringCycle    Int?      @default(1)         
   deviceFingerprint String?                       
-  isFlagged         Boolean   @default(false)     
-  flagReason        String?   
-  mlmLevel          Int?
+  isFlagged         Boolean   @default(false)
+  flagReason        String?
   paidAt            DateTime?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
@@ -2487,20 +2466,6 @@ model AffiliatePayout {
   @@index([affiliateId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
-}
-
-model AffiliateDomain {
-  id              String           @id @default(uuid())
-  affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
-  domain          String           @unique 
-  isVerified      Boolean          @default(false)
-  verificationToken String?
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  
-  @@index([domain])
-  @@index([affiliateId])
 }
 
 model AffiliateCommissionRule {

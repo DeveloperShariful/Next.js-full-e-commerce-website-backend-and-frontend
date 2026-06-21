@@ -12,21 +12,18 @@ import * as tierService from "@/app/actions/backend/affiliate/_services/tier-ser
 import * as marketingService from "@/app/actions/backend/affiliate/_services/marketing-assets-service";
 import * as ruleEngineService from "@/app/actions/backend/affiliate/_services/commition-rule-service";
 import * as engagementService from "@/app/actions/backend/affiliate/_services/engagement-service";
-import * as networkService from "@/app/actions/backend/affiliate/_services/mlm-network-service";
 import * as fraudService from "@/app/actions/backend/affiliate/_services/fraud-service";
-import * as trackingService from "@/app/actions/backend/affiliate/_services/pixel-domain-service";
 import * as productRateService from "@/app/actions/backend/affiliate/_services/product-rate-service";
 import * as kycService from "@/app/actions/backend/affiliate/_services/kyc-service";
 import * as ledgerService from "@/app/actions/backend/affiliate/_services/ledger-service";
 import * as analyticsService from "@/app/actions/backend/affiliate/_services/dashboard-service";
 import * as couponTagService from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 import * as logService from "@/app/actions/backend/affiliate/_services/log-service"; 
-import { getCachedMLMConfig } from "@/lib/global-settings-cache";
 import { serializePrismaData } from "@/lib/format-data"; 
 
 export const metadata = {
   title: "Affiliate Program | WP Admin Style",
-  description: "Advanced control center for affiliate marketing, MLM, and commission management.",
+  description: "Advanced control center for affiliate marketing and commission management.",
 };
 
 export default async function AffiliateMasterPage({
@@ -131,24 +128,15 @@ export default async function AffiliateMasterPage({
         data.announcements = await marketingService.getAllAnnouncements(page, 20);
         break;
 
-      case "network":
-        data.network = await networkService.getMLMTree();
-        break;
-
       case "fraud":
-        data.fraud = {
-          highRisk: await fraudService.getHighRiskAffiliates(),
-          flagged: await fraudService.getFlaggedReferrals(),
-          rules: await fraudService.getRules(),
-        };
-        break;
-
-      case "domains":
-        data.domains = await trackingService.getAllDomains();
-        break;
-
-      case "pixels":
-        data.pixels = await trackingService.getAllPixels();
+        const [highRisk, flagged, fraudRules, fraudStats, fraudAlerts] = await Promise.all([
+          fraudService.getHighRiskAffiliates(),
+          fraudService.getFlaggedReferrals(),
+          fraudService.getRules(),
+          fraudService.getFraudStats(),
+          fraudService.getRecentFraudAlerts(20),
+        ]);
+        data.fraud = { highRisk, flagged, rules: fraudRules, stats: fraudStats, alerts: fraudAlerts };
         break;
 
       case "product-rates":
@@ -160,8 +148,6 @@ export default async function AffiliateMasterPage({
         break;
 
       case "general":
-        // ✅ FIXED: Fetch MLM config from JSON Cache instead of deleted Table
-        data.mlmConfig = await getCachedMLMConfig();
         break;
         
       case "coupons":

@@ -83,7 +83,7 @@ export async function getLedger(affiliateId: string, limit: number = 50) {
   const ledger = await db.walletTransaction.findMany({
     where: { 
         wallet: { userId: affiliate.userId },
-        type: { in: ["AFFILIATE_COMMISSION", "MLM_BONUS", "AFFILIATE_PAYOUT", "PAYOUT_DEDUCTION", "ADJUSTMENT"] }
+        type: { in: ["AFFILIATE_COMMISSION", "AFFILIATE_PAYOUT", "PAYOUT_DEDUCTION", "ADJUSTMENT"] }
     },
     orderBy: { createdAt: "desc" },
     take: limit

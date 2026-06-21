@@ -4,8 +4,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { db } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
-import { cookies } from 'next/headers';
-import AffiliatePixelRenderer from './_components/affiliate-pixel-renderer';
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -62,6 +60,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
       shippingAddress: true,
       billingAddress: true,
       shippingMethod: true,
+      affiliateId: true,
       referrals: { select: { affiliateId: true } },
       items: {
         select: {
@@ -85,29 +84,23 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
     );
   }
 
-  // Affiliate tracking (existing logic preserved)
-  const cookieStore = await cookies();
-  const affiliateSlug = cookieStore.get('affiliate_token')?.value;
+  // Affiliate tracking — fallback if not yet processed by capture webhook
   let finalAffiliateId = order.referrals.length > 0 ? order.referrals[0].affiliateId : null;
 
-  if (!finalAffiliateId && affiliateSlug) {
+  if (!finalAffiliateId && order.affiliateId) {
     try {
-      const apiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/internal/affiliate/process-order`;
+      const apiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/affiliate/process-order`;
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: order.id,
-          userId: order.userId,
-          affiliateSlug,
-          totalAmount: Number(order.total),
-          subtotal: Number(order.subtotal),
-          items: order.items,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.INTERNAL_API_KEY || '',
+        },
+        body: JSON.stringify({ orderId: order.id }),
         cache: 'no-store',
       });
       const result = await response.json();
-      if (result.success && result.affiliateId) finalAffiliateId = result.affiliateId;
+      if (result.success) finalAffiliateId = order.affiliateId;
     } catch (error) {
       console.error('Failed to process affiliate commission:', error);
     }
@@ -121,14 +114,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
 
   return (
     <div className="min-h-[80vh] bg-gray-50 py-6 px-4">
-      {finalAffiliateId && (
-        <AffiliatePixelRenderer
-          affiliateId={finalAffiliateId}
-          orderTotal={Number(order.total)}
-          orderId={order.id}
-          currency="AUD"
-        />
-      )}
+
 
       <div className="max-w-4xl mx-auto space-y-4">
 

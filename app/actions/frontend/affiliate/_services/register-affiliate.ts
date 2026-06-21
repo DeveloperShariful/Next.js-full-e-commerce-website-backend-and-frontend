@@ -7,6 +7,13 @@ import { requireUser } from "../auth-helper";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
 
+interface AffiliateRegistrationConfig {
+  registrationEnabled?: boolean;
+  autoApprove?: boolean;
+  defaultCommissionRate?: number;
+  cookieDuration?: number;
+}
+
 // Type definition for the input
 interface RegisterInput {
   slug?: string;
@@ -35,7 +42,7 @@ export async function registerAffiliateAction(data?: RegisterInput) {
       select: { affiliateConfig: true },
     });
 
-    const config = (settings?.affiliateConfig as any) || {};
+    const config = (settings?.affiliateConfig as unknown as AffiliateRegistrationConfig) || {};
     if (config.registrationEnabled === false) {
       return { success: false, message: "Registration is currently closed." };
     }
@@ -86,7 +93,7 @@ export async function registerAffiliateAction(data?: RegisterInput) {
     revalidatePath("/affiliates");
     return { success: true, message: "Account created successfully!" };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Register Affiliate Error:", error);
     return { success: false, message: "Something went wrong. Please try again." };
   }

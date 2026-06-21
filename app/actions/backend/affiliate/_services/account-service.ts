@@ -7,7 +7,7 @@ import { AffiliateStatus, Prisma, AffiliateAccount } from "@prisma/client";
 import { DecimalMath } from "@/lib/decimal-math";
 import { auditService } from "@/lib/audit-service";
 import { revalidatePath } from "next/cache";
-import { ActionResponse, AffiliateUserTableItem, AffiliateKycDocument, AffiliatePixelData } from "../types";
+import { ActionResponse, AffiliateUserTableItem, AffiliateKycDocument } from "../types";
 import { protectAction } from "../permission-service";
 import { getChanges } from "../get-changes";
 
@@ -89,7 +89,6 @@ export async function getAffiliates(
       riskScore: account.riskScore || 0,
       commissionRate: account.commissionRate ? DecimalMath.toNumber(account.commissionRate) : null,
       commissionType: account.commissionType,
-      pixels: (account.pixels as unknown as AffiliatePixelData[]) || [],
       kycDocuments: (account.kycDocuments as unknown as AffiliateKycDocument[]) || [],
     };
   });
@@ -108,8 +107,6 @@ export async function getAffiliateDetails(id: string) {
       },
       tier: true,
       coupons: true,
-      parent: { include: { user: true } }, 
-      downlines: { include: { user: true } }, 
       payouts: { take: 10, orderBy: { createdAt: "desc" } },
       productRates: { include: { product: true } }
     }

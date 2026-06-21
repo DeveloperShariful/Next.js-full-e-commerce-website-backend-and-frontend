@@ -16,7 +16,6 @@ import {
 } from "@/app/actions/frontend/affiliate/_services/dashboard-service";
 import { getLinks, getCampaigns, getCreatives, getCoupons } from "@/app/actions/frontend/affiliate/_services/marketing-service";
 import { getWalletData, getPayoutHistory, getLedger } from "@/app/actions/frontend/affiliate/_services/finance-service";
-import { getSponsor, getNetworkTree, getNetworkStats } from "@/app/actions/frontend/affiliate/_services/network-service";
 import { getSettings } from "@/app/actions/frontend/affiliate/_services/settings-service";
 
 export const metadata = {
@@ -39,27 +38,25 @@ export default async function AffiliateStorefrontPage() {
   const [
     storeSettings,
     // Dashboard Data
-    stats, recentActivity, chartData, tierProgress, activeRules, activeContests, // ✅ Added activeContests variable
+    stats, recentActivity, chartData, tierProgress, activeRules, activeContests,
     // Marketing Data
-    links, campaigns, creatives, coupons, 
+    links, campaigns, creatives, coupons,
     // Finance Data
     wallet, payoutHistory, ledger,
-    // Network Data
-    sponsor, tree, netStats, 
     // Settings
-    settings, 
+    settings,
     // Reports
-    conversions 
-  ] = await Promise.all([ 
+    conversions
+  ] = await Promise.all([
     db.storeSettings.findUnique({ where: { id: "settings" } }),
-    
+
     // Dashboard Data Calls
     getStats(profile.id),
     getRecentActivity(profile.id),
     getPerformanceChart(profile.id),
     getTierProgress(profile.id),
     getActiveRules(),
-    getActiveContests(), // ✅ Added Function Call
+    getActiveContests(),
 
     // Marketing Data Calls
     getLinks(profile.id),
@@ -72,20 +69,15 @@ export default async function AffiliateStorefrontPage() {
     getPayoutHistory(profile.id),
     getLedger(profile.id, 50),
 
-    // Network Data Calls
-    getSponsor(profile.id),
-    getNetworkTree(profile.id),
-    getNetworkStats(profile.id),
-
     // Settings Call
     getSettings(profile.userId),
 
     // Reports Call
     db.referral.findMany({
-        where: { affiliateId: profile.id },
-        include: { order: { select: { orderNumber: true, total: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 20 
+      where: { affiliateId: profile.id },
+      include: { order: { select: { orderNumber: true, total: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20
     })
   ]);
 
@@ -110,10 +102,9 @@ export default async function AffiliateStorefrontPage() {
         activeContests // ✅ Added to dashboard object
     },
     marketing: { links, campaigns, creatives, coupons, defaultSlug: profile.slug, ...appConfig },
-    creatives, 
+    creatives,
     finance: { wallet, history: payoutHistory },
     ledger,
-    network: { sponsor, tree, stats: netStats },
     reports: { conversions },
     settings
   };

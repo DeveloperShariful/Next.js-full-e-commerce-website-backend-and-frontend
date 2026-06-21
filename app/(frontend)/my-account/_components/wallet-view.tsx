@@ -50,7 +50,7 @@ export default function WalletView({ data }: Props) {
   };
 
   const getTxConfig = (type: string) => {
-     if (type === "AFFILIATE_COMMISSION" || type === "MLM_BONUS" || type === "ADJUSTMENT") {
+     if (type === "AFFILIATE_COMMISSION" || type === "ADJUSTMENT") {
          return { color: "text-[#00a32a]", bg: "bg-[#f0f6fc] border-[#00a32a]/20", sign: "+", label: "Earnings" };
      }
      return { color: "text-[#d63638]", bg: "bg-[#fcf0f1] border-[#d63638]/20", sign: "-", label: "Debit" };

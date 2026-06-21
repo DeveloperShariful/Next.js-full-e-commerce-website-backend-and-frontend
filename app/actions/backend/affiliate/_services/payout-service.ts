@@ -44,7 +44,7 @@ export async function getPayouts(page: number = 1, limit: number = 20, status?: 
     method: p.method,
     status: p.status,
     requestedAt: p.createdAt,
-    bankDetails: p.affiliate?.bankDetails as any,
+    bankDetails: p.affiliate?.bankDetails as unknown as Record<string, string> | undefined,
     paypalEmail: p.affiliate?.paypalEmail,
     riskScore: p.affiliate?.riskScore || 0
   }));
@@ -166,9 +166,29 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
         payout.affiliateId 
       );
     } else {
+      // Decrement affiliate balance for external payouts (BANK_TRANSFER, PAYPAL)
       await tx.affiliateAccount.update({
-          where: { id: payout.affiliateId },
-          data: { version: { increment: 1 } }
+        where: { id: payout.affiliateId },
+        data: {
+          balance: { decrement: payout.amount },
+          version: { increment: 1 }
+        }
+      });
+
+      // Record the deduction in the wallet ledger
+      const userWallet = await tx.wallet.upsert({
+        where: { userId: payout.affiliate.userId },
+        create: { userId: payout.affiliate.userId, balance: 0 },
+        update: {}
+      });
+      await tx.walletTransaction.create({
+        data: {
+          walletId: userWallet.id,
+          type: "PAYOUT_DEDUCTION",
+          amount: payout.amount,
+          description: `Payout via ${payout.method}: ${transactionId || "manual"}`,
+          reference: payout.id
+        }
       });
 
       await tx.affiliatePayout.update({

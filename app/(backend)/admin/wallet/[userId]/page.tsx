@@ -93,7 +93,7 @@ export default async function UserWalletPage({
                     </tr>
                   ) : (
                     wallet.transactions.map((tx) => {
-                      const isCredit = tx.type === "AFFILIATE_COMMISSION" || tx.type === "MLM_BONUS" || tx.type === "ADJUSTMENT";
+                      const isCredit = tx.type === "AFFILIATE_COMMISSION" || tx.type === "ADJUSTMENT";
                       return (
                         <tr key={tx.id} className="hover:bg-[#f6f7f7] transition-colors">
                           <td className="px-4 py-3">

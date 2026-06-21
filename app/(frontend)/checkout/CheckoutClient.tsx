@@ -7,7 +7,7 @@ import { useEffect, useCallback, useReducer, useRef, useState, useMemo } from 'r
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import Cookies from 'js-cookie';
+
 
 import OrderNotes from './components/OrderNotes';
 import ShippingForm from './components/ShippingForm';
@@ -440,12 +440,8 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
     dispatch({ type: 'SET_LOADING', key: 'order', payload: true });
     setOrderPlacementInProgress(true);
 
-    const affiliateId = Cookies.get('solid_affiliate_id');
-    const visitId = Cookies.get('solid_affiliate_visit_id');
+    // Affiliate cookies are HttpOnly — read server-side in the API route directly
     const affiliateMetaData: { key: string; value: string }[] = [];
-    if (affiliateId) affiliateMetaData.push({ key: 'solid_affiliate_id', value: affiliateId });
-    if (visitId) affiliateMetaData.push({ key: 'solid_affiliate_visit_id', value: visitId });
-
     const utmData = getStoredUTM();
 
     try {

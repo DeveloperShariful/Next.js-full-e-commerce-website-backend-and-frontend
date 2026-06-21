@@ -3,6 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auditService } from "@/lib/audit-service";
 import { ActionResponse } from "../types";
@@ -80,12 +81,21 @@ export async function upsertRuleAction(data: RuleInput): Promise<ActionResponse>
       payload.priority = (maxPrio?.priority || 0) + 1;
     }
 
-    const prismaData: any = {
+    const prismaData: {
+      name: string;
+      isActive: boolean;
+      priority: number;
+      conditions: Prisma.InputJsonValue;
+      action: Prisma.InputJsonValue;
+      startDate: Date | null;
+      endDate: Date | null;
+      affiliateSpecificIds: string[];
+    } = {
       name: payload.name,
       isActive: payload.isActive,
       priority: payload.priority,
-      conditions: payload.conditions, 
-      action: payload.action,         
+      conditions: payload.conditions as unknown as Prisma.InputJsonValue,
+      action: payload.action as unknown as Prisma.InputJsonValue,
       startDate: payload.startDate ? new Date(payload.startDate) : null,
       endDate: payload.endDate ? new Date(payload.endDate) : null,
       affiliateSpecificIds: payload.affiliateSpecificIds,

@@ -4,9 +4,9 @@
 
 import { useState } from "react"; 
 import { 
-  LayoutDashboard, Link as LinkIcon, Image as ImageIcon, 
-  Users, Wallet, FileText, BarChart3, Settings, Menu, X, Ticket, 
-  Trophy // ✅ Import Trophy Icon
+  LayoutDashboard, Link as LinkIcon, Image as ImageIcon,
+  Wallet, FileText, BarChart3, Settings, Menu, X, Ticket,
+  Trophy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +16,6 @@ import LinkManager from "./link-manager";
 import CouponManager from "./coupon-manager"; 
 import PayoutManager from "./payout-manager";
 import TransactionLedger from "./transaction-ledger";
-import NetworkBrowser from "./network-browser";
 import SettingsForm from "./settings-form";
 import CreativeGallery from "./creative-gallery"; 
 import ConversionReport from "./conversion-report"; 
@@ -29,7 +28,6 @@ interface Props {
     dashboard: any;
     marketing: any;
     creatives: any[];
-    network: any;
     finance: any;
     ledger: any[];
     reports: any;
@@ -42,7 +40,7 @@ export default function AffiliateMainView({ initialData }: Props) {
   const [currentView, setCurrentView] = useState("overview");
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  const { profile, dashboard, marketing, creatives, network, finance, ledger, reports, settings } = initialData;
+  const { profile, dashboard, marketing, creatives, finance, ledger, reports, settings } = initialData;
 
   const handleNav = (view: string) => {
     setCurrentView(view); 
@@ -56,7 +54,6 @@ export default function AffiliateMainView({ initialData }: Props) {
     { id: "coupons", label: "Coupons", icon: Ticket },
     { id: "contests-bonuses", label: "Contests & Bonuses", icon: Trophy }, // ✅ NEW ITEM
     { id: "creatives", label: "Creatives", icon: ImageIcon },
-    { id: "network", label: "My Network", icon: Users },
     { id: "payouts", label: "Payouts", icon: Wallet },
     { id: "ledger", label: "Ledger", icon: FileText },
     { id: "reports", label: "Reports", icon: BarChart3 },
@@ -76,7 +73,6 @@ export default function AffiliateMainView({ initialData }: Props) {
       );
 
       case "creatives": return <CreativeGallery creatives={creatives || []} />;
-      case "network": return <NetworkBrowser data={network} />;
       case "payouts": return <PayoutManager data={finance} userId={profile.userId} />;
       case "ledger": return <TransactionLedger transactions={ledger || []} />;
       case "reports": return <ConversionReport conversions={reports?.conversions || []} currency={initialData.config.currency} />;

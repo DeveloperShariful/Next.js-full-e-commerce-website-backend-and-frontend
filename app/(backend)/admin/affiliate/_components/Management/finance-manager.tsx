@@ -431,7 +431,6 @@ function LedgerTab({
   const getTypeStyles = (type: string) => {
     switch (type) {
       case "AFFILIATE_COMMISSION":
-      case "MLM_BONUS":
         return { bg: "bg-[#f0f6fc] border-[#2271b1]/30", text: "text-[#2271b1]", icon: ArrowUpRight };
       case "AFFILIATE_PAYOUT":
       case "PAYOUT_DEDUCTION":
@@ -445,14 +444,13 @@ function LedgerTab({
 
   const formatTypeName = (type: string) => {
     if (type === "AFFILIATE_COMMISSION") return "Commission";
-    if (type === "MLM_BONUS") return "MLM Bonus";
     if (type === "AFFILIATE_PAYOUT") return "Payout Sent";
     if (type === "PAYOUT_DEDUCTION") return "Refund Deduction";
     return type.replace(/_/g, " ").toLowerCase();
   };
 
   const isCredit = (type: string) =>
-    type === "AFFILIATE_COMMISSION" || type === "MLM_BONUS" || type === "ADJUSTMENT";
+    type === "AFFILIATE_COMMISSION" || type === "ADJUSTMENT";
 
   const filteredData = data.filter((item) => {
     if (!item.affiliate) return false;

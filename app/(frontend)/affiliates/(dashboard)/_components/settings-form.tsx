@@ -5,21 +5,20 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { 
-    Save, Loader2, CreditCard, Code, MousePointerClick, 
-    ShieldCheck, UploadCloud, FileText, CheckCircle, XCircle 
+import {
+    Save, Loader2, CreditCard,
+    ShieldCheck, UploadCloud, FileText, CheckCircle, XCircle
 } from "lucide-react";
-import { updateSettingsAction, addPixelAction, uploadKYCAction } from "@/app/actions/frontend/affiliate/_services/settings-service";
+import { updateSettingsAction, uploadKYCAction } from "@/app/actions/frontend/affiliate/_services/settings-service";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 
 interface Props {
-  userId: string; 
+  userId: string;
   initialData: {
     paypalEmail?: string | null;
     bankDetails?: any;
-    pixels: any[];
     kyc?: {
         isVerified: boolean;
         documents: any[];
@@ -29,7 +28,7 @@ interface Props {
 
 export default function SettingsForm({ userId, initialData }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [activeTab, setActiveTab] = useState<"PAYMENT" | "TRACKING" | "KYC">("PAYMENT");
+  const [activeTab, setActiveTab] = useState<"PAYMENT" | "KYC">("PAYMENT");
   const [openKycPicker, setOpenKycPicker] = useState(false);
 
   // --- 1. Payment Form ---
@@ -42,12 +41,7 @@ export default function SettingsForm({ userId, initialData }: Props) {
     }
   });
 
-  // --- 2. Pixel Form ---
-  const pixelForm = useForm({
-    defaultValues: { provider: "FACEBOOK", pixelId: "" }
-  });
-
-  // --- 3. KYC Form ---
+  // --- 2. KYC Form ---
   const kycForm = useForm({
     defaultValues: { type: "NATIONAL_ID", number: "", url: "" }
   });
@@ -71,18 +65,6 @@ export default function SettingsForm({ userId, initialData }: Props) {
       const res = await updateSettingsAction(payload);
       if (res.success) toast.success("Payment settings saved.");
       else toast.error("Failed to save settings.");
-    });
-  };
-
-  const onAddPixel = (data: any) => {
-    startTransition(async () => {
-      const res = await addPixelAction(data.provider, data.pixelId);
-      if (res.success) {
-        toast.success("Tracking pixel added.");
-        pixelForm.reset();
-      } else {
-        toast.error("Failed to add pixel.");
-      }
     });
   };
 
@@ -120,7 +102,6 @@ export default function SettingsForm({ userId, initialData }: Props) {
       <div className="flex gap-6 border-b border-gray-200 overflow-x-auto">
         {[
             { id: "PAYMENT", label: "Payment Method", icon: CreditCard },
-            { id: "TRACKING", label: "Tracking Pixels", icon: MousePointerClick },
             { id: "KYC", label: "Verification", icon: ShieldCheck }
         ].map((tab) => (
             <button 
@@ -180,48 +161,7 @@ export default function SettingsForm({ userId, initialData }: Props) {
       )}
 
       {/* ==========================
-          2. TRACKING TAB
-      ========================== */}
-      {activeTab === "TRACKING" && (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Code className="w-5 h-5" /> Add New Pixel</h3>
-            <form onSubmit={pixelForm.handleSubmit(onAddPixel)} className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="w-full md:w-1/3">
-                <label className="text-xs font-bold text-gray-700 uppercase">Provider</label>
-                <select {...pixelForm.register("provider")} className="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white outline-none">
-                  <option value="FACEBOOK">Facebook / Meta</option>
-                  <option value="GOOGLE">Google Ads</option>
-                  <option value="TIKTOK">TikTok</option>
-                </select>
-              </div>
-              <div className="w-full md:w-1/2">
-                <label className="text-xs font-bold text-gray-700 uppercase">Pixel ID</label>
-                <input {...pixelForm.register("pixelId", { required: true })} placeholder="e.g. 1234567890" className="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none" />
-              </div>
-              <button type="submit" disabled={isPending} className="w-full md:w-auto px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors">Add</button>
-            </form>
-          </div>
-
-          <div className="space-y-3">
-             <h4 className="text-sm font-bold text-gray-500 uppercase">Active Pixels</h4>
-             {initialData.pixels.length === 0 ? <p className="text-sm text-gray-400 italic">No pixels added yet.</p> : (
-                initialData.pixels.map((p: any) => (
-                   <div key={p.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-3">
-                         <div className="p-2 bg-gray-100 rounded-md font-bold text-gray-600">{p.provider[0]}</div>
-                         <div><p className="font-bold text-sm text-gray-900">{p.provider}</p><p className="text-xs text-gray-500 font-mono">{p.pixelId}</p></div>
-                      </div>
-                      <span className="px-2 py-1 bg-green-50 text-green-700 text-[10px] font-bold uppercase rounded border border-green-100">Active</span>
-                   </div>
-                ))
-             )}
-          </div>
-        </div>
-      )}
-
-      {/* ==========================
-          3. KYC VERIFICATION TAB
+          2. KYC VERIFICATION TAB
       ========================== */}
       {activeTab === "KYC" && (
           <div className="space-y-8">

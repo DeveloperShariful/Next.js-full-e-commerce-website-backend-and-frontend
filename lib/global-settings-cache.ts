@@ -139,40 +139,7 @@ export const getCachedTransdirectConfig = unstable_cache(
 );
 
 // ============================================================================
-// 8. AFFILIATE MLM CONFIG CACHE (✅ FIXED: JSON Fetching from StoreSettings)
-// ট্যাগ: 'mlm-config'
-// ============================================================================
-
-const MLMConfigZod = z.object({
-  isEnabled: z.boolean().optional().default(false),
-  maxLevels: z.number().optional().default(3),
-  commissionBasis: z.enum(["SALES_AMOUNT", "PROFIT_MARGIN", "CV"]).optional().default("SALES_AMOUNT"),
-  levelRates: z.record(z.string(), z.number()).optional().default({ "1": 10, "2": 5, "3": 2 }),
-});
-
-export const getCachedMLMConfig = unstable_cache(
-  async () => {
-    const settings = await db.storeSettings.findUnique({
-      where: { id: "settings" },
-      select: { mlmConfig: true },
-    });
-
-    const parsedData = MLMConfigZod.safeParse(settings?.mlmConfig);
-    const config = parsedData.success ? parsedData.data : MLMConfigZod.parse({});
-
-    return {
-      isEnabled: config.isEnabled,
-      maxLevels: config.maxLevels,
-      commissionBasis: config.commissionBasis,
-      levelRates: config.levelRates,
-    };
-  },
-  ["mlm-config-cache"],
-  { tags: ["settings", "mlm-config"], revalidate: 3600 }
-);
-
-// ============================================================================
-// 9. AFFILIATE PROGRAM SETTINGS CACHE
+// 8. AFFILIATE PROGRAM SETTINGS CACHE
 // ট্যাগ: 'affiliate-config'
 // ============================================================================
 

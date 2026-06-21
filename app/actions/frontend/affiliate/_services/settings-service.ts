@@ -3,10 +3,10 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getAuthAffiliate } from "../auth-helper";
-import crypto from "crypto";
 
 // ==========================================
 // 1. VALIDATION SCHEMAS
@@ -26,14 +26,6 @@ const kycSchema = z.object({
   type: z.enum(["PASSPORT", "DRIVING_LICENSE", "NATIONAL_ID", "TAX_FORM"]),
   url: z.string().url("Invalid file URL"),
   number: z.string().min(3, "Document number required"),
-});
-
-const pixelJsonSchema = z.object({
-  id: z.string(),
-  type: z.string(),
-  pixelId: z.string(),
-  enabled: z.boolean(),
-  createdAt: z.string()
 });
 
 const kycJsonSchema = z.object({
@@ -59,8 +51,7 @@ export async function getSettings(userId: string) {
       id: true,
       paypalEmail: true,
       bankDetails: true,
-      pixels: true,          // ✅ Fetching from JSON
-      kycDocuments: true,    // ✅ Fetching from JSON
+      kycDocuments: true,
       isKyced: true,
       kycStatus: true
     }
@@ -68,24 +59,13 @@ export async function getSettings(userId: string) {
 
   if (!affiliate) return null;
 
-  // Safe parsing for JSON Arrays
-  const parsedPixels = z.array(pixelJsonSchema).safeParse(affiliate.pixels);
   const parsedDocs = z.array(kycJsonSchema).safeParse(affiliate.kycDocuments);
-
-  const pixels = parsedPixels.success ? parsedPixels.data : [];
   const documents = parsedDocs.success ? parsedDocs.data : [];
 
   return {
     id: affiliate.id,
     paypalEmail: affiliate.paypalEmail,
-    bankDetails: affiliate.bankDetails as any, 
-    pixels: pixels.map(p => ({
-      id: p.id,
-      provider: p.type, 
-      pixelId: p.pixelId,
-      enabled: p.enabled 
-    })),
-    
+    bankDetails: affiliate.bankDetails,
     kyc: {
         isVerified: affiliate.isKyced || affiliate.kycStatus === "VERIFIED",
         documents: documents.map((d, index) => ({
@@ -121,7 +101,7 @@ export async function updateSettingsAction(data: SettingsInput) {
       data: {
         paypalEmail: paypalEmail || null,
         // Prisma saves JSON directly, stringify is not strictly needed for Json fields but keeping as per your design
-        bankDetails: bankDetails as any, 
+        bankDetails: bankDetails as unknown as Prisma.InputJsonValue | undefined,
       }
     });
 
@@ -131,41 +111,6 @@ export async function updateSettingsAction(data: SettingsInput) {
   } catch (error) {
     console.error("Update Error:", error);
     return { success: false, message: "Failed to update settings." };
-  }
-}
-
-export async function addPixelAction(provider: "FACEBOOK" | "GOOGLE" | "TIKTOK", pixelId: string) {
-  try {
-    const affiliate = await getAuthAffiliate();
-    
-    // 1. Fetch current pixels JSON
-    const account = await db.affiliateAccount.findUnique({
-      where: { id: affiliate.id },
-      select: { pixels: true }
-    });
-
-    const parsed = z.array(pixelJsonSchema).safeParse(account?.pixels);
-    let currentPixels = parsed.success ? parsed.data : [];
-
-    // 2. Append new pixel
-    currentPixels.push({
-      id: crypto.randomUUID(),
-      type: provider,
-      pixelId: pixelId,
-      enabled: true,
-      createdAt: new Date().toISOString()
-    });
-
-    // 3. Update DB
-    await db.affiliateAccount.update({
-      where: { id: affiliate.id },
-      data: { pixels: currentPixels as any }
-    });
-    
-    revalidatePath("/affiliates/settings");
-    return { success: true, message: "Pixel added." };
-  } catch (error) {
-    return { success: false, message: "Failed to add pixel." };
   }
 }
 
@@ -207,7 +152,7 @@ export async function uploadKYCAction(data: KYCInput) {
         await db.affiliateAccount.update({
             where: { id: affiliate.id },
             data: {
-                kycDocuments: currentDocs as any,
+                kycDocuments: currentDocs as unknown as Prisma.InputJsonValue,
                 kycStatus: "PENDING_REVIEW" // Update global status
             }
         });

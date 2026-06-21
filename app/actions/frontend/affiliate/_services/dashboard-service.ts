@@ -9,6 +9,34 @@ import { AnnouncementType, CommissionType } from "@prisma/client";
 import { serializePrismaData } from "@/lib/format-data";
 import { z } from "zod";
 
+interface ContestJson {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  prizes?: Record<string, string>;
+  criteria?: string;
+}
+
+interface AnnouncementJson {
+  id: string;
+  title: string;
+  content: string;
+  isActive: boolean;
+  startsAt: string;
+  expiresAt?: string | null;
+  groupIds?: string[];
+  tierIds?: string[];
+  type: string;
+}
+
+interface RuleAction {
+  type: CommissionType;
+  value: number;
+}
+
 // ==========================================
 // 1. PROFILE & STATS (OPTIMIZED)
 // ==========================================
@@ -75,12 +103,16 @@ export async function getActiveContests() {
 
   if (!settings || !settings.affiliateContests) return [];
 
-  const contests = settings.affiliateContests as any[];
+  if (!Array.isArray(settings.affiliateContests)) return [];
+  const contests = settings.affiliateContests as unknown as ContestJson[];
   const now = new Date();
 
-  // Filter only active and ongoing contests
   const activeContests = contests
-    .filter(c => c.isActive && isBefore(new Date(c.startDate), now) && isAfter(new Date(c.endDate), now))
+    .filter(c => {
+      try {
+        return c?.isActive && isBefore(new Date(c.startDate), now) && isAfter(new Date(c.endDate), now);
+      } catch { return false; }
+    })
     .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
     .slice(0, 3)
     .map(c => ({
@@ -145,7 +177,7 @@ export async function getAnnouncements(affiliateId: string) {
 
   if (!settings || !settings.affiliateAnnouncements) return [];
 
-  const announcements = settings.affiliateAnnouncements as any[];
+  const announcements = settings.affiliateAnnouncements as unknown as AnnouncementJson[];
   const now = new Date();
 
   const userTags = affiliate.tags || [];
@@ -165,7 +197,7 @@ export async function getAnnouncements(affiliateId: string) {
         // Targeting Logic
         const hasNoTargets = (!a.groupIds || a.groupIds.length === 0) && (!a.tierIds || a.tierIds.length === 0);
         const matchesTag = a.groupIds?.some((tag: string) => userTags.includes(tag));
-        const matchesTier = a.tierIds?.includes(userTierId);
+        const matchesTier = userTierId ? a.tierIds?.includes(userTierId) : false;
 
         // Show if targeted to ALL, or if user's tag/tier matches
         return hasNoTargets || matchesTag || matchesTier;
@@ -258,8 +290,8 @@ export async function getActiveRules() {
     id: r.id,
     name: r.name,
     description: r.description || "Special commission offer",
-    type: (r.action as any).type as CommissionType,
-    value: Number((r.action as any).value)
+    type: (r.action as unknown as RuleAction).type,
+    value: Number((r.action as unknown as RuleAction).value)
   }));
 }
 

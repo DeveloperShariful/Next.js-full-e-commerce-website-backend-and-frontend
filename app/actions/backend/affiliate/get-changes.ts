@@ -2,7 +2,7 @@
 
 import { Prisma } from "@prisma/client";
 
-function isDeepEqual(val1: any, val2: any): boolean {
+function isDeepEqual(val1: unknown, val2: unknown): boolean {
   if (val1 === val2) return true;
 
   if ((val1 === null || val1 === undefined) && (val2 === null || val2 === undefined)) return true;
@@ -34,14 +34,16 @@ function isDeepEqual(val1: any, val2: any): boolean {
   }
 
   if (typeof val1 === 'object' && typeof val2 === 'object') {
-    const keys1 = Object.keys(val1);
-    const keys2 = Object.keys(val2);
+    const obj1 = val1 as Record<string, unknown>;
+    const obj2 = val2 as Record<string, unknown>;
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
 
     if (keys1.length !== keys2.length) return false;
 
     for (const key of keys1) {
       if (!keys2.includes(key)) return false;
-      if (!isDeepEqual(val1[key], val2[key])) return false;
+      if (!isDeepEqual(obj1[key], obj2[key])) return false;
     }
     return true;
   }

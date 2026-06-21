@@ -1,5 +1,5 @@
 // app/api/stripe/create-order/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
 import { auth } from '@/auth';
@@ -46,8 +46,12 @@ async function generateNextOrderNumber(): Promise<string> {
 // ============================================================================
 // MAIN POST REQUEST
 // ============================================================================
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Read affiliate cookies server-side (HttpOnly — cannot be read by client JS)
+    const cookieAffiliateId = request.cookies.get('solid_affiliate_id')?.value ?? null;
+    const cookieVisitId = request.cookies.get('solid_affiliate_visit_id')?.value ?? null;
+
     const body = await request.json();
     const {
       cartItems,
@@ -215,6 +219,8 @@ export async function POST(request: Request) {
     const metaDataArray = Array.isArray(affiliateMetaData) ? [...affiliateMetaData] : [];
     metaDataArray.push({ key: '_stripe_payment_method', value: selectedPaymentMethod || 'stripe' });
     metaDataArray.push({ key: '_created_via', value: 'Headless_Stripe_Create_Order_API' });
+    if (cookieAffiliateId) metaDataArray.push({ key: 'solid_affiliate_id', value: cookieAffiliateId });
+    if (cookieVisitId) metaDataArray.push({ key: 'solid_affiliate_visit_id', value: cookieVisitId });
 
     const dbOrderItems = validOrderItems.map(({ taxStatus: _ts, ...rest }) => rest);
     const billingJson = JSON.parse(JSON.stringify(customerInfo));
@@ -233,13 +239,14 @@ export async function POST(request: Request) {
       totalDue: secureOrderTotal,
       guestEmail: customerInfo.email,
       userId: sessionUserId || undefined,
+      affiliateId: cookieAffiliateId || undefined,
       billingAddress: billingJson,
       shippingAddress: shippingJson,
       shippingMethod: shippingMethodLabel,
       paymentGateway: selectedPaymentMethod,
       paymentMethod: paymentMethodTitle,
       discountId,
-      couponCode:  couponCode   || null,
+      couponCode: couponCode || null,
       customerNote: orderNotes,
       metadata: metadataJson,
       isFirstOrder,

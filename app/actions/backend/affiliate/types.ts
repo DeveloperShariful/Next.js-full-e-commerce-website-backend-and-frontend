@@ -18,12 +18,6 @@ export interface AffiliateKycDocument {
   verifiedAt?: Date | string;
 }
 
-export interface AffiliatePixelData {
-  type: string;
-  pixelId: string;
-  enabled: boolean;
-}
-
 export interface AffiliateFraudRuleData {
   type: "IP_CLICK_LIMIT" | "CONVERSION_RATE_LIMIT" | "ORDER_VALUE_LIMIT" | "BLACKLIST_COUNTRY";
   value: string;
@@ -77,12 +71,30 @@ export interface DateRange {
 export type AffiliateGeneralSettings = z.infer<typeof affiliateGeneralSchema>;
 
 export interface AffiliateConfigDTO {
+  // Program
   programName?: string;
   termsUrl?: string;
+  registrationEnabled?: boolean;
+  autoApprove?: boolean;
+  maxAffiliatesLimit?: number | null;
+  requireTermsAccept?: boolean;
+  welcomeEmailEnabled?: boolean;
+
+  // Commission
+  commissionRate?: number;
+  commissionType?: "PERCENTAGE" | "FIXED";
   excludeShipping?: boolean;
   excludeTax?: boolean;
   autoApplyCoupon?: boolean;
   zeroValueReferrals?: boolean;
+  maxCommissionCap?: number | null;
+  enableProfitMarginProtection?: boolean;
+  minProfitMargin?: number;
+  firstReferralBonus?: boolean;
+  firstReferralBonusAmount?: number;
+  firstReferralBonusType?: "PERCENTAGE" | "FIXED";
+
+  // Tracking
   referralParam?: string;
   customSlugsEnabled?: boolean;
   autoCreateSlug?: boolean;
@@ -91,12 +103,31 @@ export interface AffiliateConfigDTO {
   allowSelfReferral?: boolean;
   isLifetimeLinkOnPurchase?: boolean;
   lifetimeDuration?: number | null;
+  attributionModel?: "LAST_CLICK" | "FIRST_CLICK";
+  trackCancelledOrders?: boolean;
+  trackRefundedOrders?: boolean;
+
+  // Payouts
   holdingPeriod?: number;
   minimumPayout?: number;
   payoutMethods?: string[];
   autoApprovePayout?: boolean;
-  commissionRate?: number; 
-  commissionType?: "PERCENTAGE" | "FIXED"; 
+  requireKycForPayout?: boolean;
+
+  // Compliance
+  kycRequiredDocuments?: string[];
+  taxFormRequired?: boolean;
+  taxFormThreshold?: number;
+
+  // Automation
+  tierAutoUpgrade?: boolean;
+  tierEvaluationFrequency?: "DAILY" | "WEEKLY" | "MONTHLY";
+  commissionEmailEnabled?: boolean;
+  payoutEmailEnabled?: boolean;
+
+  // Integrations
+  postbackGlobalUrl?: string;
+  postbackSecret?: string;
 }
 
 export interface DashboardKPI {
@@ -143,8 +174,7 @@ export interface AffiliateUserTableItem {
   paymentReady?: boolean;
   commissionRate: number | null;
   commissionType?: "PERCENTAGE" | "FIXED";
-  pixels?: AffiliatePixelData[]; // Added for JSON support
-  kycDocuments?: AffiliateKycDocument[]; // Added for JSON support
+  kycDocuments?: AffiliateKycDocument[];
 }
 
 export interface PayoutQueueItem {
@@ -161,16 +191,6 @@ export interface PayoutQueueItem {
   riskScore?: number; 
 }
 
-export interface NetworkNode {
-  id: string;
-  name: string;
-  avatar: string | null;
-  tier: string;
-  totalEarnings: number;
-  directReferrals: number; 
-  teamSize: number; 
-  children?: NetworkNode[];
-}
 
 export interface FraudAlertItem {
   id: string;
@@ -180,15 +200,6 @@ export interface FraudAlertItem {
   details: string;
   detectedAt: Date;
   status: "PENDING" | "RESOLVED" | "BLOCKED";
-}
-
-export interface TrackingPixelItem {
-  id: string;
-  affiliateName: string;
-  type: string;
-  pixelId: string;
-  status: boolean;
-  createdAt: Date;
 }
 
 /**
@@ -202,7 +213,7 @@ export type EventType =
   | "TIER_UPGRADE_CHECK" 
   | "FRAUD_ALERT" 
   | "PAYOUT_REQUESTED"
-  | "MLM_BONUS_TRIGGER";
+  ;
 
 export interface AffiliateEventPayload {
   orderId?: string;
@@ -213,21 +224,9 @@ export interface AffiliateEventPayload {
   timestamp: number;
 }
 
-/**
- * ==================================================================
- * 4. ADVANCED MLM & COMMISSION TYPES
- * ==================================================================
- */
-export interface MLMConfigDTO {
-  isEnabled: boolean;
-  maxLevels: number;
-  commissionBasis: "SALES_AMOUNT" | "PROFIT_MARGIN" | "CV"; 
-  levelRates: Record<string, number>;
-}
-
 export interface CommissionCalculationResult {
   amount: number;
-  source: string; // 'GLOBAL', 'TIER', 'PRODUCT_OVERRIDE', 'MLM'
+  source: string; // 'GLOBAL', 'TIER', 'PRODUCT_OVERRIDE'
   calculationLog: string[];
   profitMarginCheck?: {
     cost: number;
@@ -250,10 +249,3 @@ export interface TaxComplianceStatus {
 
 export type IdempotencyScope = "ORDER_PROCESS" | "PAYOUT_RELEASE";
 
-export interface AffiliateConfigDTOExtended extends AffiliateConfigDTO {
-  requireTaxFormForPayout?: boolean;
-  taxFormThreshold?: number; 
-  enableProfitMarginProtection?: boolean;
-  minProfitMargin?: number; 
-  postbackUrlSecret?: string; 
-}

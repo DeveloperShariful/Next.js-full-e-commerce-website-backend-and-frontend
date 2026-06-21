@@ -3,10 +3,23 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { auditService } from "@/lib/audit-service";
 import { revalidatePath } from "next/cache";
 import { ActionResponse, AffiliateKycDocument } from "../types";
 import { protectAction } from "../permission-service";
+
+interface KycDocumentListItem extends AffiliateKycDocument {
+  id: string;
+  accountId: string;
+  docIndex: number;
+  affiliate: {
+    id: string;
+    slug: string;
+    kycStatus: string;
+    user: { name: string | null; email: string; image: string | null };
+  };
+}
 
 // =========================================
 // READ OPERATIONS (Dynamic JSON Aggregation)
@@ -17,8 +30,8 @@ export async function getDocuments(page: number = 1, limit: number = 20, status?
   // Since documents are stored in JSON inside AffiliateAccount, 
   // we fetch accounts that have KYC documents.
   const accounts = await db.affiliateAccount.findMany({
-    where: { 
-      kycDocuments: { not: undefined }, // Fetch only users who submitted docs
+    where: {
+      kycDocuments: { not: Prisma.DbNull }, // Fetch only users who submitted docs
     },
     select: {
       id: true,
@@ -30,7 +43,7 @@ export async function getDocuments(page: number = 1, limit: number = 20, status?
   });
 
   // Flatten the documents array into a standard list for the table
-  let allDocs: any[] = [];
+  let allDocs: KycDocumentListItem[] = [];
 
   accounts.forEach(acc => {
     const docs = (acc.kycDocuments as unknown as AffiliateKycDocument[]) || [];
@@ -93,7 +106,7 @@ export async function verifyDocumentAction(accountId: string, docIndex: number):
       await tx.affiliateAccount.update({
         where: { id: accountId },
         data: {
-          kycDocuments: docs as any,
+          kycDocuments: docs as unknown as Prisma.InputJsonValue,
           kycStatus: pendingDocs === 0 ? "VERIFIED" : affiliate.kycStatus
         }
       });
@@ -153,7 +166,7 @@ export async function rejectDocumentAction(accountId: string, docIndex: number, 
       await tx.affiliateAccount.update({
         where: { id: accountId },
         data: {
-          kycDocuments: docs as any,
+          kycDocuments: docs as unknown as Prisma.InputJsonValue,
           kycStatus: "REJECTED"
         }
       });

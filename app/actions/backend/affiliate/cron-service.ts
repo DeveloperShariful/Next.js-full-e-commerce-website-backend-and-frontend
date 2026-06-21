@@ -87,9 +87,9 @@ export async function processPendingReferrals() {
         await tx.walletTransaction.create({
           data: {
             walletId: userWallet.id,
-            type: ref.isMlmReward ? "MLM_BONUS" : "AFFILIATE_COMMISSION",
+            type: "AFFILIATE_COMMISSION",
             amount: ref.commissionAmount,
-            description: ref.isMlmReward ? `MLM Reward Released: #${ref.orderId}` : `Commission Released: #${ref.orderId}`,
+            description: `Commission Released: #${ref.orderId}`,
             reference: `REL-${ref.id}` 
           }
         });
@@ -132,9 +132,14 @@ export async function runTierUpgrades() {
     const eligibleAffiliates = await db.affiliateAccount.findMany({
       where: {
         status: "ACTIVE",
-        deletedAt: null, 
-        tierId: { not: targetTier.id }, 
-        totalEarnings: { gte: targetTier.minSalesAmount }, 
+        deletedAt: null,
+        tierId: { not: targetTier.id },
+        totalEarnings: { gte: targetTier.minSalesAmount },
+        // Only upgrade, never downgrade — current tier must have lower minSalesAmount
+        OR: [
+          { tierId: null },
+          { tier: { minSalesAmount: { lt: targetTier.minSalesAmount } } }
+        ]
       },
       select: { id: true, userId: true, tierId: true, user: { select: { email: true, name: true } } },
       take: BATCH_SIZE 

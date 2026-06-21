@@ -6,8 +6,9 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { getAuthAffiliate } from "../auth-helper"; 
+import { getAuthAffiliate } from "../auth-helper";
 import { serializePrismaData } from "@/lib/format-data";
+import { AffiliateConfigDTO } from "@/app/actions/backend/affiliate/types";
 
 // ==========================================
 // 1. VALIDATION SCHEMAS (JSON Ready)
@@ -48,7 +49,7 @@ const contestJsonSchema = z.object({
 // ==========================================
 async function createLinkInternal(affiliateId: string, destinationUrl: string, customSlug?: string, campaignName?: string) {
   const settings = await db.storeSettings.findUnique({ where: { id: "settings" } });
-  const config = (settings?.affiliateConfig as any) || {};
+  const config = (settings?.affiliateConfig as unknown as AffiliateConfigDTO) || {};
   
   const linkCount = await db.affiliateLink.count({ where: { affiliateId } });
   const limit = Number(config.slugLimit) || 10;

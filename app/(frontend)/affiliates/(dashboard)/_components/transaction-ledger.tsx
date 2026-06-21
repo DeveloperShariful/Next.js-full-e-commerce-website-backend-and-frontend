@@ -28,7 +28,6 @@ export default function TransactionLedger({ transactions }: Props) {
   const getTypeConfig = (type: string) => {
     switch (type) {
       case "AFFILIATE_COMMISSION":
-      case "MLM_BONUS":
         return { color: "text-[#00a32a]", bg: "bg-[#f0f6fc] border-[#00a32a]/20", icon: ArrowDownLeft, sign: "+" };
       case "AFFILIATE_PAYOUT":
       case "PAYOUT_DEDUCTION":
@@ -42,7 +41,6 @@ export default function TransactionLedger({ transactions }: Props) {
 
   const formatTypeName = (type: string) => {
     if (type === "AFFILIATE_COMMISSION") return "Commission";
-    if (type === "MLM_BONUS") return "MLM Bonus";
     if (type === "AFFILIATE_PAYOUT") return "Payout Sent";
     if (type === "PAYOUT_DEDUCTION") return "Refund / Deduction";
     return type.replace("_", " ");

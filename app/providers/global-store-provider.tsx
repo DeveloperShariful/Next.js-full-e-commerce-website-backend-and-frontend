@@ -161,7 +161,6 @@ export interface AffiliateGlobalConfig {
   minimumPayout: number;        
   payoutMethods: string[];      
 
-  enableMLM?: boolean;
   enableCreatives?: boolean;
   enableCampaigns?: boolean;
   enableAnnouncements?: boolean;
@@ -276,7 +275,6 @@ const defaultContext: GlobalStoreContextType = {
     minimumPayout: 50,
     payoutMethods: [" "],
 
-    enableMLM: false,
     enableCreatives: true,
     enableCampaigns: true,
     enableAnnouncements: true,
@@ -544,7 +542,6 @@ export function GlobalStoreProvider({
       ? affiliateRaw.payoutMethods 
       : ["BANK_TRANSFER", "STORE_CREDIT"],
 
-    enableMLM: affiliateRaw.enableMLM ?? false,
     enableCreatives: affiliateRaw.enableCreatives ?? true,
     enableCampaigns: affiliateRaw.enableCampaigns ?? true,
     enableAnnouncements: affiliateRaw.enableAnnouncements ?? true,

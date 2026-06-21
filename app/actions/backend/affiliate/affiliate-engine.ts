@@ -6,9 +6,46 @@ import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { DecimalMath } from "@/lib/decimal-math";
 import { getCachedAffiliateSettings, getCachedGlobalRules } from "@/lib/global-settings-cache";
-import { distributeMLMCommission } from "./_services/mlm-network-service";
 import { detectSelfReferral, checkVelocity } from "./_services/fraud-service";
 import { auditService } from "@/lib/audit-service";
+
+interface RuleConditions {
+  minOrderAmount?: number;
+  maxOrderAmount?: number;
+  categoryIds?: string[];
+  customerType?: "ALL" | "NEW" | "RETURNING";
+  productTags?: string[];
+}
+
+interface RuleAction {
+  type: "PERCENTAGE" | "FIXED";
+  value: number;
+  tierBonus?: number;
+}
+
+interface ItemBreakdown {
+  orderItemId: string;
+  productId: string;
+  productName: string;
+  sku?: string | null;
+  quantity?: number;
+  price?: number;
+  total?: number;
+  rate?: string;
+  type?: string;
+  source?: string;
+  commission: number;
+  profit?: number;
+  status?: string;
+  isRefunded?: boolean;
+}
+
+interface ReferralMetadata extends Record<string, unknown> {
+  itemsBreakdown?: ItemBreakdown[];
+  attribution?: string;
+  totalProfit?: string;
+  isGiftCard?: boolean;
+}
 
 export async function processOrder(orderId: string) {
   const order = await db.order.findUnique({
@@ -100,20 +137,25 @@ export async function processOrder(orderId: string) {
 
   const productIds = order.items.map(i => i.productId).filter(Boolean) as string[];
   
-  // ✅ FIXED: Only User Rates are queried now (Group product rates are obsolete)
-  const userRates = await db.affiliateProductRate.findMany({
-      where: { 
-        productId: { in: productIds }, 
-        affiliateId: affiliate.id
-      }
-  });
+  // Query affiliate-specific and tier-specific product rates
+  const [userRates, tierRates] = await Promise.all([
+    db.affiliateProductRate.findMany({
+      where: { productId: { in: productIds }, affiliateId: affiliate.id }
+    }),
+    affiliate.tierId
+      ? db.affiliateProductRate.findMany({
+          where: { productId: { in: productIds }, tierId: affiliate.tierId }
+        })
+      : Promise.resolve([])
+  ]);
 
   const userRateMap = new Map(userRates.map(r => [r.productId, r]));
+  const tierRateMap = new Map(tierRates.map(r => [r.productId, r]));
 
   let totalCommission = new Prisma.Decimal(0);
   let totalProfit = new Prisma.Decimal(0);
   let matchedRuleId: string | null = null; 
-  const itemsBreakdown: any[] = [];
+  const itemsBreakdown: ItemBreakdown[] = [];
   const globalRules = await getCachedGlobalRules();
   
   const orderSubtotal = DecimalMath.toDecimal(order.subtotal);
@@ -135,7 +177,7 @@ export async function processOrder(orderId: string) {
         sku: item.sku,
         commission: 0,
         status: "EXCLUDED_BY_PRODUCT",
-        profit: itemProfit
+        profit: DecimalMath.toNumber(itemProfit)
       });
       continue;
     }
@@ -148,8 +190,11 @@ export async function processOrder(orderId: string) {
     const userProductRate = userRateMap.get(item.productId);
 
     if (userProductRate && userProductRate.isDisabled) {
-        isExcluded = true;
-        source = "USER_OVERRIDE_DISABLED";
+      isExcluded = true;
+      source = "USER_OVERRIDE_DISABLED";
+    } else if (!userProductRate && tierRateMap.get(item.productId)?.isDisabled) {
+      isExcluded = true;
+      source = "TIER_OVERRIDE_DISABLED";
     }
 
     if (isExcluded) {
@@ -161,7 +206,7 @@ export async function processOrder(orderId: string) {
         commission: 0,
         status: "EXCLUDED",
         source,
-        profit: itemProfit 
+        profit: DecimalMath.toNumber(itemProfit)
       });
       continue;
     }
@@ -169,7 +214,7 @@ export async function processOrder(orderId: string) {
     let matchedRule = null;
     
     for (const rule of globalRules) {
-      const conditions = rule.conditions as any;
+      const conditions = rule.conditions as unknown as RuleConditions;
       let isMatch = true;
 
       if (conditions.minOrderAmount && DecimalMath.lt(orderTotal, conditions.minOrderAmount)) isMatch = false;
@@ -178,8 +223,8 @@ export async function processOrder(orderId: string) {
         if (!item.product || !item.product.categories || item.product.categories.length === 0) {
           isMatch = false; 
         } else {
-          const productCategoryIds = item.product.categories.map((c: any) => c.id);
-          const hasMatchingCategory = productCategoryIds.some((id: string) => conditions.categoryIds.includes(id));
+          const productCategoryIds = item.product.categories.map((c) => c.id);
+          const hasMatchingCategory = productCategoryIds.some((id) => conditions.categoryIds!.includes(id));
           
           if (!hasMatchingCategory) {
             isMatch = false;
@@ -198,13 +243,19 @@ export async function processOrder(orderId: string) {
       }
     }
 
-    // ✅ FIXED: Removed AffiliateGroup logic. Priority: Product Rate > Global Rule > Coupon > Tier > Global Config
+    // Priority: User Product Rate > Tier Product Rate > Global Rule > Coupon > Product Default > Tier Default > Global Config
+    const tierProductRate = tierRateMap.get(item.productId);
+
     if (userProductRate) {
       rate = userProductRate.rate;
       type = userProductRate.type;
       source = "PRODUCT_USER_OVERRIDE";
+    } else if (tierProductRate && !tierProductRate.isDisabled) {
+      rate = tierProductRate.rate;
+      type = tierProductRate.type;
+      source = "PRODUCT_TIER_OVERRIDE";
     } else if (matchedRule) {
-      const action = matchedRule.action as any;
+      const action = matchedRule.action as unknown as RuleAction;
       rate = DecimalMath.toDecimal(action.value);
       type = action.type;
       source = `RULE: ${matchedRule.name}`;
@@ -255,13 +306,13 @@ export async function processOrder(orderId: string) {
       productName: item.productName,
       sku: item.sku,
       quantity: item.quantity,
-      price: item.price,
-      total: item.total,
+      price: DecimalMath.toNumber(item.price),
+      total: DecimalMath.toNumber(item.total),
       rate: rate.toString(),
       type,
       source,
-      commission: itemComm,
-      profit: itemProfit, 
+      commission: DecimalMath.toNumber(itemComm),
+      profit: DecimalMath.toNumber(itemProfit),
       isRefunded: false
     });
   }
@@ -274,6 +325,11 @@ export async function processOrder(orderId: string) {
     const availableDate = new Date();
     availableDate.setDate(availableDate.getDate() + (config.holdingPeriod || 14));
 
+    // Determine overall commission type/rate from the first non-excluded item for record-keeping
+    const firstItem = itemsBreakdown.find((i) => i.commission > 0);
+    const overallType  = (firstItem?.type  ?? config.commissionType  ?? "PERCENTAGE") as "PERCENTAGE" | "FIXED";
+    const overallRate  = new Prisma.Decimal(firstItem?.rate ?? config.commissionRate ?? 0);
+
     await tx.referral.create({
       data: {
         affiliateId: affiliate.id,
@@ -282,16 +338,17 @@ export async function processOrder(orderId: string) {
         netOrderAmount: orderSubtotal,
         commissionAmount: totalCommission,
         status: "PENDING",
-        commissionType: "PERCENTAGE",
-        commissionRate: new Prisma.Decimal(0),
-        commissionRuleId: matchedRuleId, 
-        isRecurring: false, 
+        availableAt: availableDate,
+        commissionType: overallType,
+        commissionRate: overallRate,
+        commissionRuleId: matchedRuleId,
+        isRecurring: false,
         metadata: {
           itemsBreakdown,
           attribution: attributionSource,
-          totalProfit: totalProfit,
+          totalProfit: totalProfit.toString(),
           isGiftCard: isGiftCardPayment
-        }
+        } as unknown as Prisma.InputJsonValue
       }
     });
 
@@ -301,8 +358,6 @@ export async function processOrder(orderId: string) {
         data: { referredByAffiliateId: affiliate.id }
       });
     }
-
-    await distributeMLMCommission(tx, order.id, affiliate.id, orderSubtotal, totalProfit, config.holdingPeriod || 14);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -353,12 +408,12 @@ export async function processRefund(orderId: string, refundedItemIds: string[]) 
   if (!referral) return { success: false, error: "NO_REFERRAL_FOUND" };
   if (referral.status === "REJECTED") return { success: true, message: "ALREADY_REJECTED" };
 
-  const breakdown = (referral.metadata as any)?.itemsBreakdown || [];
+  const breakdown = (referral.metadata as unknown as ReferralMetadata)?.itemsBreakdown || [];
   let refundDeduction = new Prisma.Decimal(0);
   let updatedBreakdown = [...breakdown];
 
   refundedItemIds.forEach(itemId => {
-    const itemIndex = updatedBreakdown.findIndex((i: any) => i.orderItemId === itemId);
+    const itemIndex = updatedBreakdown.findIndex((i) => i.orderItemId === itemId);
     if (itemIndex > -1 && !updatedBreakdown[itemIndex].isRefunded) {
       const amount = new Prisma.Decimal(updatedBreakdown[itemIndex].commission);
       refundDeduction = DecimalMath.add(refundDeduction, amount);
@@ -374,12 +429,12 @@ export async function processRefund(orderId: string, refundedItemIds: string[]) 
       if (DecimalMath.lte(newCommission, 0)) {
         await tx.referral.update({
           where: { id: referral.id },
-          data: { status: "REJECTED", metadata: { ...referral.metadata as any, itemsBreakdown: updatedBreakdown } }
+          data: { status: "REJECTED", metadata: { ...(referral.metadata as unknown as ReferralMetadata), itemsBreakdown: updatedBreakdown } as unknown as Prisma.InputJsonValue }
         });
       } else {
         await tx.referral.update({
           where: { id: referral.id },
-          data: { commissionAmount: newCommission, metadata: { ...referral.metadata as any, itemsBreakdown: updatedBreakdown } }
+          data: { commissionAmount: newCommission, metadata: { ...(referral.metadata as unknown as ReferralMetadata), itemsBreakdown: updatedBreakdown } as unknown as Prisma.InputJsonValue }
         });
       }
     } else if (referral.status === "PAID" || referral.status === "APPROVED") {
@@ -412,7 +467,7 @@ export async function processRefund(orderId: string, refundedItemIds: string[]) 
       }
       await tx.referral.update({
         where: { id: referral.id },
-        data: { metadata: { ...referral.metadata as any, itemsBreakdown: updatedBreakdown } }
+        data: { metadata: { ...(referral.metadata as unknown as ReferralMetadata), itemsBreakdown: updatedBreakdown } as unknown as Prisma.InputJsonValue }
       });
     }
   });

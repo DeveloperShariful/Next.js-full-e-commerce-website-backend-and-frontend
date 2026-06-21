@@ -18,11 +18,13 @@ export async function getLedgerHistory(page: number = 1, limit: number = 20, typ
   const skip = (page - 1) * limit;
   
   // ✅ FIXED: Mapping to WalletTransaction types for affiliates
-  const affiliateTypes = ["AFFILIATE_COMMISSION", "MLM_BONUS", "PAYOUT_DEDUCTION", "ADJUSTMENT"];
-  const typeFilter = type ? [type] : affiliateTypes;
+  const affiliateTypes: import("@prisma/client").TransactionType[] = ["AFFILIATE_COMMISSION", "PAYOUT_DEDUCTION", "ADJUSTMENT"];
+  const typeFilter = (type && ["AFFILIATE_COMMISSION", "PAYOUT_DEDUCTION", "ADJUSTMENT"].includes(type))
+    ? [type as import("@prisma/client").TransactionType]
+    : affiliateTypes;
 
   const where: Prisma.WalletTransactionWhereInput = {
-    type: { in: typeFilter as any }
+    type: { in: typeFilter }
   };
 
   const [total, data] = await Promise.all([
@@ -91,9 +93,9 @@ export async function getAffiliateLedger(affiliateId: string) {
   if (!affiliate) return [];
 
   const data = await db.walletTransaction.findMany({
-      where: { 
+      where: {
         wallet: { userId: affiliate.userId },
-        type: { in: ["AFFILIATE_COMMISSION", "MLM_BONUS", "PAYOUT_DEDUCTION", "ADJUSTMENT"] }
+        type: { in: ["AFFILIATE_COMMISSION", "PAYOUT_DEDUCTION", "ADJUSTMENT"] }
       },
       orderBy: { createdAt: "desc" }
   });
@@ -174,7 +176,7 @@ export async function createAdjustmentAction(
         await tx.walletTransaction.create({
             data: {
                 walletId: userWallet.id,
-                type: type === "BONUS" ? "MLM_BONUS" : "ADJUSTMENT", 
+                type: "ADJUSTMENT",
                 amount: adjustAmount,
                 description: note,
                 reference: referenceString 

@@ -5,7 +5,7 @@
 import React, { useRef } from 'react';
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import { useCart } from '@/context/CartContext';
-import Cookies from 'js-cookie';
+
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { getStoredUTM } from '@/components/SourceTracker';
@@ -120,12 +120,8 @@ const PayPalPaymentGatewayComponent = ({
         toast.loading("Initializing secure payment...", { id: 'paypal-init' });
 
         try {
-          // Affiliate tracking from cookies
-          const affiliateId = Cookies.get('solid_affiliate_id');
-          const visitId = Cookies.get('solid_affiliate_visit_id');
+          // Affiliate cookies are HttpOnly — read server-side in the API route directly
           const affiliateMetaData: { key: string; value: string }[] = [];
-          if (affiliateId) affiliateMetaData.push({ key: 'solid_affiliate_id', value: affiliateId });
-          if (visitId) affiliateMetaData.push({ key: 'solid_affiliate_visit_id', value: visitId });
 
           const utmData = getStoredUTM();
 

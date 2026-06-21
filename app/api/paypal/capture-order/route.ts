@@ -243,14 +243,18 @@ export async function POST(request: Request) {
       }).catch(err => console.error('[PayPal Capture] Admin email failed:', err));
 
       // Affiliate commission
-      fetch(`${APP_URL}/api/affiliate/process-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.INTERNAL_API_KEY!,
-        },
-        body: JSON.stringify({ orderId: wcOrderId }),
-      }).catch(err => console.error('[PayPal Capture] Affiliate trigger failed:', err));
+      if (!process.env.INTERNAL_API_KEY) {
+        console.error('[PayPal Capture] INTERNAL_API_KEY not set — affiliate commission skipped for order:', wcOrderId);
+      } else {
+        fetch(`${APP_URL}/api/affiliate/process-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.INTERNAL_API_KEY,
+          },
+          body: JSON.stringify({ orderId: wcOrderId }),
+        }).catch(err => console.error('[PayPal Capture] Affiliate trigger failed:', err));
+      }
 
       // ✅ NEW: Daily analytics update (matches stripe/capture-order behaviour)
       // Only runs on confirmed COMPLETED payments — not on PENDING/FAILED.

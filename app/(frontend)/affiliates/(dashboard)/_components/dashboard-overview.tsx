@@ -26,11 +26,12 @@ interface StatsCardProps {
   icon: LucideIcon;
   description?: string;
   trend?: "up" | "down" | "neutral";
+  trendPercent?: number;
   color?: "blue" | "green" | "purple" | "orange";
 }
 
-function StatsCard({ title, value, icon: Icon, description, trend, color = "blue" }: StatsCardProps) {
-  
+function StatsCard({ title, value, icon: Icon, description, trend, trendPercent, color = "blue" }: StatsCardProps) {
+
   const styles = {
     blue:   { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100", ring: "group-hover:ring-blue-100" },
     green:  { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-100", ring: "group-hover:ring-emerald-100" },
@@ -49,13 +50,13 @@ function StatsCard({ title, value, icon: Icon, description, trend, color = "blue
         <div className={cn("p-3 rounded-xl", theme.bg, theme.text)}>
           <Icon className="w-6 h-6" />
         </div>
-        {trend && (
+        {trend && trend !== "neutral" && trendPercent !== undefined && (
           <span className={cn(
             "flex items-center text-xs font-bold px-2 py-1 rounded-full",
             trend === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
           )}>
             {trend === "up" ? <ArrowUpRight className="w-3 h-3 mr-1"/> : <ArrowDownRight className="w-3 h-3 mr-1"/>}
-            12% 
+            {trendPercent.toFixed(1)}%
           </span>
         )}
       </div>
@@ -363,19 +364,30 @@ export default function DashboardOverview({ data, userName, userStatus = "PENDIN
   const { stats, recentActivity, chartData, tierProgress, activeRules, activeContests } = data;
   const { formatPrice } = useGlobalStore();
   const firstName = (userName || "Partner").split(" ")[0];
-  
+
   const totalEarnings = safeNumber(stats.totalEarnings);
   const unpaidEarnings = safeNumber(stats.unpaidEarnings);
   const clicks = safeNumber(stats.clicks);
   const referrals = safeNumber(stats.referrals);
+  const approvedReferrals = safeNumber(stats.approvedReferrals);
   const conversionRate = safeNumber(stats.conversionRate);
+  const nextPayoutDate = stats.nextPayoutDate ? new Date(stats.nextPayoutDate) : null;
 
-  // Status Badge Color Logic
+  // Real trend: compare last 7 days earnings vs prior 7 days from chartData
+  const earningsTrend = (() => {
+    if (!chartData || chartData.length < 14) return { trend: "neutral" as const, pct: 0 };
+    const last7 = chartData.slice(-7).reduce((s: number, d: any) => s + safeNumber(d.earnings), 0);
+    const prev7 = chartData.slice(-14, -7).reduce((s: number, d: any) => s + safeNumber(d.earnings), 0);
+    if (prev7 === 0) return last7 > 0 ? { trend: "up" as const, pct: 100 } : { trend: "neutral" as const, pct: 0 };
+    const pct = ((last7 - prev7) / prev7) * 100;
+    return { trend: pct >= 0 ? ("up" as const) : ("down" as const), pct: Math.abs(pct) };
+  })();
+
   const getStatusColor = (status: string) => {
-      if (status === "ACTIVE") return "bg-green-100 text-green-700 border-green-200";
-      if (status === "PENDING") return "bg-yellow-100 text-yellow-700 border-yellow-200";
-      if (status === "REJECTED") return "bg-red-100 text-red-700 border-red-200";
-      return "bg-gray-100 text-gray-700 border-gray-200";
+    if (status === "ACTIVE") return "bg-green-100 text-green-700 border-green-200";
+    if (status === "PENDING") return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    if (status === "REJECTED") return "bg-red-100 text-red-700 border-red-200";
+    return "bg-gray-100 text-gray-700 border-gray-200";
   };
 
   return (
@@ -389,14 +401,15 @@ export default function DashboardOverview({ data, userName, userStatus = "PENDIN
                     <h1 className="text-3xl font-bold tracking-tight text-gray-900">
                         Hello, {firstName}! 👋
                     </h1>
-                    {/* ✅ STATUS BADGE */}
                     <span className={cn("px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider", getStatusColor(userStatus))}>
                         {userStatus}
                     </span>
                 </div>
                 <p className="text-gray-500 text-sm max-w-md leading-relaxed">
-                  You have generated <span className="text-black font-bold">{formatPrice(totalEarnings)}</span> in lifetime revenue. 
-                  Check out your new marketing assets!
+                  You have generated <span className="text-black font-bold">{formatPrice(totalEarnings)}</span> in lifetime revenue.
+                  {nextPayoutDate && (
+                    <span className="ml-1">Next payout available <span className="font-bold text-indigo-600">{format(nextPayoutDate, "MMM d")}</span>.</span>
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-3 mt-6">
@@ -421,10 +434,17 @@ export default function DashboardOverview({ data, userName, userStatus = "PENDIN
 
       {/* 2. KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard title="Unpaid Balance" value={formatPrice(unpaidEarnings)} icon={Wallet} color="blue" trend="neutral" description="Available for payout" />
-        <StatsCard title="Total Earnings" value={formatPrice(totalEarnings)} icon={DollarSign} color="green" trend="up" description="Lifetime income generated" />
-        <StatsCard title="Total Clicks" value={clicks.toLocaleString()} icon={MousePointer} color="purple" trend="up" description="Unique link visits" />
-        <StatsCard title="Conversions" value={referrals.toLocaleString()} icon={Users} color="orange" description={`${conversionRate.toFixed(1)}% Conversion Rate`} />
+        <StatsCard title="Unpaid Balance" value={formatPrice(unpaidEarnings)} icon={Wallet} color="blue" description="Available for payout" />
+        <StatsCard
+          title="Total Earnings" value={formatPrice(totalEarnings)} icon={DollarSign} color="green"
+          trend={earningsTrend.trend} trendPercent={earningsTrend.pct}
+          description="Lifetime income generated"
+        />
+        <StatsCard title="Total Clicks" value={clicks.toLocaleString()} icon={MousePointer} color="purple" description="Unique link visits" />
+        <StatsCard
+          title="Conversions" value={referrals.toLocaleString()} icon={Users} color="orange"
+          description={`${approvedReferrals} approved · ${conversionRate.toFixed(1)}% rate`}
+        />
       </div>
 
       {/* 3. Main Content Split */}

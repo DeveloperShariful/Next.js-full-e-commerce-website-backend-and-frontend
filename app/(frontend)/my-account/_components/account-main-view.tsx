@@ -6,8 +6,8 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { 
-  User, ShoppingBag, CreditCard, Home, Settings, Trophy, 
-  HelpCircle, ShieldCheck, Heart, LogOut, Menu, X, Loader2 
+  User, ShoppingBag, CreditCard, Home,
+  HelpCircle, ShieldCheck, Heart, LogOut, Menu, X, Loader2
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -145,11 +145,11 @@ export default function AccountMainView({ initialData, activeTab, tabVisibility 
 
         {/* Sidebar */}
         <aside className={cn(
-          // Mobile: absolute overlay within content area
-          "absolute top-0 left-0 bottom-0 z-40 w-[200px] bg-[#1d2327] overflow-y-auto custom-scrollbar shadow-xl transform transition-transform duration-200",
+          // Mobile: absolute overlay, height = content only (no bottom-0)
+          "absolute top-0 left-0 z-40 w-[200px] bg-[#1d2327] custom-scrollbar shadow-xl transform transition-transform duration-200",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-          // Desktop: sticky in-flow
-          "lg:static lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] lg:w-[180px] lg:shrink-0 lg:shadow-none lg:translate-x-0 lg:z-0"
+          // Desktop: sticky in-flow with full height
+          "lg:static lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] lg:overflow-y-auto lg:w-[180px] lg:shrink-0 lg:shadow-none lg:translate-x-0 lg:z-0"
         )}>
           {/* Close button — mobile only */}
           <div className="lg:hidden flex items-center justify-between px-4 h-12 border-b border-[#2c3338]">

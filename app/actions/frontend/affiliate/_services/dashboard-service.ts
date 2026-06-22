@@ -129,32 +129,46 @@ export async function getActiveContests() {
 
 export async function getStats(affiliateId: string) {
   return await unstable_cache(async () => {
-    const [clicks, referrals] = await Promise.all([
+    const [clicks, allReferrals, approvedReferrals, account] = await Promise.all([
       db.affiliateClick.count({ where: { affiliateId } }),
+      // All conversions (including pending) for total count display
+      db.referral.aggregate({
+        where: { affiliateId },
+        _count: { id: true },
+      }),
+      // Only approved/paid for earnings
       db.referral.aggregate({
         where: { affiliateId, status: { in: ["APPROVED", "PAID"] } },
         _count: { id: true },
         _sum: { commissionAmount: true }
+      }),
+      db.affiliateAccount.findUnique({
+        where: { id: affiliateId },
+        select: { balance: true, totalEarnings: true }
       })
     ]);
 
-    const account = await db.affiliateAccount.findUnique({ 
-        where: { id: affiliateId },
-        select: { balance: true }
-    });
+    const totalConversions = allReferrals._count.id;
+    const approvedCount = approvedReferrals._count.id;
+    const approvedEarnings = approvedReferrals._sum.commissionAmount?.toNumber() || 0;
 
-    const totalReferrals = referrals._count.id;
-    const totalEarnings = referrals._sum.commissionAmount?.toNumber() || 0;
+    // Next payout: soonest availableAt among APPROVED referrals not yet paid
+    const nextReferral = await db.referral.findFirst({
+      where: { affiliateId, status: "APPROVED", availableAt: { gt: new Date() } },
+      orderBy: { availableAt: "asc" },
+      select: { availableAt: true }
+    });
 
     return {
       clicks,
-      referrals: totalReferrals,
-      conversionRate: clicks > 0 ? (totalReferrals / clicks) * 100 : 0,
+      referrals: totalConversions,
+      approvedReferrals: approvedCount,
+      conversionRate: clicks > 0 ? (totalConversions / clicks) * 100 : 0,
       unpaidEarnings: account?.balance.toNumber() || 0,
-      totalEarnings,
-      nextPayoutDate: null 
+      totalEarnings: account?.totalEarnings.toNumber() || approvedEarnings,
+      nextPayoutDate: nextReferral?.availableAt ?? null,
     };
-  }, [`affiliate-stats-${affiliateId}`], { revalidate: 600 })();
+  }, [`affiliate-stats-${affiliateId}`], { revalidate: 300 })();
 }
 
 // ==========================================

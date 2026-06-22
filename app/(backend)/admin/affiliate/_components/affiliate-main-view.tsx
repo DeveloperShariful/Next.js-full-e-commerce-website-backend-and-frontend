@@ -8,7 +8,7 @@ import {
   LayoutDashboard, CreditCard, Settings, Trophy, Calculator,
   Image as ImageIcon, Network, ShieldAlert,
   Megaphone, Package, ShieldCheck, Menu, X, Loader2, Ticket,
-  Users, Terminal
+  Users, Terminal, ChevronDown, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationCenter } from "./notification-center";
@@ -45,6 +45,16 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState(currentView);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  function toggleSection(section: string) {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      next.has(section) ? next.delete(section) : next.add(section);
+      return next;
+    });
+  }
 
   useEffect(() => {
     setActiveTab(currentView);
@@ -256,10 +266,10 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
         </div>
       </div>
 
-      {/* Mobile backdrop — absolute on outer div so it covers header too */}
+      {/* Mobile backdrop — absolute so it sits within the affiliate view (below admin header) */}
       {isMobileMenuOpen && (
         <div
-          className="lg:hidden absolute inset-0 z-30 bg-black/50"
+          className="lg:hidden absolute inset-0 z-[90] bg-black/50"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -269,11 +279,12 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
 
         {/* Sidebar:
             mobile  → absolute top-0 left-0 bottom-0 (relative to outer div, covers header)
-            desktop → sticky in flex flow */}
+            desktop → sticky in flex flow, collapsible */}
         <aside className={cn(
-          "absolute top-0 left-0 bottom-0 z-40 w-[240px] bg-[#f6f7f7] overflow-y-auto custom-scrollbar shadow-xl transform transition-transform duration-200",
+          "absolute top-0 left-0 bottom-0 z-[100] w-[240px] bg-[#f6f7f7] overflow-y-auto custom-scrollbar shadow-xl transform transition-transform duration-200",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:static lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] lg:w-[200px] lg:shrink-0 lg:shadow-none lg:translate-x-0 lg:z-0 lg:border-r lg:border-[#dcdcde]"
+          "lg:static lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] lg:shrink-0 lg:shadow-none lg:translate-x-0 lg:z-0 lg:border-r lg:border-[#dcdcde] lg:overflow-hidden lg:transition-[width] lg:duration-200",
+          isSidebarCollapsed ? "lg:w-0 lg:border-r-0" : "lg:w-[200px] lg:overflow-y-auto"
         )}>
 
           {/* Mobile sidebar header */}
@@ -289,52 +300,89 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
             </button>
           </div>
 
+          {/* Desktop collapse button — top of sidebar */}
+          <div className="hidden lg:flex items-center justify-between px-3 pt-2 pb-1">
+            <span className="text-[10px] font-bold text-[#8c8f94] uppercase tracking-widest truncate">Menu</span>
+            <button
+              onClick={() => setIsSidebarCollapsed(true)}
+              title="Collapse sidebar"
+              className="p-1 text-[#8c8f94] hover:text-[#2271b1] hover:bg-[#e8e8e8] rounded transition-colors shrink-0"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
           {/* Menu sections */}
-          <nav className="pb-20 pt-1">
-            {MENU_ITEMS.map((section, idx) => (
+          <nav className="pb-4 pt-1">
+            {MENU_ITEMS.map((section, idx) => {
+              const isCollapsed = collapsedSections.has(section.section);
+              return (
               <div key={idx} className="mb-1">
-                <div className="px-4 pt-4 pb-1.5">
+                <button
+                  onClick={() => toggleSection(section.section)}
+                  className="w-full flex items-center justify-between px-4 pt-4 pb-1.5 group"
+                >
                   <span className="text-[10px] font-bold text-[#646970] uppercase tracking-widest">
                     {section.section}
                   </span>
-                </div>
-                <div className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-                    const badgeCount = item.badgeKey ? (counts?.[item.badgeKey] ?? 0) : 0;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => handleTabChange(item.id)}
-                        className={cn(
-                          "flex items-center gap-3 w-full px-4 py-[7px] text-[13px] transition-colors group text-left",
-                          isActive
-                            ? "bg-[#2271b1] text-white font-semibold"
-                            : "text-[#3c434a] hover:bg-[#e8e8e8] hover:text-[#1d2327]"
-                        )}
-                      >
-                        <Icon className={cn(
-                          "w-4 h-4 shrink-0",
-                          isActive ? "text-white" : "text-[#646970] group-hover:text-[#2271b1]"
-                        )} />
-                        <span className="flex-1 truncate">{item.label}</span>
-                        {badgeCount > 0 && (
-                          <span className={cn(
-                            "text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shrink-0",
-                            isActive ? "bg-white/25 text-white" : "bg-[#d63638] text-white"
-                          )}>
-                            {badgeCount > 99 ? "99+" : badgeCount}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                  <ChevronDown className={cn(
+                    "w-3 h-3 text-[#646970] transition-transform duration-200",
+                    isCollapsed && "-rotate-90"
+                  )} />
+                </button>
+                {!isCollapsed && (
+                  <div className="space-y-0.5">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      const badgeCount = item.badgeKey ? (counts?.[item.badgeKey] ?? 0) : 0;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleTabChange(item.id)}
+                          className={cn(
+                            "flex items-center gap-3 w-full px-4 py-[7px] text-[13px] transition-colors group text-left",
+                            isActive
+                              ? "bg-[#2271b1] text-white font-semibold"
+                              : "text-[#3c434a] hover:bg-[#e8e8e8] hover:text-[#1d2327]"
+                          )}
+                        >
+                          <Icon className={cn(
+                            "w-4 h-4 shrink-0",
+                            isActive ? "text-white" : "text-[#646970] group-hover:text-[#2271b1]"
+                          )} />
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {badgeCount > 0 && (
+                            <span className={cn(
+                              "text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center shrink-0",
+                              isActive ? "bg-white/25 text-white" : "bg-[#d63638] text-white"
+                            )}>
+                              {badgeCount > 99 ? "99+" : badgeCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </nav>
         </aside>
+
+        {/* Desktop expand button — shown only when sidebar is collapsed */}
+        {isSidebarCollapsed && (
+          <div className="hidden lg:flex flex-col items-center sticky top-12 h-[calc(100vh-3rem)] shrink-0 bg-[#f6f7f7] border-r border-[#dcdcde] w-6 z-10">
+            <button
+              onClick={() => setIsSidebarCollapsed(false)}
+              title="Expand sidebar"
+              className="mt-3 p-1 text-[#8c8f94] hover:text-[#2271b1] hover:bg-[#e8e8e8] rounded transition-colors"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Main content */}
         <main className="flex-1 min-w-0 relative bg-[#f0f0f1]">

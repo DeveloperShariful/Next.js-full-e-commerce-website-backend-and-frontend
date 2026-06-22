@@ -29,21 +29,13 @@ export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> 
   const cacheKey = `affiliate-kpi-${from.toISOString()}-${to.toISOString()}`;
 
   return await unstable_cache(
-    async () => { 
+    async () => {
       const [summaryStats, clicks, activeAffiliates, pendingApprovals, pendingPayouts] = await Promise.all([
         db.affiliateAnalyticsSummary.aggregate({
-          where: {
-            date: { gte: from, lte: to }
-          },
-          _sum: {
-            revenue: true,
-            commission: true,
-            conversions: true
-          }
+          where: { date: { gte: from, lte: to } },
+          _sum: { revenue: true, commission: true, conversions: true }
         }),
-        db.affiliateClick.count({
-          where: { createdAt: { gte: from, lte: to } }
-        }),
+        db.affiliateClick.count({ where: { createdAt: { gte: from, lte: to } } }),
         db.affiliateAccount.count({ where: { status: "ACTIVE", deletedAt: null } }),
         db.affiliateAccount.count({ where: { status: "PENDING", deletedAt: null } }),
         db.affiliatePayout.aggregate({
@@ -52,9 +44,22 @@ export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> 
         })
       ]);
 
-      const revenue = DecimalMath.toNumber(summaryStats._sum.revenue ?? 0);
-      const commission = DecimalMath.toNumber(summaryStats._sum.commission ?? 0);
-      const conversions = summaryStats._sum.conversions || 0;
+      let revenue = DecimalMath.toNumber(summaryStats._sum.revenue ?? 0);
+      let commission = DecimalMath.toNumber(summaryStats._sum.commission ?? 0);
+      let conversions = summaryStats._sum.conversions || 0;
+
+      // Fallback: if summary table has no data for range, query Referral table directly
+      if (conversions === 0) {
+        const referralStats = await db.referral.aggregate({
+          where: { createdAt: { gte: from, lte: to } },
+          _count: { id: true },
+          _sum: { commissionAmount: true, totalOrderAmount: true }
+        });
+        conversions = referralStats._count.id;
+        if (commission === 0) commission = DecimalMath.toNumber(referralStats._sum.commissionAmount ?? 0);
+        if (revenue === 0) revenue = DecimalMath.toNumber(referralStats._sum.totalOrderAmount ?? 0);
+      }
+
       const conversionRate = clicks > 0 ? (conversions / clicks) * 100 : 0;
 
       return {
@@ -69,7 +74,7 @@ export async function getDashboardKPI(range?: DateRange): Promise<DashboardKPI> 
       };
     },
     [cacheKey],
-    { tags: ["affiliate-stats"], revalidate: 300 } 
+    { tags: ["affiliate-stats"], revalidate: 300 }
   )();
 }
 

@@ -209,7 +209,7 @@ export default async function AffiliateMasterPage({
   
   return (
     // WP Background Color
-    <div className="bg-[#f0f0f1] min-h-[calc(100vh-64px)] w-full font-sans text-[13px]"> 
+    <div className="bg-[#f0f0f1] w-full font-sans text-[13px]"> 
       <Suspense fallback={
         <div className="h-screen w-full flex flex-col items-center justify-center bg-[#f0f0f1]">
             <Loader2 className="w-8 h-8 animate-spin text-[#2271b1] mb-4" />

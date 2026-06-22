@@ -13,7 +13,9 @@ interface AffiliateLayoutProps {
 
 export default function AffiliateSettingsLayout({ children }: AffiliateLayoutProps) {
   return (
-    <div className="w-full min-h-screen bg-gray-50/30 font-sans antialiased">
+    // -m-2 cancels the p-2 padding of the admin layout's <main> so the
+    // affiliate hub header is flush with the admin header (no gray gap)
+    <div className="-m-2 overflow-x-hidden">
       {children}
     </div>
   );

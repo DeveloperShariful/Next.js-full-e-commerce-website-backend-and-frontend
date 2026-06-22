@@ -73,6 +73,7 @@ function levelStyle(l: string) {
 }
 
 function exportToCSV(rows: AuditLogRecord[], filename: string) {
+  if (rows.length === 0) { toast.error("No rows selected to export"); return; }
   const headers = ["ID", "Actor", "Role", "Action", "Entity", "Record ID", "IP Address", "Date"];
   const lines = rows.map((r) => [
     r.id,
@@ -90,6 +91,7 @@ function exportToCSV(rows: AuditLogRecord[], filename: string) {
   const a = document.createElement("a");
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+  toast.success(`Exported ${rows.length} row${rows.length !== 1 ? "s" : ""} to CSV`);
 }
 
 // =========================================
@@ -107,14 +109,14 @@ function StatCard({ label, value, sub, icon: Icon, color }: {
   };
   const c = colors[color];
   return (
-    <div className="bg-white border border-[#c3c4c7] p-4 flex items-start gap-3">
-      <div className={cn("w-10 h-10 rounded-sm flex items-center justify-center shrink-0", c.bg)}>
-        <Icon className={cn("w-5 h-5", c.text)} />
+    <div className="bg-white border border-[#c3c4c7] p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+      <div className={cn("w-8 h-8 sm:w-10 sm:h-10 rounded-sm flex items-center justify-center shrink-0", c.bg)}>
+        <Icon className={cn("w-4 h-4 sm:w-5 sm:h-5", c.text)} />
       </div>
-      <div>
-        <p className="text-[12px] text-[#50575e] m-0">{label}</p>
-        <p className={cn("text-[22px] font-bold m-0 leading-tight", c.val)}>{value.toLocaleString()}</p>
-        {sub && <p className="text-[11px] text-[#8c8f94] m-0 mt-0.5">{sub}</p>}
+      <div className="min-w-0">
+        <p className="text-[11px] sm:text-[12px] text-[#50575e] m-0 truncate">{label}</p>
+        <p className={cn("text-[18px] sm:text-[22px] font-bold m-0 leading-tight", c.val)}>{value.toLocaleString()}</p>
+        {sub && <p className="text-[10px] sm:text-[11px] text-[#8c8f94] m-0 mt-0.5 truncate">{sub}</p>}
       </div>
     </div>
   );
@@ -443,17 +445,19 @@ function RetentionPanel({ onClear }: { onClear: (days: number, type: "AUDIT" | "
         ))}
 
         {/* Custom */}
-        <div className="flex items-center gap-2 p-2.5 border border-[#c3c4c7] bg-[#f6f7f7]">
-          <span className="text-[12px] font-semibold text-[#1d2327]">Custom — older than</span>
-          <input
-            type="number"
-            min={1}
-            value={customDays}
-            onChange={(e) => setCustomDays(e.target.value)}
-            className="w-16 border border-[#8c8f94] px-2 py-1 text-[12px] text-center focus:border-[#2271b1] outline-none"
-          />
-          <span className="text-[12px] text-[#50575e]">days</span>
-          <div className="ml-auto flex gap-2">
+        <div className="p-2.5 border border-[#c3c4c7] bg-[#f6f7f7] space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[12px] font-semibold text-[#1d2327] shrink-0">Custom — older than</span>
+            <input
+              type="number"
+              min={1}
+              value={customDays}
+              onChange={(e) => setCustomDays(e.target.value)}
+              className="w-16 shrink-0 border border-[#8c8f94] px-2 py-1 text-[12px] text-center focus:border-[#2271b1] outline-none"
+            />
+            <span className="text-[12px] text-[#50575e] shrink-0">days</span>
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
             {(["AUDIT", "SYSTEM", "ALL"] as const).map((t) => (
               <button
                 key={t}
@@ -475,7 +479,7 @@ function RetentionPanel({ onClear }: { onClear: (days: number, type: "AUDIT" | "
                     : "border border-[#d63638]/30 text-[#d63638] bg-white hover:bg-[#fcf0f1]"
                 )}
               >
-                {t}
+                {isPending ? <Loader2 className="w-3 h-3 animate-spin inline" /> : t}
               </button>
             ))}
           </div>
@@ -558,6 +562,7 @@ export default function LogViewer({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [isNavigating, startNavigation] = useTransition();
 
   const activeTab = (currentTab || "overview") as LogTab;
 
@@ -568,6 +573,12 @@ export default function LogViewer({
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
+  const [clickedTab, setClickedTab] = useState<LogTab | null>(null);
+  const [clickedLevel, setClickedLevel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isNavigating) { setClickedTab(null); setClickedLevel(null); }
+  }, [isNavigating]);
 
   // Local filter state — only applied on form submit via URL
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
@@ -589,16 +600,21 @@ export default function LogViewer({
       if (v) p.set(k, v);
       else p.delete(k);
     });
-    router.push(`${pathname}?${p.toString()}`);
+    startNavigation(() => {
+      router.push(`${pathname}?${p.toString()}`);
+    });
   }
 
   function setTab(tab: LogTab) {
-    navigate({ logTab: tab, page: "1", search: "", action: "", entity: "", level: "", source: "", dateFrom: "", dateTo: "" });
     setSearch(""); setFilterAction("ALL"); setFilterEntity("ALL");
     setFilterLevel("ALL"); setFilterSource("ALL"); setDateFrom(""); setDateTo("");
+    navigate({ logTab: tab, page: "1", search: "", action: "", entity: "", level: "", source: "", dateFrom: "", dateTo: "" });
   }
 
   function applyFilters() {
+    const hasAny = search || filterAction !== "ALL" || filterEntity !== "ALL" ||
+      filterLevel !== "ALL" || filterSource !== "ALL" || dateFrom || dateTo;
+    if (hasAny) toast.info("Filters applied");
     navigate({
       search,
       action: filterAction === "ALL" ? "" : filterAction,
@@ -612,6 +628,7 @@ export default function LogViewer({
   function clearFilters() {
     setSearch(""); setFilterAction("ALL"); setFilterEntity("ALL");
     setFilterLevel("ALL"); setFilterSource("ALL"); setDateFrom(""); setDateTo("");
+    toast.success("Filters cleared");
     navigate({ search: "", action: "", entity: "", level: "", source: "", dateFrom: "", dateTo: "", page: "1" });
   }
 
@@ -658,7 +675,7 @@ export default function LogViewer({
   const OverviewTab = () => (
     <div className="space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard label="Total Audit Logs"    value={stats.totalAudit}  sub={`+${stats.todayAudit} today`}  icon={Shield}        color="blue"  />
         <StatCard label="Total System Events" value={stats.totalSystem} sub={`+${stats.todaySystem} today`} icon={Activity}      color="gray"  />
         <StatCard label="System Errors (all)" value={stats.systemErrors} sub="ERROR level only"              icon={AlertCircle}   color="red"   />
@@ -720,82 +737,92 @@ export default function LogViewer({
     <div className="space-y-3">
       {/* Filter bar */}
       <div className="bg-white border border-[#c3c4c7]">
-        <div className="flex items-center gap-2 p-3 flex-wrap">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#8c8f94]" />
-            <input
-              type="text"
-              placeholder="Search user, action, entity, ID…"
-              className="w-full pl-8 pr-3 py-1.5 border border-[#8c8f94] text-[13px] focus:border-[#2271b1] outline-none"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && applyFilters()}
-            />
-          </div>
+        {/* Row 1: Search */}
+        <div className="relative border-b border-[#f0f0f1]">
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[#8c8f94]" />
+          <input
+            type="text"
+            placeholder="Search user, action, entity, ID…"
+            className="w-full pl-9 pr-3 py-2 border-0 text-[12px] focus:ring-0 outline-none bg-white"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+          />
+        </div>
+        {/* Row 2: Action buttons */}
+        <div className="flex items-center gap-1.5 p-2 flex-wrap">
           <button
             onClick={() => setShowFilters((v) => !v)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 border text-[12px] font-semibold transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 border text-[11px] font-semibold transition-colors shrink-0",
               showFilters ? "bg-[#2271b1] text-white border-[#2271b1]" : "bg-white text-[#50575e] border-[#c3c4c7] hover:bg-[#f6f7f7]"
             )}
           >
-            <Filter className="w-3.5 h-3.5" /> Filters {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-[#d63638]" />}
+            <Filter className="w-3 h-3" /> Filters {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-[#d63638] inline-block" />}
           </button>
-          <button onClick={applyFilters} className="px-4 py-1.5 bg-[#2271b1] text-white text-[12px] font-semibold hover:bg-[#135e96] transition-colors">
-            Apply
+          <button
+            onClick={applyFilters}
+            disabled={isNavigating}
+            className="px-3 py-1.5 bg-[#2271b1] text-white text-[11px] font-bold hover:bg-[#135e96] disabled:opacity-60 transition-colors shrink-0 flex items-center gap-1"
+          >
+            {isNavigating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Apply"}
           </button>
           {hasActiveFilters && (
-            <button onClick={clearFilters} className="flex items-center gap-1 px-3 py-1.5 text-[12px] text-[#d63638] font-semibold hover:underline">
-              <X className="w-3.5 h-3.5" /> Clear
+            <button onClick={clearFilters} className="p-1.5 text-[#d63638] border border-[#d63638]/30 hover:bg-[#fcf0f1] transition-colors shrink-0">
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            {selectedIds.size > 0 && (
-              <>
-                <button
-                  onClick={() => exportToCSV(auditData.logs.filter((l) => selectedIds.has(l.id)), "audit-logs.csv")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-[#2271b1] text-[#2271b1] text-[12px] font-semibold hover:bg-[#f0f6fb] transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" /> Export ({selectedIds.size})
-                </button>
-                <button
-                  onClick={() => handleDelete(Array.from(selectedIds))}
-                  disabled={isPending}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#d63638] text-white text-[12px] font-semibold hover:bg-[#b32d2e] disabled:opacity-50 transition-colors"
-                >
-                  {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  Delete ({selectedIds.size})
-                </button>
-              </>
-            )}
-          </div>
+          {selectedIds.size > 0 && (
+            <>
+              <button
+                onClick={() => exportToCSV(auditData.logs.filter((l) => selectedIds.has(l.id)), "audit-logs.csv")}
+                className="flex items-center gap-1 px-2.5 py-1.5 border border-[#2271b1] text-[#2271b1] text-[11px] font-bold hover:bg-[#f0f6fb] transition-colors shrink-0"
+              >
+                <Download className="w-3 h-3" />
+                <span className="hidden sm:inline">Export ({selectedIds.size})</span>
+              </button>
+              <button
+                onClick={() => handleDelete(Array.from(selectedIds))}
+                disabled={isPending}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-[#d63638] text-white text-[11px] font-bold hover:bg-[#b32d2e] disabled:opacity-50 transition-colors shrink-0"
+              >
+                {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                <span className="hidden sm:inline">Delete ({selectedIds.size})</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Expanded filters */}
         {showFilters && (
-          <div className="border-t border-[#f0f0f1] p-3 bg-[#f6f7f7] flex flex-wrap gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-[#50575e] uppercase">Action</label>
-              <select value={filterAction} onChange={(e) => setFilterAction(e.target.value)} className="border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none min-w-[140px]">
-                <option value="ALL">All Actions</option>
-                {auditFilterOpts.actions.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
+          <div className="border-t border-[#f0f0f1] p-3 bg-[#f6f7f7] space-y-2">
+            {/* Row 1: Action + Entity — each full width on mobile, side-by-side on sm */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-[#50575e] uppercase">Action</label>
+                <select value={filterAction} onChange={(e) => setFilterAction(e.target.value)} className="w-full border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none">
+                  <option value="ALL">All Actions</option>
+                  {auditFilterOpts.actions.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-[#50575e] uppercase">Entity</label>
+                <select value={filterEntity} onChange={(e) => setFilterEntity(e.target.value)} className="w-full border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none">
+                  <option value="ALL">All Entities</option>
+                  {auditFilterOpts.entities.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-[#50575e] uppercase">Entity</label>
-              <select value={filterEntity} onChange={(e) => setFilterEntity(e.target.value)} className="border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none min-w-[160px]">
-                <option value="ALL">All Entities</option>
-                {auditFilterOpts.entities.map((e) => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-[#50575e] uppercase">From</label>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-[#50575e] uppercase">To</label>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none" />
+            {/* Row 2: From + To — full-width stacked so calendar doesn't overflow */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-semibold text-[#50575e] uppercase w-8 shrink-0">From</label>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="flex-1 border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none" />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-semibold text-[#50575e] uppercase w-8 shrink-0">To</label>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="flex-1 border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none" />
+              </div>
             </div>
           </div>
         )}
@@ -915,77 +942,99 @@ export default function LogViewer({
   const SystemTab = () => (
     <div className="space-y-3">
       {/* Level pills + filter */}
-      <div className="bg-white border border-[#c3c4c7] p-3 flex flex-wrap gap-3 items-center">
-        <div className="flex gap-1.5">
+      <div className="bg-white border border-[#c3c4c7] divide-y divide-[#f0f0f1] overflow-hidden">
+        {/* Row 1: level pills — equal-width, no overflow */}
+        <div className="flex border-b border-[#f0f0f1]">
           {(["ALL", "INFO", "WARN", "ERROR"] as const).map((lvl) => {
             const style = lvl === "ALL" ? null : levelStyle(lvl);
             const isActive = filterLevel === lvl;
+            const isThisLoading = isNavigating && clickedLevel === lvl;
             return (
               <button
                 key={lvl}
-                onClick={() => { setFilterLevel(lvl); navigate({ level: lvl === "ALL" ? "" : lvl, page: "1" }); }}
+                disabled={isNavigating}
+                onClick={() => { setClickedLevel(lvl); setFilterLevel(lvl); navigate({ level: lvl === "ALL" ? "" : lvl, page: "1" }); }}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold border transition-colors",
+                  "flex-1 flex items-center justify-center gap-1 px-3 py-2.5 text-[11px] font-bold border-b-2 whitespace-nowrap transition-colors disabled:cursor-wait",
                   isActive
-                    ? style ? style.bg : "bg-[#1d2327] text-white border-[#1d2327]"
-                    : "bg-white text-[#50575e] border-[#c3c4c7] hover:bg-[#f6f7f7]"
+                    ? style
+                      ? cn(style.bg, "border-current")
+                      : "bg-[#1d2327] text-white border-[#1d2327]"
+                    : "border-transparent text-[#50575e] hover:bg-[#f6f7f7]"
                 )}
               >
-                {style && <style.icon className="w-3 h-3" />}
+                {isThisLoading
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : style && <style.icon className="w-3 h-3" />
+                }
                 {lvl}
               </button>
             );
           })}
         </div>
-
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#8c8f94]" />
+        {/* Row 2: search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[#8c8f94]" />
           <input
             type="text"
             placeholder="Search message or source…"
-            className="w-full pl-8 pr-3 py-1.5 border border-[#8c8f94] text-[13px] focus:border-[#2271b1] outline-none"
+            className="w-full pl-9 pr-3 py-2 border-0 text-[12px] focus:ring-0 outline-none bg-white"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && applyFilters()}
           />
         </div>
-
+        {/* Row 3: source — full width */}
         {systemSources.length > 0 && (
-          <select
-            value={filterSource}
-            onChange={(e) => { setFilterSource(e.target.value); navigate({ source: e.target.value === "ALL" ? "" : e.target.value, page: "1" }); }}
-            className="border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none min-w-[160px]"
-          >
-            <option value="ALL">All Sources</option>
-            {systemSources.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <div className="px-2 pt-2 pb-1 border-b border-[#f0f0f1]">
+            <select
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+              className="w-full border border-[#c3c4c7] px-2 py-1.5 text-[11px] bg-white focus:border-[#2271b1] outline-none"
+            >
+              <option value="ALL">All Sources</option>
+              {systemSources.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
         )}
-
-        <div className="flex gap-2 ml-auto">
-          {(dateFrom || dateTo) && (
-            <button onClick={clearFilters} className="flex items-center gap-1 px-2 py-1.5 text-[12px] text-[#d63638] font-semibold hover:underline">
-              <X className="w-3 h-3" /> Clear dates
+        {/* Row 4: dates — full-width stacked so calendar doesn't overflow */}
+        <div className="px-2 pt-2 space-y-1.5 border-b border-[#f0f0f1] pb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-[#8c8f94] uppercase w-7 shrink-0">From</span>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              className="flex-1 w-full border border-[#c3c4c7] px-2 py-1.5 text-[11px] bg-white focus:border-[#2271b1] outline-none" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-[#8c8f94] uppercase w-7 shrink-0">To</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              className="flex-1 w-full border border-[#c3c4c7] px-2 py-1.5 text-[11px] bg-white focus:border-[#2271b1] outline-none" />
+          </div>
+        </div>
+        {/* Row 5: Apply + Clear + Delete */}
+        <div className="flex gap-1.5 p-2">
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="p-1.5 text-[#d63638] border border-[#d63638]/30 hover:bg-[#fcf0f1] transition-colors shrink-0">
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-            className="border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none" />
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-            className="border border-[#8c8f94] px-2 py-1.5 text-[12px] bg-white focus:border-[#2271b1] outline-none" />
-          <button onClick={applyFilters} className="px-4 py-1.5 bg-[#2271b1] text-white text-[12px] font-semibold hover:bg-[#135e96] transition-colors">
-            Apply
-          </button>
-        </div>
-
-        {selectedIds.size > 0 && (
           <button
-            onClick={() => handleDelete(Array.from(selectedIds))}
-            disabled={isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#d63638] text-white text-[12px] font-semibold hover:bg-[#b32d2e] disabled:opacity-50 transition-colors"
+            onClick={applyFilters}
+            disabled={isNavigating}
+            className="flex-1 py-1.5 bg-[#2271b1] text-white text-[11px] font-bold hover:bg-[#135e96] disabled:opacity-60 transition-colors flex items-center justify-center gap-1"
           >
-            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-            Delete ({selectedIds.size})
+            {isNavigating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Apply"}
           </button>
-        )}
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => handleDelete(Array.from(selectedIds))}
+              disabled={isPending}
+              className="flex items-center gap-1 px-3 py-1.5 bg-[#d63638] text-white text-[11px] font-bold hover:bg-[#b32d2e] disabled:opacity-50 transition-colors shrink-0"
+            >
+              {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              Del ({selectedIds.size})
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -1097,52 +1146,61 @@ export default function LogViewer({
   ];
 
   return (
-    <div className="w-full font-sans text-[#1d2327] pb-6">
+    <div className={cn("w-full font-sans text-[#1d2327] pb-6 transition-opacity duration-150", isNavigating && "opacity-60")}>
+
+      {/* Navigation loading bar */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 z-[500] h-[3px] bg-[#2271b1]/20 overflow-hidden pointer-events-none">
+          <div className="h-full bg-[#2271b1] animate-pulse w-full" />
+        </div>
+      )}
 
       {/* Header */}
-      <div className="bg-[#1d2327] px-5 py-4 flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-sm bg-[#2271b1]/20 flex items-center justify-center">
-            <Activity className="w-5 h-5 text-[#2271b1]" />
+      <div className="bg-[#1d2327] px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-sm bg-[#2271b1]/20 flex items-center justify-center shrink-0">
+            <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-[#2271b1]" />
           </div>
-          <div>
-            <h2 className="text-[15px] font-bold text-white m-0 leading-tight">Activity Logs</h2>
-            <p className="text-[12px] text-[#8c8f94] m-0 mt-0.5">
-              {stats.totalAudit.toLocaleString()} audit · {stats.totalSystem.toLocaleString()} system · {stats.systemErrors} errors
+          <div className="min-w-0">
+            <h2 className="text-[14px] sm:text-[15px] font-bold text-white m-0 leading-tight">Activity Logs</h2>
+            <p className="text-[11px] text-[#8c8f94] m-0 mt-0.5 truncate">
+              {stats.totalAudit} audit · {stats.totalSystem} system · {stats.systemErrors} errors
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {stats.systemErrors > 0 && (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 bg-[#d63638]/20 text-[#d63638] border border-[#d63638]/30 rounded-full">
-              <AlertCircle className="w-3.5 h-3.5" /> {stats.systemErrors} error{stats.systemErrors !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
+        {stats.systemErrors > 0 && (
+          <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 bg-[#d63638]/20 text-[#d63638] border border-[#d63638]/30 rounded-full shrink-0 ml-2">
+            <AlertCircle className="w-3.5 h-3.5" /> {stats.systemErrors} error{stats.systemErrors !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       {/* Tab bar */}
       <div className="bg-white border border-[#c3c4c7] shadow-sm mb-4">
-        <div className="flex border-b border-[#c3c4c7]">
+        <div className="flex border-b border-[#c3c4c7] overflow-x-auto scrollbar-none">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setTab(tab.id)}
+                onClick={() => { setClickedTab(tab.id); setTab(tab.id); }}
+                disabled={isNavigating}
                 className={cn(
-                  "flex items-center gap-2 px-5 py-3 text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap",
+                  "flex items-center gap-1.5 px-3 sm:px-5 py-3 text-[12px] sm:text-[13px] font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0 disabled:cursor-wait",
                   isActive
                     ? "border-[#2271b1] text-[#2271b1] bg-[#f0f6fb]"
                     : "border-transparent text-[#50575e] hover:text-[#1d2327] hover:bg-[#f6f7f7]"
                 )}
               >
-                <Icon className="w-4 h-4" />
+                {isNavigating && clickedTab === tab.id
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                }
                 {tab.label}
                 {tab.count !== undefined && (
                   <span className={cn(
-                    "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                    "hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 rounded-full",
                     isActive ? "bg-[#2271b1] text-white" : "bg-[#f0f0f1] text-[#50575e]"
                   )}>
                     {tab.count.toLocaleString()}
@@ -1153,7 +1211,7 @@ export default function LogViewer({
           })}
         </div>
 
-        <div className="p-5">
+        <div>
           {activeTab === "overview" && <OverviewTab />}
           {activeTab === "audit"    && <AuditTab />}
           {activeTab === "system"   && <SystemTab />}

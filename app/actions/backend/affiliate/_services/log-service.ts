@@ -44,6 +44,34 @@ export interface PaginatedLogs<T> {
 }
 
 // =========================================
+// AFFILIATE-ONLY FILTER CONSTANTS
+// =========================================
+const AFFILIATE_AUDIT_ENTITIES = [
+  "AffiliateAccount",
+  "AffiliateCommissionRule",
+  "AffiliateLink",
+  "AffiliatePayout",
+  "AffiliateProductRate",
+  "AffiliateTag",
+  "AffiliateTier",
+  "Referral",
+  "StoreSettings",
+  "Discount",
+  "Wallet",
+  "AuditLog",
+  "SystemLog",
+  "AuditLog+SystemLog",
+] as const;
+
+const AFFILIATE_SYSTEM_SOURCES = [
+  "AFFILIATE_ENGINE",
+  "FRAUD_SHIELD",
+  "FRAUD_DETECTOR",
+  "CRON_MANAGER",
+  "CRON_REFERRAL",
+] as const;
+
+// =========================================
 // HELPERS
 // =========================================
 function startOfDay(date: Date): Date {
@@ -65,13 +93,20 @@ const SHORT_DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 // =========================================
 // STATS — Overview Tab
 // =========================================
-export async function getLogStats(): Promise<LogStats> {
+export async function getLogStats(affiliateOnly = true): Promise<LogStats> {
   await protectAction("MANAGE_CONFIGURATION");
 
   const now = new Date();
   const todayStart = startOfDay(now);
   const weekAgo = startOfDay(new Date(now));
   weekAgo.setDate(now.getDate() - 6);
+
+  const auditWhere: Prisma.AuditLogWhereInput = affiliateOnly
+    ? { tableName: { in: [...AFFILIATE_AUDIT_ENTITIES] } }
+    : {};
+  const systemWhere: Prisma.SystemLogWhereInput = affiliateOnly
+    ? { source: { in: [...AFFILIATE_SYSTEM_SOURCES] } }
+    : {};
 
   const [
     totalAudit,
@@ -85,17 +120,18 @@ export async function getLogStats(): Promise<LogStats> {
     weekAuditLogs,
     weekSystemLogs,
   ] = await Promise.all([
-    db.auditLog.count(),
-    db.systemLog.count(),
-    db.auditLog.count({ where: { createdAt: { gte: todayStart } } }),
-    db.systemLog.count({ where: { createdAt: { gte: todayStart } } }),
-    db.systemLog.count({ where: { level: "ERROR" } }),
+    db.auditLog.count({ where: auditWhere }),
+    db.systemLog.count({ where: systemWhere }),
+    db.auditLog.count({ where: { ...auditWhere, createdAt: { gte: todayStart } } }),
+    db.systemLog.count({ where: { ...systemWhere, createdAt: { gte: todayStart } } }),
+    db.systemLog.count({ where: { ...systemWhere, level: "ERROR" } }),
 
     db.auditLog.groupBy({
       by: ["action"],
       _count: { id: true },
       orderBy: { _count: { id: "desc" } },
       take: 6,
+      where: auditWhere,
     }),
 
     db.auditLog.groupBy({
@@ -103,6 +139,7 @@ export async function getLogStats(): Promise<LogStats> {
       _count: { id: true },
       orderBy: { _count: { id: "desc" } },
       take: 6,
+      where: auditWhere,
     }),
 
     db.auditLog.groupBy({
@@ -110,16 +147,16 @@ export async function getLogStats(): Promise<LogStats> {
       _count: { id: true },
       orderBy: { _count: { id: "desc" } },
       take: 5,
-      where: { userId: { not: null } },
+      where: { ...auditWhere, userId: { not: null } },
     }),
 
     db.auditLog.findMany({
-      where: { createdAt: { gte: weekAgo } },
+      where: { ...auditWhere, createdAt: { gte: weekAgo } },
       select: { createdAt: true },
     }),
 
     db.systemLog.findMany({
-      where: { createdAt: { gte: weekAgo } },
+      where: { ...systemWhere, createdAt: { gte: weekAgo } },
       select: { createdAt: true },
     }),
   ]);
@@ -181,6 +218,7 @@ export interface GetAuditLogsParams {
   tableName?: string;
   dateFrom?: string;
   dateTo?: string;
+  affiliateOnly?: boolean;
 }
 
 export async function getAuditLogs(
@@ -188,7 +226,7 @@ export async function getAuditLogs(
 ): Promise<PaginatedLogs<AuditLogRecord>> {
   await protectAction("MANAGE_CONFIGURATION");
 
-  const { page = 1, limit = 20, search, action, tableName, dateFrom, dateTo } = params;
+  const { page = 1, limit = 20, search, action, tableName, dateFrom, dateTo, affiliateOnly = true } = params;
   const skip = (page - 1) * limit;
 
   const endOfDay = (s: string): Date => {
@@ -199,6 +237,7 @@ export async function getAuditLogs(
 
   const where: Prisma.AuditLogWhereInput = {
     AND: [
+      affiliateOnly ? { tableName: { in: [...AFFILIATE_AUDIT_ENTITIES] } } : {},
       search
         ? {
             OR: [
@@ -244,6 +283,7 @@ export interface GetSystemLogsParams {
   source?: string;
   dateFrom?: string;
   dateTo?: string;
+  affiliateOnly?: boolean;
 }
 
 export async function getSystemLogs(
@@ -251,7 +291,7 @@ export async function getSystemLogs(
 ): Promise<PaginatedLogs<SystemLogRecord>> {
   await protectAction("MANAGE_CONFIGURATION");
 
-  const { page = 1, limit = 20, search, level, source, dateFrom, dateTo } = params;
+  const { page = 1, limit = 20, search, level, source, dateFrom, dateTo, affiliateOnly = true } = params;
   const skip = (page - 1) * limit;
 
   const endOfDay = (s: string): Date => {
@@ -262,6 +302,7 @@ export async function getSystemLogs(
 
   const where: Prisma.SystemLogWhereInput = {
     AND: [
+      affiliateOnly ? { source: { in: [...AFFILIATE_SYSTEM_SOURCES] } } : {},
       level && level !== "ALL" ? { level } : {},
       source && source !== "ALL"
         ? { source: { contains: source, mode: "insensitive" } }
@@ -295,21 +336,26 @@ export async function getSystemLogs(
 // =========================================
 // FILTER OPTIONS
 // =========================================
-export async function getAuditFilterOptions(): Promise<{
+export async function getAuditFilterOptions(affiliateOnly = true): Promise<{
   actions: string[];
   entities: string[];
 }> {
   await protectAction("MANAGE_CONFIGURATION");
+  const baseWhere: Prisma.AuditLogWhereInput = affiliateOnly
+    ? { tableName: { in: [...AFFILIATE_AUDIT_ENTITIES] } }
+    : {};
   const [actionsRaw, entitiesRaw] = await Promise.all([
     db.auditLog.findMany({
       select: { action: true },
       distinct: ["action"],
       orderBy: { action: "asc" },
+      where: baseWhere,
     }),
     db.auditLog.findMany({
       select: { tableName: true },
       distinct: ["tableName"],
       orderBy: { tableName: "asc" },
+      where: baseWhere,
     }),
   ]);
   return {
@@ -318,12 +364,16 @@ export async function getAuditFilterOptions(): Promise<{
   };
 }
 
-export async function getSystemLogSources(): Promise<string[]> {
+export async function getSystemLogSources(affiliateOnly = true): Promise<string[]> {
   await protectAction("MANAGE_CONFIGURATION");
+  const where: Prisma.SystemLogWhereInput = affiliateOnly
+    ? { source: { in: [...AFFILIATE_SYSTEM_SOURCES] } }
+    : {};
   const rows = await db.systemLog.findMany({
     select: { source: true },
     distinct: ["source"],
     orderBy: { source: "asc" },
+    where,
   });
   return rows.map((r) => r.source);
 }

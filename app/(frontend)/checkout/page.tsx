@@ -8,14 +8,17 @@ import CheckoutClient from './CheckoutClient';
 import { getActivePaymentMethods } from '@/app/actions/frontend/checkout/get-payment-methods';
 
 export default async function CheckoutPage() {
-  // Server-side empty cart check — prevents flash redirect on client
-  const cookieStore = await cookies();
+  // Run cookies() and auth() in parallel — both are independent
+  const [cookieStore, session] = await Promise.all([cookies(), auth()]);
   const sessionId = cookieStore.get('cart_session')?.value;
 
-  const session = await auth();
-  const userId = session?.user?.email
-    ? (await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } }))?.id
-    : null;
+  // Resolve userId and fetch payment methods in parallel
+  const [userId, paymentGateways] = await Promise.all([
+    session?.user?.email
+      ? db.user.findUnique({ where: { email: session.user.email }, select: { id: true } }).then(u => u?.id ?? null)
+      : Promise.resolve(null),
+    getActivePaymentMethods(),
+  ]);
 
   if (sessionId || userId) {
     const cart = await db.cart.findFirst({
@@ -29,8 +32,6 @@ export default async function CheckoutPage() {
   } else {
     redirect('/cart');
   }
-
-  const paymentGateways = await getActivePaymentMethods();
 
   return (
     <div className="w-full md:p-8 bg-[#f8f9fa]">

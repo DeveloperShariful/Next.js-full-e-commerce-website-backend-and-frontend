@@ -3,7 +3,7 @@
 "use client";
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { gtmAddToCart, gtmRemoveFromCart } from '../lib/gtm';
 import { klaviyoTrackAddedToCart } from '../lib/klaviyo';
 import { 
@@ -118,7 +118,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // --- 🚀 Add to Cart ---
   const addToCart = async (itemToAdd: ItemToAdd, quantity: number) => {
-    const toastId = toast.loading("Adding to cart...");
     const previousItems = [...cartItems];
 
     setCartItems(prev => {
@@ -140,7 +139,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (!response.success || !response.items) throw new Error(response.error || "Action failed");
 
       setCartItems(response.items);
-      toast.success(`"${itemToAdd.name}" added to cart!`, { id: toastId });
+      toast.success("Item Added To Cart");
 
       const priceNum = parseFloat((itemToAdd.price || '0').replace(/[^0-9.]/g, ''));
       const trackingId = itemToAdd.variationId || itemToAdd.databaseId;
@@ -167,28 +166,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     } catch (error: unknown) {
       setCartItems(previousItems);
       const errorMessage = error instanceof Error ? error.message : "Could not add item.";
-      toast.error(errorMessage, { id: toastId });
+      toast.error(errorMessage);
     }
   };
 
   // --- 🚀 Update Quantity ---
   const updateQuantity = async (key: string, newQuantity: number) => {
     if (newQuantity < 1) { await removeFromCart(key); return; }
-    
-    const toastId = toast.loading("Updating quantity...");
+
     const previousItems = [...cartItems];
-    
     setCartItems(prev => prev.map(i => i.key === key ? { ...i, quantity: newQuantity } : i));
 
     try {
         const response = await updateCartItemQuantityAction(key, newQuantity);
         if (!response.success || !response.items) throw new Error(response.error || "Update failed");
         setCartItems(response.items);
-        toast.success("Cart updated!", { id: toastId });
     } catch (error: unknown) {
         setCartItems(previousItems);
         const errorMessage = error instanceof Error ? error.message : "Could not update quantity.";
-        toast.error(errorMessage, { id: toastId });
+        toast.error(errorMessage);
     }
   };
 
@@ -197,23 +193,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const itemToRemove = cartItems.find(item => item.key === key);
     if (!itemToRemove) return;
 
-    const toastId = toast.loading("Removing item...");
     const previousItems = [...cartItems];
-    
     setCartItems(prev => prev.filter(i => i.key !== key));
 
     try {
       const response = await removeFromCartAction(key);
       if (!response.success || !response.items) throw new Error(response.error || "Remove failed");
-      
+
       setCartItems(response.items);
-      toast.success("Removed from cart.", { id: toastId });
+      toast.success("Item Remove From Cart");
 
       const priceNum = parseFloat(itemToRemove.price?.replace(/[^0-9.]/g, '') || '0');
       gtmRemoveFromCart({ item_name: itemToRemove.name, item_id: itemToRemove.databaseId, price: priceNum, quantity: itemToRemove.quantity });
-    } catch (error: unknown) { 
+    } catch (error: unknown) {
       setCartItems(previousItems);
-      toast.error("Could not remove item.", { id: toastId });
+      toast.error("Could not remove item.");
     }
   };
 
@@ -262,17 +256,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // --- ✅ Action: Remove Coupon ---
   const removeCoupon = async (code: string) => {
-    const toastId = toast.loading("Removing coupon...");
     try {
       const response = await removeCouponAction(code);
       if (response.success && response.appliedCoupons) {
         setAppliedCoupons(response.appliedCoupons);
-        toast.success("Coupon removed.", { id: toastId });
+        toast.success("Coupon removed.");
       } else {
         throw new Error(response.error || "Failed to remove coupon.");
       }
-    } catch (error: any) {
-      toast.error(error.message, { id: toastId });
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove coupon.");
     }
   };
 

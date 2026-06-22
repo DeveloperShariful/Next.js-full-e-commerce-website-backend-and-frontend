@@ -1,12 +1,11 @@
 // app/(frontend)/checkout/CheckoutClient.tsx
 'use client';
 
-import { loadStripe } from '@stripe/stripe-js';
 import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { useEffect, useCallback, useReducer, useRef, useState, useMemo } from 'react';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 
 import OrderNotes from './components/OrderNotes';

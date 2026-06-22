@@ -240,9 +240,35 @@ const TrustBadges = () => {
 // ProductCollection Component
 // ====================================================================
 const products = [
-    { imgSrc: "https://gobikes.au/wp-content/uploads/2025/10/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-E-bike-scaled.webp", altText: "GoBike 12 Kids Electric Balance Bike with 3 speed modes", name: "GoBike 12-inch", feature: "Perfect for Ages 2-5 | Featuring a Slow Safety Mode for new riders.", link: "product/ebike-for-kids-12-inch-electric-bike-ages-2-5" },
-    { imgSrc: "https://gobikes.au/wp-content/uploads/2025/08/Gobike-kids-electric-bike-ebike-for-kids-1-scaled-1.webp", altText: "GoBike 16 Kids Electric Bike with 3 speed modes", name: "GoBike 16-inch", feature: "Best for Ages 5-9 | With 3-Speed Modes, Dual Hydraulic Brakes and Front Suspension.", link: "product/gobike-16-inch-electric-bike-for-kids-riding-fun-for-ages-5-9" },
-    { imgSrc: "https://gobikes.au/wp-content/uploads/2025/10/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-1-1-scaled-2-scaled.webp", altText: "GoBike 20 All-Terrain Kids Electric Bike", name: "GoBike 20-inch", feature: "Serious Bike for Ages 8-14 | A powerful and reliable bike for the bigger kids.", link: "product/gobike-20-inch-electric-bike-for-kids-teens-for-ages-8-14s" }
+    { 
+      imgSrc: "https://gobikes.au/wp-content/uploads/2025/10/Electric-Balance-Bike-Electric-bike-Balance-Bike-Bike-baby-bike-E-bike-scaled.webp", 
+      altText: "GoBike 12 Kids Electric Balance Bike with 3 speed modes", 
+      name: "GoBike 12-inch", 
+      feature: "Perfect for Ages 2-5 | Featuring a Slow Safety Mode for new riders.", 
+      link: "product/ebike-for-kids-12-inch-electric-bike-ages-2-5" 
+    },
+    { 
+      imgSrc: "https://gobikes.au/wp-content/uploads/2025/08/Gobike-kids-electric-bike-ebike-for-kids-1-scaled-1.webp", 
+      altText: "GoBike 16 Kids Electric Bike with 3 speed modes", 
+      name: "GoBike 16-inch", 
+      feature: "Best for Ages 5-9 | With 3-Speed Modes, Dual Hydraulic Brakes and Front Suspension.", 
+      link: "product/gobike-16-inch-electric-bike-for-kids-riding-fun-for-ages-5-9" 
+    },
+    { 
+      imgSrc: "https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/GoBike%2020%20All-Terrain%20Kids%20Electric%20Bike-VjbYiNh19Dw9o3ZlSgPMSJmqtdI6vL.webp", 
+      altText: "GoBike 20 All-Terrain Kids Electric Bike", 
+      name: "GoBike 20-inch", 
+      feature: "Serious Bike for Ages 8-14 | A powerful and reliable bike for the bigger kids.", 
+      link: "product/gobike-20-inch-electric-bike-for-kids-teens-for-ages-8-14" 
+    },
+    // নতুন GoBike 24-inch লিংক থেকে পাওয়া তথ্যের ভিত্তিতে যোগ করা হলো
+    { 
+      imgSrc: "https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/GoBike%2024-inch%20Electric%20Bike%20for%20Teens%20and%20adult-twug31TuTZNZYI9sQtfLqjXu3MHgKU.webp", // <-- ওয়েবসাইট থেকে 24-inch এর ছবির লিংকটি কপি করে শুধু এখানে বসিয়ে দিন
+      altText: "GoBike 24-inch Electric Bike for Teens", 
+      name: "GoBike 24-inch", 
+      feature: "Perfect for Ages 13+ | High-Speed Performance Electric Bike for Teens and adults.", 
+      link: "product/gobike-24-inch-electric-bike-for-teens-high-speed-performance-for-ages-13" 
+    }
 ];
 
 const ProductCollection = () => {
@@ -250,7 +276,9 @@ const ProductCollection = () => {
     <section className="py-5">
       <div className="max-w-[1500px] mx-auto px-2.5">
         <h2 className="text-center text-[30px] font-bold text-[#1a1a1a] mb-5">The GoBike Electric Bike Latest Collection</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[30px]">
+        
+        {/* ৪টি আইটেম সুন্দরভাবে দেখানোর জন্য lg:grid-cols-4 দেওয়া হয়েছে */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[30px]">
           {products.map((product, index) => (
             <Link href={product.link} className="text-center border border-[#e9e9e9] rounded-lg overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-lg flex flex-col justify-between no-underline text-inherit" key={index}>
               <div className="bg-[#f7f7f7] p-1.5">
@@ -272,6 +300,7 @@ const ProductCollection = () => {
     </section>
   );
 }
+
 
 // ====================================================================
 // OurStory Component

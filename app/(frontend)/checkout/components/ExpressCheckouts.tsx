@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // ============================================================================
 // 1. INTERFACES

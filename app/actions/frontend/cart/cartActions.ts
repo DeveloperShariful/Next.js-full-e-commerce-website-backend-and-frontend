@@ -44,11 +44,9 @@ async function resolveUserId(session: AuthSession): Promise<string | null> {
 // 1. SESSION & USER MANAGEMENT
 // ============================================================================
 async function getCartSessionAndUser() {
-  const cookieStore = await cookies();
+  const [cookieStore, rawSession] = await Promise.all([cookies(), auth()]);
+  const session = rawSession as AuthSession;
   let sessionId = cookieStore.get("cart_session")?.value;
-
-  // ✅ FIX: Cast auth() result to AuthSession
-  const session = (await auth()) as AuthSession;
   const userId = await resolveUserId(session);
 
   if (!sessionId) {
@@ -184,7 +182,8 @@ async function validateStockAndReserve(
 // 3. CART ITEM FORMATTING
 // ============================================================================
 async function getFormattedCartItems(cartId: string) {
-  await db.inventoryReservation.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+  // Fire-and-forget: expired reservation cleanup runs async, never blocks cart display
+  db.inventoryReservation.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
 
   const cart = await db.cart.findUnique({
     where: { id: cartId },
@@ -286,8 +285,14 @@ export async function getCartAction(): Promise<CartActionResponse> {
   try {
     const { cart } = await getCartSessionAndUser();
     const items = await getFormattedCartItems(cart.id);
+    const savedCoupons = (cart.appliedCoupons as unknown as { code: string; amount: number }[]) || [];
+
+    // Skip DB roundtrip when no coupons — the common case for most customers
+    if (savedCoupons.length === 0) {
+      return { success: true, items, appliedCoupons: [] };
+    }
+
     const subtotal = items.reduce((acc, item) => acc + item.rawPrice * item.quantity, 0);
-    const savedCoupons = (cart.appliedCoupons as any[]) || [];
     const validCoupons = await revalidateCoupons(cart.id, savedCoupons, subtotal);
     return { success: true, items, appliedCoupons: validCoupons };
   } catch (error) {

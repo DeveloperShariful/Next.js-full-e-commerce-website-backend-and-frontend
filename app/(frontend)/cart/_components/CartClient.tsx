@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { gtmViewCart, gtmBeginCheckout } from '@/lib/gtm';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import ProductCard from '@/components/ProductCard';
 import { StorefrontProduct } from '@/app/(frontend)/types';
 import { getCrossSellProductsAction } from '@/app/actions/frontend/cart/getCrossSellProductsAction';

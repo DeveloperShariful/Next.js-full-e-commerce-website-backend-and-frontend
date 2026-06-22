@@ -6,7 +6,7 @@ import React, { useRef } from 'react';
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import { useCart } from '@/context/CartContext';
 
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { getStoredUTM } from '@/components/SourceTracker';
 

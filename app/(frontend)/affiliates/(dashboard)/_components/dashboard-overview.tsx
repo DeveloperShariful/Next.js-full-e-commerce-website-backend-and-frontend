@@ -1,72 +1,327 @@
-//app/(frontend)/affiliates/_components/dashboard-overview.tsx
-
 "use client";
 
-import { 
-  DollarSign, Wallet, MousePointer, Users, TrendingUp, Calendar, ExternalLink,
-  ArrowUpRight, ArrowDownRight, type LucideIcon, CheckCircle2, Clock, Trophy, Target, Zap, Sparkles
+import { useState } from "react";
+import {
+  DollarSign, Wallet, MousePointer, Users, TrendingUp, Clock,
+  Trophy, Target, Zap, Copy, Check, Link2, Tag, AlertCircle,
+  Info, Megaphone, ArrowUpRight, ArrowDownRight, ShoppingBag,
+  Ticket, ChevronRight, Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import Link from "next/link";
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
-} from 'recharts';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, BarChart, Bar,
+} from "recharts";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { toast } from "sonner";
 
-const safeNumber = (val: any) => Number(val) || 0;
+const n = (v: unknown) => Number(v) || 0;
 
-// =========================================================
-// COMPONENT 1: STATS CARD
-// =========================================================
+// ── Copy hook ────────────────────────────────────────────────────────────────
 
-interface StatsCardProps {
-  title: string;
-  value: string | number;
-  icon: LucideIcon;
-  description?: string;
-  trend?: "up" | "down" | "neutral";
-  trendPercent?: number;
-  color?: "blue" | "green" | "purple" | "orange";
+function useCopy() {
+  const [copied, setCopied] = useState(false);
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      toast.success("Copied!");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return { copied, copy };
 }
 
-function StatsCard({ title, value, icon: Icon, description, trend, trendPercent, color = "blue" }: StatsCardProps) {
+// ── Announcement Banner ───────────────────────────────────────────────────────
 
-  const styles = {
-    blue:   { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100", ring: "group-hover:ring-blue-100" },
-    green:  { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-100", ring: "group-hover:ring-emerald-100" },
-    purple: { bg: "bg-violet-50", text: "text-violet-600", border: "border-violet-100", ring: "group-hover:ring-violet-100" },
-    orange: { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-100", ring: "group-hover:ring-amber-100" },
+function AnnouncementBanner({ announcements }: { announcements: any[] }) {
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const visible = announcements.filter(a => !dismissed.includes(a.id)).slice(0, 1);
+  if (visible.length === 0) return null;
+
+  const a = visible[0];
+  const typeStyles: Record<string, string> = {
+    INFO:    "bg-[#e7f3ff] border-[#72aee6]/40 text-[#2271b1]",
+    WARNING: "bg-[#fcf9e8] border-[#f0c36d]/50 text-[#6b4c00]",
+    SUCCESS: "bg-[#edfaef] border-[#00a32a]/30 text-[#1d4b1d]",
+    ALERT:   "bg-[#fcebec] border-[#d63638]/30 text-[#d63638]",
   };
-
-  const theme = styles[color];
+  const TypeIcon = a.type === "WARNING" ? AlertCircle : a.type === "ALERT" ? AlertCircle : Info;
 
   return (
-    <div className={cn(
-      "group bg-white p-6 rounded-2xl border border-gray-200 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1",
-      theme.ring
-    )}>
-      <div className="flex items-start justify-between mb-4">
-        <div className={cn("p-3 rounded-xl", theme.bg, theme.text)}>
-          <Icon className="w-6 h-6" />
-        </div>
-        {trend && trend !== "neutral" && trendPercent !== undefined && (
-          <span className={cn(
-            "flex items-center text-xs font-bold px-2 py-1 rounded-full",
-            trend === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-          )}>
-            {trend === "up" ? <ArrowUpRight className="w-3 h-3 mr-1"/> : <ArrowDownRight className="w-3 h-3 mr-1"/>}
-            {trendPercent.toFixed(1)}%
-          </span>
-        )}
+    <div className={cn("border rounded-lg px-4 py-3 flex items-start gap-3 text-[13px]", typeStyles[a.type] || typeStyles.INFO)}>
+      <TypeIcon className="w-4 h-4 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <span className="font-bold">{a.title}: </span>
+        <span className="opacity-90">{a.message}</span>
       </div>
-      
-      <div>
-        <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{value}</h3>
-        {description && (
-          <p className="text-xs text-gray-400 mt-2 font-medium">
-            {description}
+      <button onClick={() => setDismissed(d => [...d, a.id])} className="shrink-0 opacity-60 hover:opacity-100 text-lg leading-none">×</button>
+    </div>
+  );
+}
+
+// ── KPI Card ─────────────────────────────────────────────────────────────────
+
+interface KpiProps {
+  label: string;
+  value: string;
+  sub?: string;
+  icon: React.ElementType;
+  color: "blue" | "green" | "amber" | "violet" | "rose";
+  todayBadge?: number;
+  trend?: "up" | "down";
+  trendPct?: number;
+}
+
+function KpiCard({ label, value, sub, icon: Icon, color, todayBadge, trend, trendPct }: KpiProps) {
+  const c = {
+    blue:   { bg: "bg-[#e7f3ff]", text: "text-[#2271b1]" },
+    green:  { bg: "bg-[#edfaef]", text: "text-[#00a32a]" },
+    amber:  { bg: "bg-[#fcf9e8]", text: "text-[#9a6700]" },
+    violet: { bg: "bg-violet-50",  text: "text-violet-600" },
+    rose:   { bg: "bg-rose-50",    text: "text-rose-600" },
+  }[color];
+
+  return (
+    <div className="bg-white border border-[#e0e0e0] rounded-xl p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-3">
+        <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", c.bg, c.text)}>
+          <Icon className="w-4.5 h-4.5" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          {todayBadge !== undefined && todayBadge > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#edfaef] text-[#00a32a] border border-[#00a32a]/20">
+              +{todayBadge} today
+            </span>
+          )}
+          {trend && trendPct !== undefined && (
+            <span className={cn("text-[10px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-full",
+              trend === "up" ? "bg-[#edfaef] text-[#00a32a]" : "bg-rose-50 text-rose-600"
+            )}>
+              {trend === "up" ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+              {trendPct.toFixed(1)}%
+            </span>
+          )}
+        </div>
+      </div>
+      <p className="text-[11px] font-semibold text-[#646970] uppercase tracking-wide mb-0.5">{label}</p>
+      <p className="text-[22px] font-black text-[#1d2327] leading-tight">{value}</p>
+      {sub && <p className="text-[11px] text-[#8c8f94] mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Earnings Chart ────────────────────────────────────────────────────────────
+
+function EarningsChart({ data, view, setView }: { data: any[]; view: "area" | "bar"; setView: (v: "area" | "bar") => void }) {
+  const { symbol, formatPrice } = useGlobalStore();
+  const currency = symbol || "$";
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-[260px] flex flex-col items-center justify-center text-[#8c8f94] border border-dashed border-[#c3c4c7] rounded-lg">
+        <TrendingUp className="w-8 h-8 mb-2 opacity-30" />
+        <p className="text-[13px]">No earnings data yet</p>
+      </div>
+    );
+  }
+
+  const commonProps = {
+    data,
+    margin: { top: 4, right: 4, left: -18, bottom: 0 },
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[12px] text-[#646970]">Last 30 days earnings</p>
+        <div className="flex border border-[#c3c4c7] rounded overflow-hidden">
+          {(["area", "bar"] as const).map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={cn("px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                view === v ? "bg-[#2271b1] text-white" : "text-[#646970] hover:bg-[#f0f0f1]"
+              )}>
+              {v === "area" ? "Area" : "Bar"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="h-[220px]">
+        <ResponsiveContainer width="100%" height="100%">
+          {view === "area" ? (
+            <AreaChart {...commonProps}>
+              <defs>
+                <linearGradient id="earn" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2271b1" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#2271b1" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f1" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false}
+                tick={{ fontSize: 10, fill: "#8c8f94" }} tickFormatter={v => v.slice(5)} />
+              <YAxis axisLine={false} tickLine={false}
+                tick={{ fontSize: 10, fill: "#8c8f94" }} tickFormatter={v => `${currency}${v}`} />
+              <Tooltip
+                contentStyle={{ borderRadius: 8, border: "1px solid #e0e0e0", fontSize: 12 }}
+                formatter={(v: unknown) => [formatPrice(n(v)), "Earnings"]}
+                labelFormatter={l => format(new Date(l), "MMM d, yyyy")}
+              />
+              <Area type="monotone" dataKey="earnings" stroke="#2271b1" strokeWidth={2.5}
+                fill="url(#earn)" animationDuration={1000} />
+            </AreaChart>
+          ) : (
+            <BarChart {...commonProps}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f1" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false}
+                tick={{ fontSize: 10, fill: "#8c8f94" }} tickFormatter={v => v.slice(5)} />
+              <YAxis axisLine={false} tickLine={false}
+                tick={{ fontSize: 10, fill: "#8c8f94" }} tickFormatter={v => `${currency}${v}`} />
+              <Tooltip
+                contentStyle={{ borderRadius: 8, border: "1px solid #e0e0e0", fontSize: 12 }}
+                formatter={(v: unknown) => [formatPrice(n(v)), "Earnings"]}
+              />
+              <Bar dataKey="earnings" fill="#2271b1" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// ── Quick Link Card ───────────────────────────────────────────────────────────
+
+function QuickLinkCard({ referralLink, slug }: { referralLink: string; slug: string }) {
+  const { copied, copy } = useCopy();
+  return (
+    <div className="bg-white border border-[#e0e0e0] rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Link2 className="w-4 h-4 text-[#2271b1]" />
+        <span className="text-[13px] font-bold text-[#1d2327]">Your Referral Link</span>
+      </div>
+      <div className="flex items-center gap-2 bg-[#f6f7f7] border border-[#e0e0e0] rounded-lg px-3 py-2">
+        <span className="text-[11px] text-[#50575e] font-mono flex-1 truncate">{referralLink}</span>
+        <button onClick={() => copy(referralLink)}
+          className="shrink-0 p-1 text-[#2271b1] hover:bg-[#e7f3ff] rounded transition-colors">
+          {copied ? <Check className="w-3.5 h-3.5 text-[#00a32a]" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => copy(referralLink)}
+          className="flex-1 h-8 bg-[#2271b1] hover:bg-[#135e96] text-white text-[12px] font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5">
+          <Copy className="w-3 h-3" /> Copy Link
+        </button>
+        <button onClick={() => copy(slug)}
+          className="flex-1 h-8 border border-[#c3c4c7] text-[#1d2327] text-[12px] font-semibold rounded-lg hover:bg-[#f0f0f1] transition-colors flex items-center justify-center gap-1.5">
+          <Tag className="w-3 h-3" /> Copy Slug
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Coupon Codes Card ─────────────────────────────────────────────────────────
+
+function CouponsCard({ coupons }: { coupons: any[] }) {
+  const { symbol } = useGlobalStore();
+  const currency = symbol || "$";
+  const { copy } = useCopy();
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopiedCode(code);
+      toast.success(`Copied: ${code}`);
+      setTimeout(() => setCopiedCode(null), 2000);
+    });
+  };
+
+  if (!coupons || coupons.length === 0) return null;
+
+  return (
+    <div className="bg-white border border-[#e0e0e0] rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#f0f0f1] flex items-center gap-2">
+        <Ticket className="w-4 h-4 text-[#9a6700]" />
+        <span className="text-[13px] font-bold text-[#1d2327]">Your Coupon Codes</span>
+        <span className="ml-auto text-[11px] font-bold bg-[#fcf9e8] text-[#9a6700] px-2 py-0.5 rounded-full border border-[#9a6700]/20">
+          {coupons.length}
+        </span>
+      </div>
+      <div className="divide-y divide-[#f0f0f1]">
+        {coupons.slice(0, 4).map((c: any) => (
+          <div key={c.id} className="px-4 py-2.5 flex items-center gap-3">
+            <span className="font-mono font-bold text-[13px] text-[#2271b1] bg-[#f0f6fc] px-2 py-0.5 rounded border border-[#2271b1]/20 flex-1">
+              {c.code}
+            </span>
+            <span className="text-[11px] text-[#646970] shrink-0">
+              {c.type === "PERCENTAGE" ? `${c.value}% off` : `${currency}${c.value} off`}
+            </span>
+            <button onClick={() => copyCode(c.code)}
+              className="shrink-0 p-1.5 text-[#2271b1] hover:bg-[#e7f3ff] rounded transition-colors">
+              {copiedCode === c.code
+                ? <Check className="w-3.5 h-3.5 text-[#00a32a]" />
+                : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        ))}
+      </div>
+      {coupons.length > 4 && (
+        <div className="px-4 py-2 border-t border-[#f0f0f1]">
+          <Link href="/affiliates?view=coupons" className="text-[12px] text-[#2271b1] hover:underline flex items-center gap-1">
+            View all {coupons.length} coupons <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tier Progress ─────────────────────────────────────────────────────────────
+
+function TierCard({ tier }: { tier: any }) {
+  const { formatPrice } = useGlobalStore();
+  if (!tier) return null;
+
+  return (
+    <div className="bg-gradient-to-br from-[#1d2327] to-[#2c3338] rounded-xl p-4 text-white relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8 pointer-events-none" />
+      <div className="relative z-10 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-[#72aee6] uppercase tracking-wider">Current Tier</p>
+            <p className="text-[16px] font-black flex items-center gap-1.5 mt-0.5">
+              <Trophy className="w-4 h-4 text-yellow-400" />
+              {tier.currentTierName || "No Tier"}
+            </p>
+          </div>
+          {!tier.isMaxTier && tier.nextTierName && (
+            <div className="text-right">
+              <p className="text-[10px] text-[#a7aaad]">Next</p>
+              <p className="text-[13px] font-bold text-[#72aee6]">{tier.nextTierName}</p>
+            </div>
+          )}
+        </div>
+
+        {!tier.isMaxTier && (
+          <div className="space-y-1.5">
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full transition-all duration-1000"
+                style={{ width: `${Math.min(tier.progress ?? 0, 100)}%` }} />
+            </div>
+            <div className="flex justify-between text-[10px] text-[#a7aaad]">
+              <span>{(tier.progress ?? 0).toFixed(0)}% complete</span>
+              <span className="flex items-center gap-1">
+                <Target className="w-3 h-3" />
+                {formatPrice(tier.amountNeeded)} more
+              </span>
+            </div>
+          </div>
+        )}
+
+        {tier.isMaxTier && (
+          <p className="text-[11px] text-yellow-300 flex items-center gap-1">
+            <Zap className="w-3 h-3" /> Maximum tier — top commission rates!
           </p>
         )}
       </div>
@@ -74,429 +329,361 @@ function StatsCard({ title, value, icon: Icon, description, trend, trendPercent,
   );
 }
 
-// =========================================================
-// COMPONENT 2: PERFORMANCE CHART
-// =========================================================
+// ── Conversion Funnel ─────────────────────────────────────────────────────────
 
-function PerformanceChart({ data }: { data: any[] }) {
-  const { symbol, formatPrice } = useGlobalStore();
-  const currency = symbol || "$";
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-        <TrendingUp className="w-8 h-8 mb-2 opacity-20" />
-        <p>No performance data available yet.</p>
-      </div>
-    );
-  }
+function ConversionFunnel({ clicks, referrals, approved }: { clicks: number; referrals: number; approved: number }) {
+  const steps = [
+    { label: "Clicks",     value: clicks,    color: "bg-[#2271b1]" },
+    { label: "Referrals",  value: referrals, color: "bg-amber-500" },
+    { label: "Approved",   value: approved,  color: "bg-[#00a32a]" },
+  ];
+  const max = Math.max(clicks, 1);
 
   return (
-    <div className="h-full w-full min-h-[300px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-            </linearGradient>
-          </defs>
-          
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-          
-          <XAxis 
-            dataKey="date" 
-            axisLine={false} 
-            tickLine={false} 
-            tick={{ fontSize: 11, fill: '#9ca3af' }}
-            dy={10}
-            tickFormatter={(value) => value.slice(5)} 
-          />
-          
-          <YAxis 
-            axisLine={false} 
-            tickLine={false} 
-            tick={{ fontSize: 11, fill: '#9ca3af' }}
-            tickFormatter={(val) => `${currency}${val}`}
-          />
-          
-          <Tooltip 
-            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-            itemStyle={{ color: '#4f46e5', fontWeight: 'bold' }}
-            formatter={(value: any) => [formatPrice(Number(value)), 'Earnings']}
-            labelStyle={{ color: '#6b7280', fontSize: '12px', marginBottom: '4px' }}
-          />
-          
-          <Area 
-            type="monotone" 
-            dataKey="earnings" 
-            stroke="#6366f1" 
-            strokeWidth={3}
-            fillOpacity={1} 
-            fill="url(#colorEarnings)" 
-            animationDuration={1500}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-// =========================================================
-// COMPONENT 3: RECENT ACTIVITY LIST ITEM
-// =========================================================
-
-function ActivityItem({ activity }: { activity: any }) {
-  const { formatPrice } = useGlobalStore();
-  
-  const isPositive = activity.type === "COMMISSION" || activity.type === "BONUS";
-  const amount = safeNumber(activity.amount);
-
-  return (
-    <div className="flex items-center gap-4 py-4 border-b border-gray-50 last:border-0 group hover:bg-gray-50/80 transition-colors px-3 -mx-3 rounded-lg cursor-default">
-      <div className="relative shrink-0">
-        <div className={cn(
-          "w-10 h-10 rounded-full flex items-center justify-center border shadow-sm transition-transform group-hover:scale-105",
-          isPositive 
-            ? "bg-green-50 border-green-100 text-green-600" 
-            : "bg-red-50 border-red-100 text-red-600"
-        )}>
-           {isPositive ? <DollarSign className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
-        </div>
+    <div className="bg-white border border-[#e0e0e0] rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Activity className="w-4 h-4 text-[#646970]" />
+        <span className="text-[13px] font-bold text-[#1d2327]">Conversion Funnel</span>
       </div>
-      
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate">{activity.description}</p>
-        <div className="flex items-center gap-2 mt-1">
-          <p className="text-xs text-gray-500">{format(new Date(activity.date), "MMM d, h:mm a")}</p>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium uppercase">
-            {activity.type.replace("_", " ")}
+      <div className="space-y-2.5">
+        {steps.map(s => (
+          <div key={s.label} className="space-y-1">
+            <div className="flex justify-between text-[11px]">
+              <span className="font-semibold text-[#50575e]">{s.label}</span>
+              <span className="font-black text-[#1d2327]">{s.value.toLocaleString()}</span>
+            </div>
+            <div className="h-2 bg-[#f0f0f1] rounded-full overflow-hidden">
+              <div className={cn("h-full rounded-full transition-all duration-700", s.color)}
+                style={{ width: `${(s.value / max) * 100}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-[#f0f0f1]">
+        <div className="flex justify-between text-[11px]">
+          <span className="text-[#8c8f94]">Click → Order rate</span>
+          <span className="font-bold text-[#1d2327]">
+            {clicks > 0 ? ((referrals / clicks) * 100).toFixed(1) : 0}%
           </span>
         </div>
       </div>
-      
-      <div className="text-right">
-        <span className={cn("block text-sm font-bold", isPositive ? "text-green-600" : "text-gray-900")}>
-          {isPositive ? "+" : "-"}{formatPrice(amount)}
-        </span>
-        <div className="flex items-center justify-end gap-1 mt-1">
-           {activity.status === "COMPLETED" ? (
-             <CheckCircle2 className="w-3 h-3 text-green-500" /> 
-           ) : (
-             <Clock className="w-3 h-3 text-amber-500" />
-           )}
-           <span className={cn(
-             "text-[10px] font-medium uppercase",
-             activity.status === "COMPLETED" ? "text-green-600" : "text-amber-600"
-           )}>
-             {activity.status}
-           </span>
+    </div>
+  );
+}
+
+// ── Recent Referrals ──────────────────────────────────────────────────────────
+
+function ReferralItem({ r }: { r: any }) {
+  const { formatPrice } = useGlobalStore();
+
+  const statusStyle: Record<string, string> = {
+    PAID:     "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/20",
+    APPROVED: "bg-[#e7f3ff] text-[#2271b1] border-[#2271b1]/20",
+    PENDING:  "bg-[#fcf9e8] text-[#9a6700] border-[#9a6700]/20",
+    REJECTED: "bg-[#fcebec] text-[#d63638] border-[#d63638]/20",
+  };
+
+  const attrIcon: Record<string, React.ElementType> = {
+    COUPON:   Ticket,
+    LIFETIME: Users,
+    COOKIE:   Link2,
+  };
+  const AttrIcon = attrIcon[r.attribution] || Link2;
+
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-[#f0f0f1] last:border-0">
+      <div className="w-8 h-8 rounded-lg bg-[#f0f6fc] border border-[#2271b1]/20 flex items-center justify-center shrink-0">
+        <ShoppingBag className="w-3.5 h-3.5 text-[#2271b1]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[12px] font-bold text-[#1d2327]">{r.description}</span>
+          <span title={r.attribution}>
+            <AttrIcon className="w-3 h-3 text-[#8c8f94]" />
+          </span>
         </div>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-[10px] text-[#8c8f94]">{format(new Date(r.date), "MMM d, h:mm a")}</span>
+          {r.orderAmount > 0 && (
+            <span className="text-[10px] text-[#8c8f94]">· Order: {formatPrice(r.orderAmount)}</span>
+          )}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-[13px] font-black text-[#00a32a]">+{formatPrice(r.amount)}</p>
+        <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border uppercase", statusStyle[r.status] || statusStyle.PENDING)}>
+          {r.status}
+        </span>
       </div>
     </div>
   );
 }
 
-// =========================================================
-// COMPONENT 4: TIER PROGRESS CARD
-// =========================================================
-function TierProgressCard({ data }: { data: any }) {
-    const { formatPrice } = useGlobalStore();
-    
-    if (!data) return null;
+// ── Active Rules ──────────────────────────────────────────────────────────────
 
-    const rateDisplay = data.nextTierType === "FIXED" 
-        ? formatPrice(data.nextTierRate) 
-        : `${data.nextTierRate}%`;
-
-    return (
-        <div className="bg-gradient-to-br from-gray-900 to-indigo-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
-            
-            <div className="relative z-10">
-                <div className="flex justify-between items-start mb-6">
-                    <div>
-                        <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-1">Current Tier</p>
-                        <h3 className="text-2xl font-bold flex items-center gap-2">
-                            <Trophy className="w-6 h-6 text-yellow-400" /> 
-                            {data.currentTierName}
-                        </h3>
-                    </div>
-                    {!data.isMaxTier && (
-                        <div className="text-right">
-                            <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider mb-1">Next Goal</p>
-                            <h3 className="text-xl font-bold text-white/90">{data.nextTierName}</h3>
-                        </div>
-                    )}
-                </div>
-
-                {!data.isMaxTier ? (
-                    <div className="space-y-3">
-                        <div className="flex justify-between text-xs font-medium text-indigo-100">
-                            <span>Progress</span>
-                            <span>{data.progress.toFixed(1)}%</span>
-                        </div>
-                        <div className="w-full bg-black/30 rounded-full h-3 overflow-hidden border border-white/10">
-                            <div 
-                                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-full rounded-full transition-all duration-1000 ease-out" 
-                                style={{ width: `${data.progress}%` }} 
-                            />
-                        </div>
-                        <p className="text-xs text-indigo-200 mt-2 flex items-center gap-1">
-                            <Target className="w-3 h-3" />
-                            Earn <span className="text-white font-bold">{formatPrice(data.amountNeeded)}</span> more to reach <span className="text-white font-bold">{rateDisplay} commission!</span>
-                        </p>
-                    </div>
-                ) : (
-                    <div className="p-4 bg-white/10 rounded-xl border border-white/20 text-center">
-                        <Sparkles className="w-6 h-6 text-yellow-300 mx-auto mb-2" />
-                        <p className="text-sm font-bold text-white">You are a Top Partner!</p>
-                        <p className="text-xs text-indigo-200">Maximum commission rates applied.</p>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// =========================================================
-// COMPONENT 5: ACTIVE RULES & BONUSES
-// =========================================================
-function ActiveRulesList({ rules }: { rules: any[] }) {
-    const { formatPrice } = useGlobalStore();
-    
-    if (!rules || rules.length === 0) return null;
-
-    return (
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-yellow-500" /> Active Bonuses
-            </h3>
-            <div className="space-y-3">
-                {rules.map((rule) => {
-                    const bonusDisplay = rule.type === "FIXED" 
-                        ? formatPrice(rule.value) 
-                        : `${rule.value}%`;
-
-                    return (
-                        <div key={rule.id} className="flex items-start gap-3 p-3 bg-yellow-50/50 rounded-xl border border-yellow-100">
-                            <div className="mt-1 p-1.5 bg-yellow-100 rounded-lg text-yellow-700">
-                                <Target className="w-4 h-4" />
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-gray-900">{rule.name}</h4>
-                                <p className="text-xs text-gray-600 mt-0.5">{rule.description}</p>
-                                <span className="inline-block mt-2 text-[10px] font-bold bg-white px-2 py-0.5 rounded border border-yellow-200 text-yellow-700">
-                                    {bonusDisplay} Bonus
-                                </span>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-// =========================================================
-// COMPONENT 6: ACTIVE CONTESTS (NEW)
-// =========================================================
-function ActiveContestsList({ contests }: { contests: any[] }) {
-    const { formatPrice } = useGlobalStore();
-
-    if (!contests || contests.length === 0) return null;
-
-    const getPrizeDisplay = (prizes: any) => {
-        if (!prizes) return "TBD";
-        if (typeof prizes === "string" || typeof prizes === "number") return formatPrice(Number(prizes));
-        if (typeof prizes === "object" && prizes["1st"]) return `${formatPrice(Number(prizes["1st"]))} (1st)`;
-        return "View Details";
-    };
-
-    return (
-        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-             {/* Decor */}
-             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10" />
-
-             <div className="relative z-10">
-                <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-300" /> Active Contests
-                </h3>
-                <div className="space-y-3">
-                    {contests.map((contest) => (
-                         <div key={contest.id} className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/10 hover:bg-white/20 transition-colors">
-                            <h4 className="font-bold text-sm truncate">{contest.title}</h4>
-                            <div className="flex justify-between items-center mt-2 text-xs text-indigo-100">
-                                <span className="text-white font-medium">
-                                    Prize: {getPrizeDisplay(contest.prizes)}
-                                </span>
-                                <span className="flex items-center gap-1 bg-white/10 px-2 py-0.5 rounded">
-                                    <Calendar className="w-3 h-3" /> 
-                                    {contest.endDate ? format(new Date(contest.endDate), "MMM d") : "N/A"}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-             </div>
-        </div>
-    );
-}
-
-// =========================================================
-// MAIN COMPONENT: DASHBOARD OVERVIEW
-// =========================================================
-
-interface DashboardProps {
-  data: {
-    stats: any;
-    recentActivity: any[];
-    chartData: any[];
-    tierProgress?: any; 
-    activeRules?: any[];
-    activeContests?: any[]; // ✅ Added
-  };
-  userName?: string | null;
-  userStatus?: string; // ✅ Added
-}
-
-export default function DashboardOverview({ data, userName, userStatus = "PENDING" }: DashboardProps) {
-  const { stats, recentActivity, chartData, tierProgress, activeRules, activeContests } = data;
+function RulesCard({ rules }: { rules: any[] }) {
   const { formatPrice } = useGlobalStore();
-  const firstName = (userName || "Partner").split(" ")[0];
+  if (!rules || rules.length === 0) return null;
+  return (
+    <div className="bg-white border border-[#e0e0e0] rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#f0f0f1] flex items-center gap-2">
+        <Zap className="w-4 h-4 text-amber-500" />
+        <span className="text-[13px] font-bold text-[#1d2327]">Active Bonus Rules</span>
+        <span className="ml-auto text-[11px] font-bold bg-[#fcf9e8] text-[#9a6700] px-1.5 py-0.5 rounded-full border border-[#9a6700]/20">
+          {rules.length}
+        </span>
+      </div>
+      <div className="divide-y divide-[#f0f0f1]">
+        {rules.slice(0, 3).map(rule => {
+          const isBonus = rule.type === "BONUS_FIXED" || rule.type === "BONUS_PERCENTAGE";
+          const isFixed = rule.type === "FIXED" || rule.type === "BONUS_FIXED";
+          const reward = isFixed ? formatPrice(rule.value) : `${rule.value}%`;
+          return (
+            <div key={rule.id} className="px-4 py-3 flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                <Target className="w-3.5 h-3.5 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-bold text-[#1d2327]">{rule.name}</p>
+                <p className="text-[11px] text-[#646970] truncate">{rule.description}</p>
+              </div>
+              <span className={cn("text-[11px] font-black shrink-0 px-2 py-0.5 rounded border",
+                isBonus ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/20"
+              )}>
+                {isBonus ? `+${reward}` : reward}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-  const totalEarnings = safeNumber(stats.totalEarnings);
-  const unpaidEarnings = safeNumber(stats.unpaidEarnings);
-  const clicks = safeNumber(stats.clicks);
-  const referrals = safeNumber(stats.referrals);
-  const approvedReferrals = safeNumber(stats.approvedReferrals);
-  const conversionRate = safeNumber(stats.conversionRate);
-  const nextPayoutDate = stats.nextPayoutDate ? new Date(stats.nextPayoutDate) : null;
+// ── Active Contests ───────────────────────────────────────────────────────────
 
-  // Real trend: compare last 7 days earnings vs prior 7 days from chartData
-  const earningsTrend = (() => {
-    if (!chartData || chartData.length < 14) return { trend: "neutral" as const, pct: 0 };
-    const last7 = chartData.slice(-7).reduce((s: number, d: any) => s + safeNumber(d.earnings), 0);
-    const prev7 = chartData.slice(-14, -7).reduce((s: number, d: any) => s + safeNumber(d.earnings), 0);
-    if (prev7 === 0) return last7 > 0 ? { trend: "up" as const, pct: 100 } : { trend: "neutral" as const, pct: 0 };
-    const pct = ((last7 - prev7) / prev7) * 100;
-    return { trend: pct >= 0 ? ("up" as const) : ("down" as const), pct: Math.abs(pct) };
-  })();
+function ContestsCard({ contests }: { contests: any[] }) {
+  const { formatPrice } = useGlobalStore();
+  if (!contests || contests.length === 0) return null;
 
-  const getStatusColor = (status: string) => {
-    if (status === "ACTIVE") return "bg-green-100 text-green-700 border-green-200";
-    if (status === "PENDING") return "bg-yellow-100 text-yellow-700 border-yellow-200";
-    if (status === "REJECTED") return "bg-red-100 text-red-700 border-red-200";
-    return "bg-gray-100 text-gray-700 border-gray-200";
+  const getPrize = (prizes: unknown) => {
+    if (!prizes) return "TBD";
+    if (typeof prizes === "object" && prizes !== null && "1st" in prizes)
+      return `${formatPrice(Number((prizes as Record<string, string>)["1st"]))} (1st)`;
+    return "View Details";
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-500">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Welcome Banner */}
-          <div className="lg:col-span-2 relative overflow-hidden bg-white p-8 rounded-3xl border border-gray-200 shadow-sm">
-            <div className="relative z-10 flex flex-col justify-between h-full">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-                        Hello, {firstName}! 👋
-                    </h1>
-                    <span className={cn("px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider", getStatusColor(userStatus))}>
-                        {userStatus}
-                    </span>
-                </div>
-                <p className="text-gray-500 text-sm max-w-md leading-relaxed">
-                  You have generated <span className="text-black font-bold">{formatPrice(totalEarnings)}</span> in lifetime revenue.
-                  {nextPayoutDate && (
-                    <span className="ml-1">Next payout available <span className="font-bold text-indigo-600">{format(nextPayoutDate, "MMM d")}</span>.</span>
-                  )}
+    <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-xl overflow-hidden text-white">
+      <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+        <Trophy className="w-4 h-4 text-yellow-300" />
+        <span className="text-[13px] font-bold">Active Contests</span>
+      </div>
+      <div className="divide-y divide-white/10">
+        {contests.slice(0, 2).map(c => (
+          <div key={c.id} className="px-4 py-3">
+            <p className="text-[12px] font-bold truncate">{c.title}</p>
+            <div className="flex items-center justify-between mt-1.5">
+              <span className="text-[11px] text-violet-200">Prize: {getPrize(c.prizes)}</span>
+              {c.endDate && (
+                <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded flex items-center gap-1">
+                  <Clock className="w-2.5 h-2.5" />
+                  {format(new Date(c.endDate), "MMM d")}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────────────────────
+
+interface Props {
+  data: {
+    stats: any;
+    todayStats?: { clicks: number; referrals: number };
+    pendingEarnings?: { amount: number; count: number };
+    recentActivity: any[];
+    chartData: any[];
+    tierProgress?: any;
+    activeRules?: any[];
+    activeContests?: any[];
+    announcements?: any[];
+    coupons?: any[];
+    referralLink?: string;
+    slug?: string;
+  };
+  userName?: string | null;
+  userStatus?: string;
+}
+
+export default function DashboardOverview({ data, userName, userStatus = "ACTIVE" }: Props) {
+  const {
+    stats, todayStats, pendingEarnings, recentActivity, chartData,
+    tierProgress, activeRules = [], activeContests = [],
+    announcements = [], coupons = [], referralLink = "", slug = "",
+  } = data;
+
+  const { formatPrice } = useGlobalStore();
+  const [chartView, setChartView] = useState<"area" | "bar">("area");
+  const firstName = (userName || "Partner").split(" ")[0];
+
+  const totalEarnings  = n(stats.totalEarnings);
+  const unpaidBalance  = n(stats.unpaidEarnings);
+  const clicks         = n(stats.clicks);
+  const referrals      = n(stats.referrals);
+  const approved       = n(stats.approvedReferrals);
+  const convRate       = n(stats.conversionRate);
+  const pending        = n(pendingEarnings?.amount);
+  const pendingCount   = n(pendingEarnings?.count);
+  const todayClicks    = n(todayStats?.clicks);
+  const todayReferrals = n(todayStats?.referrals);
+
+  // 30-day trend
+  const trend = (() => {
+    if (!chartData || chartData.length < 14) return { dir: "neutral" as const, pct: 0 };
+    const last7 = chartData.slice(-7).reduce((s: number, d: any) => s + n(d.earnings), 0);
+    const prev7 = chartData.slice(-14, -7).reduce((s: number, d: any) => s + n(d.earnings), 0);
+    if (prev7 === 0) return last7 > 0 ? { dir: "up" as const, pct: 100 } : { dir: "neutral" as const, pct: 0 };
+    const pct = ((last7 - prev7) / prev7) * 100;
+    return { dir: pct >= 0 ? "up" as const : "down" as const, pct: Math.abs(pct) };
+  })();
+
+  const statusColor: Record<string, string> = {
+    ACTIVE:    "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/30",
+    PENDING:   "bg-[#fcf9e8] text-[#9a6700] border-[#9a6700]/30",
+    SUSPENDED: "bg-[#fcebec] text-[#d63638] border-[#d63638]/30",
+  };
+
+  return (
+    <div className="space-y-4 pb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+      {/* Announcement banner */}
+      {announcements.length > 0 && <AnnouncementBanner announcements={announcements} />}
+
+      {/* ── Row 1: Welcome + Quick Link ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Welcome card */}
+        <div className="lg:col-span-2 bg-gradient-to-br from-[#1d2327] to-[#2c3338] rounded-xl px-6 py-5 text-white relative overflow-hidden">
+          <div className="absolute bottom-0 right-0 opacity-5 pointer-events-none">
+            <TrendingUp className="w-48 h-48 -mr-8 -mb-8" />
+          </div>
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-[22px] font-black">Hello, {firstName}!</h1>
+                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide", statusColor[userStatus] || statusColor.ACTIVE)}>
+                  {userStatus}
+                </span>
+              </div>
+              <p className="text-[13px] text-[#a7aaad]">
+                Lifetime earnings:{" "}
+                <span className="text-white font-bold">{formatPrice(totalEarnings)}</span>
+                {" · "}Unpaid: <span className="text-[#72aee6] font-bold">{formatPrice(unpaidBalance)}</span>
+              </p>
+              {(todayClicks > 0 || todayReferrals > 0) && (
+                <p className="text-[11px] text-emerald-400 flex items-center gap-1 mt-1">
+                  <Activity className="w-3 h-3" />
+                  Today: {todayClicks} click{todayClicks !== 1 ? "s" : ""} · {todayReferrals} referral{todayReferrals !== 1 ? "s" : ""}
                 </p>
-              </div>
-              <div className="flex items-center gap-3 mt-6">
-                <Link href="/affiliates?view=payouts" className="px-5 py-2.5 bg-black text-white font-bold rounded-xl hover:bg-gray-800 transition-all text-xs flex items-center gap-2 shadow-lg active:scale-95">
-                  <Wallet className="w-3.5 h-3.5" /> Withdraw Funds
-                </Link>
-                <Link href="/affiliates?view=links" className="px-5 py-2.5 bg-gray-100 text-gray-900 font-bold rounded-xl hover:bg-gray-200 transition-all text-xs flex items-center gap-2">
-                  <ExternalLink className="w-3.5 h-3.5" /> Create Link
-                </Link>
-              </div>
+              )}
             </div>
-            <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
-                <TrendingUp className="w-64 h-64 -mr-10 -mb-10 text-indigo-600" />
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Link href="/affiliates?view=payouts"
+                className="h-8 px-4 bg-[#2271b1] hover:bg-[#135e96] text-white text-[12px] font-bold rounded-lg transition-colors flex items-center gap-1.5 no-underline">
+                <Wallet className="w-3.5 h-3.5" /> Withdraw
+              </Link>
+              <Link href="/affiliates?view=links"
+                className="h-8 px-4 bg-white/10 hover:bg-white/20 text-white text-[12px] font-bold rounded-lg transition-colors flex items-center gap-1.5 no-underline">
+                <Link2 className="w-3.5 h-3.5" /> My Links
+              </Link>
             </div>
-          </div>
-
-          {/* Tier Progress */}
-          <div className="lg:col-span-1">
-             <TierProgressCard data={tierProgress} />
-          </div>
-      </div>
-
-      {/* 2. KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard title="Unpaid Balance" value={formatPrice(unpaidEarnings)} icon={Wallet} color="blue" description="Available for payout" />
-        <StatsCard
-          title="Total Earnings" value={formatPrice(totalEarnings)} icon={DollarSign} color="green"
-          trend={earningsTrend.trend} trendPercent={earningsTrend.pct}
-          description="Lifetime income generated"
-        />
-        <StatsCard title="Total Clicks" value={clicks.toLocaleString()} icon={MousePointer} color="purple" description="Unique link visits" />
-        <StatsCard
-          title="Conversions" value={referrals.toLocaleString()} icon={Users} color="orange"
-          description={`${approvedReferrals} approved · ${conversionRate.toFixed(1)}% rate`}
-        />
-      </div>
-
-      {/* 3. Main Content Split */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        
-        {/* Left Column: Chart */}
-        <div className="xl:col-span-2 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-[500px]">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h3 className="font-bold text-gray-900 text-xl flex items-center gap-2">
-                <TrendingUp className="w-6 h-6 text-indigo-600 bg-indigo-50 p-1 rounded-md" />
-                Performance
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">Earnings overview for the last 30 days</p>
-            </div>
-          </div>
-          <div className="flex-1 w-full min-h-0">
-            <PerformanceChart data={chartData} />
           </div>
         </div>
 
-        {/* Right Column: Activity & Rules & Contests */}
-        <div className="space-y-6">
-            {/* ✅ Active Contests (NEW) */}
-            {activeContests && activeContests.length > 0 && (
-                <ActiveContestsList contests={activeContests} />
-            )}
+        {/* Quick link card */}
+        <div className="lg:col-span-1">
+          {referralLink ? (
+            <QuickLinkCard referralLink={referralLink} slug={slug} />
+          ) : (
+            <TierCard tier={tierProgress} />
+          )}
+        </div>
+      </div>
 
-            {/* Active Rules Widget */}
-            {activeRules && activeRules.length > 0 && (
-                <ActiveRulesList rules={activeRules} />
-            )}
+      {/* ── Row 2: KPI Cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <KpiCard label="Unpaid Balance"  value={formatPrice(unpaidBalance)}  icon={Wallet}       color="blue"   todayBadge={undefined} />
+        <KpiCard label="Total Earned"    value={formatPrice(totalEarnings)}  icon={DollarSign}   color="green"  trend={trend.dir !== "neutral" ? trend.dir : undefined} trendPct={trend.pct} />
+        <KpiCard label="Pending"         value={formatPrice(pending)}        icon={Clock}        color="amber"  sub={pendingCount > 0 ? `${pendingCount} awaiting` : "nothing pending"} />
+        <KpiCard label="Total Clicks"    value={clicks.toLocaleString()}     icon={MousePointer} color="violet" todayBadge={todayClicks} />
+        <KpiCard label="Conversions"     value={referrals.toLocaleString()}  icon={Users}        color="rose"   sub={`${convRate.toFixed(1)}% rate · ${approved} approved`} todayBadge={todayReferrals} />
+      </div>
 
-            {/* Recent Activity */}
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-auto min-h-[300px]">
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900 text-lg">Recent Activity</h3>
-                <Link href="/affiliates?view=ledger" className="text-xs font-bold text-indigo-600 hover:underline">View All</Link>
-              </div>
-              <div className="flex-1 space-y-1">
-                {recentActivity.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 py-10">
-                    <Calendar className="w-10 h-10 mb-3 opacity-10" />
-                    <p className="text-sm">No recent activity</p>
-                  </div>
-                ) : (
-                  recentActivity.map((activity, i) => <ActivityItem key={activity.id || i} activity={activity} />)
-                )}
-              </div>
-            </div>
+      {/* ── Row 3: Chart + Sidebar ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+
+        {/* Chart card */}
+        <div className="xl:col-span-2 bg-white border border-[#e0e0e0] rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-[#2271b1]" />
+            <span className="text-[14px] font-bold text-[#1d2327]">Earnings Performance</span>
+          </div>
+          <EarningsChart data={chartData} view={chartView} setView={setChartView} />
         </div>
 
+        {/* Right sidebar */}
+        <div className="xl:col-span-1 space-y-4">
+          {referralLink && <TierCard tier={tierProgress} />}
+          <ConversionFunnel clicks={clicks} referrals={referrals} approved={approved} />
+          <CouponsCard coupons={coupons} />
+        </div>
+      </div>
+
+      {/* ── Row 4: Referrals + Rules/Contests ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Recent referrals */}
+        <div className="bg-white border border-[#e0e0e0] rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-[#f0f0f1] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-[#646970]" />
+              <span className="text-[13px] font-bold text-[#1d2327]">Recent Referrals</span>
+            </div>
+            <Link href="/affiliates?view=reports"
+              className="text-[11px] font-bold text-[#2271b1] hover:underline flex items-center gap-1 no-underline">
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="px-4">
+            {recentActivity.length === 0 ? (
+              <div className="py-10 text-center text-[#8c8f94]">
+                <ShoppingBag className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                <p className="text-[13px]">No referrals yet</p>
+                <p className="text-[11px] mt-1">Share your link to start earning</p>
+              </div>
+            ) : (
+              recentActivity.map((r: any, i: number) => <ReferralItem key={r.id || i} r={r} />)
+            )}
+          </div>
+        </div>
+
+        {/* Rules + Contests */}
+        <div className="space-y-4">
+          {activeContests.length > 0 && <ContestsCard contests={activeContests} />}
+          {activeRules.length > 0 && <RulesCard rules={activeRules} />}
+          {activeRules.length === 0 && activeContests.length === 0 && (
+            <div className="bg-white border border-[#e0e0e0] rounded-xl p-6 text-center text-[#8c8f94]">
+              <Megaphone className="w-8 h-8 mx-auto mb-2 opacity-20" />
+              <p className="text-[13px]">No active promotions</p>
+              <p className="text-[11px] mt-1">Check back later for bonus rules and contests</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -168,7 +168,7 @@ export async function getStats(affiliateId: string) {
       totalEarnings: account?.totalEarnings.toNumber() || approvedEarnings,
       nextPayoutDate: nextReferral?.availableAt ?? null,
     };
-  }, [`affiliate-stats-${affiliateId}`], { revalidate: 300 })();
+  }, [`affiliate-stats-${affiliateId}`], { revalidate: 300, tags: [`affiliate-stats-${affiliateId}`] })();
 }
 
 // ==========================================
@@ -292,11 +292,14 @@ export async function getActiveRules() {
       AND: [{ OR: [{ endDate: null }, { endDate: { gte: new Date() } }] }]
     },
     orderBy: { priority: "desc" },
-    select: { 
+    select: {
         id: true,
         name: true,
         description: true,
-        action: true
+        action: true,
+        conditions: true,
+        endDate: true,
+        priority: true
     }
   });
 
@@ -305,7 +308,10 @@ export async function getActiveRules() {
     name: r.name,
     description: r.description || "Special commission offer",
     type: (r.action as unknown as RuleAction).type,
-    value: Number((r.action as unknown as RuleAction).value)
+    value: Number((r.action as unknown as RuleAction).value),
+    conditions: r.conditions as unknown as Record<string, unknown>,
+    endDate: r.endDate,
+    priority: r.priority
   }));
 }
 
@@ -352,22 +358,54 @@ export async function getRecentActivity(affiliateId: string) {
   const referrals = await db.referral.findMany({
     where: { affiliateId },
     orderBy: { createdAt: "desc" },
-    take: 5,
-    select: { 
-        id: true,
-        commissionAmount: true,
-        createdAt: true,
-        status: true,
-        order: { select: { orderNumber: true } }
+    take: 8,
+    select: {
+      id: true,
+      commissionAmount: true,
+      totalOrderAmount: true,
+      commissionRate: true,
+      commissionType: true,
+      createdAt: true,
+      status: true,
+      metadata: true,
+      order: { select: { orderNumber: true, total: true } }
     }
   });
 
-  return referrals.map(r => ({
-    id: r.id,
-    type: "REFERRAL",
-    description: `Commission earned #${r.order.orderNumber}`,
-    amount: r.commissionAmount.toNumber(), 
-    date: r.createdAt,
-    status: r.status
-  }));
+  return referrals.map(r => {
+    const meta = r.metadata as Record<string, unknown> | null;
+    return {
+      id: r.id,
+      type: "REFERRAL",
+      description: `Order #${r.order.orderNumber}`,
+      amount: r.commissionAmount.toNumber(),
+      orderAmount: r.totalOrderAmount?.toNumber() ?? 0,
+      commissionRate: r.commissionRate?.toNumber() ?? 0,
+      commissionType: r.commissionType,
+      date: r.createdAt,
+      status: r.status,
+      attribution: (meta?.attribution as string) ?? "COOKIE",
+    };
+  });
+}
+
+export async function getTodayStats(affiliateId: string) {
+  const today = startOfDay(new Date());
+  const [clicks, referrals] = await Promise.all([
+    db.affiliateClick.count({ where: { affiliateId, createdAt: { gte: today } } }),
+    db.referral.count({ where: { affiliateId, createdAt: { gte: today } } }),
+  ]);
+  return { clicks, referrals };
+}
+
+export async function getPendingEarnings(affiliateId: string) {
+  const result = await db.referral.aggregate({
+    where: { affiliateId, status: "PENDING" },
+    _sum: { commissionAmount: true },
+    _count: { id: true },
+  });
+  return {
+    amount: result._sum.commissionAmount?.toNumber() ?? 0,
+    count: result._count.id,
+  };
 }

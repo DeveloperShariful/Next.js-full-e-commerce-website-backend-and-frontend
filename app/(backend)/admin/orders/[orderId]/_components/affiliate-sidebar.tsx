@@ -57,10 +57,20 @@ export const AffiliateSidebar = ({ order }: { order: any }) => {
                         )}
                         <div>
                             <span className="font-semibold text-[#646970]">Rate:</span>{" "}
-                            {order.affiliate.commissionType === "PERCENTAGE" 
-                                ? `${order.affiliate.commissionRate}%` 
-                                : formatPrice(order.affiliate.commissionRate)}
+                            {(() => {
+                                const ref = order.referrals?.[0];
+                                const type = ref?.commissionType ?? order.affiliate.commissionType;
+                                const rate = ref?.commissionRate ?? order.affiliate.commissionRate;
+                                if (!rate && rate !== 0) return "—";
+                                return type === "PERCENTAGE" ? `${rate}%` : formatPrice(rate);
+                            })()}
                         </div>
+                        {order.referrals?.[0]?.commissionAmount != null && (
+                            <div className="mt-1">
+                                <span className="font-semibold text-[#646970]">Commission:</span>{" "}
+                                <span className="text-[#5b841b] font-medium">{formatPrice(order.referrals[0].commissionAmount)}</span>
+                            </div>
+                        )}
                     </div>
 
                     <p className="text-[11px] text-[#646970] m-0 leading-relaxed italic">

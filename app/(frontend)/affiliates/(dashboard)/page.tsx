@@ -6,13 +6,16 @@ import AffiliateMainView from "./_components/affiliate-main-view";
 import { serializePrismaData } from "@/lib/format-data"; 
 import { db } from "@/lib/prisma";
 import { getAuthAffiliate } from "@/app/actions/frontend/affiliate/auth-helper";
-import { 
-  getStats, 
-  getRecentActivity, 
-  getPerformanceChart, 
-  getTierProgress, 
-  getActiveRules, 
-  getActiveContests // ✅ Already imported
+import {
+  getStats,
+  getRecentActivity,
+  getPerformanceChart,
+  getTierProgress,
+  getActiveRules,
+  getActiveContests,
+  getAnnouncements,
+  getTodayStats,
+  getPendingEarnings,
 } from "@/app/actions/frontend/affiliate/_services/dashboard-service";
 import { getLinks, getCampaigns, getCreatives, getCoupons } from "@/app/actions/frontend/affiliate/_services/marketing-service";
 import { getWalletData, getPayoutHistory, getLedger } from "@/app/actions/frontend/affiliate/_services/finance-service";
@@ -39,6 +42,7 @@ export default async function AffiliateStorefrontPage() {
     storeSettings,
     // Dashboard Data
     stats, recentActivity, chartData, tierProgress, activeRules, activeContests,
+    announcements, todayStats, pendingEarnings,
     // Marketing Data
     links, campaigns, creatives, coupons,
     // Finance Data
@@ -57,6 +61,9 @@ export default async function AffiliateStorefrontPage() {
     getTierProgress(profile.id),
     getActiveRules(),
     getActiveContests(),
+    getAnnouncements(profile.id),
+    getTodayStats(profile.id),
+    getPendingEarnings(profile.id),
 
     // Marketing Data Calls
     getLinks(profile.id),
@@ -93,13 +100,19 @@ export default async function AffiliateStorefrontPage() {
   const fullData = {
     profile,
     config: { ...affiliateConfig, ...appConfig },
-    dashboard: { 
-        stats, 
-        recentActivity, 
-        chartData, 
-        tierProgress, 
-        activeRules, 
-        activeContests // ✅ Added to dashboard object
+    dashboard: {
+      stats,
+      recentActivity,
+      chartData,
+      tierProgress,
+      activeRules,
+      activeContests,
+      announcements,
+      todayStats,
+      pendingEarnings,
+      coupons,
+      referralLink: `${appConfig.baseUrl}?${appConfig.paramName}=${profile.slug}`,
+      slug: profile.slug,
     },
     marketing: { links, campaigns, creatives, coupons, defaultSlug: profile.slug, ...appConfig },
     creatives,

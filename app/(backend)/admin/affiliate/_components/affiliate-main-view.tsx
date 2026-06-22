@@ -179,7 +179,7 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
         return initialData.tiers ? <TierList initialTiers={initialData.tiers} /> : null;
 
       case "rules":
-        return initialData.rules ? <RuleList initialRules={initialData.rules} /> : null;
+        return initialData.rules ? <RuleList initialRules={initialData.rules} categories={initialData.categories || []} /> : null;
 
       case "product-rates":
         return initialData.rates ? <ProductRateManager initialRates={initialData.rates.rates} /> : null;
@@ -200,6 +200,7 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
           <CouponTagManager
             couponsData={initialData.coupons.coupons}
             tagsData={initialData.coupons.tags}
+            affiliates={initialData.coupons.affiliates || []}
           />
         ) : null;
 

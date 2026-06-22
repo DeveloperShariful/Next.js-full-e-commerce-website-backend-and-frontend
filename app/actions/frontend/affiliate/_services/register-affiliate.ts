@@ -73,12 +73,12 @@ export async function registerAffiliateAction(data?: RegisterInput) {
     }
 
     // 5. Create Affiliate Account
-    await db.affiliateAccount.create({
+    const newAccount = await db.affiliateAccount.create({
       data: {
         userId,
         slug: finalSlug,
         status: config.autoApprove ? "ACTIVE" : "PENDING",
-        commissionRate: config.defaultCommissionRate || 10, // Default 10%
+        commissionRate: config.defaultCommissionRate || 10,
         commissionType: "PERCENTAGE",
         cookieDuration: config.cookieDuration || 30,
         balance: 0,
@@ -89,7 +89,25 @@ export async function registerAffiliateAction(data?: RegisterInput) {
       },
     });
 
-    // 6. Revalidate & Return Success
+    // 6. Auto-create a personal coupon tied to this affiliate
+    try {
+      const couponCode = finalSlug.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || nanoid(6).toUpperCase();
+      await db.discount.create({
+        data: {
+          code: couponCode,
+          type: "PERCENTAGE",
+          value: 10,
+          isActive: true,
+          affiliateId: newAccount.id,
+          description: "Affiliate Exclusive",
+          startDate: new Date(),
+        },
+      });
+    } catch {
+      // non-critical — continue even if coupon code collision
+    }
+
+    // 7. Revalidate & Return Success
     revalidatePath("/affiliates");
     return { success: true, message: "Account created successfully!" };
 

@@ -327,10 +327,10 @@ enum SalesChannel {
 
 // প্রোডাক্ট সিঙ্ক হওয়ার স্ট্যাটাস
 enum ChannelSyncStatus {
-  PENDING      // সিঙ্ক হওয়ার অপেক্ষায়
-  SYNCED       // গুগলে সাকসেসফুলি চলে গেছে
-  FAILED       // গুগল রিজেক্ট করেছে (যেমন- বারকোড নাই)
-  EXCLUDED     // এডমিন ইচ্ছা করে এই প্ল্যাটফর্মে পাঠাতে চায় না
+  PENDING // সিঙ্ক হওয়ার অপেক্ষায়
+  SYNCED // গুগলে সাকসেসফুলি চলে গেছে
+  FAILED // গুগল রিজেক্ট করেছে (যেমন- বারকোড নাই)
+  EXCLUDED // এডমিন ইচ্ছা করে এই প্ল্যাটফর্মে পাঠাতে চায় না
 }
 
 // গুগলের জন্য প্রোডাক্টের অবস্থা
@@ -345,52 +345,52 @@ enum ProductCondition {
 // ==========================================
 
 model User {
-  id                    String    @id @default(uuid())
-  name                  String?
-  email                 String    @unique
-  emailVerified         DateTime? 
-  password              String?   
-  phone                 String?   @unique
-  image                 String?   
-  mediaId               String?
-  media                 Media?    @relation(fields: [mediaId], references: [id])
-  role                  Role      @default(CUSTOMER)
-  isActive              Boolean   @default(true)
-  dateOfBirth           DateTime?
-  gender                String?
-  notes                 String?
-  metafields            Json?
-  deletedAt             DateTime?
-  version               Int       @default(1)
-  accounts              Account[]
-  sessions              Session[]
-  createdBy             String?
-  updatedBy             String?
-  auditLogs             AuditLog[]
-  addresses             Address[]
-  paymentMethods        UserPaymentMethod[]
-  orders                Order[]
-  reviews               Review[]
-  wishlist              Wishlist[]
-  cart                  Cart?
-  viewedProducts        RecentlyViewed[]
-  wallet                Wallet?
-  abandonedCheckouts    AbandonedCheckout[]
-  subscriptions         Subscription[]
-  paymentSessions       PaymentSession[]
+  id                 String              @id @default(uuid())
+  name               String?
+  email              String              @unique
+  emailVerified      DateTime?
+  password           String?
+  phone              String?             @unique
+  image              String?
+  mediaId            String?
+  media              Media?              @relation(fields: [mediaId], references: [id])
+  role               Role                @default(CUSTOMER)
+  isActive           Boolean             @default(true)
+  dateOfBirth        DateTime?
+  gender             String?
+  notes              String?
+  metafields         Json?
+  deletedAt          DateTime?
+  version            Int                 @default(1)
+  accounts           Account[]
+  sessions           Session[]
+  createdBy          String?
+  updatedBy          String?
+  auditLogs          AuditLog[]
+  addresses          Address[]
+  paymentMethods     UserPaymentMethod[]
+  orders             Order[]
+  reviews            Review[]
+  wishlist           Wishlist[]
+  cart               Cart?
+  viewedProducts     RecentlyViewed[]
+  wallet             Wallet?
+  abandonedCheckouts AbandonedCheckout[]
+  subscriptions      Subscription[]
+  paymentSessions    PaymentSession[]
 
-  activityLogs          ActivityLog[]
-  notifications         Notification[]
+  activityLogs  ActivityLog[]
+  notifications Notification[]
 
-  createdTickets        SupportTicket[] @relation("UserCreatedTickets")
-  assignedTickets       SupportTicket[] @relation("StaffTickets")
+  createdTickets  SupportTicket[] @relation("UserCreatedTickets")
+  assignedTickets SupportTicket[] @relation("StaffTickets")
 
   affiliateAccount      AffiliateAccount?
   referredByAffiliateId String?
   referredByAffiliate   AffiliateAccount? @relation("CustomerReferral", fields: [referredByAffiliateId], references: [id], onDelete: SetNull)
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([phone])
@@ -400,18 +400,18 @@ model User {
 }
 
 model Account {
-  id                 String  @id @default(uuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -438,9 +438,9 @@ model VerificationToken {
 }
 
 model UserPaymentMethod {
-  id                 String   @id @default(uuid())
+  id                 String         @id @default(uuid())
   userId             String
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   gateway            String
   type               String
   gatewayCustomerId  String?
@@ -453,10 +453,10 @@ model UserPaymentMethod {
   expiryMonth        Int?
   expiryYear         Int?
   billingDetails     Json?
-  isDefault          Boolean  @default(false)
+  isDefault          Boolean        @default(false)
   subscriptions      Subscription[]
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@index([userId])
 }
@@ -524,8 +524,8 @@ model WalletTransaction {
 model Category {
   id                      String                @id @default(uuid())
   name                    String
-  googleCategoryId       String?   // e.g., "212" (Apparel & Accessories > Clothing)
-  googleCategoryName     String?   // e.g., "Apparel & Accessories > Clothing"
+  googleCategoryId        String? // e.g., "212" (Apparel & Accessories > Clothing)
+  googleCategoryName      String? // e.g., "Apparel & Accessories > Clothing"
   slug                    String                @unique
   description             String?               @db.Text
   image                   String?
@@ -536,7 +536,7 @@ model Category {
   parentId                String?
   parent                  Category?             @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
   children                Category[]            @relation("CategoryToCategory")
-  products                Product[]             @relation("ProductToCategory") 
+  products                Product[]             @relation("ProductToCategory")
   translations            CategoryTranslation[]
   metafields              Json?
   metaTitle               String?
@@ -636,132 +636,132 @@ model ShippingClass {
 }
 
 model Product {
-  id                       String                 @id @default(uuid())
-  versions                 ProductVersion[]
-  stockHistory             StockHistory[]
-  productCode              Int                    @unique @default(autoincrement())
-  condition                ProductCondition @default(NEW)
-  googleProductCategory    String?          // e.g., "Apparel & Accessories > Clothing"
-  customLabels             String[]         // e.g., ["Summer Sale", "Best Seller"] (Postgres Array)
-  channelStatuses          ProductChannelStatus[]
-  googleTitle              String?                // গুগলের জন্য কাস্টম টাইটেল (SEO অপ্টিমাইজেশনের জন্য)
-  googleDescription        String?                @db.Text // গুগলের জন্য কাস্টম ডেসক্রিপশন
-  googleIsBundle           Boolean                @default(false) // এটি গুগলকে জানাবে প্রোডাক্টটি কাস্টম বান্ডেল কিনা
-  analytics                ProductAnalytics[]
-  name                     String
-  slug                     String                 @unique
-  description              String?                @db.Text
-  shortDescription         String?                @db.Text
-  productType              ProductType            @default(SIMPLE)
-  status                   ProductStatus          @default(DRAFT)
-  isFeatured               Boolean                @default(false)
-  categories               Category[]             @relation("ProductToCategory")
-  brandId                  String?
-  brand                    Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  tags                     Tag[]
-  collections              Collection[]
-  featuredImage            String?
-  featuredMediaId          String?
-  featuredMedia            Media?                 @relation(fields: [featuredMediaId], references: [id])
-  images                   ProductImage[]
-  videoUrl                 String?
-  videoThumbnail           String?
-  price                    Decimal                @default(0.00) @db.Decimal(12, 2)
-  salePrice                Decimal?               @db.Decimal(12, 2)
-  saleStart                DateTime?
-  saleEnd                  DateTime?
-  costPerItem              Decimal?               @db.Decimal(12, 2)
-  taxable                  Boolean                @default(true)
-  taxStatus                TaxStatus              @default(TAXABLE)
-  taxRateId                String?
-  taxRate                  TaxRate?               @relation(fields: [taxRateId], references: [id])
-  taxClassId               String?
-  sku                      String?                @unique
-  barcode                  String?
-  mpn                      String?
-  trackQuantity            Boolean                @default(true)
-  stock                    Int                    @default(0)
-  lowStockThreshold        Int                    @default(2)
-  backorderStatus          BackorderStatus        @default(DO_NOT_ALLOW)
-  soldIndividually         Boolean                @default(false)
-  isPreOrder               Boolean                @default(false)
-  preOrderReleaseDate      DateTime?
-  preOrderMessage          String?
-  preOrderLimit            Int?
-  weight                   Decimal?               @default(0) @db.Decimal(10, 3)
-  length                   Decimal?               @db.Decimal(10, 2)
-  width                    Decimal?               @db.Decimal(10, 2)
-  height                   Decimal?               @db.Decimal(10, 2)
-  weightUnit               String?                @default("kg")
-  dimensionUnit            String?                @default("cm")
-  shippingClassId          String?
-  shippingClass            ShippingClass?         @relation(fields: [shippingClassId], references: [id])
-  isVirtual                Boolean                @default(false)
-  isDownloadable           Boolean                @default(false)
-  downloadFiles            DigitalFile[]
-  downloadLimit            Int?
-  downloadExpiry           Int?
-  isDangerousGood          Boolean                @default(false)
-  dangerousGoodType        String?
-  hsCode                   String?
-  countryOfManufacture     String?
-  bundleItems              BundleItem[]           @relation("BundleParent")
-  partOfBundles            BundleItem[]           @relation("BundleChild")
-  attributes               ProductAttribute[]
-  variants                 ProductVariant[]
-  reviews                  Review[]
-  questions                QuestionAnswer[]
-  inventoryLevels          InventoryLevel[]
-  translations             ProductTranslation[]
-  upsellIds                String[]
-  crossSellIds             String[]
-  metaTitle                String?
-  metaDesc                 String?
-  seoCanonicalUrl          String?
-  seoSchema                Json?
-  gender                   String?
-  ageGroup                 String?
+  id                    String                 @id @default(uuid())
+  versions              ProductVersion[]
+  stockHistory          StockHistory[]
+  productCode           Int                    @unique @default(autoincrement())
+  condition             ProductCondition       @default(NEW)
+  googleProductCategory String? // e.g., "Apparel & Accessories > Clothing"
+  customLabels          String[] // e.g., ["Summer Sale", "Best Seller"] (Postgres Array)
+  channelStatuses       ProductChannelStatus[]
+  googleTitle           String? // গুগলের জন্য কাস্টম টাইটেল (SEO অপ্টিমাইজেশনের জন্য)
+  googleDescription     String?                @db.Text // গুগলের জন্য কাস্টম ডেসক্রিপশন
+  googleIsBundle        Boolean                @default(false) // এটি গুগলকে জানাবে প্রোডাক্টটি কাস্টম বান্ডেল কিনা
+  analytics             ProductAnalytics[]
+  name                  String
+  slug                  String                 @unique
+  description           String?                @db.Text
+  shortDescription      String?                @db.Text
+  productType           ProductType            @default(SIMPLE)
+  status                ProductStatus          @default(DRAFT)
+  isFeatured            Boolean                @default(false)
+  categories            Category[]             @relation("ProductToCategory")
+  brandId               String?
+  brand                 Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  tags                  Tag[]
+  collections           Collection[]
+  featuredImage         String?
+  featuredMediaId       String?
+  featuredMedia         Media?                 @relation(fields: [featuredMediaId], references: [id])
+  images                ProductImage[]
+  videoUrl              String?
+  videoThumbnail        String?
+  price                 Decimal                @default(0.00) @db.Decimal(12, 2)
+  salePrice             Decimal?               @db.Decimal(12, 2)
+  saleStart             DateTime?
+  saleEnd               DateTime?
+  costPerItem           Decimal?               @db.Decimal(12, 2)
+  taxable               Boolean                @default(true)
+  taxStatus             TaxStatus              @default(TAXABLE)
+  taxRateId             String?
+  taxRate               TaxRate?               @relation(fields: [taxRateId], references: [id])
+  taxClassId            String?
+  sku                   String?                @unique
+  barcode               String?
+  mpn                   String?
+  trackQuantity         Boolean                @default(true)
+  stock                 Int                    @default(0)
+  lowStockThreshold     Int                    @default(2)
+  backorderStatus       BackorderStatus        @default(DO_NOT_ALLOW)
+  soldIndividually      Boolean                @default(false)
+  isPreOrder            Boolean                @default(false)
+  preOrderReleaseDate   DateTime?
+  preOrderMessage       String?
+  preOrderLimit         Int?
+  weight                Decimal?               @default(0) @db.Decimal(10, 3)
+  length                Decimal?               @db.Decimal(10, 2)
+  width                 Decimal?               @db.Decimal(10, 2)
+  height                Decimal?               @db.Decimal(10, 2)
+  weightUnit            String?                @default("kg")
+  dimensionUnit         String?                @default("cm")
+  shippingClassId       String?
+  shippingClass         ShippingClass?         @relation(fields: [shippingClassId], references: [id])
+  isVirtual             Boolean                @default(false)
+  isDownloadable        Boolean                @default(false)
+  downloadFiles         DigitalFile[]
+  downloadLimit         Int?
+  downloadExpiry        Int?
+  isDangerousGood       Boolean                @default(false)
+  dangerousGoodType     String?
+  hsCode                String?
+  countryOfManufacture  String?
+  bundleItems           BundleItem[]           @relation("BundleParent")
+  partOfBundles         BundleItem[]           @relation("BundleChild")
+  attributes            ProductAttribute[]
+  variants              ProductVariant[]
+  reviews               Review[]
+  questions             QuestionAnswer[]
+  inventoryLevels       InventoryLevel[]
+  translations          ProductTranslation[]
+  upsellIds             String[]
+  crossSellIds          String[]
+  metaTitle             String?
+  metaDesc              String?
+  seoCanonicalUrl       String?
+  seoSchema             Json?
+  gender                String?
+  ageGroup              String?
 
   // Facebook / Google Shopping feed fields
-  facebookSyncMode         String?                // SYNC_AND_SHOW | SYNC_ONLY | EXCLUDED
-  facebookDescription      String?                @db.Text
-  facebookImageType        String?                @default("PRODUCT_IMAGE") // PRODUCT_IMAGE | CUSTOM
-  facebookPrice            Decimal?               @db.Decimal(12, 2)
-  size                     String?
-  color                    String?
-  material                 String?
-  pattern                  String?
+  facebookSyncMode    String? // SYNC_AND_SHOW | SYNC_ONLY | EXCLUDED
+  facebookDescription String?  @db.Text
+  facebookImageType   String?  @default("PRODUCT_IMAGE") // PRODUCT_IMAGE | CUSTOM
+  facebookPrice       Decimal? @db.Decimal(12, 2)
+  size                String?
+  color               String?
+  material            String?
+  pattern             String?
 
-  viewCount                Int                    @default(0)
-  soldCount                Int                    @default(0)
-  rating                   Decimal                @default(0) @db.Decimal(3, 2)
-  reviewCount              Int                    @default(0)
-  metafields               Json?
-  menuOrder                Int                    @default(0)
-  purchaseNote             String?
-  enableReviews            Boolean                @default(true)
-  affiliateCommissionRate  Decimal?               @db.Decimal(5, 2)
-  affiliateCommissionType  CommissionType         @default(PERCENTAGE)
-  disableAffiliate         Boolean                @default(false)
-  affiliateRates           AffiliateProductRate[]
-  deletedAt                DateTime?
-  version                  Int                    @default(1)
-  
-  descriptionEmbedding     Unsupported("vector(1536)")?
-  imageEmbedding           Unsupported("vector(512)")?
-  
-  wishlistedBy             Wishlist[]
-  recentViews              RecentlyViewed[]
-  orderItems               OrderItem[]
-  cartItems                CartItem[]
-  subscriptionPlans        SubscriptionPlan[]
-  inventoryReservations    InventoryReservation[]
-  
-  createdBy                String?
-  updatedBy                String?
-  
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
+  viewCount               Int                    @default(0)
+  soldCount               Int                    @default(0)
+  rating                  Decimal                @default(0) @db.Decimal(3, 2)
+  reviewCount             Int                    @default(0)
+  metafields              Json?
+  menuOrder               Int                    @default(0)
+  purchaseNote            String?
+  enableReviews           Boolean                @default(true)
+  affiliateCommissionRate Decimal?               @db.Decimal(5, 2)
+  affiliateCommissionType CommissionType         @default(PERCENTAGE)
+  disableAffiliate        Boolean                @default(false)
+  affiliateRates          AffiliateProductRate[]
+  deletedAt               DateTime?
+  version                 Int                    @default(1)
+
+  descriptionEmbedding Unsupported("vector(1536)")?
+  imageEmbedding       Unsupported("vector(512)")?
+
+  wishlistedBy          Wishlist[]
+  recentViews           RecentlyViewed[]
+  orderItems            OrderItem[]
+  cartItems             CartItem[]
+  subscriptionPlans     SubscriptionPlan[]
+  inventoryReservations InventoryReservation[]
+
+  createdBy String?
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([slug])
   @@index([brandId, status])
@@ -822,20 +822,20 @@ model StockHistory {
 }
 
 model ProductImage {
-  id             String          @id @default(uuid())
-  url            String
-  title          String?
-  altText        String?
-  width          Int?
-  height         Int?
-  position       Int             @default(0)
-  productId      String
-  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  mediaId        String?
-  media          Media?          @relation(fields: [mediaId], references: [id])
-  variantId      String?
-  variant        ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  
+  id        String          @id @default(uuid())
+  url       String
+  title     String?
+  altText   String?
+  width     Int?
+  height    Int?
+  position  Int             @default(0)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaId   String?
+  media     Media?          @relation(fields: [mediaId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
   imageEmbedding Unsupported("vector(512)")?
 
   @@index([productId, position(sort: Asc)])
@@ -872,69 +872,70 @@ model BundleItem {
 // ==========================================
 
 model Attribute {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  slug      String   @unique
-  type      String   @default("TEXT")
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  type      String    @default("TEXT")
   values    String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
   @@index([deletedAt])
 }
 
 model ProductAttribute {
-  id         String  @id @default(uuid())
+  id         String   @id @default(uuid())
   name       String
-  position   Int     @default(0)
-  visible    Boolean @default(true)
-  variation  Boolean @default(true)
-  isFeatured Boolean @default(false)
+  position   Int      @default(0)
+  visible    Boolean  @default(true)
+  variation  Boolean  @default(true)
+  isFeatured Boolean  @default(false)
   brandId    String?
-  brand      Brand?  @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  brand      Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
   values     String[]
   productId  String
-  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([brandId])
 }
 
 model ProductVariant {
-  id                  String           @id @default(uuid())
-  productId           String
-  product             Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
-  googleTitle         String?
-  googleDescription   String?          @db.Text
-  name                String
-  sku                 String?
-  barcode             String?
-  price               Decimal          @db.Decimal(12, 2)
-  salePrice           Decimal?         @db.Decimal(12, 2)
-  costPerItem         Decimal?         @db.Decimal(12, 2)
-  stock               Int              @default(0)
-  trackQuantity       Boolean          @default(true)
-  isPreOrder          Boolean          @default(false)
-  preOrderReleaseDate DateTime?
-  image               String?
-  mediaId             String?
-  media               Media?           @relation(fields: [mediaId], references: [id])
-  images              ProductImage[]
-  weight              Decimal?         @db.Decimal(10, 3)
-  length              Decimal?         @db.Decimal(10, 2)
-  width               Decimal?         @db.Decimal(10, 2)
-  height              Decimal?         @db.Decimal(10, 2)
-  attributes          Json
-  metafields          Json?
-  version             Int              @default(1)
-  inventoryLevels     InventoryLevel[]
-  wishlistedBy        Wishlist[]
-  recentViews         RecentlyViewed[]
-  cartItems           CartItem[]
-  orderItems          OrderItem[]
-  subscriptionPlans   SubscriptionPlan[]
+  id                    String                 @id @default(uuid())
+  productId             String
+  product               Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
+  googleTitle           String?
+  googleDescription     String?                @db.Text
+  name                  String
+  sku                   String?
+  barcode               String?
+  price                 Decimal                @db.Decimal(12, 2)
+  salePrice             Decimal?               @db.Decimal(12, 2)
+  costPerItem           Decimal?               @db.Decimal(12, 2)
+  stock                 Int                    @default(0)
+  trackQuantity         Boolean                @default(true)
+  isPreOrder            Boolean                @default(false)
+  preOrderReleaseDate   DateTime?
+  image                 String?
+  mediaId               String?
+  media                 Media?                 @relation(fields: [mediaId], references: [id])
+  images                ProductImage[]
+  weight                Decimal?               @db.Decimal(10, 3)
+  length                Decimal?               @db.Decimal(10, 2)
+  width                 Decimal?               @db.Decimal(10, 2)
+  height                Decimal?               @db.Decimal(10, 2)
+  attributes            Json
+  metafields            Json?
+  version               Int                    @default(1)
+  inventoryLevels       InventoryLevel[]
+  wishlistedBy          Wishlist[]
+  recentViews           RecentlyViewed[]
+  cartItems             CartItem[]
+  orderItems            OrderItem[]
+  subscriptionPlans     SubscriptionPlan[]
   inventoryReservations InventoryReservation[]
-  deletedAt           DateTime?
+  deletedAt             DateTime?
 
   @@index([productId])
   @@index([sku])
@@ -949,17 +950,17 @@ model ProductVariant {
 // ==========================================
 
 model Location {
-  id              String          @id @default(uuid())
+  id              String                 @id @default(uuid())
   name            String
   address         String?
-  isDefault       Boolean         @default(false)
-  isActive        Boolean         @default(true)
+  isDefault       Boolean                @default(false)
+  isActive        Boolean                @default(true)
   inventoryLevels InventoryLevel[]
-  stockTransfers  StockTransfer[] @relation("FromLocation")
-  stockReceived   StockTransfer[] @relation("ToLocation")
+  stockTransfers  StockTransfer[]        @relation("FromLocation")
+  stockReceived   StockTransfer[]        @relation("ToLocation")
   reservations    InventoryReservation[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 }
 
 model PickupLocation {
@@ -1048,47 +1049,47 @@ model StockTransfer {
 // ==========================================
 
 model Order {
-  id                     String             @id @default(uuid())
-  orderNumber            String             @unique
-  orderDate              DateTime           @default(now())
-  userId                 String?
-  user                   User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
-  guestEmail             String?
-  isFirstOrder           Boolean  @default(false)  // এটি True হলে বুঝবেন সে New Customer
-  utmSource              String?  // e.g. "facebook", "google", "newsletter"
-  utmMedium              String?  // e.g. "cpc", "social", "email"
-  utmCampaign            String?  // e.g. "summer_sale_2025"
-  referringSite          String?  // কোন ওয়েবসাইট থেকে আসল
-  status                 OrderStatus        @default(PENDING)
-  paymentStatus          PaymentStatus      @default(UNPAID)
-  fulfillmentStatus      FulfillmentStatus  @default(UNFULFILLED)
-  hasPreOrderItems       Boolean            @default(false)
-  currency               String             @default("AUD")
-  exchangeRate           Decimal            @default(1.0) @db.Decimal(10, 6)
-  
-  subtotal               Decimal            @db.Decimal(12, 2)
-  discountTotal          Decimal            @default(0) @db.Decimal(12, 2)
-  shippingTotal          Decimal            @default(0) @db.Decimal(12, 2)
-  taxTotal               Decimal            @default(0) @db.Decimal(12, 2)
-  surcharge              Decimal            @default(0) @db.Decimal(12, 2)
-  total                  Decimal            @db.Decimal(12, 2)
-  
-  totalPaid              Decimal            @default(0) @db.Decimal(12, 2)
-  totalDue               Decimal            @default(0) @db.Decimal(12, 2)
-  
-  paymentFee             Decimal            @default(0) @db.Decimal(12, 2)
-  netAmount              Decimal            @default(0) @db.Decimal(12, 2)
-  refundedAmount         Decimal            @default(0) @db.Decimal(12, 2)
-  netTotal               Decimal            @default(0) @db.Decimal(12, 2)
+  id                String            @id @default(uuid())
+  orderNumber       String            @unique
+  orderDate         DateTime          @default(now())
+  userId            String?
+  user              User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  guestEmail        String?
+  isFirstOrder      Boolean           @default(false) // এটি True হলে বুঝবেন সে New Customer
+  utmSource         String? // e.g. "facebook", "google", "newsletter"
+  utmMedium         String? // e.g. "cpc", "social", "email"
+  utmCampaign       String? // e.g. "summer_sale_2025"
+  referringSite     String? // কোন ওয়েবসাইট থেকে আসল
+  status            OrderStatus       @default(PENDING)
+  paymentStatus     PaymentStatus     @default(UNPAID)
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
+  hasPreOrderItems  Boolean           @default(false)
+  currency          String            @default("AUD")
+  exchangeRate      Decimal           @default(1.0) @db.Decimal(10, 6)
 
-  metadata               Json?
-  
-  paymentGateway         String?
-  paymentMethod          String?
-  paymentId              String?            @unique
-  payerId                String?
-  paymentVerified        Boolean            @default(false)
-  
+  subtotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @default(0) @db.Decimal(12, 2)
+  shippingTotal Decimal @default(0) @db.Decimal(12, 2)
+  taxTotal      Decimal @default(0) @db.Decimal(12, 2)
+  surcharge     Decimal @default(0) @db.Decimal(12, 2)
+  total         Decimal @db.Decimal(12, 2)
+
+  totalPaid Decimal @default(0) @db.Decimal(12, 2)
+  totalDue  Decimal @default(0) @db.Decimal(12, 2)
+
+  paymentFee     Decimal @default(0) @db.Decimal(12, 2)
+  netAmount      Decimal @default(0) @db.Decimal(12, 2)
+  refundedAmount Decimal @default(0) @db.Decimal(12, 2)
+  netTotal       Decimal @default(0) @db.Decimal(12, 2)
+
+  metadata Json?
+
+  paymentGateway  String?
+  paymentMethod   String?
+  paymentId       String? @unique
+  payerId         String?
+  paymentVerified Boolean @default(false)
+
   invoiceNumber          String?
   invoiceUrl             String?
   couponCode             String?
@@ -1136,30 +1137,30 @@ model Order {
   riskLevel              String?
   riskScore              Int?
   fraudAnalysis          Json?
-  
-  affiliateId            String?
-  affiliate              AffiliateAccount?  @relation("OrderAffiliate", fields: [affiliateId], references: [id], onDelete: SetNull)
-  referrals              Referral[]
 
-  items                  OrderItem[]
-  shipments              Shipment[]
-  transactions           OrderTransaction[]
-  refunds                Refund[]
-  returns                ReturnRequest[]
-  disputes               Dispute[]
-  orderNotes             OrderNote[]
-  
-  subscriptionId         String?
-  subscription           Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  
-  deletedAt              DateTime?
-  version                Int                @default(1)
-  
-  createdBy              String?
-  updatedBy              String?
-  
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  affiliateId String?
+  affiliate   AffiliateAccount? @relation("OrderAffiliate", fields: [affiliateId], references: [id], onDelete: SetNull)
+  referrals   Referral[]
+
+  items        OrderItem[]
+  shipments    Shipment[]
+  transactions OrderTransaction[]
+  refunds      Refund[]
+  returns      ReturnRequest[]
+  disputes     Dispute[]
+  orderNotes   OrderNote[]
+
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  deletedAt DateTime?
+  version   Int       @default(1)
+
+  createdBy String?
+  updatedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, status])
   @@index([createdAt(sort: Desc)])
@@ -1204,25 +1205,25 @@ model OrderItem {
 }
 
 model OrderTransaction {
-  id                  String            @id @default(uuid())
+  id                  String             @id @default(uuid())
   orderId             String
-  order               Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order               Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   gateway             String
-  paymentMethod       String?           
+  paymentMethod       String?
   type                TransactionType
-  amount              Decimal           @db.Decimal(12, 2)
-  currency            String            @default("AUD")
+  amount              Decimal            @db.Decimal(12, 2)
+  currency            String             @default("AUD")
   transactionId       String
   idempotencyKey      String?
   status              String
   parentTransactionId String?
-  parentTransaction   OrderTransaction? @relation("RefundOf", fields: [parentTransactionId], references: [id], onDelete: SetNull)
+  parentTransaction   OrderTransaction?  @relation("RefundOf", fields: [parentTransactionId], references: [id], onDelete: SetNull)
   refunds             OrderTransaction[] @relation("RefundOf")
   rawResponse         Json?
   errorCode           String?
   errorMessage        String?
   metadata            Json?
-  createdAt           DateTime          @default(now())
+  createdAt           DateTime           @default(now())
 
   @@index([orderId, status])
   @@index([transactionId])
@@ -1265,16 +1266,16 @@ model Payout {
 }
 
 model PaymentWebhookLog {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   provider        String
   eventId         String
   eventType       String
   payload         Json
-  processed       Boolean  @default(false)
+  processed       Boolean   @default(false)
   processingError String?
-  retryCount      Int      @default(0)
+  retryCount      Int       @default(0)
   nextRetryAt     DateTime?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime  @default(now())
 
   @@unique([eventId])
   @@index([provider, processed])
@@ -1306,14 +1307,14 @@ model PaymentSession {
 }
 
 model Shipment {
-  id                 String   @id @default(uuid())
+  id                 String    @id @default(uuid())
   orderId            String
-  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   trackingNumber     String?
   trackingUrl        String?
   courier            String?
   items              Json
-  shippedDate        DateTime @default(now())
+  shippedDate        DateTime  @default(now())
   deliveredDate      DateTime?
   transdirectId      Int?
   connote            String?
@@ -1323,8 +1324,8 @@ model Shipment {
   lastTrackingStatus String?
   courierJobId       String?
   manifestId         String?
-  numberOfParcels    Int      @default(1)
-  syncedToGateway    Boolean  @default(false)
+  numberOfParcels    Int       @default(1)
+  syncedToGateway    Boolean   @default(false)
   syncError          String?
   lastSyncedAt       DateTime?
   rawStatus          Json?
@@ -1385,18 +1386,18 @@ model OrderNote {
 // ==========================================
 
 model Cart {
-  id             String          @id @default(uuid())
-  userId         String?         @unique
-  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String                 @id @default(uuid())
+  userId         String?                @unique
+  user           User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   sessionId      String?
   items          CartItem[]
-  shippingHash   String?   // এখানে "2570-CAMDEN-32kg" সেভ থাকবে
-  shippingQuotes Json?     // এখানে Transdirect থেকে আসা রেটগুলো সেভ থাকবে
+  shippingHash   String? // এখানে "2570-CAMDEN-32kg" সেভ থাকবে
+  shippingQuotes Json? // এখানে Transdirect থেকে আসা রেটগুলো সেভ থাকবে
   appliedCoupons Json?
   paymentSession PaymentSession?
   reservations   InventoryReservation[]
   reminderSentAt DateTime?
-  updatedAt      DateTime        @updatedAt
+  updatedAt      DateTime               @updatedAt
 
   @@index([sessionId])
   @@index([userId])
@@ -1476,32 +1477,32 @@ model RecentlyViewed {
 // ==========================================
 
 model Discount {
-  id               String       @id @default(uuid())
-  code             String       @unique
-  description      String?
-  type             DiscountType @default(PERCENTAGE)
-  value            Decimal      @db.Decimal(12, 2)
-  minSpend         Decimal?     @db.Decimal(12, 2)
-  maxSpend         Decimal?     @db.Decimal(12, 2)
-  minQty           Int?
-  startDate        DateTime     @default(now())
-  endDate          DateTime?
-  usageLimit       Int?
-  usagePerUser     Int?
-  usedCount        Int          @default(0)
-  excludeSaleItems Boolean      @default(false)
-  productIds       String[]
-  categoryIds      String[]
-  ruleLogic        Json?
-  isActive         Boolean      @default(true)
-  orders           Order[]
-  affiliateCommissionRate Decimal?       @db.Decimal(5, 2)
-  affiliateId      String?
-  affiliate        AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
+  id                      String            @id @default(uuid())
+  code                    String            @unique
+  description             String?
+  type                    DiscountType      @default(PERCENTAGE)
+  value                   Decimal           @db.Decimal(12, 2)
+  minSpend                Decimal?          @db.Decimal(12, 2)
+  maxSpend                Decimal?          @db.Decimal(12, 2)
+  minQty                  Int?
+  startDate               DateTime          @default(now())
+  endDate                 DateTime?
+  usageLimit              Int?
+  usagePerUser            Int?
+  usedCount               Int               @default(0)
+  excludeSaleItems        Boolean           @default(false)
+  productIds              String[]
+  categoryIds             String[]
+  ruleLogic               Json?
+  isActive                Boolean           @default(true)
+  orders                  Order[]
+  affiliateCommissionRate Decimal?          @db.Decimal(5, 2)
+  affiliateId             String?
+  affiliate               AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
 
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  deletedAt        DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([code])
   @@index([startDate, endDate])
@@ -1534,21 +1535,21 @@ model Newsletter {
 }
 
 model Review {
-  id         String   @id @default(uuid())
+  id         String       @id @default(uuid())
   rating     Int
   title      String?
-  content    String?  @db.Text
-  isVerified Boolean  @default(false)
+  content    String?      @db.Text
+  isVerified Boolean      @default(false)
   status     ReviewStatus @default(PENDING)
   images     String[]
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId  String
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
   reply      String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime     @default(now())
   deletedAt  DateTime?
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime     @updatedAt
 
   @@index([productId])
   @@index([status])
@@ -1608,35 +1609,35 @@ model TicketMessage {
 // ==========================================
 
 model StoreSettings {
-  id                  String              @id @default("settings")
-  storeName           String              @default("My Store")
-  storeEmail          String?
-  storePhone          String?
-  currency            String              @default("AUD")
-  currencySymbol      String              @default("$")
-  storeAddress        Json?
-  taxSettings         Json?
-  generalConfig       Json?
-  weightUnit          String              @default("kg")
-  dimensionUnit       String              @default("cm")
-  logo                String?
-  favicon             String?
-  logoMediaId         String?
-  logoMedia           Media?              @relation("StoreLogo", fields: [logoMediaId], references: [id])
-  faviconMediaId      String?
-  faviconMedia        Media?              @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
-  socialLinks         Json?
-  smtpConfig          Json?
-  maintenance         Boolean             @default(false)
-  
+  id             String  @id @default("settings")
+  storeName      String  @default("My Store")
+  storeEmail     String?
+  storePhone     String?
+  currency       String  @default("AUD")
+  currencySymbol String  @default("$")
+  storeAddress   Json?
+  taxSettings    Json?
+  generalConfig  Json?
+  weightUnit     String  @default("kg")
+  dimensionUnit  String  @default("cm")
+  logo           String?
+  favicon        String?
+  logoMediaId    String?
+  logoMedia      Media?  @relation("StoreLogo", fields: [logoMediaId], references: [id])
+  faviconMediaId String?
+  faviconMedia   Media?  @relation("StoreFavicon", fields: [faviconMediaId], references: [id])
+  socialLinks    Json?
+  smtpConfig     Json?
+  maintenance    Boolean @default(false)
+
   // 👇 Affiliate System JSON Configs (৫টি টেবিলের কাজ এখানে)
-  affiliateConfig          Json?
-  affiliateFraudRules      Json?               
-  affiliateContests        Json?               
-  affiliateCreatives       Json?   // 🆕 Replaced AffiliateCreative & Usage [{ title, type, url }]
-  affiliateAnnouncements   Json?   // 🆕 Replaced AffiliateAnnouncement [{ title, content, type, date }]
-  
-  updatedAt           DateTime            @default(now()) @updatedAt
+  affiliateConfig        Json?
+  affiliateFraudRules    Json?
+  affiliateContests      Json?
+  affiliateCreatives     Json? // 🆕 Replaced AffiliateCreative & Usage [{ title, type, url }]
+  affiliateAnnouncements Json? // 🆕 Replaced AffiliateAnnouncement [{ title, content, type, date }]
+
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 // ==========================================
@@ -1690,18 +1691,18 @@ model ShippingRate {
 }
 
 model CarrierService {
-  id               String          @id @default(uuid())
+  id               String         @id @default(uuid())
   name             String
-  slug             String          @unique
-  isEnabled        Boolean         @default(false)
+  slug             String         @unique
+  isEnabled        Boolean        @default(false)
   apiKey           String?
   apiSecret        String?
-  isSandbox        Boolean         @default(true)
+  isSandbox        Boolean        @default(true)
   settings         Json?
   rates            ShippingRate[]
   shippingPackages ShippingBox[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([slug])
   @@index([isEnabled])
@@ -1734,32 +1735,32 @@ model TransdirectConfig {
   enableOrderBoxing       Boolean  @default(false)
 
   // ── Pricing: Handling Fee ──────────────────────────────────────────
-  handlingFee             String?
+  handlingFee String?
 
   // ── Pricing: Dynamic Markup Rules (cart subtotal < threshold হলে apply) ──
-  markupRule1Threshold    Decimal?  @db.Decimal(12, 2)
-  markupRule1Fee          String?
-  markupRule2Threshold    Decimal?  @db.Decimal(12, 2)
-  markupRule2Fee          String?
-  markupRule3Fee          String?
+  markupRule1Threshold Decimal? @db.Decimal(12, 2)
+  markupRule1Fee       String?
+  markupRule2Threshold Decimal? @db.Decimal(12, 2)
+  markupRule2Fee       String?
+  markupRule3Fee       String?
 
   // ── Pricing: Discount Rules (cart subtotal >= threshold হলে apply) ──
-  discountRule1Threshold  Decimal?  @db.Decimal(12, 2)
-  discountRule1Amount     String?
-  discountRule2Threshold  Decimal?  @db.Decimal(12, 2)
-  discountRule2Amount     String?
+  discountRule1Threshold Decimal? @db.Decimal(12, 2)
+  discountRule1Amount    String?
+  discountRule2Threshold Decimal? @db.Decimal(12, 2)
+  discountRule2Amount    String?
 
   // ── Pricing: Global Discount (সব quote-এ, threshold ছাড়া) ─────────
-  globalShippingDiscount  String?
+  globalShippingDiscount String?
 
   // ── Auto Tailgate (এই kg-এর বেশি হলে tailgate=true) ───────────────
-  autoTailgateKg          Decimal?  @db.Decimal(10, 3)  @default(25)
+  autoTailgateKg Decimal? @default(25) @db.Decimal(10, 3)
 
   // ── Developer ──────────────────────────────────────────────────────
-  debugMode               Boolean  @default(false)
+  debugMode Boolean @default(false)
 
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model TransdirectBox {
@@ -1835,7 +1836,7 @@ model EmailTemplate {
   emailType        String   @default("html")
   fromName         String?
   fromEmail        String?
-  delay            Int?     @default(0) 
+  delay            Int?     @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -1868,7 +1869,7 @@ model NotificationQueue {
 }
 
 model EmailLog {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   recipient    String
   subject      String
   templateSlug String?
@@ -1878,7 +1879,7 @@ model EmailLog {
   openedAt     DateTime?
   orderId      String?
   userId       String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   @@index([recipient])
   @@index([status])
@@ -1916,51 +1917,51 @@ model Notification {
 }
 
 model Analytics {
-  id                 String   @id @default(uuid())
-  date               DateTime @default(now()) @db.Date // প্রতিদিনের জন্য একটি রো তৈরি হবে
+  id   String   @id @default(uuid())
+  date DateTime @default(now()) @db.Date // প্রতিদিনের জন্য একটি রো তৈরি হবে
 
   // --- Sales Metrics (WooCommerce Overview) ---
-  grossSales         Decimal  @default(0) @db.Decimal(12, 2) // ট্যাক্স, শিপিং, ডিসকাউন্ট বাদে অরিজিনাল দাম
-  netSales           Decimal  @default(0) @db.Decimal(12, 2) // ডিসকাউন্ট ও রিফান্ড বাদ দেওয়ার পর প্রকৃত সেল
-  totalTax           Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকা ট্যাক্স আসল
-  totalShipping      Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন শিপিং বাবদ কত টাকা আসল
-  totalDiscounts     Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকার কুপন/ডিসকাউন্ট দেওয়া হলো
-  totalRefunds       Decimal  @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকা রিফান্ড করা হলো
+  grossSales     Decimal @default(0) @db.Decimal(12, 2) // ট্যাক্স, শিপিং, ডিসকাউন্ট বাদে অরিজিনাল দাম
+  netSales       Decimal @default(0) @db.Decimal(12, 2) // ডিসকাউন্ট ও রিফান্ড বাদ দেওয়ার পর প্রকৃত সেল
+  totalTax       Decimal @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকা ট্যাক্স আসল
+  totalShipping  Decimal @default(0) @db.Decimal(12, 2) // ওই দিন শিপিং বাবদ কত টাকা আসল
+  totalDiscounts Decimal @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকার কুপন/ডিসকাউন্ট দেওয়া হলো
+  totalRefunds   Decimal @default(0) @db.Decimal(12, 2) // ওই দিন কত টাকা রিফান্ড করা হলো
 
   // --- Order & Item Metrics ---
-  totalOrders        Int      @default(0) // ওই দিনের মোট সফল অর্ডার
-  productsSold       Int      @default(0) // মোট কত পিস প্রোডাক্ট বিক্রি হলো
-  variationsSold     Int      @default(0) // এর মধ্যে কতগুলো ভ্যারিয়েশন ছিল
+  totalOrders    Int @default(0) // ওই দিনের মোট সফল অর্ডার
+  productsSold   Int @default(0) // মোট কত পিস প্রোডাক্ট বিক্রি হলো
+  variationsSold Int @default(0) // এর মধ্যে কতগুলো ভ্যারিয়েশন ছিল
 
   // --- Customer Metrics (Shopify Style) ---
-  newCustomers       Int      @default(0) // যারা জীবনে প্রথমবার অর্ডার করল
-  returningCustomers Int      @default(0) // যারা আগেও কিনেছে, আজ আবার কিনল
+  newCustomers       Int @default(0) // যারা জীবনে প্রথমবার অর্ডার করল
+  returningCustomers Int @default(0) // যারা আগেও কিনেছে, আজ আবার কিনল
 
   // --- Cart & Checkout Metrics ---
-  abandonedCheckouts Int      @default(0) // কতজন পেমেন্ট পেজ থেকে চলে গেছে
-  recoveredCheckouts Int      @default(0) // কতজন ইমেইল পেয়ে আবার এসে পেমেন্ট করেছে
+  abandonedCheckouts Int @default(0) // কতজন পেমেন্ট পেজ থেকে চলে গেছে
+  recoveredCheckouts Int @default(0) // কতজন ইমেইল পেয়ে আবার এসে পেমেন্ট করেছে
 
   // --- Traffic Metrics (Redis থেকে দিনশেষে আপডেট হবে) ---
-  totalVisitors      Int      @default(0) // ইউনিক ইউজার
-  totalPageViews     Int      @default(0) // মোট পেজ ভিউ
+  totalVisitors  Int @default(0) // ইউনিক ইউজার
+  totalPageViews Int @default(0) // মোট পেজ ভিউ
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([date])
   @@index([date, netSales])
 }
 
 model ProductAnalytics {
-  id             String   @id @default(uuid())
-  date           DateTime @db.Date
-  productId      String
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  categoryId     String?  // ক্যাটাগরি লিডারবোর্ড দেখানোর জন্য
-  
-  itemsSold      Int      @default(0) // আজ এই প্রোডাক্টটি কত পিস বিক্রি হলো
-  netSales       Decimal  @default(0) @db.Decimal(12, 2) // এই প্রোডাক্ট থেকে আজ কত টাকা আসল
-  views          Int      @default(0) // আজ কতবার দেখা হলো (Redis থেকে আসবে)
+  id         String   @id @default(uuid())
+  date       DateTime @db.Date
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId String? // ক্যাটাগরি লিডারবোর্ড দেখানোর জন্য
+
+  itemsSold Int     @default(0) // আজ এই প্রোডাক্টটি কত পিস বিক্রি হলো
+  netSales  Decimal @default(0) @db.Decimal(12, 2) // এই প্রোডাক্ট থেকে আজ কত টাকা আসল
+  views     Int     @default(0) // আজ কতবার দেখা হলো (Redis থেকে আসবে)
 
   @@unique([date, productId])
   @@index([date])
@@ -1982,38 +1983,38 @@ model MediaFolder {
 }
 
 model Media {
-  id             String               @id @default(uuid())
-  url            String
-  type           MediaType            @default(IMAGE)
-  filename       String
-  originalName   String?
-  publicId       String?
-  pathname       String?
-  source         MediaSource          @default(GENERAL)
-  width          Int?
-  height         Int?
-  mimeType       String
-  size           Int
-  altText        String?
-  caption        String?
-  description    String?
-  folderId       String?
-  folder         MediaFolder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  uploadedBy     String?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  productImages  ProductImage[]
-  categories     Category[]
-  brands         Brand[]
-  products       Product[]
-  variants       ProductVariant[]
-  
-  storeLogos     StoreSettings[]      @relation("StoreLogo")
-  storeFavicons  StoreSettings[]      @relation("StoreFavicon")
-  users          User[]
-  collections    Collection[]
-  emailConfigs   EmailConfiguration[]
-  seoConfigs     SeoGlobalConfig[]
+  id            String           @id @default(uuid())
+  url           String
+  type          MediaType        @default(IMAGE)
+  filename      String
+  originalName  String?
+  publicId      String?
+  pathname      String?
+  source        MediaSource      @default(GENERAL)
+  width         Int?
+  height        Int?
+  mimeType      String
+  size          Int
+  altText       String?
+  caption       String?
+  description   String?
+  folderId      String?
+  folder        MediaFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  productImages ProductImage[]
+  categories    Category[]
+  brands        Brand[]
+  products      Product[]
+  variants      ProductVariant[]
+
+  storeLogos    StoreSettings[]      @relation("StoreLogo")
+  storeFavicons StoreSettings[]      @relation("StoreFavicon")
+  users         User[]
+  collections   Collection[]
+  emailConfigs  EmailConfiguration[]
+  seoConfigs    SeoGlobalConfig[]
 
   @@index([folderId])
   @@index([createdAt(sort: Desc)])
@@ -2062,115 +2063,114 @@ model SeoGlobalConfig {
 }
 
 model MarketingIntegration {
-  id                        String   @id @default("marketing_config")
-  
+  id String @id @default("marketing_config")
+
   // ==========================================
   // 1. Google Tag Manager (GTM) & Search Console
   // ==========================================
-  gtmEnabled                Boolean  @default(false)
-  gtmContainerId            String?
-  gtmAuth                   String?
-  gtmPreview                String?
-  dataLayerName             String   @default("dataLayer")
-  gscVerificationCode       String?
-  gscServiceAccountJson     String?  @db.Text
+  gtmEnabled            Boolean @default(false)
+  gtmContainerId        String?
+  gtmAuth               String?
+  gtmPreview            String?
+  dataLayerName         String  @default("dataLayer")
+  gscVerificationCode   String?
+  gscServiceAccountJson String? @db.Text
 
   // ==========================================
   // 🚀 ADVANCED GOOGLE MERCHANT CENTER (SHOPify LEVEL)
   // ==========================================
-  
+
   // 1. OAuth & Connection 
-  googleAccountId           String?  
-  googleAccountImage        String?
-  googleAccessToken         String?  @db.Text
-  googleRefreshToken        String?  @db.Text 
-  googleTokenExpiry         DateTime?
+  googleAccountId    String?
+  googleAccountImage String?
+  googleAccessToken  String?   @db.Text
+  googleRefreshToken String?   @db.Text
+  googleTokenExpiry  DateTime?
 
   // 2. Onboarding Status & Setup Wizard
-  gmcSetupStep              Int      @default(0)    // Wizard tracking (0=Not Started, 1=Account Connected, 2=Domain Claimed, 3=Mapped, 4=Completed)
-  gmcMerchantId             String?
-  gmcMerchantName           String?                 // ড্রপডাউন থেকে সিলেক্ট করা একাউন্টের নাম
-  gmcIsSubAccount           Boolean  @default(false)
-  gmcTargetCountry          String   @default("AU")
-  gmcLanguage               String   @default("en")
-  
+  gmcSetupStep     Int     @default(0) // Wizard tracking (0=Not Started, 1=Account Connected, 2=Domain Claimed, 3=Mapped, 4=Completed)
+  gmcMerchantId    String?
+  gmcMerchantName  String? // ড্রপডাউন থেকে সিলেক্ট করা একাউন্টের নাম
+  gmcIsSubAccount  Boolean @default(false)
+  gmcTargetCountry String  @default("AU")
+  gmcLanguage      String  @default("en")
+
   // 3. Domain Verification & Claiming
-  gmcDomainVerified         Boolean  @default(false) // ওয়েবসাইট গুগলে ভেরিফাইড কি না
-  gmcDomainClaimed          Boolean  @default(false) // ওয়েবসাইট গুগলে ক্লেইম করা কি না
-  gmcSiteVerificationToken  String?  @db.Text        // Google Site Verification API এর মেটা ট্যাগ বা টোকেন
+  gmcDomainVerified        Boolean @default(false) // ওয়েবসাইট গুগলে ভেরিফাইড কি না
+  gmcDomainClaimed         Boolean @default(false) // ওয়েবসাইট গুগলে ক্লেইম করা কি না
+  gmcSiteVerificationToken String? @db.Text // Google Site Verification API এর মেটা ট্যাগ বা টোকেন
 
   // 4. Target Programs (গুগল শপিং, ফ্রি লিস্টিং ইত্যাদি)
-  gmcActivePrograms         String[] @default(["surfaces_across_google"]) // surfaces_across_google = Free Listings
+  gmcActivePrograms String[] @default(["surfaces_across_google"]) // surfaces_across_google = Free Listings
 
   // 5. Global Attribute Mapping (Json এ রাখা বেস্ট কারণ এটি ডায়নামিক)
   // Example: { "color": "attr_color", "size": "attr_size", "brand": "vendor_name" }
-  gmcAttributeMapping       Json?    
+  gmcAttributeMapping Json?
 
   // 6. Sync Preferences
-  gmcContentApiEnabled      Boolean  @default(false)
-  gmcAutoSyncShipping       Boolean  @default(true)  // ওয়েবসাইটের শিপিং রুল গুগলে পাঠানো হবে কিনা
-  gmcAutoSyncTaxes          Boolean  @default(true)
+  gmcContentApiEnabled Boolean @default(false)
+  gmcAutoSyncShipping  Boolean @default(true) // ওয়েবসাইটের শিপিং রুল গুগলে পাঠানো হবে কিনা
+  gmcAutoSyncTaxes     Boolean @default(true)
 
   // ==========================================
   // 🚀 NEW: GOOGLE ADS INTEGRATION (WooCommerce Style)
   // ==========================================
-  googleAdsAccountId        String?  // এডস একাউন্ট আইডি (e.g. 556-643-3646)
-  googleAdsAccountName      String?  
-  googleAdsConnected        Boolean  @default(false)
+  googleAdsAccountId   String? // এডস একাউন্ট আইডি (e.g. 556-643-3646)
+  googleAdsAccountName String?
+  googleAdsConnected   Boolean @default(false)
 
-  googleAdsLinkStatus       String?  @default("UNLINKED") // UNLINKED, PENDING_APPROVAL, LINKED, FAILED
-  googleAdsConversionId     String?  // গুগল ট্র্যাকিং আইডি (e.g., AW-109283746)
-  googleAdsConversionLabel  String?  // পারচেজ কনভার্সন ট্র্যাকিং লেবেল (e.g., abCDefGhIJKlMnOpqR)
+  googleAdsLinkStatus                 String? @default("UNLINKED") // UNLINKED, PENDING_APPROVAL, LINKED, FAILED
+  googleAdsConversionId               String? // গুগল ট্র্যাকিং আইডি (e.g., AW-109283746)
+  googleAdsConversionLabel            String? // পারচেজ কনভার্সন ট্র্যাকিং লেবেল (e.g., abCDefGhIJKlMnOpqR)
   googleAdsEnhancedConversionsEnabled Boolean @default(false) // এনহ্যান্সড ট্র্যাকিং এনাবল করার জন্য
 
-  
   // ==========================================
   // 3. Facebook / Meta Pixel & CAPI
   // ==========================================
-  fbEnabled                 Boolean  @default(false)
-  fbPixelId                 String?
-  fbAccessToken             String?  @db.Text
-  fbTestEventCode           String?
-  fbDomainVerification      String?
+  fbEnabled               Boolean @default(false)
+  fbPixelId               String?
+  fbAccessToken           String? @db.Text
+  fbTestEventCode         String?
+  fbDomainVerification    String?
   // Facebook এর কাস্টম সেটিংসের কোনো নির্দিষ্ট আকার নেই, তাই এটি JSON রাখা বেস্ট
-  fbDataProcessingOptions   Json?    
+  fbDataProcessingOptions Json?
 
   // ==========================================
   // 4. Klaviyo (Email Marketing)
   // ==========================================
-  klaviyoEnabled            Boolean  @default(false)
+  klaviyoEnabled            Boolean @default(false)
   klaviyoPublicKey          String?
-  klaviyoPrivateKey         String?  @db.Text
+  klaviyoPrivateKey         String? @db.Text
   // একাধিক লিস্ট আইডি থাকতে পারে, তাই JSON
-  klaviyoListIds            Json?    
-  klaviyoTrackViewedProduct Boolean  @default(true)
-  klaviyoTrackAddedToCart   Boolean  @default(true)
+  klaviyoListIds            Json?
+  klaviyoTrackViewedProduct Boolean @default(true)
+  klaviyoTrackAddedToCart   Boolean @default(true)
 
   // ==========================================
   // 5. System Status
   // ==========================================
   // কোন প্ল্যাটফর্ম ভেরিফাই হয়েছে কি হয়নি তার সাধারণ স্টেটাস রাখার জন্য JSON
-  verificationStatus        Json?    @default("{}")
-  updatedAt                 DateTime @default(now()) @updatedAt
+  verificationStatus Json?    @default("{}")
+  updatedAt          DateTime @default(now()) @updatedAt
 }
 
 model ProductChannelStatus {
-  id               String            @id @default(uuid())
-  productId        String
-  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
-  channel          SalesChannel      // GOOGLE, FACEBOOK
-  status           ChannelSyncStatus @default(PENDING)
-  
-  channelProductId String?           
-  
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  channel SalesChannel // GOOGLE, FACEBOOK
+  status  ChannelSyncStatus @default(PENDING)
+
+  channelProductId String?
+
   // ★ UPDATED: Advanced Diagnostics 
-  errorMessage     String?           @db.Text 
-  googleIssues     Json?             // গুগলের বিস্তারিত ওয়ার্নিং এবং এরর লিস্ট (e.g., [{ severity: "error", code: "image_too_small" }])
-  
-  lastSyncedAt     DateTime?         
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  errorMessage String? @db.Text
+  googleIssues Json? // গুগলের বিস্তারিত ওয়ার্নিং এবং এরর লিস্ট (e.g., [{ severity: "error", code: "image_too_small" }])
+
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([productId, channel])
   @@index([status])
@@ -2195,40 +2195,40 @@ model SystemLog {
 // ==========================================
 
 model PaymentGateway {
-  id               String          @id @default(uuid())
-  identifier       String          @unique // e.g., "stripe", "stripe_klarna"
-  provider         PaymentProvider 
-  
-  name             String          
-  title            String          
-  description      String?         
-  
-  isEnabled        Boolean         @default(false)
-  isConnected      Boolean         @default(false) 
-  mode             PaymentMode     @default(TEST) 
-  displayOrder     Int             @default(0)
+  id         String          @id @default(uuid())
+  identifier String          @unique // e.g., "stripe", "stripe_klarna"
+  provider   PaymentProvider
+
+  name        String
+  title       String
+  description String?
+
+  isEnabled    Boolean     @default(false)
+  isConnected  Boolean     @default(false)
+  mode         PaymentMode @default(TEST)
+  displayOrder Int         @default(0)
 
   // ==========================================
   // 🔒 SECURITY & CREDENTIALS
   // ==========================================
-  publicKey        String?         @db.Text
-  encryptedSecret  String?         @db.Text
-  encryptedWebhook String?         @db.Text
-  webhookUrl       String?         
+  publicKey        String? @db.Text
+  encryptedSecret  String? @db.Text
+  encryptedWebhook String? @db.Text
+  webhookUrl       String?
 
   // ==========================================
   // 🎨 UI SETTINGS
   // ==========================================
-  settings         Json?           
+  settings Json?
 
   // Extra constraints
-  minOrderAmount   Decimal?        @db.Decimal(12, 2)
-  maxOrderAmount   Decimal?        @db.Decimal(12, 2)
-  surchargeEnabled Boolean         @default(false)
-  surchargeAmount  Decimal         @default(0) @db.Decimal(12, 2)
+  minOrderAmount   Decimal? @db.Decimal(12, 2)
+  maxOrderAmount   Decimal? @db.Decimal(12, 2)
+  surchargeEnabled Boolean  @default(false)
+  surchargeAmount  Decimal  @default(0) @db.Decimal(12, 2)
 
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isEnabled, displayOrder(sort: Asc)])
   @@index([provider])
@@ -2276,61 +2276,61 @@ model OutboxEvent {
 // ==========================================
 
 model AffiliateAccount {
-  id              String           @id @default(uuid())
-  userId          String           @unique
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  slug            String           @unique
-  customSlug      String?          @unique 
-  status          AffiliateStatus  @default(PENDING)
-  commissionRate  Decimal?         @db.Decimal(5, 2)
-  commissionType  CommissionType   @default(PERCENTAGE)      
-  balance         Decimal          @default(0.00) @db.Decimal(12, 2)
-  version         Int              @default(1)
-  totalEarnings   Decimal          @default(0.00) @db.Decimal(12, 2)
-  storeCredit     Decimal          @default(0.00) @db.Decimal(12, 2)
-  paymentDetailsConfigured Boolean @default(false)
-  isLifetime      Boolean          @default(false)      
-  cookieDuration  Int?             @default(30)         
-  riskScore       Float            @default(0.0)        
-  autoApprovePayout Boolean        @default(false)
-  isKyced         Boolean          @default(false)
-  
-  kycStatus       String           @default("NOT_SUBMITTED")
-  taxId           String?
-  taxDocument     String?          
-  vatNumber       String?
-  postbackUrl     String?          
-  
+  id                       String          @id @default(uuid())
+  userId                   String          @unique
+  user                     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                     String          @unique
+  customSlug               String?         @unique
+  status                   AffiliateStatus @default(PENDING)
+  commissionRate           Decimal?        @db.Decimal(5, 2)
+  commissionType           CommissionType  @default(PERCENTAGE)
+  balance                  Decimal         @default(0.00) @db.Decimal(12, 2)
+  version                  Int             @default(1)
+  totalEarnings            Decimal         @default(0.00) @db.Decimal(12, 2)
+  storeCredit              Decimal         @default(0.00) @db.Decimal(12, 2)
+  paymentDetailsConfigured Boolean         @default(false)
+  isLifetime               Boolean         @default(false)
+  cookieDuration           Int?            @default(30)
+  riskScore                Float           @default(0.0)
+  autoApprovePayout        Boolean         @default(false)
+  isKyced                  Boolean         @default(false)
+
+  kycStatus   String  @default("NOT_SUBMITTED")
+  taxId       String?
+  taxDocument String?
+  vatNumber   String?
+  postbackUrl String?
+
   // 👇 JSON & Array Fields 
-  settings        Json?            
-  kycDocuments    Json?            // Replaces AffiliateDocument model
-  tags            String[]         // Replaces AffiliateTag & AffiliateGroup (Group functionality)
-  bankDetails     Json?
-  
+  settings     Json?
+  kycDocuments Json? // Replaces AffiliateDocument model
+  tags         String[] // Replaces AffiliateTag & AffiliateGroup (Group functionality)
+  bankDetails  Json?
+
   paypalEmail       String?
-  registrationNotes String?        @db.Text
-  adminNotes        String?        @db.Text
+  registrationNotes String? @db.Text
+  adminNotes        String? @db.Text
   website           String?
   socialProfile     String?
   promotionMethod   String?
 
   // Relations
-  tierId            String?
-  tier              AffiliateTier?    @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  tierId String?
+  tier   AffiliateTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
 
-  referrals         Referral[]
-  customerReferrals User[]           @relation("CustomerReferral")
-  clicks            AffiliateClick[]
-  payouts           AffiliatePayout[]
-  orders            Order[]          @relation("OrderAffiliate")
-  coupons           Discount[]
+  referrals          Referral[]
+  customerReferrals  User[]                      @relation("CustomerReferral")
+  clicks             AffiliateClick[]
+  payouts            AffiliatePayout[]
+  orders             Order[]                     @relation("OrderAffiliate")
+  coupons            Discount[]
   analyticsSummaries AffiliateAnalyticsSummary[]
-  shortLinks        AffiliateLink[]              
-  productRates      AffiliateProductRate[]
+  shortLinks         AffiliateLink[]
+  productRates       AffiliateProductRate[]
 
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([slug])
   @@index([status])
@@ -2339,107 +2339,107 @@ model AffiliateAccount {
 }
 
 model AffiliateTier {
-  id              String             @id @default(uuid())
-  name            String             @unique
+  id              String                 @id @default(uuid())
+  name            String                 @unique
   description     String?
-  commissionRate  Decimal            @db.Decimal(5, 2)
-  commissionType  CommissionType     @default(PERCENTAGE)
-  minSalesAmount  Decimal            @default(0) @db.Decimal(12, 2)
-  minSalesCount   Int                @default(0)
+  commissionRate  Decimal                @db.Decimal(5, 2)
+  commissionType  CommissionType         @default(PERCENTAGE)
+  minSalesAmount  Decimal                @default(0) @db.Decimal(12, 2)
+  minSalesCount   Int                    @default(0)
   categoryRates   Json?
   color           String?
   icon            String?
-  isDefault       Boolean            @default(false)
-  payoutDelayDays Int                @default(30)
+  isDefault       Boolean                @default(false)
+  payoutDelayDays Int                    @default(30)
   affiliates      AffiliateAccount[]
   productRates    AffiliateProductRate[]
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@index([isDefault])
 }
 
 model AffiliateAnalyticsSummary {
-  id              String   @id @default(uuid())
-  affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  date            DateTime @db.Date
-  clicks          Int      @default(0)
-  conversions     Int      @default(0)
-  revenue         Decimal  @default(0) @db.Decimal(12, 2)
-  commission      Decimal  @default(0) @db.Decimal(12, 2)
-  
+  id          String           @id @default(uuid())
+  affiliateId String
+  affiliate   AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  date        DateTime         @db.Date
+  clicks      Int              @default(0)
+  conversions Int              @default(0)
+  revenue     Decimal          @default(0) @db.Decimal(12, 2)
+  commission  Decimal          @default(0) @db.Decimal(12, 2)
+
   @@unique([affiliateId, date])
   @@index([date])
 }
 
 model AffiliateClick {
-  id                String           @id @default(uuid())
-  affiliateId       String
-  affiliate         AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
-  ipAddress         String?
-  userAgent         String?
-  referrer          String?
-  landingPage       String?
-  subId             String?
-  campaign          String?          // 🆕 Campaign tracking logic moved here (String field)
-  country           String?
-  deviceType        String?
-  converted         Boolean          @default(false)
-  orderId           String?
-  batchId           String?         
-  isAggregated      Boolean          @default(false)
-  
-  utmSource         String?                                         
-  utmMedium         String?                                     
-  utmCampaign       String?                                     
-  deviceFingerprint String?                                      
-  city              String?                                     
-  processingTime    Int? 
-  isArchived        Boolean          @default(false) 
-  
-  createdAt         DateTime         @default(now())
-  conversionStatus  String           @default("PENDING")
+  id           String           @id @default(uuid())
+  affiliateId  String
+  affiliate    AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
+  ipAddress    String?
+  userAgent    String?
+  referrer     String?
+  landingPage  String?
+  subId        String?
+  campaign     String? // 🆕 Campaign tracking logic moved here (String field)
+  country      String?
+  deviceType   String?
+  converted    Boolean          @default(false)
+  orderId      String?
+  batchId      String?
+  isAggregated Boolean          @default(false)
+
+  utmSource         String?
+  utmMedium         String?
+  utmCampaign       String?
+  deviceFingerprint String?
+  city              String?
+  processingTime    Int?
+  isArchived        Boolean @default(false)
+
+  createdAt        DateTime @default(now())
+  conversionStatus String   @default("PENDING")
 
   @@index([affiliateId, createdAt(sort: Desc)])
   @@index([subId])
   @@index([campaign]) // 🆕 Added index for fast campaign sorting
-  @@index([createdAt]) 
+  @@index([createdAt])
   @@index([deviceFingerprint])
   @@index([converted])
 }
 
 model Referral {
-  id              String           @id @default(uuid())
-  affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
-  orderId         String           
-  order           Order            @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  totalOrderAmount Decimal         @db.Decimal(12, 2)
-  netOrderAmount  Decimal          @db.Decimal(12, 2)
-  commissionAmount Decimal         @db.Decimal(12, 2)
-  currency        String           @default("AUD")
-  status          ReferralStatus   @default(PENDING)
-  tierSnapshot    String?
-  commissionType  CommissionType   @default(PERCENTAGE)
-  commissionRate  Decimal          @db.Decimal(5, 2)
-  isLifetime      Boolean          @default(false)
-  isManual        Boolean          @default(false)
-  adminNote       String?
-  metadata        Json?
-  availableAt     DateTime?
+  id                String                   @id @default(uuid())
+  affiliateId       String
+  affiliate         AffiliateAccount         @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
+  orderId           String
+  order             Order                    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  totalOrderAmount  Decimal                  @db.Decimal(12, 2)
+  netOrderAmount    Decimal                  @db.Decimal(12, 2)
+  commissionAmount  Decimal                  @db.Decimal(12, 2)
+  currency          String                   @default("AUD")
+  status            ReferralStatus           @default(PENDING)
+  tierSnapshot      String?
+  commissionType    CommissionType           @default(PERCENTAGE)
+  commissionRate    Decimal                  @db.Decimal(5, 2)
+  isLifetime        Boolean                  @default(false)
+  isManual          Boolean                  @default(false)
+  adminNote         String?
+  metadata          Json?
+  availableAt       DateTime?
   productsBreakdown Json?
-  commissionRuleId  String?                       
-  matchedRule       AffiliateCommissionRule?      @relation(fields: [commissionRuleId], references: [id], onDelete: SetNull)
-  
-  isRecurring       Boolean   @default(false)    
-  recurringCycle    Int?      @default(1)         
-  deviceFingerprint String?                       
+  commissionRuleId  String?
+  matchedRule       AffiliateCommissionRule? @relation(fields: [commissionRuleId], references: [id], onDelete: SetNull)
+
+  isRecurring       Boolean   @default(false)
+  recurringCycle    Int?      @default(1)
+  deviceFingerprint String?
   isFlagged         Boolean   @default(false)
   flagReason        String?
   paidAt            DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([affiliateId])
   @@index([status])
@@ -2449,19 +2449,19 @@ model Referral {
 }
 
 model AffiliatePayout {
-  id              String           @id @default(uuid())
-  affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
-  amount          Decimal          @db.Decimal(12, 2)
-  method          PayoutMethod
-  status          PayoutStatus     @default(PENDING)
-  bulkPayoutId    String?
-  transactionId   String?
-  invoiceUrl      String?
-  note            String?
-  processedAt     DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id            String           @id @default(uuid())
+  affiliateId   String
+  affiliate     AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
+  amount        Decimal          @db.Decimal(12, 2)
+  method        PayoutMethod
+  status        PayoutStatus     @default(PENDING)
+  bulkPayoutId  String?
+  transactionId String?
+  invoiceUrl    String?
+  note          String?
+  processedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   @@index([affiliateId])
   @@index([status])
@@ -2469,55 +2469,55 @@ model AffiliatePayout {
 }
 
 model AffiliateCommissionRule {
-  id                   String   @id @default(uuid())
-  name                 String   
-  priority             Int      @default(0)
-  isActive             Boolean  @default(true)
-  productIds           String[] 
+  id                   String     @id @default(uuid())
+  name                 String
+  priority             Int        @default(0)
+  isActive             Boolean    @default(true)
+  productIds           String[]
   categoryIds          String[]
-  affiliateSpecificIds String[] 
-  description          String?  @db.Text
-  conditions           Json    
-  action               Json     
+  affiliateSpecificIds String[]
+  description          String?    @db.Text
+  conditions           Json
+  action               Json
   startDate            DateTime?
   endDate              DateTime?
   referrals            Referral[]
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
   @@index([conditions(ops: JsonbPathOps)], type: Gin)
   @@index([isActive, priority(sort: Desc)])
 }
 
 model AffiliateLink {
-  id              String           @id @default(uuid())
-  affiliateId     String
-  affiliate       AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
-  slug            String           @unique
-  destinationUrl  String           
-  campaignName    String?          // 🆕 Campaign Tracking (String based)
-  clickCount      Int              @default(0)
-  isActive        Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  
+  id             String           @id @default(uuid())
+  affiliateId    String
+  affiliate      AffiliateAccount @relation(fields: [affiliateId], references: [id], onDelete: SetNull)
+  slug           String           @unique
+  destinationUrl String
+  campaignName   String? // 🆕 Campaign Tracking (String based)
+  clickCount     Int              @default(0)
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+
   @@index([slug])
   @@index([affiliateId])
   @@index([campaignName])
 }
 
 model AffiliateProductRate {
-  id             String            @id @default(uuid())
-  productId      String
-  product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  affiliateId    String?
-  affiliate      AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
-  tierId         String?
-  tier           AffiliateTier?    @relation(fields: [tierId], references: [id], onDelete: Cascade)
-  rate           Decimal           @db.Decimal(12, 4)
-  type           CommissionType    @default(FIXED)
-  isDisabled     Boolean           @default(false)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id          String            @id @default(uuid())
+  productId   String
+  product     Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  affiliateId String?
+  affiliate   AffiliateAccount? @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  tierId      String?
+  tier        AffiliateTier?    @relation(fields: [tierId], references: [id], onDelete: Cascade)
+  rate        Decimal           @db.Decimal(12, 4)
+  type        CommissionType    @default(FIXED)
+  isDisabled  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@unique([productId, affiliateId])
   @@unique([productId, tierId])
@@ -2553,23 +2553,23 @@ model SubscriptionPlan {
 }
 
 model Subscription {
-  id               String               @id @default(uuid())
+  id               String                @id @default(uuid())
   userId           String
-  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   planId           String
-  plan             SubscriptionPlan     @relation(fields: [planId], references: [id])
-  status           SubscriptionStatus   @default(ACTIVE)
+  plan             SubscriptionPlan      @relation(fields: [planId], references: [id])
+  status           SubscriptionStatus    @default(ACTIVE)
   paymentMethodId  String?
-  paymentMethod    UserPaymentMethod?   @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
-  startDate        DateTime             @default(now())
+  paymentMethod    UserPaymentMethod?    @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  startDate        DateTime              @default(now())
   currentPeriodEnd DateTime
   nextBillingDate  DateTime
   cancelledAt      DateTime?
   orders           Order[]
   invoices         SubscriptionInvoice[]
   metadata         Json?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -2577,19 +2577,19 @@ model Subscription {
 }
 
 model SubscriptionInvoice {
-  id             String        @id @default(uuid())
+  id             String       @id @default(uuid())
   subscriptionId String
-  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  amount         Decimal       @db.Decimal(12, 2)
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  amount         Decimal      @db.Decimal(12, 2)
   currency       String
-  status         String        @default("pending") 
+  status         String       @default("pending")
   invoiceUrl     String?
   pdfUrl         String?
   periodStart    DateTime
   periodEnd      DateTime
   billingReason  String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([subscriptionId])
 }
@@ -2599,47 +2599,47 @@ model SubscriptionInvoice {
 // ==========================================
 
 model InventoryReservation {
-  id          String          @id @default(uuid())
-  productId   String
-  product     Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variantId   String?
-  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  locationId  String
-  location    Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  cartId      String?
-  cart        Cart?           @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  quantity    Int
-  expiresAt   DateTime
-  createdAt   DateTime        @default(now())
+  id         String          @id @default(uuid())
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  cartId     String?
+  cart       Cart?           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  quantity   Int
+  expiresAt  DateTime
+  createdAt  DateTime        @default(now())
 
   @@index([productId, variantId])
   @@index([expiresAt])
 }
 
 model WarrantyClaim {
-  id              String      @id @default(cuid())
+  id String @id @default(cuid())
 
-  name            String
-  email           String
-  description     String      @db.Text
-  mediaUrl        String?
-  shopPurchased   String
-  
-  orderNumber     String
-  orderDate       DateTime?   
-  wpName          String?     
-  wpEmail         String?     
-  phone           String?     
-  address         String?     
-  suburb          String?     
-  state           String?     
-  postcode        String?     
-  country         String?     @default("AU") 
-  
-  status          ClaimStatus @default(PENDING) 
-  replacementPart String?     
-  trackingNumber  String?     
-  
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  name          String
+  email         String
+  description   String  @db.Text
+  mediaUrl      String?
+  shopPurchased String
+
+  orderNumber String
+  orderDate   DateTime?
+  wpName      String?
+  wpEmail     String?
+  phone       String?
+  address     String?
+  suburb      String?
+  state       String?
+  postcode    String?
+  country     String?   @default("AU")
+
+  status          ClaimStatus @default(PENDING)
+  replacementPart String?
+  trackingNumber  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -76,14 +76,15 @@ export default function LinkManager({
   const effectiveBaseUrl = baseUrl || seo.siteUrl || (typeof window !== 'undefined' ? window.location.origin : "");
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
-    defaultValues: { destinationUrl: "", customSlug: "", campaignId: "" }
+    defaultValues: { destinationUrl: "", customSlug: "", campaignName: "" }
   });
 
   const onSubmit = (data: any) => {
     startTransition(async () => {
-      // NOTE: userId is handled in session now, but keeping for compatibility if needed or pass undefined
-      // If generateLinkAction expects data without userId as per previous updates:
-      const res = await generateLinkAction(data); 
+      if (data.destinationUrl && !/^https?:\/\//i.test(data.destinationUrl)) {
+        data.destinationUrl = "https://" + data.destinationUrl;
+      }
+      const res = await generateLinkAction(data);
       
       if (res.success) {
         toast.success("Link created successfully!");
@@ -167,9 +168,9 @@ export default function LinkManager({
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 uppercase">Campaign</label>
-                <select {...register("campaignId")} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none">
+                <select {...register("campaignName")} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none">
                   <option value="">No Campaign</option>
-                  {campaigns.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {campaigns.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
               </div>
 

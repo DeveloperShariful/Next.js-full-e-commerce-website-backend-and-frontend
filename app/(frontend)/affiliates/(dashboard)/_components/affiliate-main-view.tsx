@@ -80,7 +80,7 @@ export default function AffiliateMainView({ initialData }: Props) {
       case "reports":
         return <ConversionReport conversions={reports?.conversions || []} currency={initialData.config.currency} />;
       case "settings":
-        return <SettingsForm userId={profile.userId} initialData={settings} />;
+        return <SettingsForm userId={profile.userId} initialData={settings} config={initialData.config} tierProgress={dashboard.tierProgress} activeRules={dashboard.activeRules} />;
       default:
         return null;
     }
@@ -125,19 +125,19 @@ export default function AffiliateMainView({ initialData }: Props) {
 
         {/* Sidebar — absolute on mobile, sticky on desktop — exact my-account pattern */}
         <aside className={cn(
-          "absolute top-0 left-0 z-40 w-[200px] bg-[#1d2327] custom-scrollbar shadow-xl transform transition-transform duration-200",
+          "absolute top-0 left-0 z-40 w-[200px] bg-[#f6f7f7] border-r border-[#dcdcde] custom-scrollbar shadow-xl transform transition-transform duration-200",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
           "lg:static lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] lg:overflow-y-auto lg:w-[180px] lg:shrink-0 lg:shadow-none lg:translate-x-0 lg:z-0"
         )}>
 
           {/* Mobile sidebar header — brand + close */}
-          <div className="lg:hidden flex items-center justify-between px-4 h-12 border-b border-[#2c3338]">
-            <span className="text-white font-semibold text-[13px] flex items-center gap-2">
-              <Network className="w-4 h-4 text-[#72aee6]" /> Partner Hub
+          <div className="lg:hidden flex items-center justify-between px-4 h-12 border-b border-[#dcdcde]">
+            <span className="text-[#1d2327] font-semibold text-[13px] flex items-center gap-2">
+              <Network className="w-4 h-4 text-[#2271b1]" /> Partner Hub
             </span>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-1.5 text-[#c3c4c7] hover:text-white transition-colors"
+              className="p-1.5 text-[#50575e] hover:text-[#1d2327] transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -156,12 +156,12 @@ export default function AffiliateMainView({ initialData }: Props) {
                     "flex items-center gap-3 w-full px-4 py-2 text-[13px] transition-colors group text-left",
                     isActive
                       ? "bg-[#2271b1] text-white font-semibold"
-                      : "text-[#c3c4c7] hover:text-[#72aee6] hover:bg-[#2c3338]"
+                      : "text-[#50575e] hover:text-[#1d2327] hover:bg-[#ebebeb]"
                   )}
                 >
                   <Icon className={cn(
                     "w-4 h-4 shrink-0",
-                    isActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"
+                    isActive ? "text-white" : "text-[#646970] group-hover:text-[#1d2327]"
                   )} />
                   {item.label}
                 </button>
@@ -170,7 +170,7 @@ export default function AffiliateMainView({ initialData }: Props) {
 
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
-              className="flex items-center gap-3 w-full px-4 py-2 text-[13px] text-[#f78b8b] hover:text-red-400 hover:bg-[#2c3338] transition-colors text-left"
+              className="flex items-center gap-3 w-full px-4 py-2 text-[13px] text-red-600 hover:text-red-700 hover:bg-[#ebebeb] transition-colors text-left"
             >
               <LogOut className="w-4 h-4 shrink-0" />
               Log Out
@@ -179,12 +179,16 @@ export default function AffiliateMainView({ initialData }: Props) {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0 pb-10 bg-[#f0f0f1]">
-          <div className="p-4 md:p-6">
-            <div className="max-w-[1000px] mx-auto">
-              {renderContent()}
+        <main className="flex-1 min-w-0 bg-[#f0f0f1]">
+          {currentView === "settings" ? (
+            renderContent()
+          ) : (
+            <div className="p-4 md:p-6">
+              <div className="max-w-[1000px] mx-auto">
+                {renderContent()}
+              </div>
             </div>
-          </div>
+          )}
         </main>
 
       </div>

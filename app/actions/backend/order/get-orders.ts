@@ -160,6 +160,7 @@ export async function getOrderDetails(orderId: string) {
       include: {
         user: true,
         affiliate: { include: { user: true } },
+        referrals: { select: { commissionRate: true, commissionType: true, commissionAmount: true }, take: 1 },
         subscription: true,
         items: {
             include: {

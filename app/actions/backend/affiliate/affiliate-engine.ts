@@ -18,7 +18,7 @@ interface RuleConditions {
 }
 
 interface RuleAction {
-  type: "PERCENTAGE" | "FIXED";
+  type: "PERCENTAGE" | "FIXED" | "BONUS_FIXED" | "BONUS_PERCENTAGE";
   value: number;
   tierBonus?: number;
 }
@@ -87,10 +87,15 @@ export async function processOrder(orderId: string) {
 
   let affiliateId = order.affiliateId;
   let attributionSource = "COOKIE";
+  let couponOverrideRate: Prisma.Decimal | null = null;
 
   if (order.discount && order.discount.affiliateId) {
     affiliateId = order.discount.affiliateId;
     attributionSource = "COUPON";
+    // Coupon-এর custom commission rate থাকলে সংরক্ষণ করো
+    if (order.discount.affiliateCommissionRate) {
+      couponOverrideRate = order.discount.affiliateCommissionRate;
+    }
   } else if (!affiliateId && order.userId) {
     const user = await db.user.findUnique({
       where: { id: order.userId, deletedAt: null },
@@ -114,6 +119,29 @@ export async function processOrder(orderId: string) {
 
   const config = await getCachedAffiliateSettings();
   if (!config || !config.isActive) return { success: false, error: "PROGRAM_DISABLED" };
+
+  // Coupon attribution হলে একটা synthetic click তৈরি করো
+  if (attributionSource === "COUPON") {
+    await db.affiliateClick.create({
+      data: {
+        affiliateId: affiliate.id,
+        ipAddress: order.ipAddress || "coupon",
+        userAgent: "COUPON_REDEMPTION",
+        referrer: "",
+        landingPage: `order:${order.orderNumber}`,
+        deviceType: "unknown",
+        utmSource: "coupon",
+        utmCampaign: order.discount?.code || undefined,
+      }
+    }).catch(() => {});
+
+    await auditService.systemLog("INFO", "AFFILIATE_ENGINE", `Coupon Attribution: ${order.discount?.code}`, {
+      affiliateId: affiliate.id,
+      orderId: order.id,
+      couponCode: order.discount?.code,
+      couponRate: couponOverrideRate?.toString() ?? "default",
+    });
+  }
 
   const buyerEmail = order.guestEmail || order.user?.email;
   const buyerIp = order.ipAddress || "0.0.0.0";
@@ -212,23 +240,22 @@ export async function processOrder(orderId: string) {
     }
 
     let matchedRule = null;
-    
+    let matchedBonusRule = null;
+
     for (const rule of globalRules) {
       const conditions = rule.conditions as unknown as RuleConditions;
       let isMatch = true;
 
       if (conditions.minOrderAmount && DecimalMath.lt(orderTotal, conditions.minOrderAmount)) isMatch = false;
-      
+      if (conditions.maxOrderAmount && DecimalMath.lt(new Prisma.Decimal(conditions.maxOrderAmount), orderTotal)) isMatch = false;
+
       if (conditions.categoryIds && conditions.categoryIds.length > 0) {
         if (!item.product || !item.product.categories || item.product.categories.length === 0) {
-          isMatch = false; 
+          isMatch = false;
         } else {
           const productCategoryIds = item.product.categories.map((c) => c.id);
           const hasMatchingCategory = productCategoryIds.some((id) => conditions.categoryIds!.includes(id));
-          
-          if (!hasMatchingCategory) {
-            isMatch = false;
-          }
+          if (!hasMatchingCategory) isMatch = false;
         }
       }
 
@@ -238,15 +265,28 @@ export async function processOrder(orderId: string) {
       }
 
       if (isMatch) {
-        matchedRule = rule;
-        break;
+        const ruleAction = rule.action as unknown as RuleAction;
+        const isBonus = ruleAction.type === "BONUS_FIXED" || ruleAction.type === "BONUS_PERCENTAGE";
+        if (isBonus && !matchedBonusRule) {
+          matchedBonusRule = rule;
+        } else if (!isBonus && !matchedRule) {
+          matchedRule = rule;
+        }
       }
+
+      if (matchedRule && matchedBonusRule) break;
     }
 
-    // Priority: User Product Rate > Tier Product Rate > Global Rule > Coupon > Product Default > Tier Default > Global Config
+    // Priority (COUPON attribution): Coupon Rate > Product Exclusions only
+    // Priority (normal):            User Product Rate > Tier Product Rate > Global Rule > Product Default > Tier Default > Partner > Global
     const tierProductRate = tierRateMap.get(item.productId);
 
-    if (userProductRate) {
+    if (couponOverrideRate) {
+      // Coupon-এ explicit rate দেওয়া আছে — সব global rule / tier / product rate bypass
+      rate   = couponOverrideRate;
+      type   = "PERCENTAGE";
+      source = `COUPON_RATE:${order.discount?.code ?? ""}`;
+    } else if (userProductRate) {
       rate = userProductRate.rate;
       type = userProductRate.type;
       source = "PRODUCT_USER_OVERRIDE";
@@ -259,23 +299,19 @@ export async function processOrder(orderId: string) {
       rate = DecimalMath.toDecimal(action.value);
       type = action.type;
       source = `RULE: ${matchedRule.name}`;
-      matchedRuleId = matchedRule.id; 
-    } else if (order.discount?.affiliateCommissionRate) {
-      rate = order.discount.affiliateCommissionRate;
-      if (order.discount.type === 'FIXED_AMOUNT' || order.discount.type === 'FIXED_CART' || order.discount.type === 'FIXED_PRODUCT') {
-         type = "FIXED";
-      } else {
-         type = "PERCENTAGE";
-      }
-      source = "COUPON_RATE";
+      matchedRuleId = matchedRule.id;
     } else if (item.product?.affiliateCommissionRate) {
-        rate = item.product.affiliateCommissionRate;
-        type = item.product.affiliateCommissionType || "PERCENTAGE";
-        source = "PRODUCT_DEFAULT";
+      rate = item.product.affiliateCommissionRate;
+      type = item.product.affiliateCommissionType || "PERCENTAGE";
+      source = "PRODUCT_DEFAULT";
     } else if (affiliate.tier?.commissionRate) {
       rate = affiliate.tier.commissionRate;
       type = affiliate.tier.commissionType;
       source = "TIER_DEFAULT";
+    } else if (affiliate.commissionRate && !DecimalMath.isZero(affiliate.commissionRate)) {
+      rate = affiliate.commissionRate;
+      type = affiliate.commissionType || "PERCENTAGE";
+      source = "PARTNER_INDIVIDUAL";
     } else {
       rate = new Prisma.Decimal(config.commissionRate || 10);
       type = config.commissionType || "PERCENTAGE";
@@ -296,6 +332,19 @@ export async function processOrder(orderId: string) {
       itemComm = DecimalMath.mul(rate, item.quantity);
     } else {
       itemComm = DecimalMath.percent(itemBasePrice, rate);
+    }
+
+    if (matchedBonusRule) {
+      const bonusAction = matchedBonusRule.action as unknown as RuleAction;
+      let bonusComm = new Prisma.Decimal(0);
+      if (bonusAction.type === "BONUS_FIXED") {
+        bonusComm = DecimalMath.mul(DecimalMath.toDecimal(bonusAction.value), item.quantity);
+      } else {
+        bonusComm = DecimalMath.percent(itemBasePrice, bonusAction.value);
+      }
+      itemComm = DecimalMath.add(itemComm, bonusComm);
+      if (!matchedRuleId) matchedRuleId = matchedBonusRule.id;
+      source = `${source} + BONUS:${matchedBonusRule.name}`;
     }
 
     totalCommission = DecimalMath.add(totalCommission, itemComm);

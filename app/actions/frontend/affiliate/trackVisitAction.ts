@@ -1,8 +1,9 @@
-// app/actions/storefront/affiliate/trackVisitAction.ts
+﻿// app/actions/storefront/affiliate/trackVisitAction.ts
 "use server";
 
 import { db } from "@/lib/prisma";
 import { cookies, headers } from "next/headers";
+import { revalidateTag } from "next/cache";
 
 export async function trackVisitAction(data: {
   affiliateSlug?: string | null;
@@ -19,7 +20,7 @@ export async function trackVisitAction(data: {
     const cookieStore = await cookies();
 
     // ---------------------------------------------------------
-    // ১. ভিসিটর সোর্স ডিটেকশন (সরাসরি সার্ভারে)
+    // à§§. à¦­à¦¿à¦¸à¦¿à¦Ÿà¦° à¦¸à§‹à¦°à§à¦¸ à¦¡à¦¿à¦Ÿà§‡à¦•à¦¶à¦¨ (à¦¸à¦°à¦¾à¦¸à¦°à¦¿ à¦¸à¦¾à¦°à§à¦­à¦¾à¦°à§‡)
     // ---------------------------------------------------------
     let source = "direct";
     if (data.utmSource) {
@@ -37,10 +38,10 @@ export async function trackVisitAction(data: {
       }
     }
 
-    // ভিসিটর সোর্স কুকিতে সেভ করা (HttpOnly - হ্যাক প্রুফ)
+    // à¦­à¦¿à¦¸à¦¿à¦Ÿà¦° à¦¸à§‹à¦°à§à¦¸ à¦•à§à¦•à¦¿à¦¤à§‡ à¦¸à§‡à¦­ à¦•à¦°à¦¾ (HttpOnly - à¦¹à§à¦¯à¦¾à¦• à¦ªà§à¦°à§à¦«)
     if (!cookieStore.get("visitor_source")) {
       cookieStore.set("visitor_source", source, { 
-        maxAge: 60 * 60 * 24 * 30, // ৩০ দিন
+        maxAge: 60 * 60 * 24 * 30, // à§©à§¦ à¦¦à¦¿à¦¨
         httpOnly: true, 
         secure: true, 
         path: "/" 
@@ -48,7 +49,7 @@ export async function trackVisitAction(data: {
     }
 
     // ---------------------------------------------------------
-    // ২. অ্যাফিলিয়েট ট্র্যাকিং লজিক
+    // à§¨. à¦…à§à¦¯à¦¾à¦«à¦¿à¦²à¦¿à¦¯à¦¼à§‡à¦Ÿ à¦Ÿà§à¦°à§à¦¯à¦¾à¦•à¦¿à¦‚ à¦²à¦œà¦¿à¦•
     // ---------------------------------------------------------
     if (data.affiliateSlug) {
       const affiliate = await db.affiliateAccount.findFirst({
@@ -60,7 +61,6 @@ export async function trackVisitAction(data: {
       });
 
       if (affiliate) {
-        // ক্লিক রেকর্ড তৈরি
         const click = await db.affiliateClick.create({
           data: {
             affiliateId: affiliate.id,
@@ -75,15 +75,18 @@ export async function trackVisitAction(data: {
           }
         });
 
-        // অত্যন্ত সিকিউর কুকি সেট (Server-side)
+        revalidateTag(`affiliate-stats-${affiliate.id}`, "default");
+
+        // à¦…à¦¤à§à¦¯à¦¨à§à¦¤ à¦¸à¦¿à¦•à¦¿à¦‰à¦° à¦•à§à¦•à¦¿ à¦¸à§‡à¦Ÿ (Server-side)
         const expiry = (affiliate.cookieDuration || 30) * 24 * 60 * 60;
-        cookieStore.set("solid_affiliate_id", affiliate.id, { maxAge: expiry, httpOnly: true, secure: true, path: "/" });
-        cookieStore.set("solid_affiliate_visit_id", click.id, { maxAge: expiry, httpOnly: true, secure: true, path: "/" });
+        const isSecure = process.env.NODE_ENV === "production";
+        cookieStore.set("solid_affiliate_id", affiliate.id, { maxAge: expiry, httpOnly: true, secure: isSecure, path: "/" });
+        cookieStore.set("solid_affiliate_visit_id", click.id, { maxAge: expiry, httpOnly: true, secure: isSecure, path: "/" });
       }
     }
 
     // ---------------------------------------------------------
-    // ৩. পেজ ভিউ ট্র্যাকিং (ডাটাবেজ ও কুকি সিঙ্ক)
+    // à§©. à¦ªà§‡à¦œ à¦­à¦¿à¦‰ à¦Ÿà§à¦°à§à¦¯à¦¾à¦•à¦¿à¦‚ (à¦¡à¦¾à¦Ÿà¦¾à¦¬à§‡à¦œ à¦“ à¦•à§à¦•à¦¿ à¦¸à¦¿à¦™à§à¦•)
     // ---------------------------------------------------------
     const currentViews = parseInt(cookieStore.get("visitor_page_views")?.value || "0");
     const newViews = currentViews + 1;
@@ -95,3 +98,4 @@ export async function trackVisitAction(data: {
     return { success: false, error: "Tracking failed" };
   }
 }
+

@@ -114,7 +114,12 @@ export default async function AffiliateMasterPage({
         break;
 
       case "rules":
-        data.rules = await ruleEngineService.getRules();
+        const [fetchedRules, fetchedCategories] = await Promise.all([
+          ruleEngineService.getRules(),
+          db.category.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+        ]);
+        data.rules = fetchedRules;
+        data.categories = fetchedCategories;
         break;
 
       case "creatives":
@@ -156,11 +161,16 @@ export default async function AffiliateMasterPage({
         break;
         
       case "coupons":
-        const [couponsResult, tagsResult] = await Promise.all([
+        const [couponsResult, tagsResult, affiliatesList] = await Promise.all([
           couponTagService.getAllAffiliateCoupons(),
           couponTagService.getAllTags(),
+          db.affiliateAccount.findMany({
+            where: { status: "ACTIVE", deletedAt: null },
+            select: { id: true, slug: true, user: { select: { name: true, email: true } } },
+            orderBy: { user: { name: "asc" } },
+          }),
         ]);
-        data.coupons = { coupons: couponsResult, tags: tagsResult };
+        data.coupons = { coupons: couponsResult, tags: tagsResult, affiliates: affiliatesList };
         break;
 
       case "logs":

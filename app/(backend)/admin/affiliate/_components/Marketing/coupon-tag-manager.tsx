@@ -1,9 +1,9 @@
 // File: app/(backend)/admin/affiliate/_components/Marketing/coupon-tag-manager.tsx
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import {
-  Ticket, Plus, Loader2, X, User, Save,
+  Ticket, Plus, Loader2, X, Save,
   Percent, Edit, Check, AlertCircle, Trash2, Tag
 } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +13,6 @@ import {
   createAndLinkCouponAction,
   unlinkCouponAction,
   updateCouponAction,
-  searchAffiliatesForDropdown,
   deleteTagAction,
 } from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
 import { cn } from "@/lib/utils";
@@ -39,11 +38,6 @@ interface TagOption {
   name: string;
 }
 
-interface AffiliateSearchResult {
-  id: string;
-  slug: string;
-  user: { name: string | null; email: string };
-}
 
 interface CouponFormData {
   code: string;
@@ -53,9 +47,16 @@ interface CouponFormData {
   affiliateCommissionRate: number | string;
 }
 
+interface AffiliateOption {
+  id: string;
+  slug: string;
+  user: { name: string | null; email: string };
+}
+
 interface Props {
   couponsData: Coupon[];
   tagsData: TagOption[];
+  affiliates: AffiliateOption[];
 }
 
 type MainTab = "coupons" | "tags";
@@ -63,7 +64,7 @@ type CouponFilter = "ALL" | "ASSIGNED" | "UNASSIGNED";
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function CouponTagManager({ couponsData, tagsData }: Props) {
+export default function CouponTagManager({ couponsData, tagsData, affiliates }: Props) {
   const [activeTab, setActiveTab] = useState<MainTab>("coupons");
   const [coupons, setCoupons]     = useState<Coupon[]>(couponsData);
   const [tags, setTags]           = useState<TagOption[]>(tagsData);
@@ -101,7 +102,7 @@ export default function CouponTagManager({ couponsData, tagsData }: Props) {
       </div>
 
       {activeTab === "coupons" && (
-        <CouponsTab coupons={coupons} setCoupons={setCoupons} />
+        <CouponsTab coupons={coupons} setCoupons={setCoupons} affiliates={affiliates} />
       )}
       {activeTab === "tags" && (
         <TagsTab tags={tags} setTags={setTags} />
@@ -115,9 +116,11 @@ export default function CouponTagManager({ couponsData, tagsData }: Props) {
 function CouponsTab({
   coupons,
   setCoupons,
+  affiliates,
 }: {
   coupons: Coupon[];
   setCoupons: React.Dispatch<React.SetStateAction<Coupon[]>>;
+  affiliates: AffiliateOption[];
 }) {
   const [isModalOpen, setIsModalOpen]     = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -290,6 +293,7 @@ function CouponsTab({
           onClose={() => setIsModalOpen(false)}
           onSuccess={() => window.location.reload()}
           initialData={editingCoupon}
+          affiliates={affiliates}
         />
       )}
     </div>
@@ -370,14 +374,15 @@ interface ModalProps {
   onClose: () => void;
   onSuccess: () => void;
   initialData?: Coupon | null;
+  affiliates: AffiliateOption[];
 }
 
-function CouponModal({ onClose, onSuccess, initialData }: ModalProps) {
+function CouponModal({ onClose, onSuccess, initialData, affiliates }: ModalProps) {
   const [isPending, startTransition] = useTransition();
   const { symbol } = useGlobalStore();
   const currency = symbol || "$";
 
-  const { register, handleSubmit, setValue, watch } = useForm<CouponFormData>({
+  const { register, handleSubmit, watch } = useForm<CouponFormData>({
     defaultValues: {
       code:                    initialData?.code || "",
       value:                   initialData?.value || 10,
@@ -386,38 +391,6 @@ function CouponModal({ onClose, onSuccess, initialData }: ModalProps) {
       affiliateCommissionRate: initialData?.affiliateCommissionRate || "",
     },
   });
-
-  const [searchTerm, setSearchTerm]                       = useState(initialData?.affiliate?.user.name || "");
-  const [searchResults, setSearchResults]                 = useState<AffiliateSearchResult[]>([]);
-  const [isSearching, setIsSearching]                     = useState(false);
-  const [selectedAffiliateName, setSelectedAffiliateName] = useState(initialData?.affiliate?.user.name || "");
-
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (searchTerm && searchTerm !== selectedAffiliateName && searchTerm.length > 1) {
-        setIsSearching(true);
-        const results = await searchAffiliatesForDropdown(searchTerm);
-        setSearchResults(results as AffiliateSearchResult[]);
-        setIsSearching(false);
-      } else if (!searchTerm) {
-        setSearchResults([]);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm, selectedAffiliateName]);
-
-  const selectAffiliate = (aff: AffiliateSearchResult) => {
-    setValue("affiliateId", aff.id);
-    setSelectedAffiliateName(aff.user.name || "");
-    setSearchTerm(aff.user.name || "");
-    setSearchResults([]);
-  };
-
-  const clearAffiliate = () => {
-    setValue("affiliateId", "");
-    setSelectedAffiliateName("");
-    setSearchTerm("");
-  };
 
   const onSubmit = (data: CouponFormData) => {
     startTransition(async () => {
@@ -438,6 +411,7 @@ function CouponModal({ onClose, onSuccess, initialData }: ModalProps) {
 
   const watchedType        = watch("type");
   const watchedAffiliateId = watch("affiliateId");
+  const selectedAffiliate  = affiliates.find((a) => a.id === watchedAffiliateId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
@@ -456,6 +430,8 @@ function CouponModal({ onClose, onSuccess, initialData }: ModalProps) {
 
         <div className="flex-1 overflow-y-auto p-4">
           <form id="coupon-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+
+            {/* Coupon Code */}
             <div>
               <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Coupon Code</label>
               <div className="relative">
@@ -468,6 +444,7 @@ function CouponModal({ onClose, onSuccess, initialData }: ModalProps) {
               </div>
             </div>
 
+            {/* Type + Value */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">Type</label>
@@ -497,6 +474,7 @@ function CouponModal({ onClose, onSuccess, initialData }: ModalProps) {
               </div>
             </div>
 
+            {/* Commission Override */}
             <div className="border border-[#c3c4c7] bg-[#f6f7f7] p-3">
               <label className="text-[13px] font-semibold text-[#1d2327] flex items-center gap-1.5 mb-1">
                 <AlertCircle className="w-3.5 h-3.5 text-[#9a6700]" />
@@ -512,52 +490,32 @@ function CouponModal({ onClose, onSuccess, initialData }: ModalProps) {
               <p className="text-[11px] text-[#8c8f94] mt-1">If set, this rate applies instead of standard commission when coupon is used.</p>
             </div>
 
-            <div className="relative">
+            {/* Affiliate Dropdown */}
+            <div>
               <label className="text-[13px] font-semibold text-[#1d2327] block mb-1">
                 Assign to Affiliate <span className="font-normal text-[#8c8f94]">(Optional)</span>
               </label>
-              <div className="relative">
-                <User className="absolute left-2.5 top-2 w-3.5 h-3.5 text-[#8c8f94]" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name or email..."
-                  className="w-full h-8 border border-[#c3c4c7] rounded pl-8 pr-7 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]/20"
-                />
-                {isSearching && <Loader2 className="absolute right-2.5 top-2 w-3.5 h-3.5 animate-spin text-[#8c8f94]" />}
-                {searchTerm && !isSearching && (
-                  <button type="button" onClick={clearAffiliate} className="absolute right-2 top-1.5 p-0.5 text-[#8c8f94] hover:text-[#d63638] transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-              <input type="hidden" {...register("affiliateId")} />
-
-              {searchResults.length > 0 && (
-                <div className="absolute z-10 w-full bg-white border border-[#c3c4c7] shadow-lg mt-0.5 max-h-44 overflow-y-auto divide-y divide-[#f0f0f1]">
-                  {searchResults.map((aff) => (
-                    <button
-                      key={aff.id}
-                      type="button"
-                      onClick={() => selectAffiliate(aff)}
-                      className="w-full text-left px-3 py-2 hover:bg-[#f0f6fc] transition-colors"
-                    >
-                      <div className="text-[13px] font-semibold text-[#1d2327]">{aff.user.name}</div>
-                      <div className="text-[11px] text-[#8c8f94] font-mono">/{aff.slug} · {aff.user.email}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {watchedAffiliateId ? (
+              <select
+                {...register("affiliateId")}
+                className="w-full h-8 border border-[#c3c4c7] rounded px-2 text-[13px] bg-white outline-none focus:border-[#2271b1] appearance-none"
+              >
+                <option value="">— Generic coupon (no affiliate) —</option>
+                {affiliates.map((aff) => (
+                  <option key={aff.id} value={aff.id}>
+                    {aff.user.name || aff.user.email} · /{aff.slug}
+                  </option>
+                ))}
+              </select>
+              {selectedAffiliate ? (
                 <div className="flex items-center gap-1.5 mt-1.5 text-[12px] font-medium text-[#00a32a] bg-[#edfaef] border border-[#00a32a]/30 px-2 py-1 rounded">
-                  <Check className="w-3 h-3 shrink-0" /> Assigned to: {selectedAffiliateName}
+                  <Check className="w-3 h-3 shrink-0" />
+                  Assigned to: {selectedAffiliate.user.name || selectedAffiliate.user.email}
                 </div>
               ) : (
-                <p className="text-[11px] text-[#8c8f94] mt-1">Leave empty to create a generic coupon accessible by anyone.</p>
+                <p className="text-[11px] text-[#8c8f94] mt-1">Leave unselected to create a generic coupon accessible by anyone.</p>
               )}
             </div>
+
           </form>
         </div>
 

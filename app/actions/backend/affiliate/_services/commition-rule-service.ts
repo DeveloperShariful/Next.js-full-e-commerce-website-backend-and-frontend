@@ -25,7 +25,7 @@ const ruleSchema = z.object({
     message: "At least one condition is required.",
   }),
   action: z.object({
-    type: z.enum(["PERCENTAGE", "FIXED"]),
+    type: z.enum(["PERCENTAGE", "FIXED", "BONUS_FIXED", "BONUS_PERCENTAGE"]),
     value: z.coerce.number().min(0),
     tierBonus: z.coerce.number().optional(),
   }),

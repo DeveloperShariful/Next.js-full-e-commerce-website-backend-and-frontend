@@ -196,10 +196,13 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
       case "logs":
         return initialData.logs ? (
           <LogViewer
+            stats={initialData.logs.stats}
             auditData={initialData.logs.audit}
             systemData={initialData.logs.system}
+            auditFilterOpts={initialData.logs.auditFilterOpts}
+            systemSources={initialData.logs.systemSources}
             currentPage={Number(searchParams.get("page")) || 1}
-            currentTab={initialData.logs.currentTab}
+            currentTab={initialData.logs.tab}
           />
         ) : null;
 

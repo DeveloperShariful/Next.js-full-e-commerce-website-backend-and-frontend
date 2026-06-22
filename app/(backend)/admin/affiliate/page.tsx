@@ -29,13 +29,18 @@ export const metadata = {
 export default async function AffiliateMasterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ 
-    view?: string; 
-    page?: string; 
-    search?: string; 
+  searchParams: Promise<{
+    view?: string;
+    page?: string;
+    search?: string;
     status?: string;
-    logType?: string; 
-    level?: string;   
+    logTab?: string;
+    level?: string;
+    action?: string;
+    entity?: string;
+    source?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -158,20 +163,43 @@ export default async function AffiliateMasterPage({
         data.coupons = { coupons: couponsResult, tags: tagsResult };
         break;
 
-      case "logs": 
-        const logType = params.logType || "AUDIT"; 
-        
-        if (logType === "SYSTEM") {
-            data.logs = {
-                system: await logService.getSystemLogs(page, 20, params.level as string),
-                currentTab: "SYSTEM"
-            };
-        } else {
-            data.logs = {
-                audit: await logService.getAuditLogs(page, 20, search),
-                currentTab: "AUDIT"
-            };
-        }
+      case "logs":
+        const logTab = params.logTab || "overview";
+        const [logStats, auditResult, systemResult, auditFilterOpts, systemSources] = await Promise.all([
+          logService.getLogStats(),
+          logTab === "audit"
+            ? logService.getAuditLogs({
+                page,
+                limit: 20,
+                search,
+                action: params.action,
+                tableName: params.entity,
+                dateFrom: params.dateFrom,
+                dateTo: params.dateTo,
+              })
+            : Promise.resolve({ logs: [], total: 0, totalPages: 0 }),
+          logTab === "system"
+            ? logService.getSystemLogs({
+                page,
+                limit: 20,
+                search,
+                level: params.level,
+                source: params.source,
+                dateFrom: params.dateFrom,
+                dateTo: params.dateTo,
+              })
+            : Promise.resolve({ logs: [], total: 0, totalPages: 0 }),
+          logService.getAuditFilterOptions(),
+          logService.getSystemLogSources(),
+        ]);
+        data.logs = {
+          stats: logStats,
+          audit: auditResult,
+          system: systemResult,
+          auditFilterOpts,
+          systemSources,
+          tab: logTab,
+        };
         break;
     }
   } catch (error: any) {

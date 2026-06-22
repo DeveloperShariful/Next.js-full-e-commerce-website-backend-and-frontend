@@ -9,15 +9,19 @@ import { CartProvider } from '@/context/CartContext';
 import { CompareProvider } from '@/context/CompareContext';
 import { Toaster } from 'sonner';
 import AffiliateTracker from "./_components/affiliate-tracker";
+import { getCachedStoreSettings } from "@/lib/global-settings-cache";
 
-export default function FrontLayout({ children }: { children: React.ReactNode }) {
+export default async function FrontLayout({ children }: { children: React.ReactNode }) {
+  const storeSettings = await getCachedStoreSettings();
+  const affiliateParam = (storeSettings?.affiliateConfig as any)?.referralParam || "ref";
+
   return (
     <CompareProvider>
       <CartProvider>
         <div className="flex flex-col min-h-screen relative">
-          {/* Tracks ?ref=slug on every page visit, records click to AffiliateClick table */}
+          {/* Tracks ?<affiliateParam>=slug on every page visit, records click to AffiliateClick table */}
           <Suspense fallback={null}>
-            <AffiliateTracker />
+            <AffiliateTracker affiliateParam={affiliateParam} />
           </Suspense>
           <TopBar />
           <Header />

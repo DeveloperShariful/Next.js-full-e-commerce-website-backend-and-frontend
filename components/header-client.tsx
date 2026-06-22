@@ -542,19 +542,19 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                           </div>
                           My Orders
                         </Link>
-                        <Link href="/my-account/wishlist" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
+                        <Link href="/my-account?tab=wishlist" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
                           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
                             <IoHeartOutline size={16} className="text-gray-600" />
                           </div>
                           Wishlist
                         </Link>
-                        <Link href="/my-account/addresses" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
+                        <Link href="/my-account?tab=addresses" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
                           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
                             <IoLocationOutline size={16} className="text-gray-600" />
                           </div>
                           Saved Addresses
                         </Link>
-                        <Link href="/my-account/wallet" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
+                        <Link href="/my-account?tab=wallet" onClick={closeAllOverlays} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-[#333] hover:bg-gray-50 no-underline transition-colors">
                           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
                             <IoWalletOutline size={16} className="text-gray-600" />
                           </div>
@@ -858,16 +858,16 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                         <Link href="/my-account" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
                           <IoPersonOutline size={18} className="shrink-0 text-gray-500" /><span>Account Settings</span>
                         </Link>
-                        <Link href="/my-account/orders" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
+                        <Link href="/my-account?tab=orders" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
                           <IoReceiptOutline size={18} className="shrink-0 text-gray-500" /><span>My Orders</span>
                         </Link>
-                        <Link href="/my-account/wishlist" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
+                        <Link href="/my-account?tab=wishlist" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
                           <IoHeartOutline size={18} className="shrink-0 text-gray-500" /><span>Wishlist</span>
                         </Link>
-                        <Link href="/my-account/addresses" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
+                        <Link href="/my-account?tab=addresses" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
                           <IoLocationOutline size={18} className="shrink-0 text-gray-500" /><span>Saved Addresses</span>
                         </Link>
-                        <Link href="/my-account/wallet" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
+                        <Link href="/my-account?tab=wallet" onClick={closeAllOverlays} className="text-[0.95rem] font-medium text-[#333] no-underline flex items-center gap-3 border-b border-[#ececec] w-full px-4 py-2.5 hover:bg-white transition-colors">
                           <IoWalletOutline size={18} className="shrink-0 text-gray-500" /><span>Wallet & Credits</span>
                         </Link>
                         {!isAffiliate && !isAffiliateRole && (

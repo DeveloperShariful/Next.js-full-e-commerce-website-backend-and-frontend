@@ -4,14 +4,17 @@ import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { trackVisitAction } from "@/app/actions/frontend/affiliate/trackVisitAction";
 
-// Reads ?ref= from URL and records affiliate click to DB (runs once per page load)
-export default function AffiliateTracker() {
+interface Props {
+  affiliateParam?: string;
+}
+
+export default function AffiliateTracker({ affiliateParam = "ref" }: Props) {
   const searchParams = useSearchParams();
   const tracked = useRef(false);
 
   useEffect(() => {
     if (tracked.current) return;
-    const slug = searchParams.get("ref");
+    const slug = searchParams.get(affiliateParam);
     if (!slug) return;
 
     tracked.current = true;
@@ -23,7 +26,7 @@ export default function AffiliateTracker() {
       utmMedium: searchParams.get("utm_medium"),
       utmCampaign: searchParams.get("utm_campaign"),
     });
-  }, [searchParams]);
+  }, [searchParams, affiliateParam]);
 
   return null;
 }

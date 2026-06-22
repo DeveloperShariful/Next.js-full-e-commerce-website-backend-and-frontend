@@ -95,7 +95,8 @@ export default function LinkManager({
   };
 
   // Dynamic Main Link
-  const defaultLink = `${effectiveBaseUrl}/?${paramName}=${defaultSlug}`;
+  const cleanBase = effectiveBaseUrl.replace(/\/+$/, "");
+  const defaultLink = `${cleanBase}/?${paramName}=${defaultSlug}`;
 
   const filteredLinks = initialLinks.filter(link => 
     link.destinationUrl.toLowerCase().includes(searchTerm.toLowerCase()) || 

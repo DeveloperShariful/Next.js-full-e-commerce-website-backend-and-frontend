@@ -36,6 +36,7 @@ export default function Variations() {
     // Bulk Edit States
     const [bulkMode, setBulkMode] = useState(false);
     const [bulkPrice, setBulkPrice] = useState("");
+    const [bulkSalePrice, setBulkSalePrice] = useState("");
     const [bulkStock, setBulkStock] = useState("");
     const [bulkSkuPrefix, setBulkSkuPrefix] = useState("");
     
@@ -176,6 +177,7 @@ export default function Variations() {
 
     const applyBulk = () => {
         const priceVal = bulkPrice ? parseFloat(bulkPrice) : null;
+        const salePriceVal = bulkSalePrice ? parseFloat(bulkSalePrice) : null;
         const stockVal = bulkStock ? parseInt(bulkStock) : null;
         const weightVal = bulkWeight ? parseFloat(bulkWeight) : null;
         const lenVal = bulkLength ? parseFloat(bulkLength) : null;
@@ -204,6 +206,7 @@ export default function Variations() {
                 return {
                     ...v,
                     price: priceVal !== null ? priceVal : v.price,
+                    salePrice: salePriceVal !== null ? salePriceVal : v.salePrice,
                     stock: stockVal !== null ? stockVal : v.stock,
                     sku: bulkSkuPrefix ? `${bulkSkuPrefix}-${v.name}` : v.sku,
                     weight: weightVal !== null ? weightVal : v.weight,
@@ -228,7 +231,7 @@ export default function Variations() {
         setBulkFilters({});
         
         // Reset Inputs
-        setBulkPrice(""); setBulkStock(""); setBulkSkuPrefix("");
+        setBulkPrice(""); setBulkSalePrice(""); setBulkStock(""); setBulkSkuPrefix("");
         setBulkWeight(""); setBulkLength(""); setBulkWidth(""); setBulkHeight("");
     };
 
@@ -358,10 +361,14 @@ export default function Variations() {
                             <input type="number" value={bulkPrice} onChange={e => setBulkPrice(e.target.value)} className="w-full border border-gray-300 p-1.5 text-sm rounded outline-none focus:border-blue-500 bg-white"/>
                         </div>
                         <div className="col-span-1">
+                            <label className="text-xs font-bold block mb-1">Sale Price</label>
+                            <input type="number" value={bulkSalePrice} onChange={e => setBulkSalePrice(e.target.value)} className="w-full border border-gray-300 p-1.5 text-sm rounded outline-none focus:border-blue-500 bg-white" placeholder="Optional"/>
+                        </div>
+                        <div className="col-span-1">
                             <label className="text-xs font-bold block mb-1">Stock Qty</label>
                             <input type="number" value={bulkStock} onChange={e => setBulkStock(e.target.value)} className="w-full border border-gray-300 p-1.5 text-sm rounded outline-none focus:border-blue-500 bg-white"/>
                         </div>
-                        <div className="col-span-2 md:col-span-2">
+                        <div className="col-span-1">
                             <label className="text-xs font-bold block mb-1">SKU Prefix</label>
                             <input value={bulkSkuPrefix} onChange={e => setBulkSkuPrefix(e.target.value)} className="w-full border border-gray-300 p-1.5 text-sm rounded outline-none focus:border-blue-500 bg-white" placeholder="e.g. GOBIKE-2025"/>
                         </div>
@@ -481,7 +488,14 @@ export default function Variations() {
                                         </div>
                                         {/* Wrappable details */}
                                         <div className="flex items-center gap-3 ml-0 sm:ml-auto mr-2 sm:mr-4 mt-1 sm:mt-0">
-                                             <span className="text-xs font-mono text-gray-600">{currency}{v.price}</span>
+                                             {v.salePrice && v.salePrice > 0 && v.salePrice < v.price ? (
+                                                 <div className="flex items-center gap-1">
+                                                     <span className="text-xs font-mono text-gray-400 line-through">{currency}{v.price}</span>
+                                                     <span className="text-xs font-mono font-bold text-red-600">{currency}{v.salePrice}</span>
+                                                 </div>
+                                             ) : (
+                                                 <span className="text-xs font-mono text-gray-600">{currency}{v.price}</span>
+                                             )}
                                              <span className={`text-xs font-bold px-2 py-0.5 rounded ${v.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {v.stock > 0 ? `${v.stock} in stock` : 'Out of stock'}
                                              </span>
@@ -516,14 +530,18 @@ export default function Variations() {
                                         </div>
 
                                         <div className="flex-1 space-y-4">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                                                 <div>
                                                     <label className="text-xs font-bold block mb-1">SKU</label>
                                                     <input {...register(`variations.${realIndex}.sku`)} className="w-full border border-gray-400 p-2 rounded-sm text-sm focus:border-[#2271b1] outline-none" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-xs font-bold block mb-1">Price ({currency})</label>
+                                                    <label className="text-xs font-bold block mb-1">Regular price ({currency})</label>
                                                     <input type="number" {...register(`variations.${realIndex}.price`)} className="w-full border border-gray-400 p-2 rounded-sm text-sm focus:border-[#2271b1] outline-none" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold block mb-1">Sale price ({currency})</label>
+                                                    <input type="number" {...register(`variations.${realIndex}.salePrice`)} className="w-full border border-gray-400 p-2 rounded-sm text-sm focus:border-[#2271b1] outline-none" placeholder="Optional" />
                                                 </div>
                                                 <div>
                                                     <label className="text-xs font-bold block mb-1">Stock</label>

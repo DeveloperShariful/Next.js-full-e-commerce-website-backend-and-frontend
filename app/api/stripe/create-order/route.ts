@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
           const [product, variant] = await Promise.all([
             db.product.findUnique({
               where: { id: item.id },
-              select: { id: true, name: true, price: true, taxStatus: true, stock: true },
+              select: { id: true, name: true, price: true, salePrice: true, taxStatus: true, stock: true },
             }),
             item.variationId
               ? db.productVariant.findUnique({ where: { id: item.variationId } })
@@ -137,7 +137,24 @@ export async function POST(request: NextRequest) {
 
     for (const { item, product, variant } of rawProductResults) {
       if (!product) throw new Error(`Product missing or unavailable.`);
-      const price = variant ? Number(variant.price) : Number(product.price);
+      const dbRegularPrice = variant ? Number(variant.price) : Number(product.price);
+      const dbSalePrice = variant
+        ? (variant.salePrice ? Number(variant.salePrice) : null)
+        : (product.salePrice ? Number(product.salePrice) : null);
+      // Lowest valid price according to DB
+      const dbEffectivePrice = (dbSalePrice && dbSalePrice > 0 && dbSalePrice < dbRegularPrice)
+        ? dbSalePrice
+        : dbRegularPrice;
+
+      // Cart price (what the customer was shown, as a formatted string e.g. "$19.99")
+      const rawCartStr = String(item.price ?? '').replace(/[^0-9.]/g, '');
+      const cartItemPrice = rawCartStr ? Math.round(Number(rawCartStr) * 100) / 100 : null;
+
+      // Accept cart price only if it EXACTLY matches the DB regular or sale price (±1 cent).
+      // Rejects manipulated values that don't correspond to a real DB price point.
+      const matchesRegular = cartItemPrice !== null && Math.abs(cartItemPrice - dbRegularPrice) < 0.01;
+      const matchesSale    = cartItemPrice !== null && dbSalePrice !== null && Math.abs(cartItemPrice - dbSalePrice) < 0.01;
+      const price = (matchesRegular || matchesSale) ? cartItemPrice! : dbEffectivePrice;
       const itemTotal = price * item.quantity;
       subtotal += itemTotal;
       validOrderItems.push({

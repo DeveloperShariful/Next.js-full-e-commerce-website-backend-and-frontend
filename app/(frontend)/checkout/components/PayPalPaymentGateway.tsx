@@ -2,10 +2,9 @@
 
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import { useCart } from '@/context/CartContext';
-
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { getStoredUTM } from '@/components/SourceTracker';
@@ -54,19 +53,6 @@ interface PayPalGatewayProps {
   orderNotes: string;
 }
 
-// ============================================================
-// ROOT CAUSE OF BUG (FIXED):
-// ============================================================
-// আগের code: setInterval দিয়ে window.paypal.Buttons poll করত।
-// প্রথম load-এ PayPal SDK download হতে সময় লাগে (500-2000ms),
-// তাই polling শুরু হত কিন্তু SDK ready থাকত না → "Connecting..." দেখাত।
-// Reload-এ browser cache থেকে SDK instant load → buttons দেখাত।
-//
-// FIX: usePayPalScriptReducer hook use করছি।
-// এটা React context থেকে সরাসরি PayPal SDK loading state দেয়।
-// isPending=true → SDK loading, isResolved=true → SDK ready, কোনো polling নেই।
-// ============================================================
-
 const PayPalPaymentGatewayComponent = ({
   total,
   isPlacingOrder,
@@ -85,7 +71,106 @@ const PayPalPaymentGatewayComponent = ({
   const wcOrderIdRef = useRef<string | null>(null);
   const wcOrderKeyRef = useRef<string | null>(null);
 
+  // Refs keep the latest values so createOrder never uses stale closure data,
+  // even when React.memo prevents a re-render.
+  const cartItemsRef        = useRef(cartItems);
+  const customerInfoRef     = useRef(customerInfo);
+  const shippingInfoRef     = useRef(shippingInfo);
+  const selectedShippingRef = useRef(selectedShipping);
+  const shippingRatesRef    = useRef(shippingRates);
+  const appliedCouponsRef   = useRef(appliedCoupons);
+  const orderNotesRef       = useRef(orderNotes);
+  const isShippingSelectedRef = useRef(isShippingSelected);
+
+  useEffect(() => { cartItemsRef.current        = cartItems;        }, [cartItems]);
+  useEffect(() => { customerInfoRef.current     = customerInfo;     }, [customerInfo]);
+  useEffect(() => { shippingInfoRef.current     = shippingInfo;     }, [shippingInfo]);
+  useEffect(() => { selectedShippingRef.current = selectedShipping; }, [selectedShipping]);
+  useEffect(() => { shippingRatesRef.current    = shippingRates;    }, [shippingRates]);
+  useEffect(() => { appliedCouponsRef.current   = appliedCoupons;   }, [appliedCoupons]);
+  useEffect(() => { orderNotesRef.current       = orderNotes;       }, [orderNotes]);
+  useEffect(() => { isShippingSelectedRef.current = isShippingSelected; }, [isShippingSelected]);
+
   const [{ isPending, isResolved, isRejected }] = usePayPalScriptReducer();
+
+  // Stable callback — never recreated, always reads latest values from refs.
+  // No forceReRender needed: PayPal button never remounts when props change.
+  const createOrder = useCallback(async () => {
+    if (!isShippingSelectedRef.current) {
+      toast.error("Please select a shipping method first.");
+      throw new Error("Shipping not selected");
+    }
+
+    toast.loading("Initializing secure payment...", { id: 'paypal-init' });
+
+    try {
+      const affiliateMetaData: { key: string; value: string }[] = [];
+      const utmData = getStoredUTM();
+
+      const res = await fetch('/api/paypal/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cartItems:       cartItemsRef.current,
+          customerInfo:    customerInfoRef.current,
+          shippingInfo:    shippingInfoRef.current || customerInfoRef.current,
+          selectedShipping: selectedShippingRef.current,
+          shippingRates:   shippingRatesRef.current,
+          appliedCoupons:  appliedCouponsRef.current,
+          orderNotes:      orderNotesRef.current,
+          affiliateMetaData,
+          utmSource:       utmData.utmSource,
+          utmMedium:       utmData.utmMedium,
+          utmCampaign:     utmData.utmCampaign,
+          referringSite:   utmData.referringSite,
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss('paypal-init');
+
+      if (!res.ok) throw new Error(data.error || 'Failed to create PayPal order.');
+
+      wcOrderIdRef.current  = data.wcOrderId;
+      wcOrderKeyRef.current = data.wcOrderKey;
+
+      return data.id; // PayPal order ID
+    } catch (err: unknown) {
+      toast.dismiss('paypal-init');
+      const msg = err instanceof Error ? err.message : 'Failed to start payment.';
+      toast.error(msg);
+      throw err;
+    }
+  }, []); // empty deps — stable forever, reads latest from refs at click time
+
+  const onApprove = useCallback(async (data: { orderID: string }) => {
+    toast.loading('Verifying payment...', { id: 'paypal-capture' });
+    try {
+      const res = await fetch('/api/paypal/capture-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paypalOrderId: data.orderID,
+          wcOrderId:     wcOrderIdRef.current,
+        }),
+      });
+
+      const captureData = await res.json();
+      toast.dismiss('paypal-capture');
+
+      if (captureData.success) {
+        toast.success('Payment successful!');
+        await clearCart();
+        router.push(`/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}`);
+      } else {
+        toast.error(captureData.message || 'Payment could not be verified automatically.');
+      }
+    } catch (err) {
+      toast.dismiss('paypal-capture');
+      toast.error('Network error during verification.');
+      console.error('Capture Catch Error:', err);
+    }
+  }, [clearCart, router]);
 
   if (isPending) {
     return (
@@ -109,93 +194,9 @@ const PayPalPaymentGatewayComponent = ({
     <PayPalButtons
       style={{ layout: "vertical", color: 'gold', shape: 'rect', label: 'paypal', height: 48 }}
       disabled={isPlacingOrder || total <= 0 || !isShippingSelected}
-      forceReRender={[total]}
-
-      createOrder={async () => {
-        if (!isShippingSelected) {
-          toast.error("Please select a shipping method first.");
-          throw new Error("Shipping not selected");
-        }
-
-        toast.loading("Initializing secure payment...", { id: 'paypal-init' });
-
-        try {
-          // Affiliate cookies are HttpOnly — read server-side in the API route directly
-          const affiliateMetaData: { key: string; value: string }[] = [];
-
-          const utmData = getStoredUTM();
-
-          // Single request: creates DB order + PayPal order in one step.
-          // No stripe/create-order call needed for PayPal.
-          const res = await fetch('/api/paypal/create-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              cartItems,
-              customerInfo,
-              shippingInfo: shippingInfo || customerInfo,
-              selectedShipping,
-              shippingRates,
-              appliedCoupons,
-              orderNotes,
-              affiliateMetaData,
-              utmSource:     utmData.utmSource,
-              utmMedium:     utmData.utmMedium,
-              utmCampaign:   utmData.utmCampaign,
-              referringSite: utmData.referringSite,
-            }),
-          });
-
-          const data = await res.json();
-          toast.dismiss('paypal-init');
-
-          if (!res.ok) throw new Error(data.error || 'Failed to create PayPal order.');
-
-          wcOrderIdRef.current = data.wcOrderId;
-          wcOrderKeyRef.current = data.wcOrderKey;
-
-          return data.id; // PayPal order ID
-        } catch (err: unknown) {
-          toast.dismiss('paypal-init');
-          const msg = err instanceof Error ? err.message : 'Failed to start payment.';
-          toast.error(msg);
-          throw err;
-        }
-      }}
-
-      onApprove={async (data) => {
-        toast.loading('Verifying payment...', { id: 'paypal-capture' });
-        try {
-          const res = await fetch('/api/paypal/capture-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              paypalOrderId: data.orderID,
-              wcOrderId: wcOrderIdRef.current,
-            }),
-          });
-
-          const captureData = await res.json();
-          toast.dismiss('paypal-capture');
-
-          if (captureData.success) {
-            toast.success('Payment successful!');
-            await clearCart();
-            router.push(`/order-success?order_id=${wcOrderIdRef.current}&key=${wcOrderKeyRef.current}`);
-          } else {
-            toast.error(captureData.message || 'Payment could not be verified automatically.');
-          }
-        } catch (err) {
-          toast.dismiss('paypal-capture');
-          toast.error('Network error during verification.');
-          console.error('Capture Catch Error:', err);
-        }
-      }}
-
-      onCancel={() => {
-        toast.error('You cancelled the payment.');
-      }}
-
+      createOrder={createOrder}
+      onApprove={onApprove}
+      onCancel={() => { toast.error('You cancelled the payment.'); }}
       onError={(err) => {
         toast.dismiss();
         console.error('PayPal transaction failed:', err);
@@ -205,12 +206,13 @@ const PayPalPaymentGatewayComponent = ({
   );
 };
 
-// ✅ React.memo — re-renders only when total, shippingSelected, or isPlacingOrder change
+// Re-renders only when UI-visible props change (disabled state needs total/shipping/placing).
+// cartItems, coupons, shipping changes are handled via refs — no re-render, no button flicker.
 const PayPalPaymentGateway = React.memo(PayPalPaymentGatewayComponent, (prevProps, nextProps) => {
   return (
-    prevProps.total === nextProps.total &&
+    prevProps.total             === nextProps.total &&
     prevProps.isShippingSelected === nextProps.isShippingSelected &&
-    prevProps.isPlacingOrder === nextProps.isPlacingOrder
+    prevProps.isPlacingOrder    === nextProps.isPlacingOrder
   );
 });
 

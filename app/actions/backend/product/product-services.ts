@@ -257,6 +257,9 @@ export async function handleVariations(tx: any, productId: string, variationsDat
             name: v.name || "Variation",
             sku: v.sku || null,
             price: cleanPrice(v.price),
+            salePrice: (v.salePrice !== null && v.salePrice !== undefined && v.salePrice > 0 && v.salePrice < v.price)
+                ? cleanPrice(v.salePrice)
+                : null,
             stock: variantStock,
             attributes: v.attributes || {}, 
             trackQuantity: true,

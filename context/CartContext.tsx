@@ -24,14 +24,15 @@ export interface CartItemAttribute {
 }
 
 export interface CartItem {
-  id: string; 
-  databaseId: number; 
+  id: string;
+  databaseId: number;
+  variationId?: string;
   name: string;
   slug: string;
   price: string;
   image?: string | null;
   quantity: number;
-  key: string; 
+  key: string;
   total?: string;
   weight?: number;
   isPreOrder?: boolean;

@@ -20,11 +20,10 @@ class PayPalMessageErrorBoundary extends React.Component<
   }
 }
 
-function PayPalMessageInner({ total }: { total: number }) {
+function PayPalMessageInner({ debouncedTotal }: { debouncedTotal: number }) {
   const [{ isPending, isResolved, isRejected }] = usePayPalScriptReducer();
 
-  if (isPending || isRejected) return null;
-  if (!isResolved) return null;
+  if (isPending || isRejected || !isResolved) return null;
   if (
     typeof window !== 'undefined' &&
     !(window as { paypal?: { Messages?: unknown } }).paypal?.Messages
@@ -34,7 +33,10 @@ function PayPalMessageInner({ total }: { total: number }) {
 
   return (
     <div className="mb-4 text-center pl-2.5">
-      <PayPalMessages forceReRender={[{ amount: total }]} />
+      <PayPalMessages
+        amount={debouncedTotal}
+        forceReRender={[debouncedTotal]}
+      />
     </div>
   );
 }
@@ -44,21 +46,28 @@ interface PayPalMessageProps {
   clientId: string;
 }
 
-// Deferred 3 seconds after mount so it never blocks checkout page load.
-// Uses the outer PayPalScriptProvider — no inner provider needed.
 export default function PayPalMessage({ total, clientId }: PayPalMessageProps) {
+  // Delay initial render by 5 seconds — never blocks page or PayPal button load
   const [show, setShow] = useState(false);
+
+  // Debounced total — message only re-renders 1.5s after coupon/shipping stops changing
+  const [debouncedTotal, setDebouncedTotal] = useState(total);
 
   useEffect(() => {
     const timer = setTimeout(() => setShow(true), 5000);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedTotal(total), 1500);
+    return () => clearTimeout(timer);
+  }, [total]);
+
   if (!show || total <= 0 || !clientId) return null;
 
   return (
     <PayPalMessageErrorBoundary>
-      <PayPalMessageInner total={total} />
+      <PayPalMessageInner debouncedTotal={debouncedTotal} />
     </PayPalMessageErrorBoundary>
   );
 }

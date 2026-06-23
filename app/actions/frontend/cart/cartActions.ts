@@ -215,6 +215,7 @@ async function getFormattedCartItems(cartId: string) {
     return {
       id: item.product.id,
       databaseId: item.product.productCode,
+      variationId: item.variantId || undefined,
       name: isVariant ? `${item.product.name} - ${item.variant!.name}` : item.product.name,
       slug: item.product.slug,
       price: formatPrice(priceNum),

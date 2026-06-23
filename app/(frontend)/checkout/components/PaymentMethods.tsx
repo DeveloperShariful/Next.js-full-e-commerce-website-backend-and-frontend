@@ -102,7 +102,9 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   const mainStripeKey = stripePublicKey || gateways.find(g => g.identifier === 'stripe')?.publicKey || '';
-  const isPaypalEnabled = gateways.some(g => g.identifier === 'paypal' && g.isEnabled);
+  const paypalGateway = gateways.find(g => g.identifier === 'paypal');
+  const isPaypalEnabled = (paypalGateway?.isEnabled) ?? false;
+  const paypalClientId = paypalGateway?.publicKey || '';
   const isPayPalSelected = selectedPaymentMethod === 'paypal';
 
   // ============================================================
@@ -303,7 +305,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
       </div>
 
       {/* PayPal Pay Later message */}
-      {isPaypalEnabled && <PayPalMessage total={total} />}
+      {isPaypalEnabled && <PayPalMessage total={total} clientId={paypalClientId} />}
 
       {/* Payment method radio list */}
       <div className="border border-[#e0e0e0] rounded-lg overflow-hidden flex flex-col">

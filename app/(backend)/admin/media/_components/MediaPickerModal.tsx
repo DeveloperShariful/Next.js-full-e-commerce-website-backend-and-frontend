@@ -41,7 +41,10 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showUploader, setShowUploader] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(40);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const PAGE_SIZE = 40;
 
   const loadMedia = useCallback(async () => {
     setLoading(true);
@@ -56,8 +59,14 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
       setSelectedIds([]);
       setSearch('');
       setTypeFilter('ALL');
+      setVisibleCount(PAGE_SIZE);
     }
   }, [open, loadMedia]);
+
+  // Reset pagination when search or type filter changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, typeFilter]);
 
   if (!open) return null;
 
@@ -68,6 +77,9 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     const matchType = typeFilter === 'ALL' || m.type === typeFilter;
     return matchSearch && matchType;
   });
+
+  const visibleItems = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleCount;
 
   const toggleSelect = (id: string) => {
     if (multiple) {
@@ -162,7 +174,11 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
             <option value="DOCUMENT">Documents</option>
           </select>
 
-          <span className="text-[12px] text-[#646970]">{filtered.length} files</span>
+          <span className="text-[12px] text-[#646970]">
+            {visibleCount < filtered.length
+              ? `${visibleCount} of ${filtered.length} files`
+              : `${filtered.length} files`}
+          </span>
 
           <div className="flex-1" />
 
@@ -232,7 +248,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-[2px] bg-[#c3c4c7]">
-              {filtered.map(file => {
+              {visibleItems.map(file => {
                 const isSelected = selectedIds.includes(file.id);
                 return (
                   <div
@@ -294,6 +310,18 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Load More */}
+          {hasMore && (
+            <div className="flex justify-center pt-4 pb-1">
+              <button
+                onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+                className="px-5 py-2 text-[13px] border border-[#2271b1] text-[#2271b1] bg-white hover:bg-[#f0f6fc] rounded-[3px] cursor-pointer transition-colors"
+              >
+                Load More ({filtered.length - visibleCount} remaining)
+              </button>
             </div>
           )}
         </div>

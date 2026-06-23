@@ -1,10 +1,8 @@
 'use client';
 
-import React from 'react';
-import { PayPalMessages, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+import React, { useState, useEffect } from 'react';
+import { usePayPalScriptReducer, PayPalMessages } from '@paypal/react-paypal-js';
 
-// Error boundary silently catches any crash from PayPalMessages
-// (e.g. window.paypal.Messages undefined when Pay Later is unsupported)
 class PayPalMessageErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -23,13 +21,16 @@ class PayPalMessageErrorBoundary extends React.Component<
 }
 
 function PayPalMessageInner({ total }: { total: number }) {
-  const [{ isResolved, isRejected }] = usePayPalScriptReducer();
+  const [{ isPending, isResolved, isRejected }] = usePayPalScriptReducer();
 
-  // Wait until PayPal SDK is fully loaded
-  if (!isResolved || isRejected) return null;
-
-  // Messages component may be absent if merchant account doesn't support Pay Later
-  if (typeof window === 'undefined' || !(window as { paypal?: { Messages?: unknown } }).paypal?.Messages) return null;
+  if (isPending || isRejected) return null;
+  if (!isResolved) return null;
+  if (
+    typeof window !== 'undefined' &&
+    !(window as { paypal?: { Messages?: unknown } }).paypal?.Messages
+  ) {
+    return null;
+  }
 
   return (
     <div className="mb-4 text-center pl-2.5">
@@ -38,8 +39,23 @@ function PayPalMessageInner({ total }: { total: number }) {
   );
 }
 
-export default function PayPalMessage({ total }: { total: number }) {
-  if (total <= 0) return null;
+interface PayPalMessageProps {
+  total: number;
+  clientId: string;
+}
+
+// Deferred 3 seconds after mount so it never blocks checkout page load.
+// Uses the outer PayPalScriptProvider — no inner provider needed.
+export default function PayPalMessage({ total, clientId }: PayPalMessageProps) {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShow(true), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!show || total <= 0 || !clientId) return null;
+
   return (
     <PayPalMessageErrorBoundary>
       <PayPalMessageInner total={total} />

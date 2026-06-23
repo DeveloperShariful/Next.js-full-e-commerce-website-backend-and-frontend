@@ -1,4 +1,4 @@
-// File: app/admin/products/_components/product-table.tsx
+﻿// File: app/admin/products/_components/product-table.tsx
 
 // File: app/admin/products/_components/product-table.tsx
 
@@ -10,7 +10,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Image as ImageIcon, Star, Loader2 } from "lucide-react";
 import { bulkProductAction, moveToTrash, deleteProduct } from "@/app/actions/backend/product/product-list"; 
 import { duplicateProduct } from "@/app/actions/backend/product/product-duplicate"; 
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { PaginationControls } from "./pagination-controls"; 
 

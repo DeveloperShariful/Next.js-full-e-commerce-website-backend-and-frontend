@@ -1,9 +1,9 @@
-//app/(backend)/admin/marketing/klaviyo/_components/KlaviyoDashboard.tsx
+﻿//app/(backend)/admin/marketing/klaviyo/_components/KlaviyoDashboard.tsx
 
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { toast, Toaster } from "react-hot-toast";
+import { toast } from "sonner";
 import { Settings, Info, Save, Eye, EyeOff, HelpCircle, RefreshCw } from "lucide-react";
 import { 
   saveKlaviyoSettings, 
@@ -129,9 +129,7 @@ export default function KlaviyoDashboard({ config }: Props) {
 
   return (
     <div className="w-full">
-      <Toaster position="top-right" />
-
-      <div className="max-w-[1200px] mx-auto space-y-6">
+<div className="max-w-[1200px] mx-auto space-y-6">
         
         <form onSubmit={handleFormSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           

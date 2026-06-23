@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Carriers/Carrier_Service_List.tsx
+﻿// File: app/admin/settings/shipping/_components/Carriers/Carrier_Service_List.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { saveCarrierService, toggleCarrierStatus, deleteCarrierService } from "@/app/actions/backend/settings/shipping/carriers";
 import { CarrierService } from "@prisma/client";
 import { X, Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface Props {
     carriers: CarrierService[];

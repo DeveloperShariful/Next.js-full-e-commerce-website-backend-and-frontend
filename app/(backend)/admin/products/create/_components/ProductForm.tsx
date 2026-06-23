@@ -1,4 +1,4 @@
-// File: app/admin/products/create/_components/ProductForm.tsx
+﻿// File: app/admin/products/create/_components/ProductForm.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState, useTransition, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { productSchema, ProductFormValues } from "../schema";

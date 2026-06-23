@@ -1,9 +1,9 @@
-// File: app/(backend)/admin/categories/_components/category-view.tsx
+﻿// File: app/(backend)/admin/categories/_components/category-view.tsx
 
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { CategoryData } from "../types";
 
 // 🚀 Importing from the unified actions file

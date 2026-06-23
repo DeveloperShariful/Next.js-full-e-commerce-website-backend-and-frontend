@@ -1,10 +1,10 @@
-// app/admin/attributes/_components/attribute-form.tsx
+﻿// app/admin/attributes/_components/attribute-form.tsx
 
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
 import { AttributeData } from "../types";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { createAttribute, updateAttribute, AttributeState } from "@/app/actions/backend/attribute/attribute";

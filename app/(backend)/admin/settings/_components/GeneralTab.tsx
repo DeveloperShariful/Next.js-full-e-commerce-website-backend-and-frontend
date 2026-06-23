@@ -1,10 +1,10 @@
-//app/(backend)/admin/settings/_components/GeneralTab.tsx
+﻿//app/(backend)/admin/settings/_components/GeneralTab.tsx
 
 "use client";
 
 import { useState, useEffect } from "react";
 import { getGeneralSettings, updateGeneralSettings } from "@/app/actions/backend/settings/general/general";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { Loader2, Save, Store, Globe, Share2 } from "lucide-react";
 
 // সাব-কম্পোনেন্ট ইমপোর্ট (আগের general/ ফোল্ডারের ভেতরের রিলেটিভ পাথ বজায় রাখা হয়েছে)

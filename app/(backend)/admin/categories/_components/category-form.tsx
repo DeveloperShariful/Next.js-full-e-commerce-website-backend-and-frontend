@@ -1,4 +1,4 @@
-// File: app/(backend)/admin/categories/_components/category-form.tsx
+﻿// File: app/(backend)/admin/categories/_components/category-form.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { MediaSource } from "@prisma/client";
 import { CategoryData } from "../types";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { createCategory , updateCategory} from "@/app/actions/backend/categories/actions";

@@ -1,10 +1,10 @@
-// app/admin/inventory/_components/adjust-stock-modal.tsx
+﻿// app/admin/inventory/_components/adjust-stock-modal.tsx
 
 "use client";
 
 import { useState } from "react";
 import { adjustStock } from "@/app/actions/backend/inventory/inventory";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { X, Loader2 } from "lucide-react";
 
 interface AdjustStockModalProps {

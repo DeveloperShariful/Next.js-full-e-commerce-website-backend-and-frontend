@@ -1,4 +1,4 @@
-// app/admin/products/create/_components/Publish.tsx
+﻿// app/admin/products/create/_components/Publish.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormContext } from "react-hook-form";
 import { ChevronUp, ChevronDown, Trash2, Star, Key, Eye } from "lucide-react"; 
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { moveToTrash } from "@/app/actions/backend/product/product-list";
 import { ProductFormData } from "../types";
 

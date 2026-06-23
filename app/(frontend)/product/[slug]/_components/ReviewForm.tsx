@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { FaStar, FaImage, FaReply, FaTimes, FaPlayCircle } from 'react-icons/fa';
 import Image from 'next/image';
 

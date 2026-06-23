@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 

@@ -1,9 +1,9 @@
-//app/(backend)/admin/attributes/_components/attribute-view.tsx
+﻿//app/(backend)/admin/attributes/_components/attribute-view.tsx
 
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { AttributeData } from "../types";
 
 import { 

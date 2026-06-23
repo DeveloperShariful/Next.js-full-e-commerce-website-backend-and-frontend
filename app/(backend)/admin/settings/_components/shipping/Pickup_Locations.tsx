@@ -1,11 +1,11 @@
-// File: app/admin/settings/shipping/_components/Locations/Pickup_Locations.tsx
+﻿// File: app/admin/settings/shipping/_components/Locations/Pickup_Locations.tsx
 
 "use client";
 
 import { useState } from "react";
 import { deletePickupLocation, togglePickupStatus } from "@/app/actions/backend/settings/shipping/locations";
 import { PickupLocation } from "@prisma/client";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import Pickup_Location_Form from "./Pickup_Location_Form";
 
 interface PickupListProps {

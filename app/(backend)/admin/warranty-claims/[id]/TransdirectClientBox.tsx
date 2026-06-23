@@ -1,9 +1,9 @@
-//app/(backend)/admin/warranty-claims/[id]/TransdirectClientBox.tsx
+﻿//app/(backend)/admin/warranty-claims/[id]/TransdirectClientBox.tsx
 
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from "sonner";
 import { getTransdirectQuotes, confirmTransdirectBooking } from '@/app/actions/backend/warranty/transdirect-action';
 import Image from 'next/image';
 

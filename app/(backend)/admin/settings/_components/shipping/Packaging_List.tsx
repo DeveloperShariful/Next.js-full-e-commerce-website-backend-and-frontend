@@ -1,11 +1,11 @@
-// File: app/admin/settings/shipping/_components/Packaging/Packaging_List.tsx
+﻿// File: app/admin/settings/shipping/_components/Packaging/Packaging_List.tsx
 
 "use client";
 
 import { useState } from "react";
 import { deleteShippingBox, toggleBoxStatus } from "@/app/actions/backend/settings/shipping/packaging";
 import { ShippingBox, TransdirectBox } from "@prisma/client"; 
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import Box_Form_Modal from "./Box_Form_Modal";
 
 interface PackagingListProps {

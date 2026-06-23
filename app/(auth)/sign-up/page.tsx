@@ -6,7 +6,7 @@ import { registerUser } from "@/app/actions/auth";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-//app/(backend)/admin/inventory/_components/purchase-orders-view.tsx
+﻿//app/(backend)/admin/inventory/_components/purchase-orders-view.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getPurchaseOrders, createPurchaseOrder } from "@/app/actions/backend/inventory/supplier-actions";
 import { PurchaseOrderData } from "../types";
 import { Plus, Loader2, FileText, Download } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 

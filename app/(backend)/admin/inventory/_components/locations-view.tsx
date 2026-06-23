@@ -1,4 +1,4 @@
-// app/admin/inventory/_components/locations-view.tsx
+﻿// app/admin/inventory/_components/locations-view.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getLocations, upsertLocation, deleteLocation } from "@/app/actions/backend/inventory/location-actions";
 import { LocationData } from "../types";
 import { Plus, Loader2, MapPin, CheckCircle } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { format } from "date-fns";
 
 export function LocationsView() {

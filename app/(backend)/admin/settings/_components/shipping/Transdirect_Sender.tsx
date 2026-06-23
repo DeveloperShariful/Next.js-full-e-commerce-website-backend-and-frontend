@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Transdirect/Transdirect_Sender.tsx
+﻿// File: app/admin/settings/shipping/_components/Transdirect/Transdirect_Sender.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { saveTransdirectSender } from "@/app/actions/backend/settings/shipping/transdirect-sender";
 import { TransdirectConfig } from "@prisma/client";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface Props {
     config: TransdirectConfig | null;

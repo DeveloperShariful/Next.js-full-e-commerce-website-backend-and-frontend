@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Transdirect/Transdirect_Credentials.tsx
+﻿// File: app/admin/settings/shipping/_components/Transdirect/Transdirect_Credentials.tsx
 
 "use client";
 
@@ -7,7 +7,7 @@ import { saveTransdirectCredentials } from "@/app/actions/backend/settings/shipp
 import { testTransdirectConnection } from "@/app/actions/backend/settings/shipping/transdirect-service";
 import { TransdirectConfig } from "@prisma/client";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface Props {
     config: TransdirectConfig | null;

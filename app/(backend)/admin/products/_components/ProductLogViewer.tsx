@@ -1,11 +1,11 @@
-// File: app/admin/products/_components/ProductLogViewer.tsx
+﻿// File: app/admin/products/_components/ProductLogViewer.tsx
 
 "use client";
 
 import { useState, useEffect } from "react";
 import { History, X, RefreshCw, User, Loader2, Trash2, Filter, Package, ArrowRight } from "lucide-react";
 import { getProductActivityLogs, deleteActivityLogs } from "@/app/actions/backend/product/product-logs"; 
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 export default function ProductLogViewer() {
   const [isOpen, setIsOpen] = useState(false);

@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation'; 
 import { useCart } from '@/context/CartContext';
 import { useCompare } from '@/context/CompareContext'; 
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { StorefrontProduct } from '@/app/(frontend)/types'; // ১০০% ডাটাবেজ অরিজিনাল টাইপ ইম্পোর্ট
 
 // পুরানো interface Product পুরোপুরি মুছে ফেলা হয়েছে। এখন সরাসরি StorefrontProduct ব্যবহার হচ্ছে।

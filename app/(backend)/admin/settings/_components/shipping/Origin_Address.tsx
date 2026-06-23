@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Locations/Origin_Address.tsx
+﻿// File: app/admin/settings/shipping/_components/Locations/Origin_Address.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { saveOriginAddress } from "@/app/actions/backend/settings/shipping/locations";
 import { Location } from "@prisma/client";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface OriginProps {
     location: Location | null; 

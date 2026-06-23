@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { useCompare } from '@/context/CompareContext'; 
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface ProductForCart {
   id: string;

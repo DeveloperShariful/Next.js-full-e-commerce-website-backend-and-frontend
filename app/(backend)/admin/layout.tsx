@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import { Toaster } from "sonner";
 import { auth } from "@/auth"; 
 import { db } from "@/lib/prisma";
 import { Role } from "@prisma/client";
@@ -108,6 +109,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       paymentMethods={cleanData.paymentMethods as any}
       pickupLocations={cleanData.pickupLocations as any}
     >
+      <Toaster position="top-center" />
       <div className="flex flex-col h-screen bg-[#f0f0f1] font-sans text-[#3c434a] overflow-hidden">
         <AdminHeader 
           user={adminUser} 

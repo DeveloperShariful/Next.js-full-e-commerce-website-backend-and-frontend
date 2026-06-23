@@ -1,10 +1,10 @@
-//app/(backend)/admin/users/_components/UserTableClient.tsx
+﻿//app/(backend)/admin/users/_components/UserTableClient.tsx
 
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
+import { toast } from "sonner";
 import { Role } from '@prisma/client';
 import { deleteUser, bulkDeleteUsers, bulkChangeRole, sendPasswordReset } from '@/app/actions/backend/users/user-actions';
 import Pagination from '@/app/(backend)/admin/warranty-claims/_components/Pagination'; 

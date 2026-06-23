@@ -9,7 +9,7 @@ import ExpressCheckouts from './ExpressCheckouts';
 import PayPalPaymentGateway from './PayPalPaymentGateway';
 import StripePaymentGateway from './StripePaymentGateway';
 import PayPalMessage from './PayPalMessage';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // ============================================================================
 // 1. INTERFACES

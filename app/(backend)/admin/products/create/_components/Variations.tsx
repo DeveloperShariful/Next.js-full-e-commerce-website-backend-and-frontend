@@ -1,10 +1,10 @@
-// File: app/admin/products/create/_components/Variations.tsx
+﻿// File: app/admin/products/create/_components/Variations.tsx
 
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { useFormContext, useFieldArray } from "react-hook-form";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Trash2, Wand2, MapPin, Box, X, Plus, Settings2, Search, CheckSquare, Square, Filter } from "lucide-react"; 
 import { getLocations } from "@/app/actions/backend/product/product-read";
 import { ProductFormData, Variation } from "../types";

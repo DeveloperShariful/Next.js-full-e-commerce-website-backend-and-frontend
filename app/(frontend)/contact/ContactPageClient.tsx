@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, FormEvent, ChangeEvent } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import Link from 'next/link';
 // 🛑 NEW: Import the server action

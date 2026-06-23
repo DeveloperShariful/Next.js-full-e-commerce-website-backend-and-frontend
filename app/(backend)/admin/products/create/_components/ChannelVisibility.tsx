@@ -1,9 +1,9 @@
-//app/admin/products/create/_components/ChannelVisibility.tsx
+﻿//app/admin/products/create/_components/ChannelVisibility.tsx
 
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { AlertCircle, CheckCircle, Clock, EyeOff, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { getLocalProductChannelStatus } from "@/app/actions/backend/marketing/gmc-status.actions";
 import { syncSingleProductStatusFromGoogle, updateProductChannelVisibility } from "@/app/actions/backend/marketing/gmc-product-sync.actions";

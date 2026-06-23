@@ -1,39 +1,44 @@
-// File: app/(frontend)/affiliates/layout.tsx
+// File: app/(frontend)/affiliates/(dashboard)/layout.tsx
 
 import { redirect } from "next/navigation";
-import { db } from "@/lib/prisma";
-import { getAuthAffiliate } from "@/app/actions/frontend/affiliate/auth-helper";
 import { AlertTriangle, Ban, LifeBuoy, ArrowLeft, Clock, CheckCircle, Mail } from "lucide-react";
 import Link from "next/link";
+import { getAuthAffiliate } from "@/app/actions/frontend/affiliate/auth-helper";
+import { db } from "@/lib/prisma";
+import { GlobalStoreProvider } from "@/app/providers/global-store-provider";
+import { serializePrismaData } from "@/lib/format-data";
+import {
+  getCachedStoreSettings,
+  getCachedSeoConfig,
+  getCachedMarketingConfig,
+  getCachedPaymentMethods,
+  getCachedPickupLocations,
+} from "@/lib/global-settings-cache";
 
 export default async function AffiliateDashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-
-  // ✅ FIX: ফাংশনটি কল করে ডাটা একটি ভেরিয়েবলে নিলাম
   const authSession = await getAuthAffiliate();
-  
-  // ✅ FIX: অবজেক্ট থেকে userId (string) বের করলাম
-  const userId = authSession.userId; 
+  const userId = authSession.userId;
 
-  // 2. Fetch Account & Global Settings
-  const [affiliateAccount, settings] = await Promise.all([
+  // Fetch affiliate account + cached store data in parallel
+  const [affiliateAccount, settings, seo, marketing, paymentMethods, pickupLocations] = await Promise.all([
     db.affiliateAccount.findUnique({
-      where: { userId }, // ✅ এখন এটি স্ট্রিং পাচ্ছে, তাই এরর হবে না
-      select: { id: true, status: true, slug: true }
+      where: { userId },
+      select: { id: true, status: true, slug: true },
     }),
-    db.storeSettings.findUnique({
-      where: { id: "settings" },
-      select: { generalConfig: true, storeEmail: true }
-    })
+    getCachedStoreSettings(),
+    getCachedSeoConfig(),
+    getCachedMarketingConfig(),
+    getCachedPaymentMethods(),
+    getCachedPickupLocations(),
   ]);
 
-  // 3. Global Program Status Check
   const generalConfig = settings?.generalConfig as { enableAffiliateProgram?: boolean } | null;
   const isProgramActive = generalConfig?.enableAffiliateProgram ?? false;
-  
+
   if (!isProgramActive) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
@@ -53,12 +58,10 @@ export default async function AffiliateDashboardLayout({
     );
   }
 
-  // 4. Registration Check
   if (!affiliateAccount) {
     redirect("/affiliates/register");
   }
 
-  // 5. Suspension Check
   if (affiliateAccount.status === "SUSPENDED" || affiliateAccount.status === "REJECTED") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
@@ -75,7 +78,7 @@ export default async function AffiliateDashboardLayout({
           <div className="flex justify-center gap-4">
             <Link href="/" className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Back to Home</Link>
             <a href={`mailto:${settings?.storeEmail || "support@gobike.au"}`} className="px-6 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 flex items-center gap-2">
-                <LifeBuoy className="w-4 h-4" /> Contact Support
+              <LifeBuoy className="w-4 h-4" /> Contact Support
             </a>
           </div>
         </div>
@@ -83,7 +86,6 @@ export default async function AffiliateDashboardLayout({
     );
   }
 
-  // 6. PENDING — application submitted but not yet approved
   if (affiliateAccount.status === "PENDING") {
     const supportEmail = settings?.storeEmail || "support@gobike.au";
     return (
@@ -129,5 +131,67 @@ export default async function AffiliateDashboardLayout({
     );
   }
 
-  return <div className="bg-gray-50 min-h-screen">{children}</div>;
+  const rawData = {
+    settings: {
+      storeSettings: {
+        storeName: settings?.storeName || "",
+        storeEmail: settings?.storeEmail,
+        storePhone: settings?.storePhone,
+        currency: settings?.currency || "",
+        currencySymbol: settings?.currencySymbol || "",
+        weightUnit: settings?.weightUnit || "",
+        dimensionUnit: settings?.dimensionUnit || "",
+        logo: settings?.logo,
+        favicon: settings?.favicon,
+        maintenance: settings?.maintenance || false,
+        storeAddress: settings?.storeAddress,
+        socialLinks: settings?.socialLinks,
+        generalConfig: settings?.generalConfig,
+        taxSettings: settings?.taxSettings,
+        affiliateConfig: settings?.affiliateConfig,
+        logoMedia: settings?.logoMedia,
+        faviconMedia: settings?.faviconMedia,
+      },
+      seoConfig: seo ? {
+        siteName: seo.siteName || "",
+        titleSeparator: seo.titleSeparator || "|",
+        siteUrl: seo.siteUrl || "",
+        defaultMetaTitle: seo.defaultMetaTitle,
+        defaultMetaDesc: seo.defaultMetaDesc,
+        ogImage: seo.ogImage,
+        twitterCard: seo.twitterCard || "summary_large_image",
+        twitterSite: seo.twitterSite,
+        themeColor: seo.themeColor,
+        robotsTxtContent: seo.robotsTxtContent,
+        organizationData: seo.organizationData,
+        manifestJson: seo.manifestJson,
+        ogMedia: seo.ogMedia,
+      } : null,
+      marketingConfig: marketing ? {
+        gtmEnabled: marketing.gtmEnabled,
+        gtmContainerId: marketing.gtmContainerId,
+        gtmAuth: marketing.gtmAuth,
+        gtmPreview: marketing.gtmPreview,
+        fbEnabled: marketing.fbEnabled,
+        fbPixelId: marketing.fbPixelId,
+        klaviyoEnabled: marketing.klaviyoEnabled,
+        klaviyoPublicKey: marketing.klaviyoPublicKey,
+        cookieConsentRequired: false,
+      } : null,
+    },
+    paymentMethods: paymentMethods || [],
+    pickupLocations: pickupLocations || [],
+  };
+
+  const cleanData = serializePrismaData(rawData);
+
+  return (
+    <GlobalStoreProvider
+      settings={cleanData.settings}
+      paymentMethods={cleanData.paymentMethods}
+      pickupLocations={cleanData.pickupLocations}
+    >
+      <div className="bg-gray-50 min-h-screen">{children}</div>
+    </GlobalStoreProvider>
+  );
 }

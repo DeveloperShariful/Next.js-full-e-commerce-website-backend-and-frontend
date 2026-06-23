@@ -1,4 +1,4 @@
-// app/admin/inventory/_components/suppliers-view.tsx
+﻿// app/admin/inventory/_components/suppliers-view.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { getSuppliers, upsertSupplier, deleteSupplier } from "@/app/actions/backend/inventory/supplier-actions";
 import { SupplierData } from "../types";
 import { Plus, Loader2, Users, MapPin, Mail, Phone, ExternalLink } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { format } from "date-fns";
 
 export function SuppliersView() {

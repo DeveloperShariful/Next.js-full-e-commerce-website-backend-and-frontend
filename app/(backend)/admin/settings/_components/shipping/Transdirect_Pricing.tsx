@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { saveTransdirectPricing } from "@/app/actions/backend/settings/shipping/transdirect-config";
 import { TransdirectConfig } from "@prisma/client";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface Props {
   config: TransdirectConfig | null;

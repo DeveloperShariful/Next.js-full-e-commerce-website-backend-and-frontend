@@ -1,9 +1,9 @@
-//app/(backend)/admin/marketing/search-console/_components/GscDashboard.tsx
+﻿//app/(backend)/admin/marketing/search-console/_components/GscDashboard.tsx
 
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast, Toaster } from "react-hot-toast";
+import { toast } from "sonner";
 import { Settings, Info, Save, HelpCircle, Flame, Send, Trash2 } from "lucide-react";
 import { saveGscConfig, forceGoogleIndexing } from "@/app/actions/backend/marketing/gsc-indexing.actions";
 
@@ -73,9 +73,7 @@ export default function GscDashboard({ config }: Props) {
 
   return (
     <div className="w-full min-h-screen bg-[#f0f0f1] text-[#3c434a] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica_Neue',sans-serif] ">
-      <Toaster position="top-right" />
-      
-      {/* Top Header */}
+{/* Top Header */}
       <div className="bg-white border-b border-[#ccd0d4] py-4 px-4 sm:px-6 mb-6 w-full flex items-center gap-3">
          <div className="text-[20px]">🔍</div>
          <h1 className="text-[23px] font-bold text-[#1d2327] m-0">Google Search Console &amp; Indexing</h1>

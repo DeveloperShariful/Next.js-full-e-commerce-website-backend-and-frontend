@@ -1,4 +1,4 @@
-// File: app/(backend)/admin/brands/_components/brand-form.tsx
+﻿// File: app/(backend)/admin/brands/_components/brand-form.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { MediaSource } from "@prisma/client";
 import { BrandData } from "../types";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { createBrand, updateBrand } from "@/app/actions/backend/brands/brand-actions";

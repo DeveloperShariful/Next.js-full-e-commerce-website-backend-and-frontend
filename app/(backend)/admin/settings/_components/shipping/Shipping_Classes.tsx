@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Local/Shipping_Classes.tsx
+﻿// File: app/admin/settings/shipping/_components/Local/Shipping_Classes.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { createShippingClass, deleteShippingClass } from "@/app/actions/backend/settings/shipping/local";
 import { ComponentProps } from "./types";
 import { X } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 export default function Shipping_Classes({ classes, refreshData }: ComponentProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);

@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Locations/Pickup_Location_Form.tsx
+﻿// File: app/admin/settings/shipping/_components/Locations/Pickup_Location_Form.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { savePickupLocation } from "@/app/actions/backend/settings/shipping/locations";
 import { PickupLocation } from "@prisma/client";
 import { X, Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { getCountryAndStatesList } from "@/app/actions/backend/settings/general/location-helpers"; // ✅ Import Helper
 
 interface FormProps {

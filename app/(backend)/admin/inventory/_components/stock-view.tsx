@@ -1,4 +1,4 @@
-// app/admin/inventory/_components/stock-view.tsx
+﻿// app/admin/inventory/_components/stock-view.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getInventoryList, adjustStock } from "@/app/actions/backend/inventory/stock-actions";
 import { InventoryLevelData } from "../types";
 import { Search, Box, Loader2, MapPin } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 export function StockView() {
   const [data, setData] = useState<InventoryLevelData[]>([]);

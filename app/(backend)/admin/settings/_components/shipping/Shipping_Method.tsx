@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Local/Shipping_Method.tsx
+﻿// File: app/admin/settings/shipping/_components/Local/Shipping_Method.tsx
 
 "use client";
 
@@ -7,7 +7,7 @@ import { addShippingRate, deleteShippingRate, updateShippingRate } from "@/app/a
 import { ShippingZone, ShippingRate } from "./types"; 
 import { TransdirectConfig, CarrierService } from "@prisma/client";
 import { X, HelpCircle } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface ShippingMethodProps {
     zone: ShippingZone;

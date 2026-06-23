@@ -1,9 +1,9 @@
-//app/(backend)/admin/marketing/tag-manager/_components/GtmDashboard.tsx
+﻿//app/(backend)/admin/marketing/tag-manager/_components/GtmDashboard.tsx
 
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { toast, Toaster } from "react-hot-toast";
+import { toast } from "sonner";
 import { Settings, Info, RefreshCw, Layers, ShieldCheck } from "lucide-react";
 import { 
   fetchGtmAccountsAndContainers, 
@@ -147,9 +147,7 @@ export default function GtmDashboard({ config }: Props) {
 
   return (
     <div className="w-full">
-      <Toaster position="top-right" />
-
-      <div className="w-full space-y-6">
+<div className="w-full space-y-6">
         
         {/* 🚀 Google Account Profile Card */}
         {config && config.googleAccountId && (

@@ -1,9 +1,9 @@
-//app/(backend)/admin/marketing/facebook/page.tsx
+﻿//app/(backend)/admin/marketing/facebook/page.tsx
 
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { toast, Toaster } from "react-hot-toast";
+import { toast } from "sonner";
 import { Copy, Check, Info, Settings, HelpCircle, Save } from "lucide-react";
 import { getFbSettings, updateFbSettings, getFbProductStats, FbSettingsData } from "@/app/actions/backend/marketing/fb-settings.actions";
 
@@ -65,9 +65,7 @@ export default function FacebookSettingsPage() {
 
   return (
     <div className="w-full min-h-screen bg-[#f0f0f1] text-[#3c434a] font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,'Helvetica_Neue',sans-serif] p-0 m-0 pb-10">
-      <Toaster position="top-right" />
-      
-      {/* Top Header */}
+{/* Top Header */}
       <div className="bg-white border-b border-[#ccd0d4] py-4 px-6 m-0 mb-6 w-full flex items-center gap-3">
          <div className="w-8 h-8 bg-[#1877F2] text-white flex justify-center items-center rounded-full font-bold text-[18px]">f</div>
          <h1 className="text-[23px] font-bold text-[#1d2327] m-0">Facebook (Meta) Business</h1>

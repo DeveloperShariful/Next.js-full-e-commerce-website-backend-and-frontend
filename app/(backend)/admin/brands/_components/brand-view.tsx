@@ -1,9 +1,9 @@
-//app/(backend)/admin/brands/_components/brand-view.tsx
+﻿//app/(backend)/admin/brands/_components/brand-view.tsx
 
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { BrandData } from "../types";
 
 // 🚀 Importing from our new unified actions file

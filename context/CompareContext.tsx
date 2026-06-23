@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export interface ProductAttribute {
   name: string;

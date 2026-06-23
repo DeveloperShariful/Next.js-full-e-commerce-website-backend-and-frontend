@@ -68,17 +68,21 @@ export const getCachedMarketingConfig = unstable_cache(
 // 4. PAYMENT METHODS CACHE
 // ট্যাগ: 'payment-methods'
 // ============================================================================
-export const getCachedPaymentMethods = async () => {
-  try {
-    return await db.paymentGateway.findMany({ 
-      where: { isEnabled: true },
-      orderBy: { displayOrder: "asc" },
-    });
-  } catch (error) {
-    console.error("Cache Error (PaymentMethods):", error);
-    return [];
-  }
-};
+export const getCachedPaymentMethods = unstable_cache(
+  async () => {
+    try {
+      return await db.paymentGateway.findMany({
+        where: { isEnabled: true },
+        orderBy: { displayOrder: "asc" },
+      });
+    } catch (error) {
+      console.error("Cache Error (PaymentMethods):", error);
+      return [];
+    }
+  },
+  ["payment-methods-cache-key"],
+  { tags: ["payment-methods"], revalidate: 86400 }
+);
 
 // ============================================================================
 // 5. PICKUP LOCATIONS CACHE

@@ -1,32 +1,31 @@
-// app/(frontend)/electric-bike-parts/[categorySlug]/seoContent.ts
+// app/electric-bike-parts/[categorySlug]/seoContent.ts
 
 export const seoContentMap: Record<string, any> = {
   // ---------------- BATTERY PAGE ----------------
   'battery': {
     h1: "Electric Bike Batteries",
     keywords: [
-      'electric bike battery', 
-      'electric bike batteries', 
-      'battery electric bike', 
-      'electric bike batteries australia', 
+      'electric bike battery',
+      'electric bike batteries',
+      'battery electric bike',
+      'electric bike batteries australia',
       'electric bike battery replacement'
     ],
-    // 50 words, Primary Keyword & Internal Link included
-    topIntro: `Showcase replacement and upgrade <strong>electric bike batteries</strong> built specifically for the GoBike 12, 16, 20 and 24 inch range, with reliable lithium-ion cells, long ride times and safe charging. Find the perfect power source for your kids <a href="/bikes" class="text-blue-600 font-semibold hover:underline">electric bikes</a> today.`,
+    topIntro: `A reliable <strong>electric bike battery</strong> means more riding, more progression and more time outdoors. GoBike stocks replacement and upgrade batteries built specifically for our 12, 16, 20 and 24-inch bikes, delivering dependable power, long ride times and safe charging performance. From replacing a worn battery to keeping a spare on hand for those bigger riding days, you'll find exactly what you need for your bike. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">Explore our full range of kids electric bikes →</a>`,
     bottomSections: [
       {
         h2: "Shop Our Range of Electric Bike Batteries",
-        p: "Cover the variety of replacement and spare batteries available across the GoBike line-up, including different voltages and amp-hour ratings (such as the 10Ah pack used in the GoBike 20). Discuss what affects ride time, charge time, cycle life and range, plus the chargers and accessories sold alongside the batteries. Make it easy for parents to identify the right pack for their kid's specific bike size."
+        p: "Our range of electric bike batteries is designed to suit the entire GoBike line-up. From compact batteries for younger riders through to larger-capacity options like the 10Ah pack used in the GoBike 20, every battery is built to deliver reliable performance. Ride time depends on factors such as battery capacity, rider weight, terrain and speed settings. We also stock compatible chargers and accessories to help keep your battery power performing at its best. If you're looking for electric bike batteries in Australia, we'll help you find the correct one for your child's bike, as well as your own."
       },
       {
         h2: "Why Choose an Electric Bike Battery Replacement From GoBike",
-        p: "Highlight the safety and quality of genuine OEM-fit lithium-ion batteries, including BMS protection, certified cells, and reliable performance. Cover correct charging and storage practices, expected battery lifespan, and the 1-year warranty on eligible batteries. Mention expert local support to help diagnose battery faults and recommend the right replacement."
+        p: "A genuine electric bike battery replacement is built to match your GoBike perfectly. Our batteries use quality lithium-ion cells and integrated BMS protection to support safe charging and reliable operation. To maximise lifespan, store batteries in a cool, dry place and use the correct charger. Most battery electric bike systems provide years of dependable use when properly maintained. Eligible batteries are backed by a 1-year warranty, and our local team is available to help diagnose faults and recommend the right replacement solution."
       }
     ],
     faqs: [
-      { q: "How long does an electric bike battery last on a kids' ebike?", a: "With proper care, our lithium-ion batteries typically last between 3 to 5 years or 500-1000 charge cycles before capacity significantly drops." },
-      { q: "How do I know when my electric bike battery needs replacing?", a: "If the battery drains unusually fast, fails to hold a charge, or the bike cuts out unexpectedly during a ride, it's likely time for a replacement." },
-      { q: "How do I safely charge and store a lithium-ion electric bike battery?", a: "Always use the original charger, avoid overcharging, and store the battery in a cool, dry place. If storing for a long time, keep the charge level around 50%." },
+      { q: "How long does an electric bike battery last on a kids' ebike?", a: "Most lithium-ion electric bike batteries provide hundreds of charge cycles, depending on use and charging habits." },
+      { q: "How do I know when my electric bike battery needs replacing?", a: "Reduced ride time, poor charge retention and inconsistent power are common signs a replacement may be needed." },
+      { q: "How do I safely charge and store a lithium-ion electric bike battery?", a: "Use the correct charger, avoid extreme temperatures and store the battery partially charged in a dry location." },
       { q: "Can I upgrade my kids' electric bike to a higher capacity battery?", a: "In many cases, yes. However, you must ensure the new battery's voltage matches your bike's controller and motor to avoid electrical damage." }
     ]
   },
@@ -37,28 +36,28 @@ export const seoContentMap: Record<string, any> = {
   'tyre-tube': { ...tyreContent() },
 
   // ---------------- MOTORS PAGE ----------------
-  'motors-components': {
+  'motors': {
     h1: "Electric Bike Motors and Components",
     keywords: [
-      'electric bike motor', 
-      'electric bike motor kit', 
+      'electric bike motor',
+      'electric bike motor kit',
       'electric bike motor kits'
     ],
-    topIntro: `Showcase replacement and upgrade <strong>electric bike motors</strong> and motor kits engineered for the GoBike range, from the entry-level GoBike 12 right through to the powerful 2500W GoBike 24. Explore our complete range of <a href="/bikes" class="text-blue-600 font-semibold hover:underline">electric bikes</a> to learn more.`,
+    topIntro: `The right <strong>electric bike motor</strong> can keep your child riding hard, progressing faster and getting the most from every session. GoBike stocks replacement motors, components and upgrade kits engineered specifically for our full range, from the GoBike 12 through to the powerful 2500W GoBike 24. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">Check out our range of kids' electric bikes and find the right setup for your rider →</a>`,
     bottomSections: [
       {
         h2: "Shop Our Range of Electric Bike Motors",
-        p: "Cover the variety of motors and complete motor kits available, including hub motors across different wattages, controllers, throttles, wiring looms and replacement components. Specify which motor outputs suit each GoBike model (the lower-wattage motors for the 12 and 16 inch bikes through to the 2500W motor on the GoBike 24) so customers can match the correct motor or kit to their bike. Highlight any compatible upgrade paths."
+        p: "Our range includes complete electric bike motor kits, replacement hub motors, controllers, throttles, wiring looms and supporting components designed to suit the GoBike range. Lower-wattage motors are available for the GoBike 12 and 16 models, while higher-output systems support the GoBike 20 and the 2500W GoBike 24. You might be replacing a worn component or exploring compatible upgrade options; whatever the case, our electric bike motor kit solutions make it easy to match the correct power system to your bike. Every component is selected to deliver reliable performance and straightforward compatibility."
       },
       {
         h2: "Why Choose a Genuine Electric Bike Motor From GoBike",
-        p: "Highlight the build quality, sealed bearings, heat management and long-term reliability of genuine motor units. Cover compatibility with existing controllers and batteries, ease of installation, the 1-year warranty on eligible motor parts, and expert local support to diagnose motor faults and recommend the right replacement or upgrade kit."
+        p: "A genuine electric bike motor is designed to work seamlessly with your existing battery, controller and bike setup. Featuring quality construction, sealed bearings and effective heat management, our motors are built to handle regular riding and demanding conditions. Many replacement parts are straightforward to install, while eligible motor components are backed by a 1-year warranty for added peace of mind. If you're unsure whether you need a replacement motor or one of our electric bike motor kits, our Australian support team can help diagnose faults and recommend the right solution."
       }
     ],
     faqs: [
-      { q: "How do I know which electric bike motor fits my kids' ebike?", a: "Match the wattage and voltage of your current motor. Our product descriptions clearly list which GoBike model (12\", 16\", 20\", 24\") each motor is built for." },
-      { q: "What's the difference between a hub motor and a mid-drive electric bike motor?", a: "A hub motor is located in the center of the wheel (common on kids' bikes for simplicity), while a mid-drive motor sits at the pedals and leverages the bike's gears for better hill-climbing." },
-      { q: "Can I upgrade my electric bike motor to a higher wattage?", a: "Motor upgrades are possible, but you must ensure your battery and controller can handle the increased power output. Contact our support for upgrade advice." },
+      { q: "How long does an electric bike motor usually last?", a: "A quality motor can last for many years when properly maintained and used within its intended limits." },
+      { q: "Are electric bike motors easy to replace?", a: "Many motors and components can be replaced with the correct tools and compatible parts. Our team can help identify the right option." },
+      { q: "Do electric bike motors require regular maintenance?", a: "Most hub motors require minimal maintenance, although regular inspections of wiring and connections are recommended." },
       { q: "How long does an electric bike motor typically last?", a: "Our brushless hub motors are highly durable and can last upwards of 10,000 kilometres with zero to minimal maintenance." }
     ]
   }
@@ -68,22 +67,22 @@ export const seoContentMap: Record<string, any> = {
 function tyreContent() {
   return {
     h1: "Electric Bike Tyres",
-    keywords: ['electric bike tire', 'electric bike tyre', 'best electric bike tires'],
-    topIntro: `Position GoBike as the place to find replacement and upgrade <strong>electric bike tyres</strong> for 12, 16, 20 and 24 inch electric bikes. Ensure your child rides safely on all terrains. Discover our full collection of <a href="/bikes" class="text-blue-600 font-semibold hover:underline">bikes</a> today.`,
+    keywords: ['electric bike tyre', 'best electric bike tyres'],
+    topIntro: `The right <strong>electric bike tyre</strong> helps kids ride with confidence on everything from backyard tracks to weekend adventures. GoBike stocks replacement and upgrade tyres for 12, 16, 20 and 24-inch electric bikes, built to handle hard riding and changing terrain. Replacing worn rubber? Need to improve grip? Whatever the case, you'll find quality options designed to keep riders moving. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">Browse our range of kids electric bikes →</a>`,
     bottomSections: [
       {
         h2: "Shop Our Range of Replacement Electric Bike Tyres",
-        p: "Cover the variety of tyres available across all four bike sizes, including 12, 16, 20 and 24 inch options, knobby off-road tread patterns, inner tubes and valve types. Discuss tread design, puncture resistance and load ratings so riders can pick a tyre suited to their terrain, whether dirt tracks, parks, gravel or sealed paths."
+        p: "We carry replacement tyres across the full GoBike range, including 12, 16, 20 and 24-inch sizes. Choose from durable off-road tread patterns, replacement inner tubes and compatible valve options to suit your setup. Tread design plays a big role in performance. Aggressive knobby tyres provide traction on dirt, gravel and loose surfaces, while durable construction helps resist punctures and everyday wear. Across everything from dirt trails to sealed paths, selecting the right electric bike tyre can improve control and confidence."
       },
       {
-        h2: "Choosing the Best Electric Bike Tyes for Your Kids' Ebike",
-        p: "Highlight tyre durability, sidewall strength, grip on different surfaces and how the right tyre improves ride comfort and control. Mention the high quality materials used, fitment compatibility with each GoBike model, and expert advice on matching tyre choice to your child's riding style and terrain."
+        h2: "Choosing the Best Electric Bike Tyres for Your Kids' Ebike",
+        p: "The best electric bike tyres balance grip, durability and comfort. Strong sidewalls help handle rough terrain and jumps, while quality rubber compounds deliver reliable traction across different surfaces. Every tyre we stock is selected for compatibility with GoBike models, making replacement simple. If you're unsure which option is right, our team can help match the best electric bike tyres to your child's riding style, skill level and favourite terrain."
       }
     ],
     faqs: [
-      { q: "What size electric bike tyre do I need for my GoBike?", a: "Check the sidewall of your current tyre for the exact sizing (e.g., 16x2.125). We stock exact replacements for all 12, 16, 20, and 24-inch GoBike models." },
-      { q: "What are the best electric bike tires for off-road and dirt riding?", a: "Knobby or deep-tread tyres are best for off-road dirt riding as they provide superior grip and stability on loose surfaces." },
-      { q: "How long do electric bike tyres typically last on a kids' ebike?", a: "Depending on usage and terrain, a quality e-bike tyre usually lasts between 1,000 to 3,000 kilometres." },
+      { q: "What size electric bike tyre do I need?", a: "Choose the tyre size that matches your bike model. GoBike stocks options for 12, 16, 20 and 24-inch bikes." },
+      { q: "What are the best electric bike tyres for off-road and dirt riding?", a: "Tyres with deeper knobby tread patterns generally provide the best grip on dirt, gravel and loose terrain." },
+      { q: "How long do electric bike tyres typically last on a kids' ebike?", a: "Tyre lifespan varies depending on terrain, riding frequency and maintenance, but regular inspections help identify wear before performance is affected." },
       { q: "Are GoBike electric bike tyres compatible with other brands?", a: "Yes, as long as the rim diameter and tyre width specifications match, our tyres can be fitted to other standard kids' bikes." }
     ]
   }

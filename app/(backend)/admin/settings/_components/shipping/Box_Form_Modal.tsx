@@ -1,4 +1,4 @@
-// File: app/admin/settings/shipping/_components/Packaging/Box_Form_Modal.tsx
+﻿// File: app/admin/settings/shipping/_components/Packaging/Box_Form_Modal.tsx
 
 "use client";
 
@@ -6,7 +6,7 @@ import { useState } from "react";
 import { saveShippingBox } from "@/app/actions/backend/settings/shipping/packaging";
 import { ShippingBox } from "@prisma/client";
 import { X, Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 
 interface BoxFormProps {
     box: ShippingBox | null;

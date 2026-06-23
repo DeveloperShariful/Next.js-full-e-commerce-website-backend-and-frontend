@@ -6,6 +6,9 @@ import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { resyncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { sendNotification } from '@/app/api/email/send-notification';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export const maxDuration = 60; 
 
@@ -139,6 +142,61 @@ export async function POST(request: Request) {
                 resyncOrderToTransdirect(wcOrderId).catch(err =>
                     console.error('[PayPal Webhook] Rescue TransDirect resync failed:', err)
                 );
+
+                // Email + Affiliate backup — duplicate-safe: order was PENDING before rescue,
+                // so capture-order never ran these. Webhook retry → order is now PROCESSING → returns early above.
+                const rescuedOrderData = await db.order.findUnique({
+                    where: { id: wcOrderId },
+                    select: { guestEmail: true, user: { select: { email: true } } },
+                });
+                const rescueEmail = rescuedOrderData?.guestEmail || rescuedOrderData?.user?.email;
+                if (rescueEmail) {
+                    sendNotification({ trigger: 'ORDER_PROCESSING', recipient: rescueEmail, orderId: wcOrderId })
+                        .catch(err => console.error('[PayPal Webhook] Customer email failed:', err));
+                }
+                sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId: wcOrderId })
+                    .catch(err => console.error('[PayPal Webhook] Admin email failed:', err));
+
+                if (process.env.INTERNAL_API_KEY) {
+                    fetch(`${APP_URL}/api/affiliate/process-order`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.INTERNAL_API_KEY },
+                        body: JSON.stringify({ orderId: wcOrderId }),
+                    }).catch(err => console.error('[PayPal Webhook] Affiliate trigger failed:', err));
+                }
+
+                // Analytics backup — duplicate-safe: frontend missed capture so order was PENDING, not PROCESSING
+                const rescuedOrder = await db.order.findUnique({
+                    where: { id: wcOrderId },
+                    select: { subtotal: true, discountTotal: true, taxTotal: true, shippingTotal: true, isFirstOrder: true },
+                });
+                const rescueItems = await db.orderItem.findMany({
+                    where: { orderId: wcOrderId },
+                    select: { productId: true, quantity: true, total: true },
+                });
+                if (rescuedOrder && rescueItems.length > 0) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const sub = Number(rescuedOrder.subtotal);
+                    const disc = Number(rescuedOrder.discountTotal);
+                    const tax = Number(rescuedOrder.taxTotal);
+                    const ship = Number(rescuedOrder.shippingTotal);
+                    const totalSold = rescueItems.reduce((s, i) => s + i.quantity, 0);
+                    Promise.allSettled([
+                        db.analytics.upsert({
+                            where: { date: today },
+                            create: { date: today, grossSales: sub, netSales: sub - disc, totalTax: tax, totalShipping: ship, totalDiscounts: disc, totalOrders: 1, productsSold: totalSold, newCustomers: rescuedOrder.isFirstOrder ? 1 : 0, returningCustomers: rescuedOrder.isFirstOrder ? 0 : 1 },
+                            update: { grossSales: { increment: sub }, netSales: { increment: sub - disc }, totalTax: { increment: tax }, totalShipping: { increment: ship }, totalDiscounts: { increment: disc }, totalOrders: { increment: 1 }, productsSold: { increment: totalSold }, newCustomers: { increment: rescuedOrder.isFirstOrder ? 1 : 0 }, returningCustomers: { increment: rescuedOrder.isFirstOrder ? 0 : 1 } },
+                        }),
+                        ...rescueItems.filter(i => !!i.productId).map(({ productId, quantity, total }) =>
+                            db.productAnalytics.upsert({
+                                where: { date_productId: { date: today, productId: productId! } },
+                                create: { date: today, productId: productId!, itemsSold: quantity, netSales: Number(total) },
+                                update: { itemsSold: { increment: quantity }, netSales: { increment: Number(total) } },
+                            })
+                        ),
+                    ]).catch(err => console.error('[PayPal Webhook] Analytics rescue failed:', err));
+                }
             }
         }
 
@@ -150,7 +208,7 @@ export async function POST(request: Request) {
 
             if (!wcOrderId) return NextResponse.json({ message: "No Order ID found" }, { status: 200 });
 
-            const order = await db.order.findUnique({ where: { id: wcOrderId } });
+            const order = await db.order.findUnique({ where: { id: wcOrderId }, include: { user: { select: { email: true } } } });
             if (!order) return NextResponse.json({ message: "Order not found" }, { status: 200 });
 
             if (order.status === OrderStatus.PENDING || order.status === OrderStatus.FAILED) {
@@ -164,6 +222,57 @@ export async function POST(request: Request) {
                 if (!isMismatch) resyncOrderToTransdirect(wcOrderId).catch(err =>
                     console.error('[PayPal Webhook] TransDirect resync failed:', err)
                 );
+
+                // Email + Affiliate backup — only on clean capture (no mismatch)
+                // Duplicate-safe: order was PENDING/FAILED → capture-order never sent these.
+                if (!isMismatch) {
+                    const syncEmail = order.guestEmail || order.user?.email;
+                    if (syncEmail) {
+                        sendNotification({ trigger: 'ORDER_PROCESSING', recipient: syncEmail, orderId: wcOrderId })
+                            .catch(err => console.error('[PayPal Webhook] Customer email failed:', err));
+                    }
+                    sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId: wcOrderId })
+                        .catch(err => console.error('[PayPal Webhook] Admin email failed:', err));
+
+                    if (process.env.INTERNAL_API_KEY) {
+                        fetch(`${APP_URL}/api/affiliate/process-order`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.INTERNAL_API_KEY },
+                            body: JSON.stringify({ orderId: wcOrderId }),
+                        }).catch(err => console.error('[PayPal Webhook] Affiliate trigger failed:', err));
+                    }
+                }
+
+                // Analytics backup — only runs when order was PENDING/FAILED (not already PROCESSING)
+                if (!isMismatch) {
+                    const syncItems = await db.orderItem.findMany({
+                        where: { orderId: wcOrderId },
+                        select: { productId: true, quantity: true, total: true },
+                    });
+                    if (syncItems.length > 0) {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const sub = Number(order.subtotal);
+                        const disc = Number(order.discountTotal);
+                        const tax = Number(order.taxTotal);
+                        const ship = Number(order.shippingTotal);
+                        const totalSold = syncItems.reduce((s, i) => s + i.quantity, 0);
+                        Promise.allSettled([
+                            db.analytics.upsert({
+                                where: { date: today },
+                                create: { date: today, grossSales: sub, netSales: sub - disc, totalTax: tax, totalShipping: ship, totalDiscounts: disc, totalOrders: 1, productsSold: totalSold, newCustomers: order.isFirstOrder ? 1 : 0, returningCustomers: order.isFirstOrder ? 0 : 1 },
+                                update: { grossSales: { increment: sub }, netSales: { increment: sub - disc }, totalTax: { increment: tax }, totalShipping: { increment: ship }, totalDiscounts: { increment: disc }, totalOrders: { increment: 1 }, productsSold: { increment: totalSold }, newCustomers: { increment: order.isFirstOrder ? 1 : 0 }, returningCustomers: { increment: order.isFirstOrder ? 0 : 1 } },
+                            }),
+                            ...syncItems.filter(i => !!i.productId).map(({ productId, quantity, total }) =>
+                                db.productAnalytics.upsert({
+                                    where: { date_productId: { date: today, productId: productId! } },
+                                    create: { date: today, productId: productId!, itemsSold: quantity, netSales: Number(total) },
+                                    update: { itemsSold: { increment: quantity }, netSales: { increment: Number(total) } },
+                                })
+                            ),
+                        ]).catch(err => console.error('[PayPal Webhook] Analytics sync failed:', err));
+                    }
+                }
             }
         }
 

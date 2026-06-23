@@ -269,8 +269,8 @@ export async function POST(request: Request) {
         const isFirstOrder = order.isFirstOrder;
         const totalItemsSold = orderItems.reduce((sum, i) => sum + i.quantity, 0);
 
-        // Promise.allSettled so one failure doesn't block the response
-        await Promise.allSettled([
+        // fire-and-forget — does not block the response to the user
+        Promise.allSettled([
           db.analytics.upsert({
             where: { date: today },
             create: {
@@ -314,12 +314,7 @@ export async function POST(request: Request) {
                 },
               })
             ),
-        ]);
-
-        console.log(
-          `📊 [PayPal Capture] Analytics updated for order ${wcOrderId} — ` +
-          `${totalItemsSold} items, $${(subtotal - discountTotal).toFixed(2)} net sales`
-        );
+        ]).catch(err => console.error('[PayPal Capture] Analytics update failed:', err));
       }
     }
 

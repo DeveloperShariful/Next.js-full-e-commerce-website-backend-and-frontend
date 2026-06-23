@@ -235,7 +235,7 @@ export async function POST(request: Request) {
       }).catch(err => console.error('[Stripe Capture] Affiliate trigger failed:', err));
     }
 
-    // ── 8. Analytics update ───────────────────────────────────
+    // ── 8. Analytics update (fire-and-forget — does not block response) ──
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -246,7 +246,7 @@ export async function POST(request: Request) {
     const isFirstOrder = currentOrder.isFirstOrder;
     const totalItemsSold = orderItems.reduce((sum, i) => sum + i.quantity, 0);
 
-    await Promise.allSettled([
+    Promise.allSettled([
       db.analytics.upsert({
         where: { date: today },
         create: {
@@ -290,7 +290,7 @@ export async function POST(request: Request) {
             },
           })
         ),
-    ]);
+    ]).catch(err => console.error('[Stripe Capture] Analytics update failed:', err));
 
     return NextResponse.json({ success: true, orderId });
 

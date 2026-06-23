@@ -228,12 +228,19 @@ async function getFormattedCartItems(cartId: string) {
       isVirtual: item.product.isVirtual,
       taxStatus: item.product.taxStatus,
       shippingClassId: item.product.shippingClassId || null,
-      attributes: item.product.attributes.map((attr) => ({
-        id: attr.id,
-        name: attr.name,
-        label: attr.name,
-        value: attr.values.join(", "),
-      })),
+      attributes: isVariant && item.variant
+        ? Object.entries(item.variant.attributes as Record<string, string>).map(([name, value]) => ({
+            id: name,
+            name,
+            label: name,
+            value,
+          }))
+        : item.product.attributes.map((attr) => ({
+            id: attr.id,
+            name: attr.name,
+            label: attr.name,
+            value: attr.values.join(", "),
+          })),
     };
   });
 }

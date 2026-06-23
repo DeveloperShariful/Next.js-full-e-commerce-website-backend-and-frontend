@@ -298,8 +298,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             const variationsChanged = data.productType === 'VARIABLE' && (!oldProductData || (
                 oldProductData.variants.length !== data.variationsData.length ||
                 !isDeepEqual(
-                    oldProductData.variants.map((v: any) => ({ s: v.sku || "", p: Number(v.price), st: v.stock })).sort((a:any, b:any) => a.s.localeCompare(b.s)),
-                    data.variationsData.map((v: any) => ({ s: v.sku || "", p: Number(v.price), st: Number(v.stock) })).sort((a:any, b:any) => a.s.localeCompare(b.s))
+                    oldProductData.variants.map((v: any) => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: v.stock })).sort((a:any, b:any) => a.s.localeCompare(b.s)),
+                    data.variationsData.map((v: any) => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: Number(v.stock) })).sort((a:any, b:any) => a.s.localeCompare(b.s))
                 )
             ));
             

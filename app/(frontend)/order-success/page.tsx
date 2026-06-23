@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { db } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
+import PurchaseTracker from './_components/PurchaseTracker';
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -112,8 +113,24 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
   const shippingLine = [shipping?.city, shipping?.state, shipping?.postcode].filter(Boolean).join(', ');
   const billingLine = [billing?.city, billing?.state, billing?.postcode].filter(Boolean).join(', ');
 
+  const trackedItems = order.items.map((item) => ({
+    name: [item.productName, item.variantName].filter(Boolean).join(" - "),
+    price: parseFloat(String(item.price)),
+    quantity: item.quantity,
+    total: parseFloat(String(item.total)),
+    image: item.image ?? "",
+  }));
+
   return (
     <div className="min-h-[80vh] bg-gray-50 py-6 px-4">
+      <PurchaseTracker
+        orderId={order.id}
+        orderNumber={String(order.orderNumber)}
+        total={parseFloat(String(order.total))}
+        tax={0}
+        shipping={parseFloat(String(order.shippingTotal))}
+        items={trackedItems}
+      />
 
 
       <div className="max-w-4xl mx-auto space-y-4">

@@ -50,7 +50,7 @@ export default function ContestsBonusesTierView({ tierData, contests, bonuses }:
       try {
           const res = await getContestLeaderboard(contestId);
           if (res.success) {
-              setLeaderboardData(res.data);
+              setLeaderboardData(res.data ?? []);
           }
       } catch (error) {
           console.error("Failed to fetch leaderboard");

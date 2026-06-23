@@ -4,6 +4,7 @@
 
 import { db } from '@/lib/prisma';
 import { sendNotification } from '@/app/api/email/send-notification';
+import { subscribeUserToKlaviyo } from '@/app/actions/backend/marketing/klaviyo.actions';
 
 export async function subscribeNewsletter(formData: FormData) {
   const email = formData.get('email') as string;
@@ -15,39 +16,39 @@ export async function subscribeNewsletter(formData: FormData) {
   const cleanEmail = email.toLowerCase().trim();
 
   try {
-    // 1. চেক করা হচ্ছে ইউজার আগে থেকেই ডাটাবেসে আছে কি না
     const existingUser = await db.user.findUnique({
       where: { email: cleanEmail }
     });
 
     if (existingUser) {
-      // যদি আগে থেকেই কাস্টমার বা সাবস্ক্রাইবার হিসেবে থাকে, তবে শুধু সাকসেস মেসেজ দেখাবে (ডাবল সেভ করবে না)
+      // Already in DB — still try to sync to Klaviyo in case they weren't added before
+      await subscribeUserToKlaviyo(cleanEmail);
       return { success: true, message: 'You are already subscribed to our newsletter! 🎉' };
     }
 
-    // 2. নতুন ইউজার হিসেবে ডাটাবেসে সেভ করা হচ্ছে (Role: SUBSCRIBER)
+    // New subscriber — save to DB
     await db.user.create({
       data: {
         email: cleanEmail,
-        name: 'Subscriber', // যেহেতু ফর্মে শুধু ইমেইল থাকে, তাই ডিফল্ট নাম দেওয়া হলো
+        name: 'Subscriber',
         role: 'SUBSCRIBER',
         isActive: true,
-        // password ফাঁকা থাকবে, কারণ সে কোনো অ্যাকাউন্ট তৈরি করেনি
       }
     });
 
-    // 3. ওয়েলকাম ইমেইল ট্রিগার করা হচ্ছে
-    await sendNotification({
-      trigger: "NEWSLETTER_SUBSCRIPTION",
-      recipient: cleanEmail,
-      data: {
-        customer_name: "Subscriber"
-      }
-    });
+    // Welcome email + Klaviyo sync — parallel
+    await Promise.all([
+      sendNotification({
+        trigger: "NEWSLETTER_SUBSCRIPTION",
+        recipient: cleanEmail,
+        data: { customer_name: "Subscriber" },
+      }),
+      subscribeUserToKlaviyo(cleanEmail),
+    ]);
 
     return { success: true, message: 'Thank you for subscribing! Check your inbox for a welcome gift. 🎉' };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Newsletter Subscription Error:', error);
     return { success: false, message: 'Something went wrong. Please try again later.' };
   }

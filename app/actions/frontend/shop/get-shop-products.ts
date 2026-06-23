@@ -17,6 +17,7 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+  image: string | null;
 }
 
 interface ShopResponse {
@@ -34,7 +35,7 @@ export async function getProductsAndCategoriesAction(
     // 1. Fetch Categories
     const categoriesData = await db.category.findMany({
       where: { isActive: true, deletedAt: null },
-      select: { id: true, name: true, slug: true },
+      select: { id: true, name: true, slug: true, image: true },
       orderBy: { menuOrder: "asc" },
     });
 

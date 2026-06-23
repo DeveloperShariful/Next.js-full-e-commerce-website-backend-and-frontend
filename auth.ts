@@ -7,52 +7,36 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/prisma";
 import { authConfig } from "./auth.config";
 
+const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes — DB sync throttle
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(db),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   providers: [
     CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          console.log("❌ Error: Email or Password missing in credentials");
-          return null;
-        }
+        if (!credentials?.email || !credentials?.password) return null;
 
-        const email = (credentials.email as string).toLowerCase();
+        const email = (credentials.email as string).toLowerCase().trim();
 
-        // ১. ডাটাবেজে ইউজার আছে কি না চেক করুন
-        const user = await db.user.findUnique({
-          where: { email }
-        });
+        const user = await db.user.findUnique({ where: { email } });
 
-        if (!user) {
-          console.log(`❌ Error: No user found with email: ${email}`);
-          return null;
-        }
+        // User not found, no password, banned, or soft-deleted → reject
+        if (!user || !user.password) return null;
+        if (!user.isActive || user.deletedAt !== null) return null;
 
-        if (!user.password) {
-          console.log(`❌ Error: User ${email} exists but has NO password in DB )`);
-          return null;
-        }
-
-        // ৩. পাসওয়ার্ড চেক করুন
         const passwordsMatch = await bcrypt.compare(
           credentials.password as string,
           user.password
         );
 
-        if (!passwordsMatch) {
-          console.log(`❌ Error: Password mismatch for user: ${email}`);
-          return null;
-        }
-
-        console.log(`✅ Success: User ${email} authenticated successfully!`);
+        if (!passwordsMatch) return null;
 
         return {
           id: user.id,
@@ -61,47 +45,62 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           image: user.image,
           role: user.role,
         };
-      }
-    })
+      },
+    }),
   ],
   callbacks: {
-    // ========================================================================
-    // 🚀 REAL-TIME SESSION SYNC (ডাটাবেসের সাথে সেশন সিঙ্ক লজিক)
-    // ========================================================================
     async jwt({ token, user }) {
+      // First sign-in: populate token directly from credentials result
       if (user) {
-        token.role = user.role || "CUSTOMER"; 
-        token.id = user.id as string; 
+        token.role = user.role || "CUSTOMER";
+        token.id = user.id as string;
+        token.syncedAt = Date.now();
+        return token;
       }
 
-      // কাস্টমার রিফ্রেশ বা পেজ চেঞ্জ করার সময় ডাটাবেস থেকে রিয়েল-টাইম নাম ও পিকচার তুলে আনা হবে
-      if (token?.id) {
+      // Throttle: only hit the DB every 5 minutes per session
+      const needsSync =
+        !token.syncedAt || Date.now() - (token.syncedAt as number) > SYNC_INTERVAL;
+
+      if (token?.id && needsSync) {
         try {
           const dbUser = await db.user.findUnique({
-            where: { id: token.id },
-            select: { name: true, role: true, image: true }
+            where: { id: token.id as string },
+            select: {
+              name: true,
+              role: true,
+              image: true,
+              isActive: true,
+              deletedAt: true,
+            },
           });
-          if (dbUser) {
-            token.name = dbUser.name;
-            token.role = dbUser.role;
-            token.picture = dbUser.image;
+
+          // User deleted, banned, or not found → kill session immediately
+          if (!dbUser || !dbUser.isActive || dbUser.deletedAt !== null) {
+            return null;
           }
+
+          token.name = dbUser.name;
+          token.role = dbUser.role;
+          token.picture = dbUser.image;
+          token.syncedAt = Date.now();
         } catch (error) {
-          console.error("Failed to sync session with database:", error);
+          console.error("Session sync failed:", error);
         }
       }
 
       return token;
     },
+
     async session({ session, token }) {
+      if (!token?.id) return session;
       if (token && session.user) {
         session.user.role = (token.role as string) || "CUSTOMER";
         session.user.id = token.id as string;
-        // ✅ ডাইনামিকলি সেশনে লেটেস্ট নাম ও পিকচার পুশ করা হচ্ছে
-        session.user.name = token.name as string; 
-        session.user.image = token.picture as string; 
+        session.user.name = token.name as string;
+        session.user.image = token.picture as string;
       }
       return session;
     },
-  }
+  },
 });

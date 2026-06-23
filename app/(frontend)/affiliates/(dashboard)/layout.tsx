@@ -7,13 +7,7 @@ import { getAuthAffiliate } from "@/app/actions/frontend/affiliate/auth-helper";
 import { db } from "@/lib/prisma";
 import { GlobalStoreProvider } from "@/app/providers/global-store-provider";
 import { serializePrismaData } from "@/lib/format-data";
-import {
-  getCachedStoreSettings,
-  getCachedSeoConfig,
-  getCachedMarketingConfig,
-  getCachedPaymentMethods,
-  getCachedPickupLocations,
-} from "@/lib/global-settings-cache";
+import { buildGlobalStoreData } from "@/lib/build-global-data";
 
 export default async function AffiliateDashboardLayout({
   children,
@@ -23,21 +17,18 @@ export default async function AffiliateDashboardLayout({
   const authSession = await getAuthAffiliate();
   const userId = authSession.userId;
 
-  // Fetch affiliate account + cached store data in parallel
-  const [affiliateAccount, settings, seo, marketing, paymentMethods, pickupLocations] = await Promise.all([
+  // Fetch affiliate account + global store data in parallel
+  const [affiliateAccount, globalData] = await Promise.all([
     db.affiliateAccount.findUnique({
       where: { userId },
       select: { id: true, status: true, slug: true },
     }),
-    getCachedStoreSettings(),
-    getCachedSeoConfig(),
-    getCachedMarketingConfig(),
-    getCachedPaymentMethods(),
-    getCachedPickupLocations(),
+    buildGlobalStoreData(),
   ]);
 
-  const generalConfig = settings?.generalConfig as { enableAffiliateProgram?: boolean } | null;
-  const isProgramActive = generalConfig?.enableAffiliateProgram ?? false;
+  const storeSettings = globalData.settings.storeSettings;
+  const isProgramActive = storeSettings?.generalConfig?.enableAffiliateProgram ?? false;
+  const supportEmail = storeSettings?.storeEmail || "support@store.au";
 
   if (!isProgramActive) {
     return (
@@ -77,7 +68,7 @@ export default async function AffiliateDashboardLayout({
           </p>
           <div className="flex justify-center gap-4">
             <Link href="/" className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50">Back to Home</Link>
-            <a href={`mailto:${settings?.storeEmail || "support@gobike.au"}`} className="px-6 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 flex items-center gap-2">
+            <a href={`mailto:${supportEmail}`} className="px-6 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 flex items-center gap-2">
               <LifeBuoy className="w-4 h-4" /> Contact Support
             </a>
           </div>
@@ -87,7 +78,6 @@ export default async function AffiliateDashboardLayout({
   }
 
   if (affiliateAccount.status === "PENDING") {
-    const supportEmail = settings?.storeEmail || "support@gobike.au";
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
         <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
@@ -131,59 +121,7 @@ export default async function AffiliateDashboardLayout({
     );
   }
 
-  const rawData = {
-    settings: {
-      storeSettings: {
-        storeName: settings?.storeName || "",
-        storeEmail: settings?.storeEmail,
-        storePhone: settings?.storePhone,
-        currency: settings?.currency || "",
-        currencySymbol: settings?.currencySymbol || "",
-        weightUnit: settings?.weightUnit || "",
-        dimensionUnit: settings?.dimensionUnit || "",
-        logo: settings?.logo,
-        favicon: settings?.favicon,
-        maintenance: settings?.maintenance || false,
-        storeAddress: settings?.storeAddress,
-        socialLinks: settings?.socialLinks,
-        generalConfig: settings?.generalConfig,
-        taxSettings: settings?.taxSettings,
-        affiliateConfig: settings?.affiliateConfig,
-        logoMedia: settings?.logoMedia,
-        faviconMedia: settings?.faviconMedia,
-      },
-      seoConfig: seo ? {
-        siteName: seo.siteName || "",
-        titleSeparator: seo.titleSeparator || "|",
-        siteUrl: seo.siteUrl || "",
-        defaultMetaTitle: seo.defaultMetaTitle,
-        defaultMetaDesc: seo.defaultMetaDesc,
-        ogImage: seo.ogImage,
-        twitterCard: seo.twitterCard || "summary_large_image",
-        twitterSite: seo.twitterSite,
-        themeColor: seo.themeColor,
-        robotsTxtContent: seo.robotsTxtContent,
-        organizationData: seo.organizationData,
-        manifestJson: seo.manifestJson,
-        ogMedia: seo.ogMedia,
-      } : null,
-      marketingConfig: marketing ? {
-        gtmEnabled: marketing.gtmEnabled,
-        gtmContainerId: marketing.gtmContainerId,
-        gtmAuth: marketing.gtmAuth,
-        gtmPreview: marketing.gtmPreview,
-        fbEnabled: marketing.fbEnabled,
-        fbPixelId: marketing.fbPixelId,
-        klaviyoEnabled: marketing.klaviyoEnabled,
-        klaviyoPublicKey: marketing.klaviyoPublicKey,
-        cookieConsentRequired: false,
-      } : null,
-    },
-    paymentMethods: paymentMethods || [],
-    pickupLocations: pickupLocations || [],
-  };
-
-  const cleanData = serializePrismaData(rawData);
+  const cleanData = serializePrismaData(globalData);
 
   return (
     <GlobalStoreProvider

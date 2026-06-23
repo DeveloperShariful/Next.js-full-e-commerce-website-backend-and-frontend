@@ -17,20 +17,18 @@ export interface PickupLocation {
   postcode: string;
   country: string;
   instructions: string | null;
-  openingHours: any;
+  openingHours: Record<string, unknown> | null;
 }
 
 export interface ActivePaymentMethod {
   identifier: string;
   name: string;
-  icon: string | null;
   description?: string | null;
   mode: "TEST" | "LIVE";
   minOrderAmount?: number | null;
   maxOrderAmount?: number | null;
   surchargeEnabled: boolean;
   surchargeAmount: number;
-  surchargeType: string;
 }
 
 export interface StoreAddress {
@@ -108,7 +106,6 @@ export interface SeoConfig {
 export interface VerificationConfig {
   googleSearchConsole?: string | null;
   facebookDomain?: string | null;
-  pinterest?: string | null;
 }
 
 export interface MarketingConfig {
@@ -120,7 +117,6 @@ export interface MarketingConfig {
   fbPixelId: string | null;
   klaviyoEnabled: boolean;
   klaviyoPublicKey: string | null;
-  cookieConsentRequired?: boolean;
 }
 
 export interface StoreFeatures {
@@ -134,6 +130,34 @@ export interface StoreFeatures {
   enableAffiliateProgram: boolean;
   enableWallet: boolean;
   enableGiftCards: boolean;
+}
+
+export interface AffiliateConfigRaw {
+  programName?: string;
+  referralParam?: string;
+  termsUrl?: string | null;
+  cookieDuration?: number;
+  allowSelfReferral?: boolean;
+  excludeShipping?: boolean;
+  excludeTax?: boolean;
+  autoApplyCoupon?: boolean;
+  zeroValueReferrals?: boolean;
+  customSlugsEnabled?: boolean;
+  autoCreateSlug?: boolean;
+  slugLimit?: number;
+  isLifetimeLinkOnPurchase?: boolean;
+  lifetimeDuration?: number | null;
+  holdingPeriod?: number;
+  minimumPayout?: number;
+  payoutMethods?: string[];
+  enableCreatives?: boolean;
+  enableCampaigns?: boolean;
+  enableAnnouncements?: boolean;
+  enableContests?: boolean;
+  enableFraudProtection?: boolean;
+  enableGroups?: boolean;
+  enableProductRates?: boolean;
+  enableTiers?: boolean;
 }
 
 export interface AffiliateGlobalConfig {
@@ -182,8 +206,7 @@ interface GlobalStoreContextType {
   
   logo: StoreMedia | null;
   favicon: string | null;
-  primaryColor: string;
-  
+
   currency: string;
   symbol: string;
   locale: string;
@@ -218,7 +241,6 @@ const defaultContext: GlobalStoreContextType = {
   storePhone: "",
   logo: null,
   favicon: null,
-  primaryColor: "",
   currency: "",
   symbol: "",
   locale: "en-US",
@@ -236,7 +258,7 @@ const defaultContext: GlobalStoreContextType = {
   tax: { pricesIncludeTax: false, calculateTaxBasedOn: 'shipping', displayPricesInShop: 'exclusive', displayPricesDuringCart: 'exclusive' },
   seo: { siteName: "", titleSeparator: "|", siteUrl: "", defaultMetaTitle: null, defaultMetaDesc: null, ogImage: null, twitterCard: "summary", twitterSite: null },
   marketing: { gtmEnabled: false, gtmContainerId: null, gtmAuth: null, gtmPreview: null, fbEnabled: false, fbPixelId: null, klaviyoEnabled: false, klaviyoPublicKey: null },
-  verifications: {},
+  verifications: { googleSearchConsole: null, facebookDomain: null },
   features: { 
     enableWishlist: false, 
     enableReviews: false, 
@@ -288,7 +310,7 @@ const defaultContext: GlobalStoreContextType = {
 
 const GlobalStoreContext = createContext<GlobalStoreContextType>(defaultContext);
 
-interface StoreSettingsDTO {
+export interface StoreSettingsDTO {
   storeName: string;
   storeEmail?: string | null;
   storePhone?: string | null;
@@ -301,9 +323,9 @@ interface StoreSettingsDTO {
   maintenance: boolean;
   storeAddress?: StoreAddress | null;
   socialLinks?: SocialLinks | null;
-  generalConfig?: any;
-  taxSettings?: any;
-  affiliateConfig?: any; 
+  generalConfig?: GeneralConfig | null;
+  taxSettings?: TaxSettings | null;
+  affiliateConfig?: AffiliateConfigRaw | null;
   logoMedia?: {
     url: string;
     altText?: string | null;
@@ -314,12 +336,9 @@ interface StoreSettingsDTO {
   faviconMedia?: {
     url: string;
   } | null;
-  emailConfig?: {
-    baseColor?: string | null;
-  } | null;
 }
 
-interface SeoConfigDTO {
+export interface SeoConfigDTO {
   siteName: string;
   titleSeparator: string;
   siteUrl: string;
@@ -330,14 +349,14 @@ interface SeoConfigDTO {
   twitterSite?: string | null;
   themeColor?: string | null;
   robotsTxtContent?: string | null;
-  organizationData?: any;
-  manifestJson?: any;
+  organizationData?: Record<string, unknown> | null;
+  manifestJson?: Record<string, unknown> | null;
   ogMedia?: {
     url: string;
   } | null;
 }
 
-interface MarketingConfigDTO {
+export interface MarketingConfigDTO {
   gtmEnabled: boolean;
   gtmContainerId?: string | null;
   gtmAuth?: string | null;
@@ -346,29 +365,25 @@ interface MarketingConfigDTO {
   fbPixelId?: string | null;
   klaviyoEnabled: boolean;
   klaviyoPublicKey?: string | null;
-  cookieConsentRequired?: boolean;
   gscVerificationCode?: string | null;
   fbDomainVerification?: string | null;
-  pinterest?: string | null;
 }
 
 
-interface PaymentMethodDTO {
+export interface PaymentMethodDTO {
   identifier: string;
   name: string;
   isEnabled: boolean;
   displayOrder: number;
   mode: "TEST" | "LIVE";
-  icon?: string | null;
   description?: string | null;
   minOrderAmount?: number | string | null;
   maxOrderAmount?: number | string | null;
   surchargeEnabled?: boolean;
   surchargeAmount?: number | string | null;
-  surchargeType?: string;
 }
 
-interface PickupLocationDTO {
+export interface PickupLocationDTO {
   id: string;
   name: string;
   address: string;
@@ -381,7 +396,7 @@ interface PickupLocationDTO {
   openingHours?: any;
 }
 
-interface ProviderSettings {
+export interface ProviderSettings {
   storeSettings: StoreSettingsDTO | null;
   seoConfig: SeoConfigDTO | null;
   marketingConfig: MarketingConfigDTO | null;
@@ -409,8 +424,17 @@ export function GlobalStoreProvider({
   const seoData = settings?.seoConfig || {} as SeoConfigDTO;
   const mktData = settings?.marketingConfig || {} as MarketingConfigDTO;
 
-  const generalConfig = (s.generalConfig as GeneralConfig) || {};
-  const taxSettings = (s.taxSettings as TaxSettings) || {};
+  const generalConfig: GeneralConfig = s.generalConfig ?? {
+    timezone: "UTC",
+    dateFormat: "dd/MM/yyyy",
+    orderIdFormat: "#",
+  };
+  const taxSettings: TaxSettings = s.taxSettings ?? {
+    pricesIncludeTax: false,
+    calculateTaxBasedOn: "shipping",
+    displayPricesInShop: "exclusive",
+    displayPricesDuringCart: "exclusive",
+  };
   const activeLocale = generalConfig.locale || "";
 
   // =========================================================
@@ -484,14 +508,12 @@ export function GlobalStoreProvider({
         return {
           identifier: pm.identifier,
           name: pm.name,
-          icon: pm.icon || null,
           description: pm.description,
           mode: pm.mode,
           minOrderAmount: minAmt || null,
           maxOrderAmount: maxAmt || null,
           surchargeEnabled: pm.surchargeEnabled || false,
           surchargeAmount: surAmt,
-          surchargeType: pm.surchargeType || ''
         };
       });
   }, [paymentMethods]);
@@ -513,7 +535,7 @@ export function GlobalStoreProvider({
       }));
   }, [pickupLocations]);
 
-  const affiliateRaw = s.affiliateConfig || {};
+  const affiliateRaw: AffiliateConfigRaw = s.affiliateConfig ?? {};
   
   const affiliateConfig: AffiliateGlobalConfig = {
     programName: affiliateRaw.programName || "Affiliate Program",
@@ -559,8 +581,7 @@ export function GlobalStoreProvider({
     
     logo: logoData,
     favicon: faviconUrl,
-    primaryColor: seoData.themeColor || s.emailConfig?.baseColor || "", 
-    
+
     currency: s.currency || "",
     symbol: s.currencySymbol || "",
     locale: activeLocale,
@@ -616,13 +637,11 @@ export function GlobalStoreProvider({
       fbPixelId: mktData.fbPixelId || null,
       klaviyoEnabled: mktData.klaviyoEnabled || false,
       klaviyoPublicKey: mktData.klaviyoPublicKey || null,
-      cookieConsentRequired: mktData.cookieConsentRequired || false,
     },
 
     verifications: {
       googleSearchConsole: mktData.gscVerificationCode || null,
       facebookDomain: mktData.fbDomainVerification || null,
-      pinterest: mktData.pinterest || null,
     },
 
     features: {

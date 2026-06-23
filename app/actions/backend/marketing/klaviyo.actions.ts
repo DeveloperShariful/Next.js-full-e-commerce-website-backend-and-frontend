@@ -14,6 +14,26 @@ export interface KlaviyoSettings {
   selectedListId: string;
 }
 
+interface KlaviyoListItem {
+  id: string;
+  attributes: { name: string };
+}
+
+interface KlaviyoProfileItem {
+  id: string;
+  attributes: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+  };
+}
+
+interface KlaviyoListIds {
+  newsletter?: string;
+  [key: string]: string | undefined;
+}
+
 // ============================================================================
 // 1. FETCH LIVE KLAVIYO LISTS FROM API
 // ============================================================================
@@ -28,29 +48,29 @@ export async function fetchKlaviyoLists(privateKey: string) {
       headers: {
         "Authorization": `Klaviyo-API-Key ${privateKey.trim()}`,
         "revision": KLAVIYO_REVISION,
-        "Accept": "application/json"
+        "Accept": "application/json",
       },
-      cache: "no-store"
+      cache: "no-store",
     });
 
     if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
+      const errData = await response.json().catch(() => ({})) as { errors?: { detail?: string }[] };
       const errMsg = errData?.errors?.[0]?.detail || "Invalid Private API Key or API error.";
       return { success: false, error: errMsg };
     }
 
-    const resData = await response.json();
+    const resData = await response.json() as { data?: KlaviyoListItem[] };
     const lists = resData.data || [];
 
-    const formattedLists = lists.map((list: any) => ({
-      id: list.id, 
-      name: list.attributes?.name || "Unnamed List"
+    const formattedLists = lists.map((list) => ({
+      id: list.id,
+      name: list.attributes?.name || "Unnamed List",
     }));
 
     return { success: true, lists: formattedLists };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Klaviyo List Fetch Error:", error);
-    return { success: false, error: error.message || "Failed to connect to Klaviyo." };
+    return { success: false, error: "Failed to connect to Klaviyo." };
   }
 }
 
@@ -59,9 +79,7 @@ export async function fetchKlaviyoLists(privateKey: string) {
 // ============================================================================
 export async function saveKlaviyoSettings(data: KlaviyoSettings) {
   try {
-    const listConfig = {
-      newsletter: data.selectedListId 
-    };
+    const listConfig: KlaviyoListIds = { newsletter: data.selectedListId };
 
     await db.marketingIntegration.upsert({
       where: { id: "marketing_config" },
@@ -77,12 +95,12 @@ export async function saveKlaviyoSettings(data: KlaviyoSettings) {
         klaviyoPublicKey: data.klaviyoPublicKey.trim(),
         klaviyoPrivateKey: data.klaviyoPrivateKey.trim(),
         klaviyoListIds: listConfig,
-      }
+      },
     });
 
     revalidatePath("/admin/marketing/klaviyo");
     return { success: true, message: "Klaviyo integration configured successfully!" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Save Klaviyo Settings Error:", error);
     return { success: false, error: "Failed to save Klaviyo settings." };
   }
@@ -99,18 +117,18 @@ export async function getKlaviyoConfig() {
         klaviyoEnabled: true,
         klaviyoPublicKey: true,
         klaviyoPrivateKey: true,
-        klaviyoListIds: true
-      }
+        klaviyoListIds: true,
+      },
     });
 
     if (!config) {
       return {
         success: true,
-        data: { klaviyoEnabled: false, klaviyoPublicKey: "", klaviyoPrivateKey: "", selectedListId: "" }
+        data: { klaviyoEnabled: false, klaviyoPublicKey: "", klaviyoPrivateKey: "", selectedListId: "" },
       };
     }
 
-    const listIds = config.klaviyoListIds as Record<string, any> | null;
+    const listIds = config.klaviyoListIds as unknown as KlaviyoListIds | null;
     const selectedListId = listIds?.newsletter || "";
 
     return {
@@ -119,10 +137,10 @@ export async function getKlaviyoConfig() {
         klaviyoEnabled: config.klaviyoEnabled,
         klaviyoPublicKey: config.klaviyoPublicKey || "",
         klaviyoPrivateKey: config.klaviyoPrivateKey || "",
-        selectedListId
-      }
+        selectedListId,
+      },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Get Klaviyo Config Error:", error);
     return { success: false, error: "Failed to load configuration." };
   }
@@ -135,15 +153,15 @@ export async function subscribeUserToKlaviyo(email: string) {
   try {
     const config = await db.marketingIntegration.findUnique({
       where: { id: "marketing_config" },
-      select: { klaviyoEnabled: true, klaviyoPrivateKey: true, klaviyoListIds: true }
+      select: { klaviyoEnabled: true, klaviyoPrivateKey: true, klaviyoListIds: true },
     });
 
     if (!config?.klaviyoEnabled || !config.klaviyoPrivateKey || !config.klaviyoListIds) {
       return { success: false, error: "Klaviyo integration is disabled." };
     }
 
-    const listIds = config.klaviyoListIds as Record<string, any>;
-    const targetListId = listIds.newsletter; 
+    const listIds = config.klaviyoListIds as unknown as KlaviyoListIds;
+    const targetListId = listIds.newsletter;
 
     if (!targetListId) {
       return { success: false, error: "No target newsletter list configured." };
@@ -157,22 +175,15 @@ export async function subscribeUserToKlaviyo(email: string) {
             data: [
               {
                 type: "profile",
-                attributes: {
-                  email: email.trim().toLowerCase()
-                }
-              }
-            ]
-          }
+                attributes: { email: email.trim().toLowerCase() },
+              },
+            ],
+          },
         },
         relationships: {
-          list: {
-            data: {
-              type: "list",
-              id: targetListId
-            }
-          }
-        }
-      }
+          list: { data: { type: "list", id: targetListId } },
+        },
+      },
     };
 
     const response = await fetch("https://a.klaviyo.com/api/profile-subscription-bulk-create-jobs/", {
@@ -181,27 +192,27 @@ export async function subscribeUserToKlaviyo(email: string) {
         "Authorization": `Klaviyo-API-Key ${config.klaviyoPrivateKey.trim()}`,
         "revision": KLAVIYO_REVISION,
         "Content-Type": "application/json",
-        "Accept": "application/json"
+        "Accept": "application/json",
       },
       body: JSON.stringify(requestBody),
-      cache: "no-store"
+      cache: "no-store",
     });
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
+      const err = await response.json().catch(() => ({})) as { errors?: { detail?: string }[] };
       console.error("Klaviyo Subscription Failed:", err);
       return { success: false, error: err?.errors?.[0]?.detail || "Failed to subscribe." };
     }
 
     return { success: true, message: "Successfully subscribed to newsletter!" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Klaviyo Subscription Exception:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: "Subscription failed." };
   }
 }
 
 // ============================================================================
-// 🚀 5. NEW: FETCH SUBSCRIBERS FROM SPECIFIC KLAVIYO LIST
+// 5. FETCH SUBSCRIBERS FROM SPECIFIC KLAVIYO LIST
 // ============================================================================
 export async function fetchKlaviyoListProfiles(listId: string) {
   try {
@@ -209,52 +220,49 @@ export async function fetchKlaviyoListProfiles(listId: string) {
 
     const config = await db.marketingIntegration.findUnique({
       where: { id: "marketing_config" },
-      select: { klaviyoPrivateKey: true }
+      select: { klaviyoPrivateKey: true },
     });
 
     if (!config?.klaviyoPrivateKey) {
       return { success: false, error: "Private API Key missing in DB." };
     }
 
-    // 🚀 ক্লাভিও v3 Profiles List এপিআই কল (ইমেইল, নাম ও ফোন নম্বর নিয়ে আসবে)
-    const response = await fetch(`https://a.klaviyo.com/api/lists/${listId}/profiles/?fields[profile]=email,first_name,last_name,phone_number`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Klaviyo-API-Key ${config.klaviyoPrivateKey.trim()}`,
-        "revision": KLAVIYO_REVISION,
-        "Accept": "application/json"
-      },
-      cache: "no-store"
-    });
+    const response = await fetch(
+      `https://a.klaviyo.com/api/lists/${listId}/profiles/?fields[profile]=email,first_name,last_name,phone_number`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Klaviyo-API-Key ${config.klaviyoPrivateKey.trim()}`,
+          "revision": KLAVIYO_REVISION,
+          "Accept": "application/json",
+        },
+        cache: "no-store",
+      }
+    );
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
+      const err = await response.json().catch(() => ({})) as { errors?: { detail?: string }[] };
       return { success: false, error: err?.errors?.[0]?.detail || "Failed to fetch profiles." };
     }
 
-    const resData = await response.json();
+    const resData = await response.json() as { data?: KlaviyoProfileItem[] };
     const data = resData.data || [];
 
-    const formattedProfiles = data.map((profile: any) => {
-      const attr = profile.attributes || {};
-      const email = attr.email || "No Email";
+    const formattedProfiles = data.map((profile) => {
+      const attr = profile.attributes;
       const firstName = attr.firstName || "";
       const lastName = attr.lastName || "";
-      const phone = attr.phoneNumber || "No Phone";
-      
-      const name = `${firstName} ${lastName}`.trim() || "Anonymous Subscriber";
-
       return {
         id: profile.id,
-        email,
-        name,
-        phone
+        email: attr.email || "No Email",
+        name: `${firstName} ${lastName}`.trim() || "Anonymous Subscriber",
+        phone: attr.phoneNumber || "No Phone",
       };
     });
 
     return { success: true, profiles: formattedProfiles };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Klaviyo Profiles Fetch Error:", error);
-    return { success: false, error: error.message || "Failed to load profiles." };
+    return { success: false, error: "Failed to load profiles." };
   }
 }

@@ -14,39 +14,28 @@ function isDecimal(value: unknown): value is DecimalLike {
   );
 }
 
-export function serializePrismaData(data: unknown): any {
+export function serializePrismaData<T>(data: T): T {
+  if (data === null || data === undefined) return data;
 
-  if (data === null || data === undefined) {
-    return data;
-  }
+  if (isDecimal(data)) return data.toNumber() as unknown as T;
 
-  if (isDecimal(data)) {
-    return data.toNumber(); 
-  }
+  if (data instanceof Date) return data.toISOString() as unknown as T;
 
-  if (data instanceof Date) {
-    return data.toISOString();
-  }
-
-  if (typeof data === "bigint") {
-    return data.toString();
-  }
+  if (typeof data === "bigint") return data.toString() as unknown as T;
 
   if (Array.isArray(data)) {
-    return data.map((item) => serializePrismaData(item));
+    return data.map((item) => serializePrismaData(item)) as unknown as T;
   }
 
   if (typeof data === "object") {
-    const newObj: Record<string, any> = {};
-    
+    const newObj: Record<string, unknown> = {};
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
-
-        const value = (data as Record<string, unknown>)[key];
-        newObj[key] = serializePrismaData(value);
+        newObj[key] = serializePrismaData((data as Record<string, unknown>)[key]);
       }
     }
-    return newObj;
+    return newObj as unknown as T;
   }
+
   return data;
 }

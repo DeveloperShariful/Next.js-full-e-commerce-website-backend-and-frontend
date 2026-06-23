@@ -8,11 +8,12 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
 export async function registerUser(formData: FormData) {
-  const name = formData.get("name") as string;
-  const email = (formData.get("email") as string).toLowerCase(); 
-  const password = formData.get("password") as string;
+  const name = ((formData.get("name") as string) ?? "").trim();
+  const email = ((formData.get("email") as string) ?? "").toLowerCase().trim();
+  const password = (formData.get("password") as string) ?? "";
 
   if (!email || !password) return { error: "Email and password are required" };
+  if (password.length < 8) return { error: "Password must be at least 8 characters" };
 
   try {
     const existingUser = await db.user.findUnique({ where: { email } });
@@ -21,37 +22,34 @@ export async function registerUser(formData: FormData) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await db.user.create({
-      data: { name, email, password: hashedPassword },
+      data: { name: name || null, email, password: hashedPassword },
     });
 
     await db.wallet.create({
       data: { userId: newUser.id, balance: 0, points: 0 },
     });
-
-  } catch (error) {
-    // যদি ডাটাবেজ লেভেলে কোনো এরর হয়
+  } catch {
     return { error: "Could not create account. Please try again." };
   }
 
-  // রেজিস্ট্রেশন শেষে লগইন পেজে রিডাইরেক্ট
   redirect("/sign-in");
 }
 
 export async function loginUser(formData: FormData) {
-  const email = (formData.get("email") as string).toLowerCase();
-  const password = formData.get("password") as string;
+  const email = ((formData.get("email") as string) ?? "").toLowerCase().trim();
+  const password = (formData.get("password") as string) ?? "";
 
   try {
-    await signIn("credentials", {
-      email,
-      password,
-      redirectTo: "/admin", 
-    });
-  } catch (error: any) {
-    // --- এরর ফিক্স লজিক ---
-    // Next.js-এ redirect() আসলে একটি 'NEXT_REDIRECT' এরর থ্রো করে। 
-    // ইমপোর্ট ছাড়াই সেটি চেক করার উপায় নিচে দেওয়া হলো:
-    if (error?.digest?.includes("NEXT_REDIRECT")) {
+    await signIn("credentials", { email, password, redirectTo: "/admin" });
+  } catch (error: unknown) {
+    // Next.js redirect() throws a NEXT_REDIRECT error — must re-throw it
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      typeof (error as Record<string, unknown>).digest === "string" &&
+      (error as Record<string, string>).digest.includes("NEXT_REDIRECT")
+    ) {
       throw error;
     }
 
@@ -63,7 +61,7 @@ export async function loginUser(formData: FormData) {
           return { error: "Something went wrong." };
       }
     }
-    
+
     return { error: "An unexpected error occurred." };
   }
 }

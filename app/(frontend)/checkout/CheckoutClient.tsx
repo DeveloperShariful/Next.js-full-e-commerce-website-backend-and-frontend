@@ -150,7 +150,7 @@ const formatCurrency = (amount: number): string =>
 // ============================================================================
 // 2. MAIN COMPONENT
 // ============================================================================
-function CheckoutClientComponent({ paymentGateways }: { paymentGateways: PaymentGateway[] }) {
+function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGateways: PaymentGateway[]; enableCoupons: boolean }) {
   const router = useRouter();
   const { cartItems, loading: isCartContextLoading } = useCart();
   const [state, dispatch] = useReducer(checkoutReducer, paymentGateways, createInitialState);
@@ -606,6 +606,7 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
           onRateSelect={handleShippingSelect}
           isLoadingShipping={loading.shipping}
           addressEntered={addressInputStarted}
+          enableCoupons={enableCoupons}
         />
 
         <PaymentMethods
@@ -635,7 +636,7 @@ function CheckoutClientComponent({ paymentGateways }: { paymentGateways: Payment
 // ============================================================================
 // 3. WRAPPER — PayPalScriptProvider only, no outer Elements
 // ============================================================================
-export default function CheckoutClient({ paymentGateways }: { paymentGateways: PaymentGateway[] }) {
+export default function CheckoutClient({ paymentGateways, enableCoupons }: { paymentGateways: PaymentGateway[]; enableCoupons: boolean }) {
   const paypalGateway = paymentGateways.find(g => g.identifier === 'paypal');
   const paypalClientId = paypalGateway?.publicKey || null;
 
@@ -649,10 +650,10 @@ export default function CheckoutClient({ paymentGateways }: { paymentGateways: P
   if (paypalClientId) {
     return (
       <PayPalScriptProvider options={paypalOptions}>
-        <CheckoutClientComponent paymentGateways={paymentGateways} />
+        <CheckoutClientComponent paymentGateways={paymentGateways} enableCoupons={enableCoupons} />
       </PayPalScriptProvider>
     );
   }
 
-  return <CheckoutClientComponent paymentGateways={paymentGateways} />;
+  return <CheckoutClientComponent paymentGateways={paymentGateways} enableCoupons={enableCoupons} />;
 }

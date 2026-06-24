@@ -9,6 +9,15 @@ import { searchProducts } from "@/app/actions/backend/product/product-read";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { BundleItem, ProductFormData } from "../types";
 
+type ProductSearchResult = {
+    id: string;
+    name: string;
+    featuredImage?: string | null;
+    sku?: string | null;
+    price?: number | null;
+    images?: { url: string }[];
+};
+
 export default function BundleItems() {
     const { watch, setValue } = useFormContext<ProductFormData>();
     const bundleItems = watch("bundleItems") || [];
@@ -17,7 +26,7 @@ export default function BundleItems() {
     const { formatPrice } = useGlobalStore();
 
     const [input, setInput] = useState("");
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<ProductSearchResult[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -25,7 +34,7 @@ export default function BundleItems() {
             if (input.length > 1) {
                 setLoading(true);
                 const res = await searchProducts(input);
-                if (res.success) setResults(res.data as any);
+                if (res.success) setResults(res.data as unknown as ProductSearchResult[]);
                 setLoading(false);
             } else {
                 setResults([]);
@@ -34,7 +43,7 @@ export default function BundleItems() {
         return () => clearTimeout(delayDebounceFn);
     }, [input]);
 
-    const addProduct = (prod: any) => {
+    const addProduct = (prod: ProductSearchResult) => {
         if (bundleItems.some((item) => item.childProductId === prod.id)) return;
         if (productId === prod.id) return;
 

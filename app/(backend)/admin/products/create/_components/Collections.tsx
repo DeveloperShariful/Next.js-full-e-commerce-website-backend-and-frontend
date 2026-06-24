@@ -18,7 +18,7 @@ export default function Collections() {
 
     useEffect(() => {
         getCollections().then(res => { 
-            if(res.success) setDbCollections(res.data as any);
+            if(res.success) setDbCollections(res.data);
         });
     }, []);
 

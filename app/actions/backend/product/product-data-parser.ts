@@ -1,7 +1,14 @@
 // File: app/actions/backend/product/product-data-parser.ts
 
-import { ProductType, TaxStatus, ProductStatus, ProductCondition } from "@prisma/client";
-import { parseJSON, cleanPrice } from "@/app/actions/backend/product/product-utils"; 
+import { ProductType, TaxStatus, ProductStatus, ProductCondition, BackorderStatus } from "@prisma/client";
+import { parseJSON, cleanPrice } from "@/app/actions/backend/product/product-utils";
+
+type BundleItemData = { childProductId: string; childProductName?: string; childProductImage?: string; quantity: number };
+type InventoryItemData = { locationId: string; quantity: number };
+type GalleryImageData = { url: string; mediaId?: string; altText?: string; id?: string };
+type DigitalFileData = { id?: string; name: string; url: string; isSecure: boolean };
+type AttributeData = { id?: string; name: string; values: string[]; visible: boolean; variation: boolean; position?: number; saveGlobally?: boolean };
+type VariationData = { id?: string; name: string; price: number; salePrice?: number | null; stock: number; sku?: string; barcode?: string; trackQuantity: boolean; attributes: Record<string, string>; images?: (string | GalleryImageData)[]; inventoryData?: InventoryItemData[]; isPreOrder?: boolean; preOrderReleaseDate?: string | null; costPerItem?: number | null; weight?: number | null; length?: number | null; width?: number | null; height?: number | null }; 
 
 export const parseProductFormData = (formData: FormData) => {
     const name = (formData.get("name") as string)?.trim(); 
@@ -32,7 +39,7 @@ export const parseProductFormData = (formData: FormData) => {
 
         isFeatured: formData.get("isFeatured") === "true",
 
-        bundleItems: parseJSON<any[]>(formData.get("bundleItems") as string, []),
+        bundleItems: parseJSON<BundleItemData[]>(formData.get("bundleItems") as string, []),
         giftCardAmounts: parseJSON<number[]>(formData.get("giftCardAmounts") as string, []), 
 
         videoUrl: formData.get("videoUrl") as string || null,
@@ -57,7 +64,7 @@ export const parseProductFormData = (formData: FormData) => {
         trackQuantity: formData.get("trackQuantity") === "true",
         stock: parseInt(formData.get("stock") as string) || 0, 
 
-        inventoryData: parseJSON<any[]>(formData.get("inventoryData") as string, []),
+        inventoryData: parseJSON<InventoryItemData[]>(formData.get("inventoryData") as string, []),
 
         isVirtual: formData.get("isVirtual") === "true",
         isDownloadable: formData.get("isDownloadable") === "true",
@@ -82,23 +89,23 @@ export const parseProductFormData = (formData: FormData) => {
         seoCanonicalUrl: formData.get("seoCanonicalUrl") as string,
 
         taxStatus: taxStatusInput as TaxStatus,
-        taxRateId: formData.get("taxRateId") as string,
-        shippingClassId: formData.get("shippingClassId") as string,
+        taxRateId: (formData.get("taxRateId") as string) || null,
+        shippingClassId: (formData.get("shippingClassId") as string) || null,
 
         tagsList: parseJSON<string[]>(formData.get("tags") as string, []),
         collectionIds: parseJSON<string[]>(formData.get("collectionIds") as string, []),
         upsells: parseJSON<string[]>(formData.get("upsells") as string, []),
         crossSells: parseJSON<string[]>(formData.get("crossSells") as string, []),
         
-        galleryImages: parseJSON<any[]>(formData.get("galleryImages") as string, []),
-        
-        digitalFiles: parseJSON<any[]>(formData.get("digitalFiles") as string, []),
-        
-        attributesData: parseJSON<any[]>(formData.get("attributes") as string, []),
-        variationsData: parseJSON<any[]>(formData.get("variations") as string, []),
+        galleryImages: parseJSON<GalleryImageData[]>(formData.get("galleryImages") as string, []),
+
+        digitalFiles: parseJSON<DigitalFileData[]>(formData.get("digitalFiles") as string, []),
+
+        attributesData: parseJSON<AttributeData[]>(formData.get("attributes") as string, []),
+        variationsData: parseJSON<VariationData[]>(formData.get("variations") as string, []),
 
         lowStockThreshold: parseInt(formData.get("lowStockThreshold") as string) || 2,
-        backorderStatus: formData.get("backorderStatus") as any || "DO_NOT_ALLOW",
+        backorderStatus: ((formData.get("backorderStatus") as string) || "DO_NOT_ALLOW") as BackorderStatus,
         soldIndividually: formData.get("soldIndividually") === "true",
         
         mpn: formData.get("mpn") as string || null,

@@ -221,8 +221,8 @@ export default async function CreateProductPage(props: PageProps) {
       downloadLimit: product.downloadLimit ?? null,
       downloadExpiry: product.downloadExpiry ?? null,
 
-      digitalFiles: product.downloadFiles.map(d => ({ 
-        id: d.id, name: d.name, url: d.url, isSecure: false 
+      digitalFiles: product.downloadFiles.map(d => ({
+        id: d.id, name: d.name, url: d.url, isSecure: d.isSecure
       })),
       
       attributes: product.attributes.map((a) => ({
@@ -267,8 +267,8 @@ export default async function CreateProductPage(props: PageProps) {
       upsells: product.upsellIds,
       crossSells: product.crossSellIds,
       
-      giftCardAmounts: [] 
-    } as any;
+      giftCardAmounts: []
+    } as unknown as ProductFormValues;
   }
 
   const sanitizedInitialData = JSON.parse(JSON.stringify(initialData));

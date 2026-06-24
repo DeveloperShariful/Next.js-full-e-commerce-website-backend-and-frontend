@@ -27,7 +27,7 @@ export const Stripe_Webhook_Config = ({ method }: { method: PaymentGatewayUI }) 
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setLocalUrl(`${window.location.origin}/api/webhook/stripe`)
+      setLocalUrl(`${window.location.origin}/api/webhooks/stripe`)
     }
   }, [])
 

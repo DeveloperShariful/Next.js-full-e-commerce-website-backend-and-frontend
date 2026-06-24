@@ -28,7 +28,25 @@ export type ProductFormState = {
     productId?: string;
 };
 
-async function syncSystemAttribute(tx: any, name: string, value: string | null) {
+type OldProductData = Prisma.ProductGetPayload<{
+    include: {
+        tags: true;
+        inventoryLevels: true;
+        images: true;
+        attributes: true;
+        collections: true;
+        categories: true;
+        brand: true;
+        downloadFiles: true;
+        bundleItems: true;
+        variants: {
+            where: { deletedAt: null };
+            include: { images: true; inventoryLevels: true };
+        };
+    };
+}>;
+
+async function syncSystemAttribute(tx: Prisma.TransactionClient, name: string, value: string | null) {
     if (!value) return;
     const slug = name.toLowerCase().replace(/\s+/g, '-'); 
     
@@ -53,7 +71,7 @@ async function syncSystemAttribute(tx: any, name: string, value: string | null) 
     }
 }
 
-async function syncGlobalAttributeValues(tx: any, attributesData: any[]) {
+async function syncGlobalAttributeValues(tx: Prisma.TransactionClient, attributesData: { name?: string; values: string[]; saveGlobally?: boolean }[]) {
     for (const attr of attributesData) {
         if (attr.saveGlobally && attr.name) {
              const slug = attr.name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
@@ -135,7 +153,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
     }
 
     if (data.productType === 'BUNDLE' && data.bundleItems.length > 0 && data.id) {
-        const childIds = data.bundleItems.map((b: any) => b.childProductId);
+        const childIds = data.bundleItems.map(b => b.childProductId);
         if (await checkBundleCycle(data.id, childIds)) {
              return { success: false, message: "Cyclic dependency detected in bundle items." };
         }
@@ -164,7 +182,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             };
         });
 
-        let oldProductData: any = null;
+        let oldProductData: OldProductData | null = null;
         if (type === "UPDATE" && data.id) {
             oldProductData = await db.product.findUnique({
                 where: { id: data.id },
@@ -192,7 +210,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 await tx.productVersion.create({
                     data: {
                         productId: data.id,
-                        data: oldProductData as any,
+                        data: oldProductData as unknown as Prisma.InputJsonValue,
                         createdBy: dbUser!.id,
                         reason: "Product Update"
                     }
@@ -209,11 +227,11 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             }
 
             // 🚀 উকমার্স গুগল সাইজ, কালার ইত্যাদি ডাটা ডাইনামিকলি Metafields JSON এর ভেতর ইনজেক্ট করার ম্যাজিক লজিক
-            const metafieldsObj: Record<string, any> = {};
-            
+            const metafieldsObj: Record<string, unknown> = {};
+
             // কাস্টম মেটাফিল্ডসগুলো প্রথমে অবজেক্টে রূপান্তর করা হচ্ছে
             if (Array.isArray(data.metafields)) {
-                data.metafields.forEach((item: any) => {
+                data.metafields.forEach((item: { key?: string; value?: string }) => {
                     if (item.key && item.value) {
                         metafieldsObj[item.key] = item.value;
                     }
@@ -231,9 +249,9 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             metafieldsObj.google_adult_content = data.google_adult_content;
             metafieldsObj.google_availability_date = data.google_availability_date || "";
 
-            const normalizeInventory = (items: any[]) => items?.map(i => ({ loc: i.locationId, qty: i.quantity })).sort((a,b) => a.loc.localeCompare(b.loc)) || [];
-            const normalizeImages = (imgs: any[]) => imgs?.map(i => (typeof i === 'string' ? i : i.url)).sort() || [];
-            const normalizeAttributes = (attrs: any[]) => attrs?.map(a => ({ n: a.name, v: [...(a.values || [])].sort() })).sort((a,b) => a.n.localeCompare(b.n)) || [];
+            const normalizeInventory = (items: { locationId: string; quantity: number }[]) => items?.map(i => ({ loc: i.locationId, qty: i.quantity })).sort((a, b) => a.loc.localeCompare(b.loc)) || [];
+            const normalizeImages = (imgs: (string | { url: string })[]) => imgs?.map(i => (typeof i === 'string' ? i : i.url)).sort() || [];
+            const normalizeAttributes = (attrs: { name: string; values?: string[] }[]) => attrs?.map(a => ({ n: a.name, v: [...(a.values || [])].sort() })).sort((a, b) => a.n.localeCompare(b.n)) || [];
             
             // 🚀 Scalars changed লজিকে নতুন গুগল মার্চেন্ট সেন্টারের ৫টি কলাম ফিক্স করা হয়েছে (ডেল্টা সিস্টেম অক্ষুণ্ণ রাখতে)
             const scalarsChanged = !oldProductData || 
@@ -255,6 +273,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 Number(oldProductData.width || 0) !== (data.width || 0) ||
                 Number(oldProductData.height || 0) !== (data.height || 0) ||
                 oldProductData.isPreOrder !== data.isPreOrder ||
+                (oldProductData.preOrderReleaseDate?.toISOString().split('T')[0] || null) !== (data.preOrderReleaseDate || null) ||
                 oldProductData.preOrderLimit !== (data.preOrderLimit || null) ||
                 oldProductData.preOrderMessage !== (data.preOrderMessage || null) ||
                 oldProductData.featuredImage !== (data.featuredImage || null) ||
@@ -266,17 +285,17 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 oldProductData.googleIsBundle !== data.googleIsBundle;
 
             const categoriesChanged = !oldProductData || !arraysHaveSameContent(
-                oldProductData.categories.map((c: any) => c.id),
+                oldProductData.categories.map(c => c.id),
                 data.categoryIds || []
             );
 
             const tagsChanged = !oldProductData || !arraysHaveSameContent(
-                oldProductData.tags.map((t: any) => t.name),
+                oldProductData.tags.map(t => t.name),
                 data.tagsList
             );
 
             const collectionsChanged = !oldProductData || !arraysHaveSameContent(
-                oldProductData.collections.map((c: any) => c.id),
+                oldProductData.collections.map(c => c.id),
                 data.collectionIds
             );
 
@@ -298,14 +317,14 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             const variationsChanged = data.productType === 'VARIABLE' && (!oldProductData || (
                 oldProductData.variants.length !== data.variationsData.length ||
                 !isDeepEqual(
-                    oldProductData.variants.map((v: any) => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: v.stock })).sort((a:any, b:any) => a.s.localeCompare(b.s)),
-                    data.variationsData.map((v: any) => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: Number(v.stock) })).sort((a:any, b:any) => a.s.localeCompare(b.s))
+                    oldProductData.variants.map(v => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: v.stock, pre: v.isPreOrder, prd: v.preOrderReleaseDate?.toISOString().split('T')[0] || null })).sort((a, b) => a.s.localeCompare(b.s)),
+                    data.variationsData.map(v => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: Number(v.stock), pre: v.isPreOrder || false, prd: v.preOrderReleaseDate || null })).sort((a, b) => a.s.localeCompare(b.s))
                 )
             ));
-            
+
             const bundleChanged = data.productType === 'BUNDLE' && (!oldProductData || !isDeepEqual(
-                oldProductData.bundleItems.map((b: any) => b.childProductId).sort(),
-                data.bundleItems.map((b: any) => b.childProductId).sort()
+                oldProductData.bundleItems.map(b => b.childProductId).sort(),
+                data.bundleItems.map(b => b.childProductId).sort()
             ));
 
             const metafieldsChanged = !oldProductData || !isDeepEqual(
@@ -344,7 +363,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 }
             } : undefined;
 
-            const productPayload: any = {
+            const productPayload: Record<string, unknown> = {
                 name: data.name,
                 slug: finalSlug, 
                 description: data.description,
@@ -374,8 +393,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 ageGroup: data.ageGroup,
                 
                 // 🚀 মার্চ করা নতুন মেটাফিল্ডস অবজেক্ট সেভ করা হচ্ছে
-                metafields: metafieldsObj, 
-                seoSchema: data.seoSchema || Prisma.DbNull,
+                metafields: metafieldsObj as unknown as Prisma.InputJsonValue,
+                seoSchema: (data.seoSchema || Prisma.DbNull) as unknown as Prisma.InputJsonValue,
                 
                 isFeatured: data.isFeatured || false,
 
@@ -449,37 +468,39 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                  if (scalarsChanged || tagsChanged || collectionsChanged || categoriesChanged || variationsChanged || metafieldsChanged || type === "UPDATE") {
                      product = await tx.product.update({
                         where: { id: data.id },
-                        data: productPayload
+                        data: productPayload as unknown as Prisma.ProductUpdateInput
                     });
                  } else {
-                     product = { id: data.id, name: data.name, slug: finalSlug };
+                     product = await tx.product.findUniqueOrThrow({ where: { id: data.id }, select: { id: true, name: true, slug: true } });
                  }
             } else {
                 productPayload.tags = {
                     connectOrCreate: tagOperations
                 };
                 product = await tx.product.create({
-                    data: productPayload
+                    data: productPayload as unknown as Prisma.ProductCreateInput
                 });
             }
 
             const promises = [];
 
-            if ((inventoryChanged || type === "CREATE") && data.productType !== 'BUNDLE') {
+            if (data.productType === 'BUNDLE') {
+                // Clean up parent-level inventory when switching to BUNDLE type
+                promises.push(tx.inventoryLevel.deleteMany({ where: { productId: product.id, variantId: null } }));
+            } else if (inventoryChanged || type === "CREATE") {
                 promises.push(handleInventory(tx, product, data, locationId, dbUser!.id));
             }
             if (imagesChanged || type === "CREATE") {
                 promises.push(handleImages(tx, product.id, data.galleryImages));
             }
-            if (data.isDownloadable) {
-                promises.push(handleDigitalFiles(tx, product.id, data.isDownloadable, data.digitalFiles));
-            }
+            // Always call handleDigitalFiles so files are deleted when switching away from downloadable
+            promises.push(handleDigitalFiles(tx, product.id, data.isDownloadable, data.digitalFiles));
             if (attributesChanged || type === "CREATE") {
                 promises.push(handleAttributes(tx, product.id, data.attributesData));
             }
             
             const productTypeChanged = oldProductData && oldProductData.productType !== data.productType;
-            const hasOrphanedVariations = data.productType !== 'VARIABLE' && oldProductData?.variants?.length > 0;
+            const hasOrphanedVariations = data.productType !== 'VARIABLE' && (oldProductData?.variants?.length ?? 0) > 0;
             
             if (variationsChanged || productTypeChanged || hasOrphanedVariations || type === "CREATE") {
                 promises.push(handleVariations(tx, product.id, data.variationsData, data.productType, locationId, dbUser!.id));
@@ -546,27 +567,29 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         revalidatePath("/admin/products");
         return { success: true, productId: savedProduct.id };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("[SAVE_PRODUCT_ERROR]", error);
-        
-        if (error.message === "NAME_DUPLICATE_ERROR") {
+
+        if (error instanceof Error && error.message === "NAME_DUPLICATE_ERROR") {
             return { success: false, message: `The product name "${data.name}" is already used by another product.` };
         }
 
-        if (error.code === 'P2002') {
-            const target = error.meta?.target;
-            if (Array.isArray(target)) {
-                if (target.includes('name')) return { success: false, message: `The name "${data.name}" is already taken.` };
-                if (target.includes('slug')) return { success: false, message: "URL Slug collision. Please try again." };
-                if (target.includes('sku')) return { success: false, message: `SKU "${data.sku}" is already in use.` };
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            if (error.code === 'P2002') {
+                const target = (error.meta as { target?: string[] } | undefined)?.target;
+                if (Array.isArray(target)) {
+                    if (target.includes('name')) return { success: false, message: `The name "${data.name}" is already taken.` };
+                    if (target.includes('slug')) return { success: false, message: "URL Slug collision. Please try again." };
+                    if (target.includes('sku')) return { success: false, message: `SKU "${data.sku}" is already in use.` };
+                }
+                return { success: false, message: "Duplicate value found (Tags, SKU, or Name)." };
             }
-            return { success: false, message: "Duplicate value found (Tags, SKU, or Name)." };
+            if (error.code === 'P2028') {
+                return { success: false, message: "Operation timed out due to too many variations. Please try saving fewer variations at once." };
+            }
         }
 
-        if (error.code === 'P2028') {
-             return { success: false, message: "Operation timed out due to too many variations. Please try saving fewer variations at once." };
-        }
-
-        return { success: false, message: "Failed to save product. " + (error.message || "") };
+        const message = error instanceof Error ? error.message : "";
+        return { success: false, message: "Failed to save product. " + message };
     }
 }

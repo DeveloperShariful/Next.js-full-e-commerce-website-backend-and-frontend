@@ -18,7 +18,7 @@ export default function Shipping() {
     const dUnit = dimensionUnit || "cm";
 
     useEffect(() => {
-        getShippingClasses().then(res => { if(res.success) setClasses(res.data as any) });
+        getShippingClasses().then(res => { if(res.success) setClasses(res.data) });
     }, []);
 
     return (

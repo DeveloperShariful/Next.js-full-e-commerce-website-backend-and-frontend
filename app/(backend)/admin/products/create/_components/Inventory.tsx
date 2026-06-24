@@ -21,12 +21,12 @@ export default function Inventory() {
     useEffect(() => {
         getLocations().then(res => {
             if(res.success && res.data) {
-                setLocations(res.data as any);
+                setLocations(res.data);
                 if (data.productType === 'SIMPLE' && data.trackQuantity) {
                     const currentStock = data.stock || 0;
                     const existingData = data.inventoryData || [];
                     if (existingData.length === 0 && res.data.length > 0) {
-                        const defaultLoc = res.data.find((l: any) => l.isDefault) || res.data[0];
+                        const defaultLoc = res.data.find(l => l.isDefault) || res.data[0];
                         setValue("inventoryData", [{
                             locationId: defaultLoc.id,
                             quantity: currentStock

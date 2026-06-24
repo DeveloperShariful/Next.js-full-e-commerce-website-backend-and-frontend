@@ -178,9 +178,12 @@ export async function bulkProductAction(formData: FormData) {
                     data: { status: ProductStatus.DRAFT }
                 });
                 break;
+
+            default:
+                return { success: false, message: `Unknown action: ${action}` };
         }
         
-        if (action !== "delete" && userId) {
+        if (userId) {
             await db.activityLog.create({
                 data: {
                     userId,
@@ -220,7 +223,9 @@ export async function moveToTrash(id: string) {
         }
 
         revalidatePath("/admin/products");
+        return { success: true };
     } catch (error) {
         console.error(error);
+        return { success: false, error: "Failed to move to trash" };
     }
 }

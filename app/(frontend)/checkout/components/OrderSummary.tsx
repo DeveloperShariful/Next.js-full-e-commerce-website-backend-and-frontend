@@ -58,6 +58,7 @@ interface OrderSummaryProps {
   onRateSelect: (rateId: string) => void;
   isLoadingShipping: boolean;
   addressEntered: boolean;
+  enableCoupons: boolean;
 }
 
 // ============================================================================
@@ -75,6 +76,7 @@ export default function OrderSummary({
   onRateSelect,
   isLoadingShipping,
   addressEntered,
+  enableCoupons,
 }: OrderSummaryProps) {
   const [couponCode, setCouponCode] = useState('');
 
@@ -157,28 +159,30 @@ export default function OrderSummary({
         </div>
       </div>
 
-      {/* Coupon Input */}
-      <div className="border-t border-[#e0e0e0] mt-4 pt-4">
-        <h3 className="mt-0 mb-4 text-[1.1rem] font-semibold md:text-[1rem]">Have a Coupon Code?</h3>
-        <div className="flex gap-2 flex-col md:flex-row">
-          <input
-            type="text"
-            value={couponCode}
-            onChange={(e) => setCouponCode(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleApplyClick(e as any)}
-            placeholder="Coupon code"
-            className="flex-grow p-3 text-base border border-[#ccc] rounded w-full"
-            disabled={isApplyingCoupon || (cartData?.appliedCoupons?.length ?? 0) > 0}
-          />
-          <button
-            onClick={handleApplyClick}
-            className="p-3 px-6 text-base font-semibold text-white bg-[#333] border border-[#333] rounded cursor-pointer transition-all duration-200 hover:bg-black disabled:bg-[#575757] disabled:border-[#aaa] disabled:cursor-not-allowed w-full md:w-auto"
-            disabled={isApplyingCoupon || !couponCode.trim() || (cartData?.appliedCoupons?.length ?? 0) > 0}
-          >
-            {isApplyingCoupon ? 'Applying...' : 'Apply'}
-          </button>
+      {/* Coupon Input — only shown when coupons are enabled in store settings */}
+      {enableCoupons && (
+        <div className="border-t border-[#e0e0e0] mt-4 pt-4">
+          <h3 className="mt-0 mb-4 text-[1.1rem] font-semibold md:text-[1rem]">Have a Coupon Code?</h3>
+          <div className="flex gap-2 flex-col md:flex-row">
+            <input
+              type="text"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplyClick(e as any)}
+              placeholder="Coupon code"
+              className="flex-grow p-3 text-base border border-[#ccc] rounded w-full"
+              disabled={isApplyingCoupon || (cartData?.appliedCoupons?.length ?? 0) > 0}
+            />
+            <button
+              onClick={handleApplyClick}
+              className="p-3 px-6 text-base font-semibold text-white bg-[#333] border border-[#333] rounded cursor-pointer transition-all duration-200 hover:bg-black disabled:bg-[#575757] disabled:border-[#aaa] disabled:cursor-not-allowed w-full md:w-auto"
+              disabled={isApplyingCoupon || !couponCode.trim() || (cartData?.appliedCoupons?.length ?? 0) > 0}
+            >
+              {isApplyingCoupon ? 'Applying...' : 'Apply'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Totals breakdown */}
       <div className="border-t border-[#e0e0e0] mt-6 pt-6 flex flex-col gap-4">

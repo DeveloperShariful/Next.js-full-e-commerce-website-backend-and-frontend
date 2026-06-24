@@ -118,11 +118,11 @@ export async function connectPaypalKeys(id: string, clientId: string, secretKey:
       message: `PayPal ${isSandbox ? 'Sandbox' : 'Live'} connected successfully!` 
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("PayPal Connection Catch Error:", error);
-    return { 
-      success: false, 
-      error: error.message || "Network Error: Could not connect to PayPal." 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network Error: Could not connect to PayPal."
     };
   }
 }
@@ -150,7 +150,7 @@ export async function refreshPaypalWebhook(id: string) {
 
     let appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     if (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1);
-    const webhookUrl = `${appUrl}/api/webhook/paypal`;
+    const webhookUrl = `${appUrl}/api/webhooks/paypal`;
 
     const createRes = await fetch(`${baseUrl}/v1/notifications/webhooks`, {
       method: "POST",

@@ -12,11 +12,17 @@ interface Props {
   productId: string;
 }
 
+type ChannelStatus = {
+  status: "SYNCED" | "PENDING" | "FAILED" | "EXCLUDED";
+  errorMessage?: string | null;
+  lastSyncedAt?: string | null;
+};
+
 export function ChannelVisibility({ productId }: Props) {
   const [isOpen, setIsOpen] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [status, setStatus] = useState<any>(null);
+  const [status, setStatus] = useState<ChannelStatus | null>(null);
   const [visibility, setVisibility] = useState<"SYNCED" | "EXCLUDED">("SYNCED");
 
   // ১. মাউন্ট হওয়ার সময় লোকাল ডাটাবেজ থেকে স্ট্যাটাস আনা
@@ -24,7 +30,7 @@ export function ChannelVisibility({ productId }: Props) {
     if (productId) {
       getLocalProductChannelStatus(productId).then((res) => {
         if (res.success && res.status) {
-          setStatus(res.status);
+          setStatus(res.status as ChannelStatus);
           setVisibility(res.status.status === "EXCLUDED" ? "EXCLUDED" : "SYNCED");
         }
       });
@@ -42,7 +48,7 @@ export function ChannelVisibility({ productId }: Props) {
         toast.success(val === "EXCLUDED" ? "Product excluded from Google." : "Product queued for Google sync.", { id: toastId });
         // স্ট্যাটাস রিলোড করা
         const updated = await getLocalProductChannelStatus(productId);
-        if (updated.success) setStatus(updated.status);
+        if (updated.success) setStatus(updated.status as ChannelStatus);
       } else {
         toast.error(res.error || "Failed to update channel visibility.", { id: toastId });
       }
@@ -62,7 +68,7 @@ export function ChannelVisibility({ productId }: Props) {
         toast.success("Successfully synced and updated status!", { id: toastId });
         // লাইভ স্ট্যাটাস রেন্ডার করা
         const updated = await getLocalProductChannelStatus(productId);
-        if (updated.success) setStatus(updated.status);
+        if (updated.success) setStatus(updated.status as ChannelStatus);
       } else {
         toast.error(res.error || "Sync failed. Check errors.", { id: toastId });
       }
@@ -95,7 +101,7 @@ export function ChannelVisibility({ productId }: Props) {
             </label>
             <select
               value={visibility}
-              onChange={(e) => handleVisibilityChange(e.target.value as any)}
+              onChange={(e) => handleVisibilityChange(e.target.value as "SYNCED" | "EXCLUDED")}
               disabled={isPending || isSyncing}
               className="w-full border border-[#8c8f94] rounded-[3px] px-2.5 py-1.5 text-[12px] focus:border-[#2271b1] focus:ring-1 focus:outline-none bg-white cursor-pointer disabled:opacity-50"
             >

@@ -5,8 +5,17 @@
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { X, Search, Loader2 } from "lucide-react";
-import { searchProducts } from "@/app/actions/backend/product/product-read";
+import { searchProducts, getProductNamesByIds } from "@/app/actions/backend/product/product-read";
 import { ProductFormData } from "../types";
+
+type ProductSearchResult = {
+    id: string;
+    name: string;
+    featuredImage?: string | null;
+    sku?: string | null;
+    price?: number | null;
+    images?: { url: string }[];
+};
 
 export default function LinkedProducts() {
     const { watch, setValue } = useFormContext<ProductFormData>();
@@ -15,18 +24,32 @@ export default function LinkedProducts() {
 
     const [upsellInput, setUpsellInput] = useState("");
     const [crossSellInput, setCrossSellInput] = useState("");
-    const [upsellResults, setUpsellResults] = useState<any[]>([]);
-    const [crossSellResults, setCrossSellResults] = useState<any[]>([]);
+    const [upsellResults, setUpsellResults] = useState<ProductSearchResult[]>([]);
+    const [crossSellResults, setCrossSellResults] = useState<ProductSearchResult[]>([]);
     const [loadingUpsell, setLoadingUpsell] = useState(false);
     const [loadingCrossSell, setLoadingCrossSell] = useState(false);
+    const [labelMap, setLabelMap] = useState<Record<string, string>>({});
 
-    // Search logic unchanged
+    // On mount, resolve names for IDs that came from edit mode
+    useEffect(() => {
+        const allIds = [...upsells, ...crossSells];
+        if (allIds.length === 0) return;
+        getProductNamesByIds(allIds).then(res => {
+            if (res.success && res.data.length > 0) {
+                const entries: Record<string, string> = {};
+                res.data.forEach(p => { entries[p.id] = p.name; });
+                setLabelMap(prev => ({ ...prev, ...entries }));
+            }
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (upsellInput.length > 1) {
                 setLoadingUpsell(true);
                 const res = await searchProducts(upsellInput);
-                if (res.success) setUpsellResults(res.data as any);
+                if (res.success) setUpsellResults(res.data as unknown as ProductSearchResult[]);
                 setLoadingUpsell(false);
             } else {
                 setUpsellResults([]);
@@ -40,7 +63,7 @@ export default function LinkedProducts() {
             if (crossSellInput.length > 1) {
                 setLoadingCrossSell(true);
                 const res = await searchProducts(crossSellInput);
-                if (res.success) setCrossSellResults(res.data as any);
+                if (res.success) setCrossSellResults(res.data as unknown as ProductSearchResult[]);
                 setLoadingCrossSell(false);
             } else {
                 setCrossSellResults([]);
@@ -49,12 +72,13 @@ export default function LinkedProducts() {
         return () => clearTimeout(delayDebounceFn);
     }, [crossSellInput]);
 
-    const addProduct = (type: 'upsells' | 'crossSells', id: string) => {
+    const addProduct = (type: 'upsells' | 'crossSells', prod: ProductSearchResult) => {
         const currentList = type === 'upsells' ? upsells : crossSells;
-        if (!currentList.includes(id)) {
-            setValue(type, [...currentList, id], { shouldDirty: true, shouldValidate: true });
+        if (!currentList.includes(prod.id)) {
+            setValue(type, [...currentList, prod.id], { shouldDirty: true, shouldValidate: true });
+            setLabelMap(prev => ({ ...prev, [prod.id]: prod.name }));
         }
-        
+
         if (type === 'upsells') {
             setUpsellInput("");
             setUpsellResults([]);
@@ -71,21 +95,20 @@ export default function LinkedProducts() {
 
     return (
         <div className="space-y-6 max-w-2xl">
-            
+
             {/* Upsells */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start border-b border-[#f0f0f1] pb-6">
                 <div className="md:text-left mt-1.5">
                     <label className="text-[13px] text-[#3c434a] font-medium block">Upsells</label>
                     <span className="text-[11px] text-[#8c8f94] italic block leading-tight mt-0.5">Products you recommend instead of the current one.</span>
                 </div>
-                
+
                 <div className="md:col-span-3 relative">
-                    {/* Selected Items Chips */}
                     {upsells.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-2">
                             {upsells.map((id, i) => (
                                 <span key={i} className="bg-[#f0f0f1] border border-[#c3c4c7] text-[#3c434a] rounded-[2px] px-2 py-0.5 text-[12px] flex items-center gap-1.5 shadow-sm">
-                                    <span className="max-w-[150px] truncate">{id}</span> 
+                                    <span className="max-w-[150px] truncate">{labelMap[id] || `${id.slice(0, 8)}…`}</span>
                                     <X size={12} className="cursor-pointer text-[#8c8f94] hover:text-[#d63638]" onClick={() => removeProduct('upsells', id)}/>
                                 </span>
                             ))}
@@ -93,7 +116,7 @@ export default function LinkedProducts() {
                     )}
 
                     <div className="relative">
-                        <input 
+                        <input
                             value={upsellInput}
                             onChange={(e) => setUpsellInput(e.target.value)}
                             className="w-full border border-[#8c8f94] pl-7 pr-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
@@ -109,13 +132,13 @@ export default function LinkedProducts() {
                     {upsellResults.length > 0 && (
                         <ul className="absolute z-10 w-full bg-white border border-[#c3c4c7] rounded-[3px] shadow-lg max-h-48 overflow-y-auto mt-1 custom-scrollbar">
                             {upsellResults.map((prod) => (
-                                <li 
-                                    key={prod.id} 
-                                    onClick={() => addProduct('upsells', prod.id)}
+                                <li
+                                    key={prod.id}
+                                    onClick={() => addProduct('upsells', prod)}
                                     className="px-3 py-2 hover:bg-[#f0f6fc] cursor-pointer text-[12px] flex items-center gap-2 border-b border-[#f0f0f1] last:border-0"
                                 >
                                     <div className="w-6 h-6 bg-[#f0f0f1] border border-[#c3c4c7] rounded-[2px] overflow-hidden shrink-0">
-                                        <img src={prod.featuredImage || prod.image || "/placeholder.jpg"} className="w-full h-full object-cover" alt="" />
+                                        <img src={prod.featuredImage || "/placeholder.jpg"} className="w-full h-full object-cover" alt="" />
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="font-semibold text-[#2271b1]">{prod.name}</span>
@@ -134,14 +157,13 @@ export default function LinkedProducts() {
                     <label className="text-[13px] text-[#3c434a] font-medium block">Cross-sells</label>
                     <span className="text-[11px] text-[#8c8f94] italic block leading-tight mt-0.5">Products you promote in the cart.</span>
                 </div>
-                
+
                 <div className="md:col-span-3 relative">
-                    {/* Selected Items Chips */}
                     {crossSells.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-2">
                             {crossSells.map((id, i) => (
                                 <span key={i} className="bg-[#f0f0f1] border border-[#c3c4c7] text-[#3c434a] rounded-[2px] px-2 py-0.5 text-[12px] flex items-center gap-1.5 shadow-sm">
-                                    <span className="max-w-[150px] truncate">{id}</span>
+                                    <span className="max-w-[150px] truncate">{labelMap[id] || `${id.slice(0, 8)}…`}</span>
                                     <X size={12} className="cursor-pointer text-[#8c8f94] hover:text-[#d63638]" onClick={() => removeProduct('crossSells', id)}/>
                                 </span>
                             ))}
@@ -149,7 +171,7 @@ export default function LinkedProducts() {
                     )}
 
                     <div className="relative">
-                        <input 
+                        <input
                             value={crossSellInput}
                             onChange={(e) => setCrossSellInput(e.target.value)}
                             className="w-full border border-[#8c8f94] pl-7 pr-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
@@ -165,13 +187,13 @@ export default function LinkedProducts() {
                     {crossSellResults.length > 0 && (
                         <ul className="absolute z-10 w-full bg-white border border-[#c3c4c7] rounded-[3px] shadow-lg max-h-48 overflow-y-auto mt-1 custom-scrollbar">
                             {crossSellResults.map((prod) => (
-                                <li 
-                                    key={prod.id} 
-                                    onClick={() => addProduct('crossSells', prod.id)}
+                                <li
+                                    key={prod.id}
+                                    onClick={() => addProduct('crossSells', prod)}
                                     className="px-3 py-2 hover:bg-[#f0f6fc] cursor-pointer text-[12px] flex items-center gap-2 border-b border-[#f0f0f1] last:border-0"
                                 >
                                     <div className="w-6 h-6 bg-[#f0f0f1] border border-[#c3c4c7] rounded-[2px] overflow-hidden shrink-0">
-                                        <img src={prod.featuredImage || prod.image || "/placeholder.jpg"} className="w-full h-full object-cover" alt="" />
+                                        <img src={prod.featuredImage || "/placeholder.jpg"} className="w-full h-full object-cover" alt="" />
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="font-semibold text-[#2271b1]">{prod.name}</span>

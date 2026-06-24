@@ -21,7 +21,7 @@ export default function Publish({ loading, isEdit, onSubmit }: Props) {
     const [isPending, startTransition] = useTransition();
     const [isExpanded, setIsExpanded] = useState(true);
     
-    const { register, watch } = useFormContext<ProductFormData>();
+    const { watch, setValue } = useFormContext<ProductFormData>();
     const id = watch("id");
     const isFeatured = watch("isFeatured");
     const status = watch("status");
@@ -67,8 +67,9 @@ export default function Publish({ loading, isEdit, onSubmit }: Props) {
                             <span className="font-bold">
                                 {status === "ACTIVE" ? "Published" : status === "ARCHIVED" ? "Archived" : "Draft"}
                             </span>
-                            <select 
-                                {...register("status")}
+                            <select
+                                value={status || "DRAFT"}
+                                onChange={(e) => setValue("status", e.target.value as ProductFormData["status"], { shouldDirty: true })}
                                 className="ml-auto text-[12px] bg-[#f6f7f7] border border-[#8c8f94] rounded-[3px] px-1 focus:border-[#2271b1] outline-none"
                             >
                                 <option value="DRAFT">Draft</option>
@@ -86,9 +87,10 @@ export default function Publish({ loading, isEdit, onSubmit }: Props) {
                         
                         <div className="pl-6">
                             <label className="flex items-center gap-2 text-[13px] text-[#3c434a] cursor-pointer select-none">
-                                <input 
-                                    type="checkbox" 
-                                    {...register("isFeatured")}
+                                <input
+                                    type="checkbox"
+                                    checked={!!isFeatured}
+                                    onChange={(e) => setValue("isFeatured", e.target.checked, { shouldDirty: true })}
                                     className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]"
                                 />
                                 <span className="flex items-center gap-1">

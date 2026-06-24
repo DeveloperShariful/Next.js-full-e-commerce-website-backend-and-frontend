@@ -238,3 +238,16 @@ export async function getTaxClasses() {
         return { success: false, data: [] };
     }
 }
+
+export async function getProductNamesByIds(ids: string[]) {
+    if (!ids?.length) return { success: true, data: [] as { id: string; name: string }[] };
+    try {
+        const products = await db.product.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true }
+        });
+        return { success: true, data: products };
+    } catch {
+        return { success: false, data: [] as { id: string; name: string }[] };
+    }
+}

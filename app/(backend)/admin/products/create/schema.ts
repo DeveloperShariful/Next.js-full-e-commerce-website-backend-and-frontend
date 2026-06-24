@@ -131,8 +131,8 @@ export const productSchema = z.object({
   googleProductCategory: emptyToString,
   googleTitle: emptyToString,
   googleDescription: emptyToString,
-  googleIsBundle: z.boolean().default(false),
-  
+  googleIsBundle: z.preprocess(val => val === true || val === "true", z.boolean()).default(false),
+
   // 🚀 NEW: GOOGLE SPECIFIC ATTRIBUTES (Stored in JSON metafields)
   google_size: emptyToString,
   google_size_system: emptyToString,
@@ -141,7 +141,7 @@ export const productSchema = z.object({
   google_material: emptyToString,
   google_pattern: emptyToString,
   google_multipack: emptyToString,
-  google_adult_content: z.boolean().default(false),
+  google_adult_content: z.preprocess(val => val === true || val === "true", z.boolean()).default(false),
   google_availability_date: emptyToString,
 
   attributes: z.array(z.object({

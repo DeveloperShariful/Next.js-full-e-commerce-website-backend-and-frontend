@@ -28,7 +28,11 @@ export default function Attributes({ onSubmit, loading }: AttributesProps) {
     // Fetch Global Attributes
     useEffect(() => {
         getAttributes().then(res => {
-            if(res.success) setGlobalAttrs(res.data as any || []);
+            if (res.success) {
+                setGlobalAttrs(
+                    res.data.map(a => ({ id: a.id, name: a.name, values: (a.values as unknown as string[]) || [] }))
+                );
+            }
         });
     }, []);
 

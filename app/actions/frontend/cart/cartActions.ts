@@ -399,7 +399,16 @@ export async function clearCartAction(): Promise<CartActionResponse> {
 
 export async function applyCouponAction(code: string): Promise<CartActionResponse> {
   try {
-    const { cart } = await getCartSessionAndUser();
+    const [{ cart }, storeSettings] = await Promise.all([
+      getCartSessionAndUser(),
+      db.storeSettings.findUnique({ where: { id: "settings" }, select: { generalConfig: true } }),
+    ]);
+
+    const generalConfig = storeSettings?.generalConfig as { enableCoupons?: boolean } | null;
+    if (generalConfig?.enableCoupons === false) {
+      return { success: false, error: "Coupon codes are not enabled." };
+    }
+
     const items    = await getFormattedCartItems(cart.id);
     const subtotal = items.reduce((acc, item) => acc + item.rawPrice * item.quantity, 0);
 

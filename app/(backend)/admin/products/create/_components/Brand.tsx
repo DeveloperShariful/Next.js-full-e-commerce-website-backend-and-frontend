@@ -21,8 +21,8 @@ export default function Brand() {
     useEffect(() => {
         getBrands().then(res => { 
             if(res.success) {
-                setDbBrands(res.data as any);
-                setFilteredBrands(res.data as any);
+                setDbBrands(res.data);
+                setFilteredBrands(res.data);
             }
         });
     }, []);

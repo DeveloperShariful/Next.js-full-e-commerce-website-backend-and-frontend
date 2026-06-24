@@ -34,7 +34,7 @@ export const Paypal_Webhook_Config = ({ method }: { method: PaymentGatewayUI }) 
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setLocalUrl(`${window.location.origin}/api/webhook/paypal`)
+      setLocalUrl(`${window.location.origin}/api/webhooks/paypal`)
     }
   }, [])
 

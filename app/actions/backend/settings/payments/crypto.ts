@@ -2,7 +2,7 @@
 
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.PAYMENT_ENCRYPTION_KEY || 'default-32-char-key-must-change-it'; 
+const ENCRYPTION_KEY = process.env.PAYMENT_ENCRYPTION_KEY || 'default-32-char-key-change-me!!!';
 const IV_LENGTH = 16; 
 
 export function encrypt(text: string): string {

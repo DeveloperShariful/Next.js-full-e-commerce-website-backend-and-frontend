@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { ProductStatus } from "@prisma/client";
+import { ProductStatus, Prisma } from "@prisma/client";
 import { auth } from "@/auth"; 
 
 export async function duplicateProduct(id: string) {
@@ -18,17 +18,18 @@ export async function duplicateProduct(id: string) {
       where: { id },
       include: {
         tags: true,
-        categories: true, // ✅ FIX: Fetch Multiple Categories
+        categories: true,
         brand: true,
-        images: true, 
+        images: true,
         attributes: true,
-        inventoryLevels: true, 
-        variants: { 
-            include: { 
+        inventoryLevels: true,
+        downloadFiles: true,
+        variants: {
+            include: {
                 images: true,
-                inventoryLevels: true 
-            } 
-        }, 
+                inventoryLevels: true
+            }
+        },
       }
     });
 
@@ -138,7 +139,7 @@ export async function duplicateProduct(id: string) {
                         sku: v.sku ? `${v.sku}-COPY-${Math.floor(Math.random() * 1000)}` : null,
                         price: v.price,
                         stock: v.stock,
-                        attributes: v.attributes as any,
+                        attributes: v.attributes as unknown as Prisma.InputJsonValue,
                         trackQuantity: v.trackQuantity,
                         weight: v.weight,
                         version: 1,
@@ -169,6 +170,17 @@ export async function duplicateProduct(id: string) {
                     });
                 }
             }
+        }
+
+        if (original.downloadFiles && original.downloadFiles.length > 0) {
+            await tx.digitalFile.createMany({
+                data: original.downloadFiles.map(file => ({
+                    productId: newProduct.id,
+                    name: file.name,
+                    url: file.url,
+                    isSecure: file.isSecure,
+                }))
+            });
         }
 
         if (dbUser) {

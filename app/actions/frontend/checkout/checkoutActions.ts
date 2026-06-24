@@ -335,7 +335,7 @@ export async function getCheckoutDataAction(
     const country = shippingAddressInput?.country || "AU";
 
     // ✅ PERF: All independent DB queries fire in parallel
-    const [cart, zones, activeTaxRate, transdirectConfig] = await Promise.all([
+    const [cart, zones, activeTaxRate, transdirectConfig, storeSettings] = await Promise.all([
       db.cart.findFirst({
         where: userId ? { userId } : { sessionId },
         include: {
@@ -366,7 +366,11 @@ export async function getCheckoutDataAction(
         : Promise.resolve([]),
       db.taxRate.findFirst({ where: { country, isActive: true } }),
       db.transdirectConfig.findUnique({ where: { id: "transdirect_config" } }),
+      db.storeSettings.findUnique({ where: { id: "settings" }, select: { taxSettings: true } }),
     ]);
+
+    const taxSettings = storeSettings?.taxSettings as { enableTax?: boolean; pricesIncludeTax?: boolean } | null;
+    const isTaxEnabled = taxSettings?.enableTax === true;
 
     if (!cart || cart.items.length === 0) {
       return { success: false, error: "Your cart is empty." };
@@ -561,7 +565,7 @@ export async function getCheckoutDataAction(
 
     // GST (tax-inclusive — extract)
     let taxTotal = 0;
-    if (activeTaxRate) {
+    if (isTaxEnabled && activeTaxRate) {
       const rate = Number(activeTaxRate.rate);
       const shippingIsTaxable = activeTaxRate.shipping ?? true;
       let taxableSubtotal = 0;

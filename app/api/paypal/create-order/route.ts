@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
           const [product, variant] = await Promise.all([
             db.product.findUnique({
               where: { id: item.id },
-              select: { id: true, name: true, price: true, salePrice: true, taxStatus: true, stock: true },
+              select: { id: true, name: true, price: true, salePrice: true, taxStatus: true, stock: true, isPreOrder: true, preOrderReleaseDate: true },
             }),
             item.variationId
               ? db.productVariant.findUnique({ where: { id: item.variationId } })
@@ -159,6 +159,8 @@ export async function POST(request: NextRequest) {
       quantity: number;
       total: number;
       taxStatus: TaxStatus;
+      isPreOrder: boolean;
+      preOrderReleaseDate: Date | null;
     }> = [];
 
     for (const { item, product, variant } of rawProductResults) {
@@ -191,6 +193,8 @@ export async function POST(request: NextRequest) {
         quantity: item.quantity,
         total: itemTotal,
         taxStatus: product.taxStatus,
+        isPreOrder: variant ? variant.isPreOrder : product.isPreOrder,
+        preOrderReleaseDate: variant ? variant.preOrderReleaseDate : product.preOrderReleaseDate,
       });
     }
 
@@ -266,6 +270,7 @@ export async function POST(request: NextRequest) {
     if (cookieAffiliateId) metaDataArray.push({ key: 'solid_affiliate_id', value: cookieAffiliateId });
     if (cookieVisitId) metaDataArray.push({ key: 'solid_affiliate_visit_id', value: cookieVisitId });
 
+    const hasPreOrderItems = validOrderItems.some(i => i.isPreOrder);
     const billingJson = JSON.parse(JSON.stringify(customerInfo));
     const shippingJson = JSON.parse(JSON.stringify(shippingInfo || customerInfo));
     const metadataJson = JSON.parse(JSON.stringify(metaDataArray));
@@ -300,6 +305,7 @@ export async function POST(request: NextRequest) {
       referringSite: referringSite || null,
       transdirectQuoteId: tdBookingId ?? null,
       selectedCourierCode: tdCourierKey ?? null,
+      hasPreOrderItems,
       items: { create: dbOrderItems },
     };
 

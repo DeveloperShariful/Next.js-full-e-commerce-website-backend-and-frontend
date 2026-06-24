@@ -110,7 +110,7 @@ export async function refreshStripeWebhook(id: string) {
     if (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1);
     if (appUrl.includes("localhost")) throw new Error("Webhooks cannot use 'localhost'.");
 
-    const webhookUrl = `${appUrl}/api/webhook/stripe`;
+    const webhookUrl = `${appUrl}/api/webhooks/stripe`;
 
     const webhooksList = await stripe.webhookEndpoints.list();
     const existing = webhooksList.data.find((w) => w.url === webhookUrl);

@@ -847,6 +847,7 @@ model DigitalFile {
   name        String
   url         String
   fileSize    String?
+  isSecure    Boolean  @default(false)
   productId   String
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   accessCount Int      @default(0)

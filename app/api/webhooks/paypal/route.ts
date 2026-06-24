@@ -108,7 +108,10 @@ export async function POST(request: Request) {
 
             await sleep(10000); // Give frontend 10 seconds to finish first
 
-            const order = await db.order.findUnique({ where: { id: wcOrderId } });
+            const order = await db.order.findUnique({
+                where: { id: wcOrderId },
+                include: { user: { select: { email: true } } },
+            });
             if (order && (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID)) {
                 // ✅ Backup: payment done but TransDirect not synced yet → resync
                 if (order.transdirectOrderStatus !== 'booked') {
@@ -129,27 +132,35 @@ export async function POST(request: Request) {
             });
 
             const captureData = await captureResponse.json();
-            
+
             if (captureResponse.ok && captureData.status === 'COMPLETED') {
                 const transactionId = String(captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id);
                 const capturedAmount = Number(captureData.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value || 0);
 
-                await db.$transaction([
-                    db.order.update({ where: { id: wcOrderId }, data: { status: OrderStatus.PROCESSING, paymentStatus: PaymentStatus.PAID, paymentId: transactionId, totalPaid: capturedAmount, totalDue: 0 } }),
-                    db.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: captureData } }),
-                    db.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Captured & Rescued via PayPal Webhook. TXN: ${transactionId}`, isSystem: true } })
-                ]);
+                const rescueOrderItems = await db.orderItem.findMany({
+                    where: { orderId: wcOrderId },
+                    select: { productId: true, variantId: true, quantity: true },
+                });
+
+                await db.$transaction(async (tx) => {
+                    await tx.order.update({ where: { id: wcOrderId }, data: { status: OrderStatus.PROCESSING, paymentStatus: PaymentStatus.PAID, paymentId: transactionId, totalPaid: capturedAmount, totalDue: 0 } });
+                    await tx.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: captureData } });
+                    await tx.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Captured & Rescued via PayPal Webhook. TXN: ${transactionId}`, isSystem: true } });
+                    for (const item of rescueOrderItems) {
+                        if (item.variantId) {
+                            await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
+                        } else if (item.productId) {
+                            await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity }, soldCount: { increment: item.quantity } } });
+                        }
+                    }
+                });
                 resyncOrderToTransdirect(wcOrderId).catch(err =>
                     console.error('[PayPal Webhook] Rescue TransDirect resync failed:', err)
                 );
 
                 // Email + Affiliate backup — duplicate-safe: order was PENDING before rescue,
                 // so capture-order never ran these. Webhook retry → order is now PROCESSING → returns early above.
-                const rescuedOrderData = await db.order.findUnique({
-                    where: { id: wcOrderId },
-                    select: { guestEmail: true, user: { select: { email: true } } },
-                });
-                const rescueEmail = rescuedOrderData?.guestEmail || rescuedOrderData?.user?.email;
+                const rescueEmail = order?.guestEmail || order?.user?.email;
                 if (rescueEmail) {
                     sendNotification({ trigger: 'ORDER_PROCESSING', recipient: rescueEmail, orderId: wcOrderId })
                         .catch(err => console.error('[PayPal Webhook] Customer email failed:', err));
@@ -166,29 +177,26 @@ export async function POST(request: Request) {
                 }
 
                 // Analytics backup — duplicate-safe: frontend missed capture so order was PENDING, not PROCESSING
-                const rescuedOrder = await db.order.findUnique({
-                    where: { id: wcOrderId },
-                    select: { subtotal: true, discountTotal: true, taxTotal: true, shippingTotal: true, isFirstOrder: true },
-                });
-                const rescueItems = await db.orderItem.findMany({
+                // Reuse rescueOrderItems (already fetched above); `order` has all totals from the initial query
+                const rescueAnalyticsItems = await db.orderItem.findMany({
                     where: { orderId: wcOrderId },
                     select: { productId: true, quantity: true, total: true },
                 });
-                if (rescuedOrder && rescueItems.length > 0) {
+                if (order && rescueAnalyticsItems.length > 0) {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    const sub = Number(rescuedOrder.subtotal);
-                    const disc = Number(rescuedOrder.discountTotal);
-                    const tax = Number(rescuedOrder.taxTotal);
-                    const ship = Number(rescuedOrder.shippingTotal);
-                    const totalSold = rescueItems.reduce((s, i) => s + i.quantity, 0);
+                    const sub = Number(order.subtotal);
+                    const disc = Number(order.discountTotal);
+                    const tax = Number(order.taxTotal);
+                    const ship = Number(order.shippingTotal);
+                    const totalSold = rescueAnalyticsItems.reduce((s, i) => s + i.quantity, 0);
                     Promise.allSettled([
                         db.analytics.upsert({
                             where: { date: today },
-                            create: { date: today, grossSales: sub, netSales: sub - disc, totalTax: tax, totalShipping: ship, totalDiscounts: disc, totalOrders: 1, productsSold: totalSold, newCustomers: rescuedOrder.isFirstOrder ? 1 : 0, returningCustomers: rescuedOrder.isFirstOrder ? 0 : 1 },
-                            update: { grossSales: { increment: sub }, netSales: { increment: sub - disc }, totalTax: { increment: tax }, totalShipping: { increment: ship }, totalDiscounts: { increment: disc }, totalOrders: { increment: 1 }, productsSold: { increment: totalSold }, newCustomers: { increment: rescuedOrder.isFirstOrder ? 1 : 0 }, returningCustomers: { increment: rescuedOrder.isFirstOrder ? 0 : 1 } },
+                            create: { date: today, grossSales: sub, netSales: sub - disc, totalTax: tax, totalShipping: ship, totalDiscounts: disc, totalOrders: 1, productsSold: totalSold, newCustomers: order.isFirstOrder ? 1 : 0, returningCustomers: order.isFirstOrder ? 0 : 1 },
+                            update: { grossSales: { increment: sub }, netSales: { increment: sub - disc }, totalTax: { increment: tax }, totalShipping: { increment: ship }, totalDiscounts: { increment: disc }, totalOrders: { increment: 1 }, productsSold: { increment: totalSold }, newCustomers: { increment: order.isFirstOrder ? 1 : 0 }, returningCustomers: { increment: order.isFirstOrder ? 0 : 1 } },
                         }),
-                        ...rescueItems.filter(i => !!i.productId).map(({ productId, quantity, total }) =>
+                        ...rescueAnalyticsItems.filter(i => !!i.productId).map(({ productId, quantity, total }) =>
                             db.productAnalytics.upsert({
                                 where: { date_productId: { date: today, productId: productId! } },
                                 create: { date: today, productId: productId!, itemsSold: quantity, netSales: Number(total) },
@@ -214,11 +222,25 @@ export async function POST(request: Request) {
             if (order.status === OrderStatus.PENDING || order.status === OrderStatus.FAILED) {
                 const isMismatch = Math.abs(Number(order.total) - capturedAmount) > 0.05;
 
-                await db.$transaction([
-                    db.order.update({ where: { id: wcOrderId }, data: { status: isMismatch ? OrderStatus.PENDING : OrderStatus.PROCESSING, paymentStatus: isMismatch ? PaymentStatus.AUTHORIZED : PaymentStatus.PAID, paymentId: transactionId, totalPaid: capturedAmount, totalDue: isMismatch ? Number(order.total) : 0 } }),
-                    db.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: event } }),
-                    db.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Order updated via Webhook. TXN: ${transactionId}`, isSystem: true } })
-                ]);
+                const syncOrderItems = await db.orderItem.findMany({
+                    where: { orderId: wcOrderId },
+                    select: { productId: true, variantId: true, quantity: true, total: true },
+                });
+
+                await db.$transaction(async (tx) => {
+                    await tx.order.update({ where: { id: wcOrderId }, data: { status: isMismatch ? OrderStatus.PENDING : OrderStatus.PROCESSING, paymentStatus: isMismatch ? PaymentStatus.AUTHORIZED : PaymentStatus.PAID, paymentId: transactionId, totalPaid: capturedAmount, totalDue: isMismatch ? Number(order.total) : 0 } });
+                    await tx.orderTransaction.create({ data: { orderId: wcOrderId, gateway: 'paypal', type: TransactionType.SALE, amount: capturedAmount, transactionId, status: 'COMPLETED', rawResponse: event } });
+                    await tx.orderNote.create({ data: { orderId: wcOrderId, content: `✅ Order updated via Webhook. TXN: ${transactionId}`, isSystem: true } });
+                    if (!isMismatch) {
+                        for (const item of syncOrderItems) {
+                            if (item.variantId) {
+                                await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { decrement: item.quantity } } });
+                            } else if (item.productId) {
+                                await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: item.quantity }, soldCount: { increment: item.quantity } } });
+                            }
+                        }
+                    }
+                });
                 if (!isMismatch) resyncOrderToTransdirect(wcOrderId).catch(err =>
                     console.error('[PayPal Webhook] TransDirect resync failed:', err)
                 );

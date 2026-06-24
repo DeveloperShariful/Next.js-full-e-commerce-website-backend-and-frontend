@@ -12,13 +12,17 @@ export default async function CheckoutPage() {
   const [cookieStore, session] = await Promise.all([cookies(), auth()]);
   const sessionId = cookieStore.get('cart_session')?.value;
 
-  // Resolve userId and fetch payment methods in parallel
-  const [userId, paymentGateways] = await Promise.all([
+  // Resolve userId, payment methods, and store settings in parallel
+  const [userId, paymentGateways, storeSettings] = await Promise.all([
     session?.user?.email
       ? db.user.findUnique({ where: { email: session.user.email }, select: { id: true } }).then(u => u?.id ?? null)
       : Promise.resolve(null),
     getActivePaymentMethods(),
+    db.storeSettings.findUnique({ where: { id: "settings" }, select: { generalConfig: true } }),
   ]);
+
+  const generalConfig = storeSettings?.generalConfig as { enableCoupons?: boolean } | null;
+  const enableCoupons = generalConfig?.enableCoupons !== false;
 
   if (sessionId || userId) {
     const cart = await db.cart.findFirst({
@@ -36,7 +40,7 @@ export default async function CheckoutPage() {
   return (
     <div className="w-full md:p-8 bg-[#f8f9fa]">
       <div className="w-full max-w-full mx-auto relative overflow-x-hidden">
-        <CheckoutClient paymentGateways={paymentGateways} />
+        <CheckoutClient paymentGateways={paymentGateways} enableCoupons={enableCoupons} />
       </div>
     </div>
   );

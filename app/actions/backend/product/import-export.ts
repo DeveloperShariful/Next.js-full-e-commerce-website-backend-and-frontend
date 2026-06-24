@@ -24,6 +24,49 @@ import {
 } from "@prisma/client";
 
 // ============================================================
+// TYPES
+// ============================================================
+
+type MetaJsonFields = {
+  wcId?:         string | null;
+  visibility?:   string | null;
+  externalUrl?:  string | null;
+  buttonText?:   string | null;
+  focusKeyword?: string | null;
+  description?:  string | null;
+  fb?: {
+    description?:  string | null;
+    brand?:        string | null;
+    mpn?:          string | null;
+    size?:         string | null;
+    color?:        string | null;
+    material?:     string | null;
+    pattern?:      string | null;
+    imageSource?:  string | null;
+    productImage?: string | null;
+    richText?:     string | null;
+    videoSource?:  string | null;
+  } | null;
+  gla?: {
+    sizeSystem?: string | null;
+    sizeType?:   string | null;
+    size?:       string | null;
+    color?:      string | null;
+    material?:   string | null;
+    syncedAt?:   string | null;
+  } | null;
+};
+
+const parseMeta = (raw: unknown): MetaJsonFields =>
+  raw !== null && typeof raw === "object" && !Array.isArray(raw)
+    ? (raw as MetaJsonFields)
+    : {};
+
+type SlugConnectOrCreate = {
+  connectOrCreate: { where: { slug: string }; create: { name: string; slug: string } };
+};
+
+// ============================================================
 // SECTION 1: UTILITIES
 // ============================================================
 

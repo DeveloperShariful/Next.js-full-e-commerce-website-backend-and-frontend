@@ -52,7 +52,7 @@ export default function Variations() {
     useEffect(() => {
         getLocations().then(res => {
             if(res.success && res.data) {
-                setLocations(res.data as any);
+                setLocations(res.data);
             }
         });
     }, []);
@@ -466,7 +466,7 @@ export default function Variations() {
                     const isOpen = openIndex === realIndex;
                     const isSelected = selectedIds.includes(v.id!);
                     const firstImage = v.images && v.images.length > 0 ? v.images[0] : null;
-                    const imageUrl = firstImage ? (typeof firstImage === 'object' ? (firstImage as any).url : firstImage) : null;
+                    const imageUrl = firstImage ? (typeof firstImage === 'object' ? (firstImage as { url: string }).url : firstImage) : null;
 
                     return (
                         <div key={v.id} className={`bg-white group transition-all ${isSelected ? 'bg-blue-50/30' : ''}`}>

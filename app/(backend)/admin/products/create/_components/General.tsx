@@ -118,7 +118,7 @@ export default function General() {
     const currency = symbol || "$";
 
     useEffect(() => {
-        getTaxClasses().then(res => { if(res.success) setTaxClasses(res.data as any) });
+        getTaxClasses().then(res => { if(res.success) setTaxClasses(res.data) });
         getConfigOptions().then(res => {
             if(res.success) {
                 setGenderOptions(res.data.genders);

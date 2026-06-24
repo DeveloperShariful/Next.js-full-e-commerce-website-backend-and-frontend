@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { useForm, FormProvider, FieldErrors, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -50,8 +50,8 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const [origin, setOrigin] = useState("");
 
   const methods = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema) as any,
-    defaultValues: initialData as any,
+    resolver: zodResolver(productSchema) as unknown as Resolver<ProductFormValues>,
+    defaultValues: initialData,
     mode: "onChange",
   });
 
@@ -108,6 +108,13 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     toast.success("Draft discarded");
   };
 
+  const onFormError = (errors: FieldErrors<ProductFormValues>) => {
+    const firstError = Object.values(errors)[0];
+    const message = firstError?.message as string | undefined;
+    toast.error(message || "Please fix the form errors before saving.");
+    console.error("Form validation errors:", errors);
+  };
+
   const onSubmit = async (data: ProductFormValues) => {
     if (isEdit && !isDirty) {
         toast.success("No changes detected.");
@@ -120,7 +127,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     if (isEdit && initialData.id) formData.append("id", initialData.id);
 
     Object.keys(data).forEach((key) => {
-        const value = (data as any)[key];
+        const value = (data as Record<string, unknown>)[key];
         
         if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'categoryIds', 'digitalFiles', 'bundleItems', 'inventoryData', 'metafields', 'seoSchema', 'giftCardAmounts'].includes(key)) {
             formData.append(key, JSON.stringify(value));
@@ -172,7 +179,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
 
             <Header 
                 loading={isSubmitting || isPending} 
-                onSubmit={handleSubmit(onSubmit)} 
+                onSubmit={handleSubmit(onSubmit, onFormError)} 
                 title={watch("name")} 
                 isEdit={isEdit} 
             />
@@ -186,7 +193,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     
                     {/* 🚀 MOBILE ONLY: Publish widget shown at the very top of mobile views */}
                     <div className="block lg:hidden w-full">
-                        <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
+                        <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit, onFormError)} />
                     </div>
 
                     <div className="space-y-1">
@@ -271,7 +278,12 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                                 {activeTab === 'general' && <General />}
                                 {activeTab === 'inventory' && <Inventory />}
                                 {activeTab === 'shipping' && <Shipping />}
-                                {activeTab === 'attributes' && <Attributes />}
+                                {activeTab === 'attributes' && (
+                                    <Attributes
+                                        onSubmit={() => void handleSubmit(onSubmit, onFormError)()}
+                                        loading={isSubmitting || isPending}
+                                    />
+                                )}
                                 {activeTab === 'variations' && <Variations />}
                                 {activeTab === 'bundle' && <BundleItems />}
                                 {activeTab === 'google-shopping' && <GoogleShopping />}
@@ -293,7 +305,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     
                     {/* 🚀 DESKTOP ONLY: Publish widget hidden on mobile, shown on desktop */}
                     <div className="hidden lg:block w-full">
-                        <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit)} />
+                        <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit, onFormError)} />
                     </div>
 
                     {/* Channel Visibility Sidebar Widget */}

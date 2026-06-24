@@ -38,10 +38,15 @@ export default async function CheckoutPage() {
   }
 
   return (
-    <div className="w-full md:p-8 bg-[#f8f9fa]">
-      <div className="w-full max-w-full mx-auto relative overflow-x-hidden">
-        <CheckoutClient paymentGateways={paymentGateways} enableCoupons={enableCoupons} />
+    <>
+      <link rel="preconnect" href="https://www.paypal.com" />
+      <link rel="preconnect" href="https://www.paypalobjects.com" />
+      <link rel="dns-prefetch" href="https://www.paypal.com" />
+      <div className="w-full md:p-8 bg-[#f8f9fa]">
+        <div className="w-full max-w-full mx-auto relative overflow-x-hidden">
+          <CheckoutClient paymentGateways={paymentGateways} enableCoupons={enableCoupons} />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

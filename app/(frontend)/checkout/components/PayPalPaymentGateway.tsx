@@ -4,6 +4,29 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+
+class PayPalButtonErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center">
+          PayPal could not load. Please refresh the page to try again.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -172,37 +195,42 @@ const PayPalPaymentGatewayComponent = ({
     }
   }, [clearCart, router]);
 
-  if (isPending) {
-    return (
-      <div className="w-full h-12 bg-gray-200 animate-pulse rounded-md flex justify-center items-center text-xs text-gray-500">
-        Connecting to PayPal API...
-      </div>
-    );
-  }
+  if (isPending || !isResolved) return <div className="w-full min-h-[100px]" />;
 
   if (isRejected) {
     return (
-      <div className="w-full h-12 bg-red-50 border border-red-200 rounded-md flex justify-center items-center text-xs text-red-600">
-        PayPal failed to load. Please refresh the page.
+      <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center">
+        PayPal could not load. Please refresh the page to try again.
       </div>
     );
   }
 
-  if (!isResolved) return null;
+  if (
+    typeof window !== 'undefined' &&
+    !(window as { paypal?: { Buttons?: unknown } }).paypal?.Buttons
+  ) {
+    return (
+      <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center">
+        PayPal could not load. Please refresh the page to try again.
+      </div>
+    );
+  }
 
   return (
-    <PayPalButtons
-      style={{ layout: "vertical", color: 'gold', shape: 'rect', label: 'paypal', height: 48 }}
-      disabled={isPlacingOrder || total <= 0 || !isShippingSelected}
-      createOrder={createOrder}
-      onApprove={onApprove}
-      onCancel={() => { toast.error('You cancelled the payment.'); }}
-      onError={(err) => {
-        toast.dismiss();
-        console.error('PayPal transaction failed:', err);
-        toast.error('A PayPal error occurred. Please try again.');
-      }}
-    />
+    <PayPalButtonErrorBoundary>
+      <PayPalButtons
+        style={{ layout: "vertical", color: 'gold', shape: 'rect', label: 'paypal', height: 48 }}
+        disabled={isPlacingOrder || total <= 0 || !isShippingSelected}
+        createOrder={createOrder}
+        onApprove={onApprove}
+        onCancel={() => { toast.error('You cancelled the payment.'); }}
+        onError={(err) => {
+          toast.dismiss();
+          console.error('PayPal transaction failed:', err);
+          toast.error('A PayPal error occurred. Please try again.');
+        }}
+      />
+    </PayPalButtonErrorBoundary>
   );
 };
 

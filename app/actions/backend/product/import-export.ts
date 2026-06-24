@@ -13,6 +13,7 @@ import Papa              from "papaparse";
 import { revalidatePath } from "next/cache";
 import crypto            from "crypto";
 import {
+  Prisma,
   ProductStatus,
   ProductType,
   BackorderStatus,
@@ -81,31 +82,31 @@ const generateSlug = (name: string): string =>
     .replace(/^-|-$/g, "");
 
 /** যেকোনো value → safe float */
-const safeFloat = (val: any): number | null => {
+const safeFloat = (val: unknown): number | null => {
   if (val === null || val === undefined || String(val).trim() === "") return null;
   const n = parseFloat(String(val).replace(/[^\d.-]/g, ""));
   return isNaN(n) ? null : n;
 };
 
 /** যেকোনো value → safe int */
-const safeInt = (val: any): number | null => {
+const safeInt = (val: unknown): number | null => {
   if (val === null || val === undefined || String(val).trim() === "") return null;
   const n = parseInt(String(val), 10);
   return isNaN(n) ? null : n;
 };
 
 /** "1" / "yes" / "true" → boolean */
-const safeBool = (val: any): boolean =>
+const safeBool = (val: unknown): boolean =>
   ["1", "yes", "true"].includes(String(val ?? "").toLowerCase().trim());
 
 /** খালি string → null */
-const nullIfEmpty = (val: any): string | null => {
+const nullIfEmpty = (val: unknown): string | null => {
   const s = String(val ?? "").trim();
   return s === "" ? null : s;
 };
 
 /** WC date string → Date | null */
-const safeDate = (val: any): Date | null => {
+const safeDate = (val: unknown): Date | null => {
   if (!val || String(val).trim() === "") return null;
   const d = new Date(String(val).trim());
   return isNaN(d.getTime()) ? null : d;
@@ -182,8 +183,8 @@ const buildProductSlug = async (name: string, wcId?: string): Promise<string> =>
   if (!existing) return base;
 
   // Same WC ID → same product (re-import) → reuse slug
-  const meta = existing.metafields as any;
-  if (wcId && meta?.wcId === wcId) return base;
+  const meta = parseMeta(existing.metafields);
+  if (wcId && meta.wcId === wcId) return base;
 
   // Different product, same slug → suffix with wcId or random
   const suffix = wcId ?? crypto.randomBytes(3).toString("hex");
@@ -466,7 +467,7 @@ export async function importProductsCSV(
         const viewCount = safeInt(row["Meta: ekit_post_views_count"]) ?? 0;
 
         // ── metafields JSON (বাকি সব Meta fields) ──
-        const metafields: Record<string, any> = {
+        const metafields: Record<string, unknown> = {
           wcId,
           visibility:    nullIfEmpty(row["Visibility in catalog"]) ?? "visible",
           externalUrl:   nullIfEmpty(row["External URL"]),
@@ -509,7 +510,7 @@ export async function importProductsCSV(
         const categoryIds = await upsertCategoryChain(row["Categories"] ?? "");
 
         // ── Brand ──
-        let brandConnect: any = undefined;
+        let brandConnect: SlugConnectOrCreate | undefined = undefined;
         const brandName = nullIfEmpty(
           row["Brands"] || row["Brand"] || row["Meta: _wc_gla_brand"] || row["Meta: fb_brand"]
         );
@@ -540,7 +541,7 @@ export async function importProductsCSV(
             : undefined;
 
         // ── Shipping Class ──
-        let shippingClassConnect: any = undefined;
+        let shippingClassConnect: SlugConnectOrCreate | undefined = undefined;
         const shippingClassName = nullIfEmpty(row["Shipping class"]);
         if (shippingClassName) {
           const scSlug = generateSlug(shippingClassName);
@@ -611,7 +612,7 @@ export async function importProductsCSV(
           googleTitle,
           googleDescription,
           viewCount,
-          metafields,
+          metafields: metafields as unknown as Prisma.InputJsonValue,
           featuredImage,
           brand:         brandConnect,
           tags:          tagsConnect,
@@ -691,9 +692,10 @@ export async function importProductsCSV(
         // WC ID map ও রাখা (variation parent match এর জন্য)
         if (wcId) skuToIdMap.set(`wcid_${wcId}`, productId);
 
-      } catch (err: any) {
-        console.error(`Product failed (SKU: ${rawSku}, Name: ${name}):`, err?.message);
-        result.errors.push(`${name} (SKU: ${rawSku ?? "none"}): ${err?.message ?? "Unknown"}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        console.error(`Product failed (SKU: ${rawSku}, Name: ${name}):`, msg);
+        result.errors.push(`${name} (SKU: ${rawSku ?? "none"}): ${msg}`);
         result.failCount++;
       }
     }
@@ -807,9 +809,10 @@ export async function importProductsCSV(
           }
         }
 
-      } catch (err: any) {
-        console.error("Variation failed:", err?.message);
-        result.errors.push(`Variation (Parent: ${row["Parent"]}): ${err?.message ?? "Unknown"}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Unknown";
+        console.error("Variation failed:", msg);
+        result.errors.push(`Variation (Parent: ${row["Parent"]}): ${msg}`);
         result.failCount++;
       }
     }
@@ -820,9 +823,9 @@ export async function importProductsCSV(
     result.message = `✅ Created: ${result.successCount} | 🔄 Updated: ${result.skipCount} | ❌ Failed: ${result.failCount}`;
     return result;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Critical Import Error:", error);
-    result.error = `Critical failure: ${error?.message ?? "Unknown"}`;
+    result.error = `Critical failure: ${error instanceof Error ? error.message : "Unknown"}`;
     return result;
   }
 }
@@ -873,10 +876,10 @@ export async function exportProductsCSV(
       take:    50000,
     });
 
-    const csvRows: Record<string, any>[] = [];
+    const csvRows: Record<string, unknown>[] = [];
 
     for (const p of products) {
-      const meta: any = p.metafields ?? {};
+      const meta = parseMeta(p.metafields);
 
       // Categories: "Parent > Child" format
       const categoriesStr = p.categories
@@ -905,16 +908,16 @@ export async function exportProductsCSV(
       const fbStatus     = p.channelStatuses.find((c) => c.channel === "FACEBOOK");
 
       // ── Main product row ──
-      const baseRow: Record<string, any> = {
+      const baseRow: Record<string, unknown> = {
         // Core
-        "ID":                             (meta as any).wcId ?? p.productCode ?? "",
+        "ID":                             meta.wcId ?? p.productCode ?? "",
         "Type":                           p.productType.toLowerCase(),
         "SKU":                            p.sku ?? "",
         "GTIN, UPC, EAN, or ISBN":        p.barcode ?? "",
         "Name":                           p.name,
         "Published":                      p.status === "ACTIVE" ? 1 : 0,
         "Is featured?":                   p.isFeatured ? 1 : 0,
-        "Visibility in catalog":          (meta as any).visibility ?? "visible",
+        "Visibility in catalog":          meta.visibility ?? "visible",
         "Short description":              p.shortDescription ?? "",
         "Description":                    p.description ?? "",
         "Date sale price starts":         p.saleStart ? p.saleStart.toISOString().split("T")[0] : "",
@@ -945,44 +948,44 @@ export async function exportProductsCSV(
         "Grouped products":               "",
         "Upsells":                        p.upsellIds.join(", "),
         "Cross-sells":                    p.crossSellIds.join(", "),
-        "External URL":                   (meta as any).externalUrl ?? "",
-        "Button text":                    (meta as any).buttonText  ?? "",
+        "External URL":                   meta.externalUrl ?? "",
+        "Button text":                    meta.buttonText  ?? "",
         "Position":                       p.menuOrder ?? 0,
         "Cost of goods":                  p.costPerItem ?? "",
         "Brands":                         p.brand?.name ?? "",
         // SEO
         "Meta: rank_math_title":          p.metaTitle ?? "",
         "Meta: rank_math_description":    p.metaDesc  ?? "",
-        "Meta: rank_math_focus_keyword":  (meta as any).focusKeyword ?? "",
+        "Meta: rank_math_focus_keyword":  meta.focusKeyword ?? "",
         // Google Merchant
         "Meta: _wc_gla_sync_status":      googleStatus?.status ?? "",
         "Meta: _wc_gla_visibility":       googleStatus ? "sync" : "",
         "Meta: _wc_gla_condition":        p.condition?.toLowerCase() ?? "new",
         "Meta: _wc_gla_brand":            p.brand?.name ?? "",
         "Meta: _wc_gla_gender":           p.gender   ?? "",
-        "Meta: _wc_gla_color":            (meta as any).gla?.color    ?? "",
-        "Meta: _wc_gla_material":         (meta as any).gla?.material ?? "",
+        "Meta: _wc_gla_color":            meta.gla?.color    ?? "",
+        "Meta: _wc_gla_material":         meta.gla?.material ?? "",
         "Meta: _wc_gla_ageGroup":         p.ageGroup ?? "",
-        "Meta: _wc_gla_sizeSystem":       (meta as any).gla?.sizeSystem ?? "",
-        "Meta: _wc_gla_sizeType":         (meta as any).gla?.sizeType   ?? "",
-        "Meta: _wc_gla_size":             (meta as any).gla?.size        ?? "",
-        "Meta: _wc_gla_synced_at":        (meta as any).gla?.syncedAt   ?? "",
+        "Meta: _wc_gla_sizeSystem":       meta.gla?.sizeSystem ?? "",
+        "Meta: _wc_gla_sizeType":         meta.gla?.sizeType   ?? "",
+        "Meta: _wc_gla_size":             meta.gla?.size        ?? "",
+        "Meta: _wc_gla_synced_at":        meta.gla?.syncedAt   ?? "",
         // Facebook
         "Meta: _wc_facebook_sync_enabled": fbStatus?.status === "SYNCED" ? "1" : "0",
         "Meta: fb_visibility":             fbStatus?.status === "SYNCED" ? "1" : "0",
-        "Meta: fb_product_description":    (meta as any).fb?.description  ?? "",
-        "Meta: fb_brand":                  (meta as any).fb?.brand         ?? "",
-        "Meta: fb_mpn":                    (meta as any).fb?.mpn           ?? "",
-        "Meta: fb_size":                   (meta as any).fb?.size          ?? "",
-        "Meta: fb_color":                  (meta as any).fb?.color         ?? "",
-        "Meta: fb_material":               (meta as any).fb?.material      ?? "",
-        "Meta: fb_pattern":                (meta as any).fb?.pattern       ?? "",
+        "Meta: fb_product_description":    meta.fb?.description  ?? "",
+        "Meta: fb_brand":                  meta.fb?.brand         ?? "",
+        "Meta: fb_mpn":                    meta.fb?.mpn           ?? "",
+        "Meta: fb_size":                   meta.fb?.size          ?? "",
+        "Meta: fb_color":                  meta.fb?.color         ?? "",
+        "Meta: fb_material":               meta.fb?.material      ?? "",
+        "Meta: fb_pattern":                meta.fb?.pattern       ?? "",
         "Meta: fb_age_group":              p.ageGroup ?? "",
         "Meta: fb_gender":                 p.gender   ?? "",
         "Meta: fb_product_condition":      p.condition?.toLowerCase() ?? "new",
-        "Meta: _wc_facebook_product_image_source": (meta as any).fb?.imageSource ?? "",
-        "Meta: fb_product_image":          (meta as any).fb?.productImage  ?? "",
-        "Meta: fb_rich_text_description":  (meta as any).fb?.richText      ?? "",
+        "Meta: _wc_facebook_product_image_source": meta.fb?.imageSource ?? "",
+        "Meta: fb_product_image":          meta.fb?.productImage  ?? "",
+        "Meta: fb_rich_text_description":  meta.fb?.richText      ?? "",
         "Meta: ekit_post_views_count":     p.viewCount ?? 0,
         // Attributes
         ...attrCols,
@@ -992,14 +995,14 @@ export async function exportProductsCSV(
 
       // ── Variation rows (WC format: আলাদা row, Type=variation) ──
       for (const variant of p.variants) {
-        const varMeta: any = variant.metafields ?? {};
+        const varMeta = parseMeta(variant.metafields);
         const varImageUrls = [
           variant.image,
           ...variant.images.map((img) => img.url),
         ].filter(Boolean) as string[];
 
         const varAttrCols: Record<string, string> = {};
-        const varAttrs: Record<string, string> = variant.attributes as any ?? {};
+        const varAttrs = (variant.attributes as unknown as Record<string, string>) ?? {};
         Object.entries(varAttrs).forEach(([key, val], idx) => {
           const n = idx + 1;
           varAttrCols[`Attribute ${n} name`]     = key;
@@ -1042,7 +1045,7 @@ export async function exportProductsCSV(
           "Images":           varImageUrls.join(", "),
           "Download limit":   "",
           "Download expiry days": "",
-          "Parent":           p.sku ?? (meta as any).wcId ?? p.productCode ?? "",
+          "Parent":           p.sku ?? meta.wcId ?? p.productCode ?? "",
           "Grouped products": "",
           "Upsells":          "",
           "Cross-sells":      "",
@@ -1078,8 +1081,8 @@ export async function exportProductsCSV(
     const csvString = Papa.unparse(csvRows);
     return { success: true, csv: csvString };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Product Export Error:", error);
-    return { success: false, error: `Export failed: ${error?.message ?? "Unknown"}` };
+    return { success: false, error: `Export failed: ${error instanceof Error ? error.message : "Unknown"}` };
   }
 }

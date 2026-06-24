@@ -644,7 +644,7 @@ export default function CheckoutClient({ paymentGateways, enableCoupons }: { pay
     clientId: paypalClientId || 'test',
     currency: 'AUD',
     intent: 'capture',
-    components: 'buttons,messages',
+    components: 'buttons',
   }), [paypalClientId]);
 
   if (paypalClientId) {

@@ -239,8 +239,18 @@ export default function Footer() {
       <div className="bg-black text-white p-5 text-sm">
           <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row flex-wrap justify-between items-center gap-4 text-center md:text-left">
               <div>Copyright &copy; {new Date().getFullYear()} GoBike All Rights Reserved</div>
-              <div>
-                  <Image src="https://gobikes.au/wp-content/uploads/2018/07/trust-symbols_b.jpg" width={1600} height={168} alt="Secure Payment Methods" className="max-h-[35px] w-auto" />
+              <div className="flex flex-wrap items-center justify-center md:justify-end gap-2">
+                {[
+                  { src: 'https://gobikes.au/wp-content/uploads/2026/05/Credit-Card-Icons.webp', alt: 'Visa / Mastercard / Amex', w: 90 },
+                  { src: 'https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png', alt: 'PayPal', w: 56 },
+                  { src: 'https://static.afterpay.com/integration/logo-afterpay-colour.svg', alt: 'Afterpay', w: 66 },
+                  { src: 'https://gobikes.au/wp-content/uploads/2026/05/Zip-Pay-Logo.webp', alt: 'Zip Pay', w: 44 },
+                  { src: 'https://x.klarnacdn.net/payment-method/assets/badges/generic/klarna.svg', alt: 'Klarna', w: 44 },
+                ].map(icon => (
+                  <div key={icon.alt} className="bg-white rounded-md px-2 py-1 flex items-center justify-center">
+                    <Image src={icon.src} alt={icon.alt} width={icon.w} height={24} className="h-5 w-auto object-contain" unoptimized />
+                  </div>
+                ))}
               </div>
           </div>
       </div>

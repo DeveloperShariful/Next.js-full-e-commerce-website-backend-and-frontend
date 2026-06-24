@@ -5,6 +5,8 @@ import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { db } from '@/lib/prisma';
 import CheckoutClient from './CheckoutClient';
+import CheckoutHeader from './components/CheckoutHeader';
+import CheckoutFooter from './components/CheckoutFooter';
 import { getActivePaymentMethods } from '@/app/actions/frontend/checkout/get-payment-methods';
 
 export default async function CheckoutPage() {
@@ -39,6 +41,7 @@ export default async function CheckoutPage() {
 
   return (
     <>
+      <CheckoutHeader />
       <link rel="preconnect" href="https://www.paypal.com" />
       <link rel="preconnect" href="https://www.paypalobjects.com" />
       <link rel="dns-prefetch" href="https://www.paypal.com" />
@@ -47,6 +50,7 @@ export default async function CheckoutPage() {
           <CheckoutClient paymentGateways={paymentGateways} enableCoupons={enableCoupons} />
         </div>
       </div>
+      <CheckoutFooter />
     </>
   );
 }

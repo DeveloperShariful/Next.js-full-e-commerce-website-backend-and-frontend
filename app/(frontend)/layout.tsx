@@ -3,7 +3,9 @@
 import { Suspense } from "react";
 import TopBar from "@/components/TopBar";
 import Header from "@/components/header";
+import ConditionalHeader from "@/components/ConditionalHeader";
 import Footer from "@/components/Footer";
+import ConditionalFooter from "@/components/ConditionalFooter";
 import FloatingCompareBar from "@/components/FloatingCompareBar";
 import { CartProvider } from '@/context/CartContext';
 import { CompareProvider } from '@/context/CompareContext';
@@ -42,13 +44,17 @@ export default async function FrontLayout({ children }: { children: React.ReactN
           <AffiliateTrackerProvider />
 
           <TopBar />
-          <Header />
+          <ConditionalHeader>
+            <Header />
+          </ConditionalHeader>
 
           <main className="flex-grow">
             {children}
           </main>
 
-          <Footer />
+          <ConditionalFooter>
+            <Footer />
+          </ConditionalFooter>
           <FloatingCompareBar />
           {/* GTM + Klaviyo — user interaction এর পরে load হয়, page speed এ impact নেই */}
           <DelayedScripts gtmId={gtmId} klaviyoKey={klaviyoKey} />

@@ -79,6 +79,7 @@ export default function OrderSummary({
   enableCoupons,
 }: OrderSummaryProps) {
   const [couponCode, setCouponCode] = useState('');
+  const [isItemsOpen, setIsItemsOpen] = useState(false);
 
   const handleApplyClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -106,56 +107,92 @@ export default function OrderSummary({
 
   return (
     <div className="bg-[#f9f9f9] border border-[#e0e0e0] rounded-lg p-2 md:p-6 w-full">
-      <h2 className="mt-0 mb-6 text-[1.75rem] font-bold text-[#1d1d1d] border-b border-[#e0e0e0] pb-4 text-center md:text-left">
-        Your Order
-      </h2>
+      {/* Heading — mobile: clickable toggle, desktop: static */}
+      <button
+        type="button"
+        className="w-full flex items-center justify-between mb-6 border-b border-[#e0e0e0] pb-4 md:cursor-default"
+        onClick={() => setIsItemsOpen(o => !o)}
+        aria-expanded={isItemsOpen}
+      >
+        <h2 className="mt-0 text-[1.75rem] font-bold text-[#1d1d1d] text-left m-0">
+          Your Order
+        </h2>
 
-      {/* Cart Items */}
-      <div className="flex flex-col gap-4 mb-5">
-        {cartItems.map(item => (
-          <div key={item.key} className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
-            <div className="relative w-16 h-16">
-              {item.image ? (
-                <Image
-                  src={item.image}
-                  alt={item.name}
-                  width={64}
-                  height={64}
-                  className="rounded border border-[#eee] object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-200 rounded" />
-              )}
-              <span className="absolute -top-2 -right-2 bg-[#333] text-white rounded-full w-6 h-6 flex items-center justify-center text-[0.8rem] font-bold border-2 border-[#f9f9f9]">
-                {item.quantity}
-              </span>
+        {/* Professional mobile toggle badge */}
+        <span className="md:hidden flex items-center gap-1.5 bg-[#1d1d1d] hover:bg-[#333] active:scale-95 transition-all duration-150 rounded-full pl-2 pr-3 py-1.5 shrink-0 shadow-sm">
+          {/* Cart icon */}
+          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          {/* Item count */}
+          <span className="text-white text-[11px] font-bold leading-none">
+            {cartItems.length}
+          </span>
+          {/* Divider */}
+          <span className="w-px h-3 bg-white/30" />
+          {/* Label */}
+          <span className="text-white text-[11px] font-semibold leading-none">
+            {isItemsOpen ? 'Hide' : 'View'}
+          </span>
+          {/* Animated chevron */}
+          <svg
+            className={`w-3 h-3 text-white/80 transition-transform duration-300 ${isItemsOpen ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          </svg>
+        </span>
+      </button>
+
+      {/* Cart Items + Subtotal — hidden on mobile until expanded */}
+      <div className={isItemsOpen ? '' : 'hidden md:block'}>
+        <div className="flex flex-col gap-4 mb-5">
+          {cartItems.map(item => (
+            <div key={item.key} className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
+              <div className="relative w-16 h-16">
+                {item.image ? (
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    width={64}
+                    height={64}
+                    className="rounded border border-[#eee] object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 rounded" />
+                )}
+                <span className="absolute -top-2 -right-2 bg-[#333] text-white rounded-full w-6 h-6 flex items-center justify-center text-[0.8rem] font-bold border-2 border-[#f9f9f9]">
+                  {item.quantity}
+                </span>
+              </div>
+
+              <div className="pr-4">
+                <p className="m-0 font-semibold text-[#333] text-[0.95rem]">{item.name}</p>
+                {item.attributes && item.attributes.length > 0 && (
+                  <div className="text-[13px] text-[#666] mt-1">
+                    {item.attributes.map((attr, index) => (
+                      <div key={index}>
+                        <strong>{formatLabel(attr.name)}:</strong> {attr.value}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <p className="m-0 font-semibold whitespace-nowrap text-base md:text-[1rem]">
+                {formatPrice(item.price)}
+              </p>
             </div>
+          ))}
+        </div>
 
-            <div className="pr-4">
-              <p className="m-0 font-semibold text-[#333] text-[0.95rem]">{item.name}</p>
-              {item.attributes && item.attributes.length > 0 && (
-                <div className="text-[13px] text-[#666] mt-1">
-                  {item.attributes.map((attr, index) => (
-                    <div key={index}>
-                      <strong>{formatLabel(attr.name)}:</strong> {attr.value}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <p className="m-0 font-semibold whitespace-nowrap text-base md:text-[1rem]">
-              {formatPrice(item.price)}
-            </p>
+        {/* Subtotal */}
+        <div className="border-t border-[#e0e0e0] mt-6 pt-6 flex flex-col gap-3">
+          <div className="flex justify-between items-center text-base text-[#555]">
+            <p className="font-semibold text-[1.1rem] text-black m-0">Subtotal</p>
+            <span className="font-semibold text-[1.2rem] text-black">{subtotalDisplay}</span>
           </div>
-        ))}
-      </div>
-
-      {/* Subtotal */}
-      <div className="border-t border-[#e0e0e0] mt-6 pt-6 flex flex-col gap-3">
-        <div className="flex justify-between items-center text-base text-[#555]">
-          <p className="font-semibold text-[1.1rem] text-black m-0">Subtotal</p>
-          <span className="font-semibold text-[1.2rem] text-black">{subtotalDisplay}</span>
         </div>
       </div>
 

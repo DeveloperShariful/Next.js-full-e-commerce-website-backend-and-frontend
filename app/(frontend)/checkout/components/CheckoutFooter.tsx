@@ -46,34 +46,67 @@ const trustBadges = [
 
 const paymentIcons = [
   {
+    src: 'https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/Apple_Pay-Logo.wine-WwzHKTdKTtEYxYzkt32CDcB4DRS93R.svg',
+    alt: 'Apple Pay',
+    width: 160, height: 44,
+    box: 'h-10 px-1 py-1 sm:h-12 sm:min-w-[80px] sm:px-2',
+    img: 'h-8 max-w-full sm:h-10 sm:max-w-[120px]',
+  },
+  {
+    src: 'https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/svgviewer-output-YUYAUZ7am3poOTgMoWNwremAzaQbsF.jpg',
+    alt: 'Google Pay',
+    width: 220, height: 56,
+    box: 'h-10 px-1 py-1 sm:h-14 sm:min-w-[90px] sm:px-2',
+    img: 'h-8 max-w-full sm:h-12 sm:max-w-[140px]',
+  },
+  {
+    src: 'https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/Link_idHNoUBT0y_0-zvoRkBAOydrJpRwDdptkNjn8MlwmQM.png',
+    alt: 'Link Pay',
+    width: 120, height: 32,
+    box: 'h-10 px-1 py-1.5 sm:h-11 sm:min-w-[64px] sm:px-3 sm:py-2',
+    img: 'h-6 max-w-full sm:h-7 sm:max-w-[90px]',
+  },
+  {
     src: 'https://gobikes.au/wp-content/uploads/2026/05/Credit-Card-Icons.webp',
     alt: 'Visa / Mastercard / Amex',
-    width: 120,
-    height: 28,
+    width: 120, height: 32,
+    box: 'h-10 px-1 py-1.5 sm:h-11 sm:min-w-[64px] sm:px-3 sm:py-2',
+    img: 'h-6 max-w-full sm:h-7 sm:max-w-[90px]',
+  },
+  {
+    src: 'https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/WooCommerce-PayPal-Pay-Later%20%281%29-wYfLILZCgu0rFsFTytK7WT6BFlmTTW.png',
+    alt: 'Pay Later',
+    width: 100, height: 56,
+    box: 'h-10 px-1 py-1 sm:h-12 sm:min-w-[90px]',
+    img: 'h-8 max-w-full sm:h-12 sm:max-w-[140px]',
   },
   {
     src: 'https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png',
     alt: 'PayPal',
-    width: 70,
-    height: 18,
+    width: 80, height: 32,
+    box: 'h-10 px-1 py-1.5 sm:h-11 sm:min-w-[64px] sm:px-3 sm:py-2',
+    img: 'h-6 max-w-full sm:h-7 sm:max-w-[90px]',
   },
   {
     src: 'https://static.afterpay.com/integration/logo-afterpay-colour.svg',
     alt: 'Afterpay',
-    width: 80,
-    height: 22,
+    width: 90, height: 32,
+    box: 'h-10 px-1 py-1.5 sm:h-11 sm:min-w-[64px] sm:px-3 sm:py-2',
+    img: 'h-6 max-w-full sm:h-7 sm:max-w-[90px]',
   },
   {
     src: 'https://gobikes.au/wp-content/uploads/2026/05/Zip-Pay-Logo.webp',
     alt: 'Zip Pay',
-    width: 55,
-    height: 22,
+    width: 60, height: 32,
+    box: 'h-10 px-1 py-1.5 sm:h-11 sm:min-w-[64px] sm:px-3 sm:py-2',
+    img: 'h-6 max-w-full sm:h-7 sm:max-w-[90px]',
   },
   {
     src: 'https://x.klarnacdn.net/payment-method/assets/badges/generic/klarna.svg',
     alt: 'Klarna',
-    width: 55,
-    height: 22,
+    width: 60, height: 32,
+    box: 'h-10 px-1 py-1.5 sm:h-11 sm:min-w-[64px] sm:px-3 sm:py-2',
+    img: 'h-6 max-w-full sm:h-7 sm:max-w-[90px]',
   },
 ];
 
@@ -106,17 +139,22 @@ export default function CheckoutFooter() {
         <p className="text-[11px] text-gray-400 uppercase tracking-wide font-medium">
           We accept
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           {paymentIcons.map((icon) => (
-            <Image
+            <div
               key={icon.alt}
-              src={icon.src}
-              alt={icon.alt}
-              width={icon.width}
-              height={icon.height}
-              className="h-6 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity"
-              unoptimized
-            />
+              className={`bg-white border border-gray-200 rounded-lg flex items-center justify-center shadow-sm ${icon.box}`}
+              title={icon.alt}
+            >
+              <Image
+                src={icon.src}
+                alt={icon.alt}
+                width={icon.width}
+                height={icon.height}
+                className={`w-auto object-contain ${icon.img}`}
+                unoptimized
+              />
+            </div>
           ))}
         </div>
       </div>

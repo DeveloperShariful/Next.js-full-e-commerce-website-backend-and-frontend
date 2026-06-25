@@ -191,7 +191,7 @@ export default function WarrantyClient() {
       </section>
 
       {/* How it works */}
-      <section className="max-w-[1100px] mx-auto px-4 sm:px-6 py-12">
+      <section className="max-w-[1100px] mx-auto px-2 sm:px-6 py-12">
         <h2 className="text-center text-2xl font-extrabold text-gray-900 mb-8">How It Works</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
@@ -210,7 +210,7 @@ export default function WarrantyClient() {
       </section>
 
       {/* Main */}
-      <section className="max-w-[1100px] mx-auto px-4 sm:px-6 pb-16">
+      <section className="max-w-[1100px] mx-auto px-2 sm:px-6 pb-16">
         <div className="space-y-8">
           <div>
             <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
@@ -237,7 +237,7 @@ export default function WarrantyClient() {
         </div>
 
         <div className="mt-8">
-          <div className="bg-white p-8 sm:p-10 rounded-2xl shadow-lg border border-gray-100">
+          <div className="bg-white p-2 sm:p-10 rounded-2xl shadow-lg border border-gray-100">
             <h2 className="text-xl font-extrabold text-gray-900 mb-6 pb-4 border-b border-gray-100">Submit Your Claim</h2>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -258,19 +258,7 @@ export default function WarrantyClient() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div><label className="block text-sm font-bold text-gray-700 mb-2">Full Name *</label><input type="text" name="name" required value={formData.name} onChange={handleInputChange} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="John Doe" /></div>
-                <div><label className="block text-sm font-bold text-gray-700 mb-2">Email Address *</label><input type="email" name="email" required value={formData.email} onChange={handleInputChange} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="john@example.com" /></div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Original Order Number {isGoBikeOnline ? '*' : <span className="text-gray-400 font-normal">(optional for retail purchases)</span>}
-                  </label>
-                  <input type="text" name="orderNumber" required={isGoBikeOnline} value={formData.orderNumber} onChange={handleInputChange} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. #12345" />
-                </div>
-                <div>
+              <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Where did you purchase? *</label>
                   <select name="shopPurchased" required value={formData.shopPurchased} onChange={handleInputChange} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
                     {SHOP_OPTIONS.map((group) => (
@@ -282,10 +270,39 @@ export default function WarrantyClient() {
                     ))}
                   </select>
                 </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {isGoBikeOnline && (
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                       Full Name * 
+                    </label>
+                      <input 
+                        type="text" 
+                        name="name" 
+                        required 
+                        value={formData.name} 
+                        onChange={handleInputChange} 
+                        className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
+                        placeholder="John Doe" 
+                      />
+                    </div>
+                  )}
+                <div><label className="block text-sm font-bold text-gray-700 mb-2">Email Address *</label><input type="email" name="email" required value={formData.email} onChange={handleInputChange} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="john@example.com" /></div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Original Order Number {isGoBikeOnline ? '*' : <span className="text-gray-400 font-normal">(optional for retail purchases)</span>}
+                  </label>
+                  <input type="text" name="orderNumber" required={isGoBikeOnline} value={formData.orderNumber} onChange={handleInputChange} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. #12345" />
+                </div>
+                
               </div>
 
               {!isGoBikeOnline && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-2">
                   <h3 className="text-sm font-bold text-blue-800 mb-4">Delivery Address for Replacement Parts *</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div><label className="block text-xs font-bold text-gray-700 mb-1">First Name *</label><input type="text" name="firstName" required value={addressForm.firstName} onChange={handleAddressChange} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="John" /></div>

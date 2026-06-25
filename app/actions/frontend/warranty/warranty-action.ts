@@ -1,4 +1,4 @@
-//app/actions/storefront/warranty/warranty-action.ts
+// app/actions/storefront/warranty/warranty-action.ts
 
 'use server';
 
@@ -30,7 +30,14 @@ export async function submitWarrantyClaim(data: ClaimData) {
   try {
     const isGoBikeOnline = data.shopPurchased === 'GoBike Australia';
 
-    if (!data.name || !data.email || !data.description) {
+    // ✅ ১. আসল নাম তৈরি: অফলাইন হলে Address-এর ফার্স্ট নেম + লাস্ট নেম মিলে আসল নাম হবে
+    let finalCustomerName = data.name;
+    if (!isGoBikeOnline && data.manualAddress) {
+      finalCustomerName = `${data.manualAddress.firstName} ${data.manualAddress.lastName}`.trim();
+    }
+
+    // ✅ ২. বেসিক ভ্যালিডেশন
+    if (!finalCustomerName || !data.email || !data.description) {
       return { success: false, message: 'Missing required fields' };
     }
     if (isGoBikeOnline && !data.orderNumber) {
@@ -45,7 +52,7 @@ export async function submitWarrantyClaim(data: ClaimData) {
 
     const cleanOrderNumber = data.orderNumber ? data.orderNumber.replace('#', '').trim() : '';
 
-    // For non-GoBike purchases, use the manually entered address
+    // ✅ ৩. অফলাইন হলে ম্যানুয়াল অ্যাড্রেস বসবে, অনলাইন হলে ডাটাবেজ থেকে খুঁজবে
     if (!isGoBikeOnline && data.manualAddress) {
       const m = data.manualAddress;
       customerAddress = [m.address1, m.address2].filter(Boolean).join(', ');
@@ -56,43 +63,42 @@ export async function submitWarrantyClaim(data: ClaimData) {
     } else if (cleanOrderNumber) {
       try {
         // =================================================================
-        // LOCAL PRISMA QUERY (Blazing Fast & Secure)
+        // LOCAL PRISMA QUERY (শুধুমাত্র Order Number চেক করবে)
         // =================================================================
         const orderRecord = await db.order.findUnique({
           where: { orderNumber: cleanOrderNumber }
         });
 
         if (orderRecord) {
+          // অর্ডার পাওয়া গেছে! ইমেইল চেক করার দরকার নেই, সরাসরি ডাটাবেজ থেকে ঠিকানা নিয়ে নেবে।
           const billingDetails = typeof orderRecord.billingAddress === 'string' ? JSON.parse(orderRecord.billingAddress) : orderRecord.billingAddress || {};
           const shippingDetails = typeof orderRecord.shippingAddress === 'string' ? JSON.parse(orderRecord.shippingAddress) : orderRecord.shippingAddress || {};
 
-          const orderEmail = billingDetails.email?.toLowerCase() || '';
-          const inputEmail = data.email.toLowerCase();
-
-          if (orderEmail === inputEmail) {
-            customerPhone = billingDetails.phone || '';
-            const addr1 = shippingDetails.address1 || '';
-            const addr2 = shippingDetails.address2 || '';
-            customerAddress = `${addr1} ${addr2}`.trim();
-            customerSuburb = shippingDetails.city || '';
-            customerState = shippingDetails.state || '';
-            customerPostcode = shippingDetails.postcode || '';
-          } else {
-            console.log(`Email mismatch for order ${cleanOrderNumber}. Expected ${orderEmail}, got ${inputEmail}`);
-          }
+          customerPhone = billingDetails.phone || '';
+          const addr1 = shippingDetails.address1 || '';
+          const addr2 = shippingDetails.address2 || '';
+          customerAddress = `${addr1} ${addr2}`.trim();
+          customerSuburb = shippingDetails.city || '';
+          customerState = shippingDetails.state || '';
+          customerPostcode = shippingDetails.postcode || '';
+          
         } else {
           console.log(`Order ${cleanOrderNumber} not found in database.`);
+          // ✅ আপডেট: অর্ডার নাম্বার না পেলে সাবমিট আটকে দেবে এবং এরর দেখাবে
+          if (isGoBikeOnline) {
+            return { success: false, message: 'Invalid Order Number. We could not find this order in our system.' };
+          }
         }
       } catch (error) {
         console.error("Database query error during claim submission:", error);
       }
     }
 
-    // Save claim natively in the Prisma Database
+    // ✅ ৪. Save claim natively in the Prisma Database
     const newClaim = await db.warrantyClaim.create({
       data: {
-        name: data.name,
-        orderNumber: cleanOrderNumber,
+        name: finalCustomerName, 
+        orderNumber: cleanOrderNumber || "N/A", // ✅ TypeScript Error ফিক্স: ফাঁকা থাকলে "N/A" যাবে
         shopPurchased: data.shopPurchased,
         email: data.email,
         description: data.description,
@@ -115,8 +121,8 @@ export async function submitWarrantyClaim(data: ClaimData) {
         trigger: "WARRANTY_CLAIM_CUSTOMER",
         recipient: data.email,
         data: {
-          customer_name: data.name,
-          order_number:  cleanOrderNumber || 'N/A',
+          customer_name: finalCustomerName, 
+          order_number:  cleanOrderNumber || 'N/A', 
           description:   data.description,
         },
       }),
@@ -124,7 +130,7 @@ export async function submitWarrantyClaim(data: ClaimData) {
         trigger: "WARRANTY_CLAIM_ADMIN",
         recipient: "",
         data: {
-          customer_name:  data.name,
+          customer_name:  finalCustomerName, 
           order_number:   cleanOrderNumber || 'N/A',
           shop_purchased: data.shopPurchased,
           description:    data.description,
@@ -134,11 +140,12 @@ export async function submitWarrantyClaim(data: ClaimData) {
       }),
     ]);
 
-    if (customerEmailResult.status === 'fulfilled' && !customerEmailResult.value.success) {
-      console.error(`[Warranty] Customer email FAILED (claimId: ${newClaim.id}):`, customerEmailResult.value.error);
-    }
-    if (adminEmailResult.status === 'fulfilled' && !adminEmailResult.value.success) {
-      console.error(`[Warranty] Admin email FAILED (claimId: ${newClaim.id}):`, adminEmailResult.value.error);
+    // ✅ ৫. ইমেইল ফেইল লগিং
+    if (customerEmailResult.status === 'fulfilled' && !customerEmailResult.value.success) {	 
+      console.error(`[Warranty] Customer email FAILED (claimId: ${newClaim.id}):`, customerEmailResult.value.error);	 
+    }	 
+    if (adminEmailResult.status === 'fulfilled' && !adminEmailResult.value.success) {	 
+      console.error(`[Warranty] Admin email FAILED (claimId: ${newClaim.id}):`, adminEmailResult.value.error);	 
     }
 
     return { success: true, message: 'Claim submitted successfully!' };

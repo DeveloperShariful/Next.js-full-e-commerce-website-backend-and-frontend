@@ -6,11 +6,15 @@ import { db } from "@/lib/prisma";
 import Papa from "papaparse";
 import { DiscountType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
 
 // ==========================================
 // EXPORT COUPONS TO CSV
 // ==========================================
-export async function exportCouponsCSV(filters?: any) {
+export async function exportCouponsCSV() {
+  const session = await auth();
+  if (!session?.user?.email) return { success: false, error: "Unauthorized." };
+
   try {
     const coupons = await db.discount.findMany({
       orderBy: { createdAt: 'desc' }
@@ -48,14 +52,17 @@ export async function exportCouponsCSV(filters?: any) {
 // IMPORT COUPONS FROM CSV
 // ==========================================
 export async function importCouponsCSV(csvString: string) {
+    const session = await auth();
+    if (!session?.user?.email) return { success: false, error: "Unauthorized." };
+
     try {
-        const { data } = Papa.parse(csvString, { header: true, skipEmptyLines: true });
-        
+        const { data } = Papa.parse<Record<string, string>>(csvString, { header: true, skipEmptyLines: true });
+
         let successCount = 0;
         let skipCount = 0;
         let errorCount = 0;
 
-        for (const row of data as any[]) {
+        for (const row of data) {
             const code = row["Code"]?.toString().trim().toUpperCase();
             if (!code) continue;
 
@@ -92,7 +99,7 @@ export async function importCouponsCSV(csvString: string) {
         revalidatePath("/admin/coupons");
         return { success: true, message: `Imported: ${successCount}. Skipped: ${skipCount}. Failed: ${errorCount}` };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("CSV Parse Error:", error);
         return { success: false, error: "Critical failure parsing CSV." };
     }

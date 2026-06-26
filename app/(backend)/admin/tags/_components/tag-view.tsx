@@ -7,11 +7,14 @@ import { toast } from "sonner";
 import { TagData } from "../types";
 
 // 🚀 Importing from our new unified actions file
-import { 
-  getTags, 
-  deleteTag, 
-  restoreTag, 
-  forceDeleteTag 
+import {
+  getTags,
+  deleteTag,
+  restoreTag,
+  forceDeleteTag,
+  bulkDeleteTags,
+  bulkRestoreTags,
+  bulkForceDeleteTags,
 } from "@/app/actions/backend/tags/tag-actions";
 
 import TagHeader from "./header";
@@ -105,34 +108,23 @@ export default function TagView() {
   // --- BULK ACTIONS ---
   const handleBulkAction = async (ids: string[], action: "delete" | "restore" | "force_delete") => {
     if (action === "force_delete" && !confirm(`You are about to permanently delete ${ids.length} items. This action cannot be undone.`)) return false;
-    
-    const toastId = toast.loading(`Processing bulk ${action}...`);
-    let successCount = 0;
-    let errorCount = 0;
 
-    for (const id of ids) {
-      try {
-        let res;
-        if (action === "delete") res = await deleteTag(id);
-        else if (action === "restore") res = await restoreTag(id);
-        else res = await forceDeleteTag(id);
+    const toastId = toast.loading("Processing...");
 
-        if (res.success) successCount++;
-        else errorCount++;
-      } catch (error) {
-        errorCount++;
-      }
-    }
+    const res = action === "delete"
+      ? await bulkDeleteTags(ids)
+      : action === "restore"
+        ? await bulkRestoreTags(ids)
+        : await bulkForceDeleteTags(ids);
 
-    if (successCount > 0) {
-      toast.success(`${successCount} items processed successfully.`, { id: toastId });
+    if (res.success) {
+      toast.success(res.message ?? `${ids.length} items processed.`, { id: toastId });
       fetchData();
-    }
-    if (errorCount > 0) {
-      toast.error(`Failed to process ${errorCount} items.`);
+    } else {
+      toast.error(res.error ?? "Operation failed.", { id: toastId });
     }
 
-    return true; 
+    return res.success;
   };
 
   const resetForm = () => {
@@ -166,10 +158,11 @@ export default function TagView() {
         </div>
       ) : (
         <>
-          <TagHeader 
-            viewMode={viewMode} 
-            setViewMode={setViewMode} 
-            resetForm={resetForm} 
+          <TagHeader
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            resetForm={resetForm}
+            onImportSuccess={fetchData}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
           />

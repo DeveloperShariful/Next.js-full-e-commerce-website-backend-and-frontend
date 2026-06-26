@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { MediaSource } from "@prisma/client";
 import { BrandData } from "../types";
@@ -26,14 +26,36 @@ export default function BrandForm({ initialData, onSuccess, isEditing }: FormPro
     website: initialData.website || "",
     countryOfOrigin: initialData.countryOfOrigin || "",
     logo: initialData.logo ? [initialData.logo] : [],
+    isFeatured: initialData.isFeatured ?? false,
     metaTitle: initialData.metaTitle || "",
     metaDesc: initialData.metaDesc || "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openLogoPicker, setOpenLogoPicker] = useState(false);
+  const slugManuallyEdited = useRef(!!initialData.slug);
+
+  const toSlug = (value: string) =>
+    value.toLowerCase().trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+  const handleNameChange = (value: string) => {
+    if (!slugManuallyEdited.current) {
+      setFormData(prev => ({ ...prev, name: value, slug: toSlug(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, name: value }));
+    }
+  };
+
+  const handleSlugChange = (value: string) => {
+    slugManuallyEdited.current = value.length > 0;
+    setFormData(prev => ({ ...prev, slug: value }));
+  };
 
   useEffect(() => {
+    slugManuallyEdited.current = !!initialData.slug;
     setFormData({
       id: initialData.id || "",
       name: initialData.name || "",
@@ -42,6 +64,7 @@ export default function BrandForm({ initialData, onSuccess, isEditing }: FormPro
       website: initialData.website || "",
       countryOfOrigin: initialData.countryOfOrigin || "",
       logo: initialData.logo ? [initialData.logo] : [],
+      isFeatured: initialData.isFeatured ?? false,
       metaTitle: initialData.metaTitle || "",
       metaDesc: initialData.metaDesc || "",
     });
@@ -61,6 +84,7 @@ export default function BrandForm({ initialData, onSuccess, isEditing }: FormPro
     data.append("website", formData.website);
     data.append("countryOfOrigin", formData.countryOfOrigin);
     if (formData.logo.length > 0) data.append("logo", formData.logo[0]);
+    data.append("isFeatured", String(formData.isFeatured));
     data.append("metaTitle", formData.metaTitle);
     data.append("metaDesc", formData.metaDesc);
 
@@ -70,7 +94,7 @@ export default function BrandForm({ initialData, onSuccess, isEditing }: FormPro
       if (res.success) {
         toast.success(res.message as string, { id: toastId });
         if (!isEditing) {
-          setFormData({ id: "", name: "", slug: "", description: "", website: "", countryOfOrigin: "", logo: [], metaTitle: "", metaDesc: "" });
+          setFormData({ id: "", name: "", slug: "", description: "", website: "", countryOfOrigin: "", logo: [], isFeatured: false, metaTitle: "", metaDesc: "" });
         }
         onSuccess();
       } else {
@@ -99,25 +123,30 @@ export default function BrandForm({ initialData, onSuccess, isEditing }: FormPro
         {/* Basic Fields */}
         <div>
           <label className="block text-[14px] text-[#2c3338] mb-1">Name</label>
-          <input 
-            type="text" 
-            required 
-            value={formData.name} 
-            onChange={(e) => setFormData({...formData, name: e.target.value})} 
-            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          <input
+            type="text"
+            required
+            value={formData.name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow"
           />
           <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">The name is how it appears on your site.</p>
         </div>
 
         <div>
           <label className="block text-[14px] text-[#2c3338] mb-1">Slug</label>
-          <input 
-            type="text" 
-            value={formData.slug} 
-            onChange={(e) => setFormData({...formData, slug: e.target.value})} 
-            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          <input
+            type="text"
+            value={formData.slug}
+            onChange={(e) => handleSlugChange(e.target.value)}
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow"
           />
-          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">The "slug" is the URL-friendly version of the name. It is usually all lowercase and contains only letters, numbers, and hyphens.</p>
+          {formData.slug && (
+            <p className="text-[12px] text-[#646970] mt-1 font-mono truncate">
+              /brands/<span className="text-[#2271b1]">{formData.slug}</span>
+            </p>
+          )}
+          <p className="text-[13px] text-[#646970] mt-1 leading-relaxed">Auto-generated from name. Edit manually to override.</p>
         </div>
 
         <div>
@@ -177,6 +206,20 @@ export default function BrandForm({ initialData, onSuccess, isEditing }: FormPro
               source={MediaSource.BRAND}
             />
           </div>
+        </div>
+
+        {/* Featured Toggle */}
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={formData.isFeatured}
+              onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+              className="w-4 h-4 rounded-[2px] border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1] cursor-pointer"
+            />
+            <span className="text-[14px] text-[#2c3338]">Featured brand</span>
+          </label>
+          <p className="text-[13px] text-[#646970] mt-1.5 ml-6">Show this brand in featured sections on the storefront.</p>
         </div>
 
         {/* Custom Meta Fields */}

@@ -4,8 +4,8 @@ import { db } from "@/lib/prisma";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { Prisma } from "@prisma/client";
 
-export const safeFloat = (val: any): number => {
-  if (!val) return 0;
+export const safeFloat = (val: unknown): number => {
+  if (val === null || val === undefined || val === "") return 0;
   const num = Number(val);
   return isNaN(num) ? 0 : num;
 };
@@ -15,20 +15,20 @@ export const toDecimal = (val: number | string | Prisma.Decimal): number => {
 };
 
 export const add = (a: number, b: number): number => {
-  return Math.round((a + b) + Number.EPSILON * 100) / 100;
+  return Math.round((a + b) * 100) / 100;
 };
 
 export const sub = (a: number, b: number): number => {
-  return Math.round((a - b) + Number.EPSILON * 100) / 100;
+  return Math.round((a - b) * 100) / 100;
 };
 
 export const mul = (a: number, b: number): number => {
-  return Math.round((a * b) + Number.EPSILON * 100) / 100;
+  return Math.round((a * b) * 100) / 100;
 };
 
 export const div = (a: number, b: number): number => {
   if (b === 0) return 0;
-  return Math.round((a / b) + Number.EPSILON * 100) / 100;
+  return Math.round((a / b) * 100) / 100;
 };
 
 export const round = (num: number): number => {

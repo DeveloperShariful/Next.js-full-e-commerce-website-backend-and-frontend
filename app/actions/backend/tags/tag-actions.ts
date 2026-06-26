@@ -39,9 +39,12 @@ async function getDbUserId(): Promise<string | null> {
   if (!session?.user?.email) return null;
   const dbUser = await db.user.findUnique({
     where: { email: session.user.email },
-    select: { id: true },
+    select: { id: true, role: true },
   });
-  return dbUser?.id ?? null;
+  if (!dbUser) return null;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "MANAGER", "EDITOR"] as const;
+  if (!(allowed as readonly string[]).includes(dbUser.role)) return null;
+  return dbUser.id;
 }
 
 async function generateUniqueSlug(
@@ -452,5 +455,123 @@ export async function forceDeleteTag(
   } catch (error) {
     console.error("FORCE_DELETE_TAG_ERROR", error);
     return { success: false, error: "Failed to permanently delete tag." };
+  }
+}
+
+// ==========================================
+// 7. BULK DELETE (SOFT)
+// ==========================================
+
+export async function bulkDeleteTags(
+  ids: string[]
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+  if (!ids.length) return { success: false, error: "No tags selected." };
+
+  const linked = await db.product.count({
+    where: { tags: { some: { id: { in: ids } } }, deletedAt: null },
+  });
+
+  if (linked > 0) {
+    return { success: false, error: `Cannot delete: ${linked} active product(s) still use selected tag(s).` };
+  }
+
+  try {
+    await db.tag.updateMany({
+      where: { id: { in: ids }, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "TAG_BULK_SOFT_DELETED",
+        entityType: "Tag",
+        entityId: ids[0],
+        details: { tagIds: ids, totalCount: ids.length } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    revalidatePath("/admin/tags");
+    return { success: true, message: `${ids.length} tag(s) moved to trash.` };
+  } catch (error) {
+    console.error("BULK_DELETE_TAGS_ERROR", error);
+    return { success: false, error: "Failed to bulk delete tags." };
+  }
+}
+
+// ==========================================
+// 8. BULK RESTORE
+// ==========================================
+
+export async function bulkRestoreTags(
+  ids: string[]
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+  if (!ids.length) return { success: false, error: "No tags selected." };
+
+  try {
+    await db.tag.updateMany({
+      where: { id: { in: ids }, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "TAG_BULK_RESTORED",
+        entityType: "Tag",
+        entityId: ids[0],
+        details: { tagIds: ids, totalCount: ids.length } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    revalidatePath("/admin/tags");
+    return { success: true, message: `${ids.length} tag(s) restored.` };
+  } catch (error) {
+    console.error("BULK_RESTORE_TAGS_ERROR", error);
+    return { success: false, error: "Failed to bulk restore tags." };
+  }
+}
+
+// ==========================================
+// 9. BULK FORCE DELETE (PERMANENT)
+// ==========================================
+
+export async function bulkForceDeleteTags(
+  ids: string[]
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+  if (!ids.length) return { success: false, error: "No tags selected." };
+
+  const linked = await db.product.count({
+    where: { tags: { some: { id: { in: ids } } } },
+  });
+
+  if (linked > 0) {
+    return { success: false, error: `Cannot permanently delete: ${linked} product(s) still use selected tag(s).` };
+  }
+
+  try {
+    await db.tag.deleteMany({ where: { id: { in: ids } } });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "TAG_BULK_FORCE_DELETED",
+        entityType: "Tag",
+        entityId: ids[0],
+        details: { tagIds: ids, totalCount: ids.length, permanent: true } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    revalidatePath("/admin/tags");
+    return { success: true, message: `${ids.length} tag(s) permanently deleted.` };
+  } catch (error) {
+    console.error("BULK_FORCE_DELETE_TAGS_ERROR", error);
+    return { success: false, error: "Failed to permanently delete tags." };
   }
 }

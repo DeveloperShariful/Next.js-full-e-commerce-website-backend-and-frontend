@@ -3,6 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 export async function getUniqueMetaKeys() {
@@ -44,7 +45,7 @@ export async function getUniqueMetaKeys() {
   }
 }
 
-export async function updateOrderMetadata(orderId: string, metaKey: string, metaValue: any) {
+export async function updateOrderMetadata(orderId: string, metaKey: string, metaValue: unknown) {
   try {
     if (!orderId || !metaKey) return { success: false, error: "Order ID and Meta Key are required" };
 
@@ -56,14 +57,14 @@ export async function updateOrderMetadata(orderId: string, metaKey: string, meta
     if (!order) return { success: false, error: "Order not found" };
 
     const currentMetadata = typeof order.metadata === 'object' && order.metadata !== null 
-      ? (order.metadata as Record<string, any>) 
+      ? (order.metadata as Record<string, unknown>) 
       : {};
 
     const updatedMetadata = { ...currentMetadata, [metaKey]: metaValue };
 
     await db.order.update({
       where: { id: orderId },
-      data: { metadata: updatedMetadata }
+      data: { metadata: updatedMetadata as unknown as Prisma.InputJsonValue }
     });
 
     await db.orderNote.create({
@@ -91,7 +92,7 @@ export async function deleteOrderMetadata(orderId: string, metaKey: string) {
     if (!order) return { success: false, error: "Order not found" };
 
     const currentMetadata = typeof order.metadata === 'object' && order.metadata !== null 
-      ? (order.metadata as Record<string, any>) 
+      ? (order.metadata as Record<string, unknown>) 
       : {};
 
     if (metaKey in currentMetadata) {
@@ -100,7 +101,7 @@ export async function deleteOrderMetadata(orderId: string, metaKey: string) {
 
     await db.order.update({
       where: { id: orderId },
-      data: { metadata: currentMetadata }
+      data: { metadata: currentMetadata as unknown as Prisma.InputJsonValue }
     });
 
     await db.orderNote.create({

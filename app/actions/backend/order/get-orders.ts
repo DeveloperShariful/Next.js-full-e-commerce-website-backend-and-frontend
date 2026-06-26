@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 
 export async function getOrders(
   page: number = 1, 
@@ -34,7 +34,7 @@ export async function getOrders(
 
     // 🔥 FIXED: Separate Base Filter array created
     // এটি ডেট, পেমেন্ট মেথড এবং সার্চ কোয়ারিগুলো ধরে রাখবে।
-    const baseFilterParams: any[] = [];
+    const baseFilterParams: Prisma.OrderWhereInput[] = [];
 
     if (query) {
       baseFilterParams.push({
@@ -67,12 +67,11 @@ export async function getOrders(
       });
     }
 
-    // Main Where Condition
-    const whereCondition: any = {
+    const whereCondition: Prisma.OrderWhereInput = {
       AND: [
-        ...baseFilterParams, // বেস ফিল্টার এখানে বসানো হলো
+        ...baseFilterParams,
         isTrashMode ? { deletedAt: { not: null } } : { deletedAt: null },
-        status && status !== 'all' && status !== 'trash' ? { status: status as OrderStatus } : {}
+        status && status !== "all" && status !== "trash" ? { status: status as OrderStatus } : {}
       ]
     };
 
@@ -147,7 +146,7 @@ export async function getOrders(
       meta: { total: totalCount, pages: Math.ceil(totalCount / limit), counts } 
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("GET_ORDERS_ERROR", error);
     return { success: false, error: "Failed to fetch orders" };
   }

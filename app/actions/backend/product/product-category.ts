@@ -54,9 +54,12 @@ async function getDbUserId(): Promise<string | null> {
   if (!session?.user?.email) return null;
   const dbUser = await db.user.findUnique({
     where: { email: session.user.email },
-    select: { id: true },
+    select: { id: true, role: true },
   });
-  return dbUser?.id ?? null;
+  if (!dbUser) return null;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "MANAGER", "EDITOR"] as const;
+  if (!(allowed as readonly string[]).includes(dbUser.role)) return null;
+  return dbUser.id;
 }
 
 async function generateUniqueSlug(
@@ -512,5 +515,29 @@ export async function forceDeleteCategory(
   } catch (error) {
     console.error("FORCE_DELETE_CATEGORY_ERROR", error);
     return { success: false, error: "Failed to permanently delete category." };
+  }
+}
+
+// ==========================================
+// 8. UPDATE CATEGORY ORDER (drag-n-drop)
+// ==========================================
+
+export async function updateCategoryOrder(
+  items: { id: string; menuOrder: number }[]
+): Promise<{ success: boolean; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  try {
+    await db.$transaction(
+      items.map(({ id, menuOrder }) =>
+        db.category.update({ where: { id }, data: { menuOrder } })
+      )
+    );
+    revalidatePath("/admin/categories");
+    return { success: true };
+  } catch (error) {
+    console.error("UPDATE_CATEGORY_ORDER_ERROR", error);
+    return { success: false, error: "Failed to update order." };
   }
 }

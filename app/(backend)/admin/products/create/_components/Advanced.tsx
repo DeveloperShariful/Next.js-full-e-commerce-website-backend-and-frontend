@@ -7,13 +7,17 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { Plus, Trash2, Settings, ListOrdered, MessageSquare, Link as LinkIcon, Code, LayoutList, AlertTriangle, RefreshCw, X , ImagePlus} from "lucide-react";
 import { ProductFormData } from "../types";
 import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
-import Image from "next/image"; 
+import Image from "next/image";
+import SeoPreview from "@/app/(backend)/admin/_components/SeoPreview";
 
 export default function Advanced() {
     const { register, control, watch, setValue, formState: { errors } } = useFormContext<ProductFormData>();
-    
-    // Watch SEO Image for Preview
+
     const ogImage = watch("seoSchema.ogImage");
+    const ogTitle = watch("seoSchema.ogTitle");
+    const ogDescription = watch("seoSchema.ogDescription");
+    const productName = watch("name");
+    const productSlug = watch("slug");
     
     // Modal State
     const [openSeoMedia, setOpenSeoMedia] = useState(false);
@@ -49,8 +53,8 @@ export default function Advanced() {
             replace(newArray);
             setJsonError(null);
             setRawMode(false);
-        } catch (e: any) {
-            setJsonError(e.message || "Invalid JSON syntax");
+        } catch (e: unknown) {
+            setJsonError(e instanceof Error ? e.message : "Invalid JSON syntax");
         }
     };
 
@@ -181,10 +185,23 @@ export default function Advanced() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#c3c4c7] pb-6">
                     <label className="md:text-left text-[13px] text-[#3c434a] font-medium">Robots Meta</label>
                     <div className="md:col-span-3">
-                        <input 
-                            {...register("seoSchema.robots")} 
-                            className="w-full md:w-1/2 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none" 
+                        <input
+                            {...register("seoSchema.robots")}
+                            className="w-full md:w-1/2 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
                             placeholder="e.g. index, follow"
+                        />
+                    </div>
+                </div>
+
+                {/* Google Search Preview */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start pt-2">
+                    <label className="md:text-left text-[13px] text-[#3c434a] font-medium mt-1">Search Preview</label>
+                    <div className="md:col-span-3">
+                        <SeoPreview
+                            title={ogTitle || productName || ""}
+                            description={ogDescription || ""}
+                            slug={productSlug || ""}
+                            baseUrl="https://yourstore.com/products"
                         />
                     </div>
                 </div>

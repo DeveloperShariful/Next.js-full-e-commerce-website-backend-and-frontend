@@ -1,4 +1,4 @@
-//app/(backend)/admin/reviews/_components/review-list.tsx
+﻿//app/(backend)/admin/reviews/_components/review-list.tsx
 
 "use client";
 
@@ -32,8 +32,10 @@ export default function ReviewList({
   currentFilter, setCurrentFilter, counts, ratingFilter, setRatingFilter, productSearch, setProductSearch, pagination, setCurrentPage
 }: ListProps) {
   
+  type BulkActionType = "approve" | "unapprove" | "delete" | "restore" | "force_delete" | "spam";
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState<string>("");
+  const [bulkAction, setBulkAction] = useState<"" | BulkActionType>("");
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [localProductInput, setLocalProductInput] = useState(productSearch);
@@ -56,7 +58,7 @@ export default function ReviewList({
     if (bulkAction === "" || selectedIds.length === 0) return;
     
     setIsProcessing(true);
-    const finished = await handleBulkAction(selectedIds, bulkAction as any);
+    const finished = await handleBulkAction(selectedIds, bulkAction);
     if (finished) {
       setSelectedIds([]); 
       setBulkAction("");
@@ -113,7 +115,7 @@ export default function ReviewList({
           <div className="flex items-center gap-1 mr-1">
             <select 
               value={bulkAction}
-              onChange={(e) => setBulkAction(e.target.value)}
+              onChange={(e) => setBulkAction(e.target.value as typeof bulkAction)}
               disabled={isProcessing || reviews.length === 0}
               className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
             >

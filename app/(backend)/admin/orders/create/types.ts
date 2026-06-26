@@ -33,7 +33,7 @@ export interface CustomerType {
   name: string;
   email: string;
   phone: string | null;
-  addresses?: any[]; 
+  addresses?: AddressType[];
 }
 
 export interface OrderDataType {
@@ -42,52 +42,22 @@ export interface OrderDataType {
   customer: CustomerType | null;
   guestEmail: string;
   guestPhone: string;
-  
+
   billing: AddressType;
   shipping: AddressType;
-  
+
   items: CartItemType[];
   shippingCost: number;
   shippingMethod: string;
-  discountCode: string;
-  discountAmount: number;
-  taxRate: number;
-  taxName: string;
-  
-  customerNote: string;
-  adminNote: string;
-  customFields: CustomFieldType[];
-}
 
-export interface OrderTotalsType {
-  subtotal: number;
-  taxTotal: number;
-  finalTotal: number;
-}
-
-export interface OrderDataType {
-  createdAt: Date;
-  status: string;
-  customer: CustomerType | null;
-  guestEmail: string;
-  guestPhone: string;
-  
-  billing: AddressType;
-  shipping: AddressType;
-  
-  items: CartItemType[];
-  shippingCost: number;
-  shippingMethod: string;
-  
-  // Transdirect Tracking Variables
   selectedCourierCode: string;
   transdirectBookingId: string;
-  
+
   discountCode: string;
   discountAmount: number;
   taxRate: number;
   taxName: string;
-  
+
   customerNote: string;
   adminNote: string;
   customFields: CustomFieldType[];
@@ -97,4 +67,31 @@ export interface OrderTotalsType {
   subtotal: number;
   taxTotal: number;
   finalTotal: number;
+}
+
+export interface CreateOrderPayload {
+  customerId: string | null;
+  guestInfo: { name: string; email: string; phone: string } | null;
+  items: CartItemType[];
+  subtotal: number;
+  shippingCost: number;
+  shippingMethod: string;
+  selectedCourierCode: string | null;
+  discountCode: string | null;
+  discountAmount: number;
+  taxTotal: number;
+  total: number;
+  address: AddressType | null;
+  adminNote: string | null;
+  customerNote: string | null;
+  paymentMethod: string;
+  currency: string;
+  status: string;
+  paymentStatus: string;
+  isDraft: boolean;
+  giftCardCode?: string | null;
+  giftCardAmount?: number;
+  surcharge?: number;
+  pickupLocationId?: string | null;
+  estimatedTransitTime?: string | null;
 }

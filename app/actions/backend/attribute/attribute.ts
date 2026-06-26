@@ -82,15 +82,16 @@ export async function getAttributes(filter: "active" | "trash" = "active", query
       orderBy: { updatedAt: "desc" },
     });
 
+    const attributeIds = attributes.map(a => a.id);
     const usageCounts = await db.productAttribute.groupBy({
-      by: ["name"],
-      _count: { name: true },
-      where: { name: { in: attributes.map(a => a.name) } }
+      by: ["attributeId"],
+      _count: { attributeId: true },
+      where: { attributeId: { in: attributeIds } },
     });
 
     const attributesWithUsage: AttributeWithUsage[] = attributes.map(attr => {
-      const usage = usageCounts.find(u => u.name === attr.name);
-      return { ...attr, count: usage?._count.name || 0 };
+      const usage = usageCounts.find(u => u.attributeId === attr.id);
+      return { ...attr, count: usage?._count.attributeId ?? 0 };
     });
 
     return {

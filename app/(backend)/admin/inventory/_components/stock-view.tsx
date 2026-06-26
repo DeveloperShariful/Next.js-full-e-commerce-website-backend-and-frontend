@@ -82,7 +82,7 @@ export function StockView() {
 
       {/* 🚀 WP List Table */}
       <div className="bg-white border border-[#c3c4c7] shadow-sm">
-         <div className="overflow-x-auto min-h-[300px]">
+         <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[800px]">
                
                <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">

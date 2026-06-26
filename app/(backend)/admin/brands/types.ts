@@ -8,6 +8,7 @@ export interface BrandData {
   description: string | null;
   website: string | null;
   countryOfOrigin: string | null;
+  isFeatured: boolean;
   metaTitle: string | null;
   metaDesc: string | null;
   deletedAt: Date | null;

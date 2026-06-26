@@ -7,13 +7,16 @@ import { toast } from "sonner";
 // 🚀 FIXED: Added ReviewStatus import to fix the Type Error
 import { ReviewData, PaginationData, ReviewStatus } from "../types";
 
-import { 
-  getReviews, 
-  updateReviewStatus, 
-  deleteReview, 
-  restoreReview, 
+import {
+  getReviews,
+  updateReviewStatus,
+  deleteReview,
+  restoreReview,
   forceDeleteReview,
-  submitReply
+  submitReply,
+  bulkUpdateReviewStatus,
+  bulkRestoreReviews,
+  bulkForceDeleteReviews,
 } from "@/app/actions/backend/review/actions";
 
 import ReviewHeader from "./header";
@@ -120,36 +123,27 @@ export default function ReviewView() {
 
   // --- BULK ACTIONS ---
   const handleBulkAction = async (ids: string[], action: "approve" | "unapprove" | "spam" | "delete" | "restore" | "force_delete") => {
-    if (action === "force_delete" && !confirm(`You are about to permanently delete ${ids.length} items.`)) return false;
-    
-    const toastId = toast.loading(`Processing bulk ${action}...`);
-    let successCount = 0;
-    let errorCount = 0;
+    if (action === "force_delete" && !confirm(`You are about to permanently delete ${ids.length} items. This action cannot be undone.`)) return false;
 
-    for (const id of ids) {
-      try {
-        let res;
-        if (action === "delete") res = await deleteReview(id);
-        else if (action === "restore") res = await restoreReview(id);
-        else if (action === "force_delete") res = await forceDeleteReview(id);
-        else if (action === "approve") res = await updateReviewStatus(id, "APPROVED");
-        else if (action === "unapprove") res = await updateReviewStatus(id, "PENDING");
-        else if (action === "spam") res = await updateReviewStatus(id, "SPAM");
+    const toastId = toast.loading(`Processing...`);
 
-        if (res?.success) successCount++;
-        else errorCount++;
-      } catch (error) {
-        errorCount++;
-      }
-    }
+    let res: { success: boolean; message?: string; error?: string };
 
-    if (successCount > 0) {
-      toast.success(`${successCount} items processed successfully.`, { id: toastId });
+    if (action === "approve") res = await bulkUpdateReviewStatus(ids, "APPROVED");
+    else if (action === "unapprove") res = await bulkUpdateReviewStatus(ids, "PENDING");
+    else if (action === "spam") res = await bulkUpdateReviewStatus(ids, "SPAM");
+    else if (action === "delete") res = await bulkUpdateReviewStatus(ids, "TRASH");
+    else if (action === "restore") res = await bulkRestoreReviews(ids);
+    else res = await bulkForceDeleteReviews(ids);
+
+    if (res.success) {
+      toast.success(res.message ?? `${ids.length} items processed.`, { id: toastId });
       fetchData();
+    } else {
+      toast.error(res.error ?? "Operation failed.", { id: toastId });
     }
-    if (errorCount > 0) toast.error(`Failed to process ${errorCount} items.`);
 
-    return true; 
+    return res.success;
   };
 
   return (

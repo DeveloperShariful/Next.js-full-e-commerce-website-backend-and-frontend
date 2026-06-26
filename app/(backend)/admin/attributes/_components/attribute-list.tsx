@@ -1,11 +1,16 @@
-// app/admin/attributes/_components/attribute-list.tsx
+﻿// app/admin/attributes/_components/attribute-list.tsx
 
 "use client";
 
 import { useState } from "react";
 import { AttributeData } from "../types";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import AttributeRow from "./attribute-row";
+import { exportAttributesCsv } from "@/app/actions/backend/shared/csv-export";
+import { importAttributesCsv } from "@/app/actions/backend/shared/csv-import";
+import CsvImportButton from "@/app/(backend)/admin/_components/CsvImportButton";
+
+const ITEMS_PER_PAGE = 20;
 
 interface ListProps {
   attributes: AttributeData[];
@@ -18,19 +23,45 @@ interface ListProps {
   currentFilter: "active" | "trash";
   setCurrentFilter: (f: "active" | "trash") => void;
   counts: { active: number; trash: number; all: number };
+  onImportSuccess: () => void;
 }
 
-export function AttributeList({ 
-  attributes, loading, handleEdit, handleDelete, handleRestore, handleForceDelete, handleBulkAction, currentFilter, setCurrentFilter, counts 
+export function AttributeList({
+  attributes, loading, handleEdit, handleDelete, handleRestore, handleForceDelete, handleBulkAction, currentFilter, setCurrentFilter, counts, onImportSuccess
 }: ListProps) {
   
+  type BulkActionType = "delete" | "restore" | "force_delete";
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState<string>("");
+  const [bulkAction, setBulkAction] = useState<"" | BulkActionType>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    const res = await exportAttributesCsv();
+    if (res.success && res.csv) {
+      const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attributes-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setExporting(false);
+  };
 
   const allAttrIds = attributes.map(a => a.id);
   const totalItems = allAttrIds.length;
   const isAllSelected = totalItems > 0 && selectedIds.length === totalItems;
+
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const paginatedAttributes = attributes.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) setSelectedIds(allAttrIds);
@@ -46,7 +77,7 @@ export function AttributeList({
     if (bulkAction === "" || selectedIds.length === 0) return;
     
     setIsProcessing(true);
-    const finished = await handleBulkAction(selectedIds, bulkAction as any);
+    const finished = await handleBulkAction(selectedIds, bulkAction);
     if (finished) {
       setSelectedIds([]); 
       setBulkAction("");
@@ -61,7 +92,7 @@ export function AttributeList({
       <ul className="flex items-center gap-1 text-[13px] mb-3 text-[#646970]">
         <li>
           <button 
-            onClick={() => { setCurrentFilter("active"); setSelectedIds([]); }} 
+            onClick={() => { setCurrentFilter("active"); setSelectedIds([]); setCurrentPage(1); }}
             className={`${currentFilter === "active" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#0a4b78]"}`}
           >
             All <span className="text-[#646970] font-normal">({counts.all})</span>
@@ -72,7 +103,7 @@ export function AttributeList({
             <li className="text-[#c3c4c7]">|</li>
             <li>
               <button 
-                onClick={() => { setCurrentFilter("trash"); setSelectedIds([]); }} 
+                onClick={() => { setCurrentFilter("trash"); setSelectedIds([]); setCurrentPage(1); }}
                 className={`${currentFilter === "trash" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#0a4b78]"}`}
               >
                 Trash <span className="text-[#646970] font-normal">({counts.trash})</span>
@@ -82,12 +113,25 @@ export function AttributeList({
         )}
       </ul>
 
+      {/* CSV Import — only in active filter */}
+      {currentFilter === "active" && (
+        <div className="mb-3">
+          <CsvImportButton
+            label="Attributes"
+            templateColumns={["name", "slug", "type", "values"]}
+            templateExample={{ name: "Color", slug: "color", type: "COLOR", values: "Red | Blue | Green" }}
+            onImport={importAttributesCsv}
+            onSuccess={onImportSuccess}
+          />
+        </div>
+      )}
+
       {/* 🚀 WP Style Top Actions Bar */}
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-1">
           <select 
             value={bulkAction}
-            onChange={(e) => setBulkAction(e.target.value)}
+            onChange={(e) => setBulkAction(e.target.value as "" | BulkActionType)}
             disabled={isProcessing || attributes.length === 0}
             className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
           >
@@ -109,14 +153,22 @@ export function AttributeList({
             Apply
           </button>
         </div>
-        <div className="text-[13px] text-[#646970]">
-          {loading ? "Loading..." : `${totalItems} items`}
+        <div className="flex items-center gap-2 text-[13px] text-[#646970]">
+          <span>{loading ? "Loading..." : `${totalItems} items`}</span>
+          <button
+            onClick={handleExport}
+            disabled={exporting || totalItems === 0}
+            className="hidden sm:flex items-center gap-1 px-2 py-[3px] border border-[#c3c4c7] bg-[#f6f7f7] text-[#646970] hover:bg-[#f0f0f1] rounded-[3px] transition-colors disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+            Export
+          </button>
         </div>
       </div>
 
       {/* WP List Table */}
       <div className="bg-white border border-[#c3c4c7] shadow-sm">
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[600px]">
             
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
@@ -155,15 +207,15 @@ export function AttributeList({
                   </td>
                 </tr>
               ) : (
-                <AttributeRow 
-                  attributes={attributes} 
-                  handleEdit={handleEdit} 
-                  handleDelete={handleDelete} 
-                  handleRestore={handleRestore} 
-                  handleForceDelete={handleForceDelete} 
-                  selectedIds={selectedIds} 
-                  handleSelectOne={handleSelectOne} 
-                  currentFilter={currentFilter} 
+                <AttributeRow
+                  attributes={paginatedAttributes}
+                  handleEdit={handleEdit}
+                  handleDelete={handleDelete}
+                  handleRestore={handleRestore}
+                  handleForceDelete={handleForceDelete}
+                  selectedIds={selectedIds}
+                  handleSelectOne={handleSelectOne}
+                  currentFilter={currentFilter}
                 />
               )}
             </tbody>
@@ -190,8 +242,36 @@ export function AttributeList({
 
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2 border-t border-[#c3c4c7] bg-[#f6f7f7]">
+            <span className="text-[12px] text-[#646970]">
+              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="px-1.5 py-[3px] bg-white border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] disabled:opacity-40"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span className="text-[12px] text-[#646970] px-2">
+                {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-1.5 py-[3px] bg-white border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] disabled:opacity-40"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      
+
     </div>
   );
 }

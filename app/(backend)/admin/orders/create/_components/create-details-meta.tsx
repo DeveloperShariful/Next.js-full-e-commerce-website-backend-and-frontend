@@ -48,7 +48,7 @@ export const CreateDetailsMeta = ({ orderData, setOrderData }: CreateDetailsMeta
   const selectCustomer = (cust: CustomerType) => {
       setSearchQuery("");
       setSearchResults([]);
-      const addr = cust.addresses?.[0] || {};
+      const addr = (cust.addresses?.[0] ?? {}) as Partial<import("../types").AddressType>;
       
       setOrderData((prev) => ({
           ...prev,

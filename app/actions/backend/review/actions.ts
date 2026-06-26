@@ -60,9 +60,12 @@ async function getDbUserId(): Promise<string | null> {
   if (!session?.user?.email) return null;
   const dbUser = await db.user.findUnique({
     where: { email: session.user.email },
-    select: { id: true },
+    select: { id: true, role: true },
   });
-  return dbUser?.id ?? null;
+  if (!dbUser) return null;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "MANAGER", "EDITOR", "SUPPORT"] as const;
+  if (!(allowed as readonly string[]).includes(dbUser.role)) return null;
+  return dbUser.id;
 }
 
 async function recalculateProductRating(productId: string): Promise<void> {
@@ -529,6 +532,87 @@ export async function bulkUpdateReviewStatus(
   } catch (error) {
     console.error("BULK_UPDATE_REVIEW_STATUS_ERROR", error);
     return { success: false, error: "Failed to bulk update review status." };
+  }
+}
+
+// ==========================================
+// 6b. BULK RESTORE
+// ==========================================
+
+export async function bulkRestoreReviews(
+  ids: string[]
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+  if (!ids.length) return { success: false, error: "No reviews selected." };
+
+  try {
+    await db.review.updateMany({
+      where: { id: { in: ids }, status: ReviewStatus.TRASH },
+      data: { status: ReviewStatus.PENDING, deletedAt: null },
+    });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "REVIEW_BULK_RESTORED",
+        entityType: "Review",
+        entityId: ids[0],
+        details: { reviewIds: ids, totalCount: ids.length } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    revalidatePath("/admin/reviews");
+    return { success: true, message: `${ids.length} review(s) restored.` };
+  } catch (error) {
+    console.error("BULK_RESTORE_REVIEWS_ERROR", error);
+    return { success: false, error: "Failed to bulk restore reviews." };
+  }
+}
+
+// ==========================================
+// 6c. BULK FORCE DELETE (PERMANENT)
+// ==========================================
+
+export async function bulkForceDeleteReviews(
+  ids: string[]
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+  if (!ids.length) return { success: false, error: "No reviews selected." };
+
+  const reviews = await db.review.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, productId: true },
+  });
+
+  const affectedProductIds = [...new Set(reviews.map((r) => r.productId))];
+
+  try {
+    await db.review.deleteMany({ where: { id: { in: ids } } });
+
+    await Promise.all(affectedProductIds.map((pid) => recalculateProductRating(pid)));
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "REVIEW_BULK_FORCE_DELETED",
+        entityType: "Review",
+        entityId: ids[0],
+        details: {
+          reviewIds: ids,
+          totalCount: ids.length,
+          affectedProducts: affectedProductIds,
+          permanent: true,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    revalidatePath("/admin/reviews");
+    return { success: true, message: `${ids.length} review(s) permanently deleted.` };
+  } catch (error) {
+    console.error("BULK_FORCE_DELETE_REVIEWS_ERROR", error);
+    return { success: false, error: "Failed to permanently delete reviews." };
   }
 }
 

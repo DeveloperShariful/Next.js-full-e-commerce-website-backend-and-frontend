@@ -32,20 +32,23 @@ export default function BrandView() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getBrands(currentFilter);
+      const res = await getBrands(currentFilter, searchQuery);
       if (res.success) {
         setBrands(res.data);
-        setCounts(res.counts); 
+        setCounts(res.counts);
       }
     } catch (error) {
       toast.error("Failed to load brands");
     } finally {
       setLoading(false);
     }
-  }, [currentFilter]); 
+  }, [currentFilter, searchQuery]);
 
   useEffect(() => {
-    fetchData();
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [fetchData]);
 
   const handleEdit = (brand: BrandData) => {

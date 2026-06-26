@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TagData } from "../types";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -27,8 +27,10 @@ export default function TagForm({ initialData, onSuccess, isEditing }: FormProps
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const slugManuallyEdited = useRef(!!initialData.slug);
 
   useEffect(() => {
+    slugManuallyEdited.current = !!initialData.slug;
     setFormData({
       id: initialData.id || "",
       name: initialData.name || "",
@@ -39,6 +41,25 @@ export default function TagForm({ initialData, onSuccess, isEditing }: FormProps
       metaDesc: initialData.metaDesc || "",
     });
   }, [initialData]);
+
+  const toSlug = (value: string) =>
+    value.toLowerCase().trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+  const handleNameChange = (value: string) => {
+    if (!slugManuallyEdited.current) {
+      setFormData(prev => ({ ...prev, name: value, slug: toSlug(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, name: value }));
+    }
+  };
+
+  const handleSlugChange = (value: string) => {
+    slugManuallyEdited.current = value.length > 0;
+    setFormData(prev => ({ ...prev, slug: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,25 +111,30 @@ export default function TagForm({ initialData, onSuccess, isEditing }: FormProps
         {/* Basic Fields */}
         <div>
           <label className="block text-[14px] text-[#2c3338] mb-1">Name</label>
-          <input 
-            type="text" 
-            required 
-            value={formData.name} 
-            onChange={(e) => setFormData({...formData, name: e.target.value})} 
-            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          <input
+            type="text"
+            required
+            value={formData.name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow"
           />
           <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">The name is how it appears on your site.</p>
         </div>
 
         <div>
           <label className="block text-[14px] text-[#2c3338] mb-1">Slug</label>
-          <input 
-            type="text" 
-            value={formData.slug} 
-            onChange={(e) => setFormData({...formData, slug: e.target.value})} 
-            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow" 
+          <input
+            type="text"
+            value={formData.slug}
+            onChange={(e) => handleSlugChange(e.target.value)}
+            className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[14px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-shadow"
           />
-          <p className="text-[13px] text-[#646970] mt-1.5 leading-relaxed">The "slug" is the URL-friendly version of the name. It is usually all lowercase and contains only letters, numbers, and hyphens.</p>
+          {formData.slug && (
+            <p className="text-[12px] text-[#646970] mt-1 font-mono truncate">
+              /tags/<span className="text-[#2271b1]">{formData.slug}</span>
+            </p>
+          )}
+          <p className="text-[13px] text-[#646970] mt-1 leading-relaxed">Auto-generated from name. Edit manually to override.</p>
         </div>
 
         <div>

@@ -121,18 +121,18 @@ export default async function CreateProductPage(props: PageProps) {
         if (Array.isArray(product.metafields)) {
             parsedMetafields = product.metafields as { key: string; value: string }[];
         } else {
-            const rawMeta = product.metafields as Record<string, any>;
+            const rawMeta = product.metafields as Record<string, unknown>;
             
             // ১. গুগলের জন্য বরাদ্দকৃত ভ্যালুগুলো অবজেক্ট থেকে বের করে নেওয়া হচ্ছে
-            google_size = rawMeta.google_size || "";
-            google_size_system = rawMeta.google_size_system || "";
-            google_size_type = rawMeta.google_size_type || "";
-            google_color = rawMeta.google_color || "";
-            google_material = rawMeta.google_material || "";
-            google_pattern = rawMeta.google_pattern || "";
-            google_multipack = rawMeta.google_multipack || "";
+            google_size = String(rawMeta.google_size ?? "");
+            google_size_system = String(rawMeta.google_size_system ?? "");
+            google_size_type = String(rawMeta.google_size_type ?? "");
+            google_color = String(rawMeta.google_color ?? "");
+            google_material = String(rawMeta.google_material ?? "");
+            google_pattern = String(rawMeta.google_pattern ?? "");
+            google_multipack = String(rawMeta.google_multipack ?? "");
             google_adult_content = rawMeta.google_adult_content === true;
-            google_availability_date = rawMeta.google_availability_date || "";
+            google_availability_date = String(rawMeta.google_availability_date ?? "");
 
             // ২. গুগলের কাস্টম কীগুলো বাদ দিয়ে বাকি শুধু আসল মেটাফিল্ডসগুলো টেবিলে পাঠানো হচ্ছে
             Object.entries(rawMeta).forEach(([key, value]) => {

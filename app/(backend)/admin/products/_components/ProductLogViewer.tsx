@@ -2,15 +2,15 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { History, X, RefreshCw, User, Loader2, Trash2, Filter, Package, ArrowRight } from "lucide-react";
-import { getProductActivityLogs, deleteActivityLogs } from "@/app/actions/backend/product/product-logs"; 
+import { getProductActivityLogs, deleteActivityLogs, ActivityLogEntry } from "@/app/actions/backend/product/product-logs";
 import { toast } from "sonner";
 
 export default function ProductLogViewer() {
   const [isOpen, setIsOpen] = useState(false);
   
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -73,7 +73,7 @@ export default function ProductLogViewer() {
     }
   };
 
-  const formatValue = (val: any) => {
+  const formatValue = (val: unknown) => {
     if (val === 0) return "0"; 
     if (val === false) return "False";
     if (val === true) return "True";
@@ -83,37 +83,38 @@ export default function ProductLogViewer() {
   };
 
   // 🔥 Visual Diff Render Logic (Advanced Feature)
-  const renderDetails = (details: any) => {
+  const renderDetails = (details: Record<string, unknown> | null): ReactNode => {
     if (!details || typeof details !== 'object') return null;
-    
-    const { productName, ...rest } = details;
-    
+
+    const { productName: _productName, ...rest } = details;
+
     const entries = Object.entries(rest);
     if (entries.length === 0) return null;
 
     return (
         <div className="bg-[#f0f0f1] p-3 rounded-[3px] border border-[#e2e4e7] mt-3 space-y-3 shadow-inner">
-            {entries.map(([key, value]: [string, any]) => {
+            {entries.map(([key, value]: [string, unknown]) => {
                 const isDiff = value && typeof value === 'object' && ('old' in value || 'new' in value);
 
                 if (isDiff) {
+                    const diffValue = value as Record<string, unknown>;
                     return (
                         <div key={key} className="flex flex-col border-b border-[#c3c4c7] last:border-0 pb-2 last:pb-0">
                             <span className="font-semibold capitalize text-[#1d2327] mb-1.5 text-[12px]">
                                 {key.replace(/([A-Z])/g, ' $1').trim()}
                             </span>
-                            
+
                             <div className="flex items-center gap-2 text-[12px]">
                                 {/* OLD Value */}
                                 <div className="flex-1 bg-[#fef2f2] border border-[#fecaca] p-1.5 rounded-[2px] text-[#991b1b] line-through decoration-red-400/50 break-all opacity-80 shadow-sm">
-                                    {formatValue(value.old)}
+                                    {formatValue(diffValue.old)}
                                 </div>
-                                
+
                                 <ArrowRight size={14} className="text-[#8c8f94] shrink-0"/>
-                                
+
                                 {/* NEW Value */}
                                 <div className="flex-1 bg-[#f0fdf4] border border-[#bbf7d0] p-1.5 rounded-[2px] text-[#166534] font-medium break-all shadow-sm">
-                                    {formatValue(value.new)}
+                                    {formatValue(diffValue.new)}
                                 </div>
                             </div>
                         </div>
@@ -220,9 +221,11 @@ export default function ProductLogViewer() {
                 </div>
               )}
 
-              {logs.map((log) => (
-                <div 
-                    key={log.id} 
+              {logs.map((log) => {
+                const logDetails = log.details as Record<string, unknown> | null;
+                return (
+                <div
+                    key={log.id}
                     className={`bg-white p-3 rounded-[3px] border shadow-sm text-[13px] transition-all ${selectedIds.includes(log.id) ? 'border-[#2271b1] bg-[#f0f6fc]' : 'border-[#c3c4c7] hover:border-[#8c8f94]'}`}
                 >
                     <div className="flex gap-3">
@@ -258,7 +261,6 @@ export default function ProductLogViewer() {
                                 </div>
                             </div>
 
-                            {/* Badge */}
                             <div className="mb-2 font-semibold text-[11px]">
                                 {log.action === "CREATED_PRODUCT" && <span className="text-[#008a20] bg-[#f0fdf4] px-1.5 py-0.5 rounded-[2px] border border-[#bbf7d0]">Created product</span>}
                                 {log.action === "UPDATED_PRODUCT" && <span className="text-[#2271b1] bg-[#f0f6fc] px-1.5 py-0.5 rounded-[2px] border border-[#c5d9ed]">Updated product</span>}
@@ -270,19 +272,20 @@ export default function ProductLogViewer() {
                             </div>
 
                             {/* Product Name */}
-                            {log.details?.productName && (
+                            {!!logDetails?.productName && (
                                 <div className="mb-2 flex items-center gap-1.5 text-[12px] text-[#50575e]">
                                     <Package size={12} className="text-[#8c8f94]"/>
-                                    <span className="font-semibold text-[#1d2327]">{log.details.productName}</span>
+                                    <span className="font-semibold text-[#1d2327]">{String(logDetails.productName)}</span>
                                 </div>
                             )}
 
-                            {renderDetails(log.details)}
-                            
+                            {renderDetails(logDetails)}
+
                         </div>
                     </div>
                 </div>
-              ))}
+                );
+              })}
 
               {hasMore && (
                   <button 

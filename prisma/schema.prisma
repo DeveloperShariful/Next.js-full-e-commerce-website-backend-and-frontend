@@ -575,6 +575,7 @@ model Brand {
   description       String?            @db.Text
   website           String?
   countryOfOrigin   String?
+  isFeatured        Boolean            @default(false)
   products          Product[]
   productAttributes ProductAttribute[]
   metaTitle         String?
@@ -585,6 +586,7 @@ model Brand {
   updatedAt         DateTime           @updatedAt
 
   @@index([name])
+  @@index([isFeatured])
   @@index([deletedAt])
 }
 

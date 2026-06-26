@@ -6,6 +6,10 @@ import { db } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 
+export type ActivityLogEntry = Prisma.ActivityLogGetPayload<{
+  include: { user: { select: { name: true; email: true; image: true } } };
+}>;
+
 async function getAuthUser() {
   const session = await auth();
   if (!session?.user?.email) return null;

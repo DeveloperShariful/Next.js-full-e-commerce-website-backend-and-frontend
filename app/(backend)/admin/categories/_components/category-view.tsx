@@ -11,6 +11,7 @@ import {
   deleteCategory,
   restoreCategory,
   forceDeleteCategory,
+  updateCategoryOrder,
 } from "@/app/actions/backend/product/product-category";
 
 import CategoryHeader from "./header";
@@ -151,10 +152,19 @@ export default function CategoryView() {
     return true; 
   };
 
+  const handleReorder = async (items: { id: string; menuOrder: number }[]) => {
+    const res = await updateCategoryOrder(items);
+    if (res.success) {
+      fetchData();
+    } else {
+      toast.error("Failed to save order.");
+    }
+  };
+
   const resetForm = () => {
     setEditingCat(null);
     setViewMode("list");
-    fetchData(); 
+    fetchData();
   };
 
   return (
@@ -207,18 +217,19 @@ export default function CategoryView() {
 
             {/* Right Column (Category List) */}
             <div className={`flex-1 w-full overflow-hidden ${viewMode === "form" ? "hidden lg:block" : "block"}`}>
-              <CategoryList 
-                categories={categories} 
-                loading={loading} 
-                handleEdit={handleEdit} 
+              <CategoryList
+                categories={categories}
+                loading={loading}
+                handleEdit={handleEdit}
                 handleDelete={handleDelete}
-                handleRestore={handleRestore} // 🚀 Passed down
-                handleForceDelete={handleForceDelete} // 🚀 Passed down
-                handleBulkAction={handleBulkAction} // 🚀 Unified bulk action
+                handleRestore={handleRestore}
+                handleForceDelete={handleForceDelete}
+                handleBulkAction={handleBulkAction}
+                handleReorder={handleReorder}
                 searchQuery={searchQuery}
-                currentFilter={currentFilter} // 🚀 Current Tab
+                currentFilter={currentFilter}
                 setCurrentFilter={setCurrentFilter}
-                counts={counts} // 🚀 Counts for the UI
+                counts={counts}
               />
             </div>
 

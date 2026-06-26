@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Role } from "@prisma/client";
 import { sidebarConfig } from "./menu-config";
 import { SidebarItem } from "./sidebar-item";
 
@@ -34,7 +35,7 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
   const filteredMenu = sidebarConfig.map(group => ({
     ...group,
     items: group.items.filter(item =>
-      !item.roles || (user.role && item.roles.includes(user.role as any))
+      !item.roles || (user.role && item.roles.includes(user.role as Role))
     )
   })).filter(group => group.items.length > 0);
 

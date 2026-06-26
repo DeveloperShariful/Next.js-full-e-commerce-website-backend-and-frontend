@@ -185,17 +185,18 @@ export default function AttributeView() {
 
             {/* Right Column (Attribute List) */}
             <div className={`flex-1 w-full overflow-hidden ${viewMode === "form" ? "hidden lg:block" : "block"}`}>
-              <AttributeList 
-                attributes={attributes} 
-                loading={loading} 
-                handleEdit={handleEdit} 
+              <AttributeList
+                attributes={attributes}
+                loading={loading}
+                handleEdit={handleEdit}
                 handleDelete={handleDelete}
-                handleRestore={handleRestore} 
-                handleForceDelete={handleForceDelete} 
-                handleBulkAction={handleBulkAction} 
-                currentFilter={currentFilter} 
+                handleRestore={handleRestore}
+                handleForceDelete={handleForceDelete}
+                handleBulkAction={handleBulkAction}
+                currentFilter={currentFilter}
                 setCurrentFilter={setCurrentFilter}
-                counts={counts} 
+                counts={counts}
+                onImportSuccess={fetchData}
               />
             </div>
 

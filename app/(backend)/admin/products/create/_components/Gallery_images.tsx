@@ -9,6 +9,8 @@ import { ProductFormData } from "../types";
 import MediaPickerModal, { PickedMedia } from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { MediaSource } from "@prisma/client";
 
+type GalleryImageItem = string | { url: string; mediaId?: string | null; altText?: string; id?: string };
+
 export default function GalleryImages() {
     const { watch, setValue } = useFormContext<ProductFormData>();
     const galleryImages = watch("galleryImages") || [];
@@ -25,8 +27,8 @@ export default function GalleryImages() {
             id: undefined,
         }));
         
-        const existingUrls = galleryImages.map((img: any) => typeof img === 'string' ? img : img.url);
-        const uniqueImages = newImages.filter((img: any) => !existingUrls.includes(img.url));
+        const existingUrls = galleryImages.map((img: GalleryImageItem) => typeof img === 'string' ? img : img.url);
+        const uniqueImages = newImages.filter(img => !existingUrls.includes(img.url));
         
         setValue("galleryImages", [...galleryImages, ...uniqueImages], { shouldDirty: true, shouldValidate: true });
         setOpen(false);
@@ -96,7 +98,7 @@ export default function GalleryImages() {
                     {galleryImages.length > 0 && (
                         // 🚀 FIXED: grid-cols-4 for mobile ensures small square images just like desktop
                         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-4 xl:grid-cols-4 gap-2 mb-3">
-                            {galleryImages.map((img: any, index: number) => {
+                            {galleryImages.map((img: GalleryImageItem, index: number) => {
                                 const url = typeof img === 'string' ? img : img.url;
                                 const alt = typeof img === 'object' ? img.altText : "";
 

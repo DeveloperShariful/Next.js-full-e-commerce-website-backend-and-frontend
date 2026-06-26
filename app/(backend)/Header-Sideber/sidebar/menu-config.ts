@@ -7,7 +7,8 @@ import {
   Undo2, Megaphone, Truck, MedalIcon, MessageCircle,
   Handshake, Link, Network, UserPlus, Facebook, Wallet, RefreshCw, Heart,
   BadgeDollarSign, LayoutGrid, Award, SlidersHorizontal, Tag, Star, Boxes,
-  Code2, Search, Plug
+  Code2, Search, Plug,
+  type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
 
@@ -15,9 +16,9 @@ import { Role } from "@prisma/client";
 export interface SidebarItem {
   name: string;
   href: string;
-  icon?: any;
+  icon?: LucideIcon;
   roles?: Role[];
-  submenu?: { name: string; href: string; icon?: any ; roles?: Role[];}[]; 
+  submenu?: { name: string; href: string; icon?: LucideIcon; roles?: Role[] }[];
 }
 
 export interface SidebarGroup {

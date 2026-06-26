@@ -5,7 +5,8 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import Stripe from "stripe";
-import { decrypt } from "@/app/actions/backend/settings/payments/crypto"; // ✅ Add this import for decryption
+import { decrypt } from "@/app/actions/backend/settings/payments/crypto";
+import { restockInventory } from "./order-utils";
 
 export async function processRefund(formData: FormData) {
   try {
@@ -21,6 +22,12 @@ export async function processRefund(formData: FormData) {
     });
 
     if (!order) return { success: false, error: "Order not found" };
+
+    // Guard: শুধু paid/partially-refunded order রিফান্ড করা যাবে
+    const refundableStatuses = ["PAID", "PARTIALLY_REFUNDED", "PARTIALLY_PAID"];
+    if (!refundableStatuses.includes(order.paymentStatus)) {
+      return { success: false, error: "Only paid orders can be refunded." };
+    }
 
     // ভ্যালিডেশন: অর্ডারের টোটালের বেশি রিফান্ড করা যাবে না
     const currentRefunded = order.refundedAmount ? Number(order.refundedAmount) : 0;
@@ -53,7 +60,7 @@ export async function processRefund(formData: FormData) {
             return { success: false, error: "Failed to decrypt Stripe API key." };
         }
 
-        const stripe = new Stripe(secretKey, { apiVersion: '2025-01-27.acacia' as any });
+        const stripe = new Stripe(secretKey, { apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion });
 
         try {
             // Stripe API Call
@@ -68,9 +75,10 @@ export async function processRefund(formData: FormData) {
             gatewayRefundId = refund.id;
             transactionStatus = "SUCCESS";
 
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Stripe refund failed";
             console.error("Stripe Error:", err);
-            return { success: false, error: err.message };
+            return { success: false, error: msg };
         }
     }
 
@@ -134,9 +142,10 @@ export async function processRefund(formData: FormData) {
             gatewayRefundId = refundData.id;
             transactionStatus = "SUCCESS";
 
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "PayPal refund failed";
             console.error("PayPal Error:", err);
-            return { success: false, error: err.message };
+            return { success: false, error: msg };
         }
     }
     
@@ -189,6 +198,11 @@ export async function processRefund(formData: FormData) {
                     status: newPaymentStatus === "REFUNDED" ? "REFUNDED" : order.status
                 }
             });
+
+            // D. Restock inventory on full refund
+            if (newPaymentStatus === "REFUNDED") {
+                await restockInventory(order.id);
+            }
 
             // D. Add Order Note
             await tx.orderNote.create({

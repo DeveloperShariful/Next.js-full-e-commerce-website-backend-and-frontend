@@ -81,7 +81,6 @@ export default function CreateOrderPage() {
 
     setLoading(true);
 
-    // ✅ FIXED: Clean Payload mapping for the backend action
     const payload = {
         customerId: orderData.customer?.id || null,
         guestInfo: !orderData.customer?.id ? {
@@ -89,20 +88,21 @@ export default function CreateOrderPage() {
             email: orderData.guestEmail,
             phone: orderData.guestPhone
         } : null,
-        
+
         items: orderData.items,
+        subtotal: totals.subtotal,
         shippingCost: Number(orderData.shippingCost),
         shippingMethod: orderData.shippingMethod || "Standard Shipping",
-        selectedCourierCode: orderData.selectedCourierCode || null,        
+        selectedCourierCode: orderData.selectedCourierCode || null,
         discountCode: orderData.discountCode || null,
-        discountAmount: Number(orderData.discountAmount),        
+        discountAmount: Number(orderData.discountAmount),
         taxTotal: totals.taxTotal,
         total: totals.finalTotal,
-        address: orderData.shipping.address1 ? orderData.shipping : orderData.billing,       
+        address: orderData.shipping.address1 ? orderData.shipping : orderData.billing,
         adminNote: orderData.adminNote || null,
         customerNote: orderData.customerNote || null,
         paymentMethod: "Manual",
-        currency: currency,        
+        currency: currency,
         status: isDraft ? "DRAFT" : orderData.status,
         paymentStatus: isDraft ? "UNPAID" : (totals.finalTotal === 0 ? "PAID" : "UNPAID"),
         isDraft

@@ -10,9 +10,48 @@ import { toast } from "sonner";
 import { Eye, Check, Loader2, Trash2, RefreshCcw, AlertTriangle, Truck } from "lucide-react";
 import { bulkUpdateOrderStatus, deleteOrder, restoreOrder } from "@/app/actions/backend/order/bulk-update";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+import type { OrderStatus } from "@prisma/client";
+
+interface OrderAddress {
+  firstName?: string;
+  lastName?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+}
+
+interface SerializedOrder {
+  id: string;
+  orderNumber: string;
+  createdAt: string | Date;
+  status: string;
+  paymentStatus: string;
+  fulfillmentStatus: string;
+  paymentGateway: string | null;
+  paymentMethod: string | null;
+  shippingMethod: string | null;
+  shippingTrackingNumber: string | null;
+  shippingTrackingUrl: string | null;
+  transdirectBookingId: string | null;
+  billingAddress: OrderAddress | null;
+  shippingAddress: OrderAddress | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  referringSite: string | null;
+  total: number;
+  refundedAmount: number;
+  deletedAt: string | Date | null;
+  user: { name: string | null; email: string | null } | null;
+  affiliate: { user: { name: string | null } } | null;
+  _count: { items: number };
+}
 
 interface OrderListTableProps {
-  orders: any[];
+  orders: SerializedOrder[];
   isTrashView?: boolean;
 }
 
@@ -59,21 +98,33 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
       });
     } else if (bulkAction === "print") {
       if (selectedOrders.length > 50) return toast.error("Max 50 invoices at once.");
-      window.open(`/admin/orders/print-batch?ids=${selectedOrders.join(",")}`, '_blank');
+      window.open(`/admin/orders/print-batch?ids=${selectedOrders.join(",")}`, "_blank");
       setBulkAction("");
+    } else if (bulkAction === "restore") {
+      startTransition(async () => {
+        try {
+          await Promise.all(selectedOrders.map(id => restoreOrder(id)));
+          toast.success("Orders restored");
+          setSelectedOrders([]);
+          setBulkAction("");
+          router.refresh();
+        } catch {
+          toast.error("Bulk restore failed");
+        }
+      });
     } else {
       startTransition(async () => {
-          try {
-              const res = await bulkUpdateOrderStatus(selectedOrders, bulkAction as any);
-              if (res.success) {
-                  toast.success(res.message);
-                  setSelectedOrders([]);
-                  setBulkAction("");
-                  router.refresh();
-              } else toast.error(res.error);
-          } catch (error) {
-              toast.error("Something went wrong");
-          }
+        try {
+          const res = await bulkUpdateOrderStatus(selectedOrders, bulkAction as OrderStatus);
+          if (res.success) {
+            toast.success(res.message);
+            setSelectedOrders([]);
+            setBulkAction("");
+            router.refresh();
+          } else toast.error(res.error);
+        } catch {
+          toast.error("Something went wrong");
+        }
       });
     }
   };
@@ -113,7 +164,7 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
     }
   };
 
-  const formatAddress = (addr: any) => {
+  const formatAddress = (addr: OrderAddress | null | undefined) => {
       if (!addr) return null;
       const name = `${addr.firstName || ''} ${addr.lastName || ''}`.trim();
       const lines = [

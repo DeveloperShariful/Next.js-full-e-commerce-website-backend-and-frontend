@@ -110,7 +110,16 @@ export default function BrandRow({
             <td className="p-2 text-[13px] text-[#50575e] align-top pt-[10px]">
               {brand.countryOfOrigin || "—"}
             </td>
-            
+
+            {/* Featured */}
+            <td className="p-2 text-center align-top pt-[10px]">
+              {brand.isFeatured ? (
+                <span className="inline-block px-1.5 py-0.5 bg-[#fff3cd] border border-[#f0c040] text-[#856404] rounded-[3px] text-[11px] font-medium">Yes</span>
+              ) : (
+                <span className="text-[#c3c4c7] text-[12px]">—</span>
+              )}
+            </td>
+
             {/* Count */}
             <td className="p-2 text-center align-top pt-[10px]">
               <span className={`text-[#2271b1] font-medium ${currentFilter === "active" ? "hover:text-[#0a4b78] cursor-pointer" : ""}`}>

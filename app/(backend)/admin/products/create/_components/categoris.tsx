@@ -5,17 +5,8 @@
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { ChevronUp, ChevronDown } from "lucide-react";
-import { getCategoryTree } from "@/app/actions/backend/product/product-category";
+import { getCategoryTree, CategoryNode } from "@/app/actions/backend/product/product-category";
 import { ProductFormData } from "../types";
-
-// ক্যাটাগরি ট্রি রেন্ডার করার জন্য টাইপ ডিফাইন
-type CategoryNode = {
-    id: string;
-    name: string;
-    slug: string;
-    parentId: string | null;
-    children?: CategoryNode[];
-};
 
 export default function Categories() {
     const { watch, setValue } = useFormContext<ProductFormData>();
@@ -29,8 +20,8 @@ export default function Categories() {
 
     useEffect(() => {
         // Fetch categories and build tree
-        getCategoryTree().then((res: any[]) => {
-            if(res && res.length > 0) {
+        getCategoryTree().then((res) => {
+            if (res && res.length > 0) {
                 const tree = buildCategoryTree(res);
                 setDbCategories(tree);
             }
@@ -38,7 +29,7 @@ export default function Categories() {
     }, []);
 
     // 🌳 Helper: Build Tree Structure from flat array
-    const buildCategoryTree = (categories: any[]): CategoryNode[] => {
+    const buildCategoryTree = (categories: CategoryNode[]): CategoryNode[] => {
         const categoryMap = new Map<string, CategoryNode>();
         const tree: CategoryNode[] = [];
 

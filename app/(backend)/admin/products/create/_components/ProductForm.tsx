@@ -50,7 +50,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const [origin, setOrigin] = useState("");
 
   const methods = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema) as unknown as Resolver<ProductFormValues>,
+    resolver: zodResolver(productSchema) as Resolver<ProductFormValues>,
     defaultValues: initialData,
     mode: "onChange",
   });

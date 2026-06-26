@@ -8,6 +8,7 @@ import { MediaSource } from "@prisma/client";
 import { CategoryData } from "../types";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import SeoPreview from "@/app/(backend)/admin/_components/SeoPreview";
 
 import { createCategory, updateCategory } from "@/app/actions/backend/product/product-category";
 
@@ -201,11 +202,17 @@ export default function CategoryForm({ initialData, categories, onSuccess, isEdi
               
               <div>
                 <label className="block text-[13px] text-[#2c3338] mb-1">Meta Description</label>
-                <textarea 
-                  rows={2} 
-                  value={formData.metaDesc} 
-                  onChange={(e) => setFormData({...formData, metaDesc: e.target.value})} 
-                  className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none resize-none" 
+                <textarea
+                  rows={2}
+                  value={formData.metaDesc}
+                  onChange={(e) => setFormData({...formData, metaDesc: e.target.value})}
+                  className="w-full px-2 py-[5px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none resize-none"
+                />
+                <SeoPreview
+                  title={formData.metaTitle || formData.name}
+                  description={formData.metaDesc}
+                  slug={formData.slug}
+                  baseUrl="https://yourstore.com/categories"
                 />
               </div>
 

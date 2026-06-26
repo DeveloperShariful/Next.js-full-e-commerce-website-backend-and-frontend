@@ -1,4 +1,4 @@
-// File: app/(backend)/admin/affiliate/_components/log-viewer.tsx
+﻿// File: app/(backend)/admin/affiliate/_components/log-viewer.tsx
 
 "use client";
 
@@ -839,7 +839,7 @@ export default function LogViewer({
           </button>
         </div>
 
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className="overflow-x-auto">
           <table className="w-full text-left whitespace-nowrap">
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7]">
               <tr>
@@ -1048,7 +1048,7 @@ export default function LogViewer({
           </button>
         </div>
 
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className="overflow-x-auto">
           <table className="w-full text-left whitespace-nowrap">
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7]">
               <tr>

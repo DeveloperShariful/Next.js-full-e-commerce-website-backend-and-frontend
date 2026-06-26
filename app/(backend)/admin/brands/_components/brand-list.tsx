@@ -1,11 +1,13 @@
-//app/(backend)/admin/brands/_components/brand-list.tsx
+﻿//app/(backend)/admin/brands/_components/brand-list.tsx
 
 "use client";
 
 import { useState } from "react";
 import { BrandData } from "../types";
 import BrandRow from "./brand-row";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+
+const ITEMS_PER_PAGE = 20;
 
 interface ListProps {
   brands: BrandData[];
@@ -25,13 +27,22 @@ export default function BrandList({
   brands, loading, handleEdit, handleDelete, handleRestore, handleForceDelete, handleBulkAction, searchQuery, currentFilter, setCurrentFilter, counts 
 }: ListProps) {
   
+  type BulkActionType = "delete" | "restore" | "force_delete";
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState<string>("");
+  const [bulkAction, setBulkAction] = useState<"" | BulkActionType>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const allBrandIds = brands.map(b => b.id);
   const totalItems = allBrandIds.length;
   const isAllSelected = totalItems > 0 && selectedIds.length === totalItems;
+
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const paginatedBrands = brands.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) setSelectedIds(allBrandIds);
@@ -47,7 +58,7 @@ export default function BrandList({
     if (bulkAction === "" || selectedIds.length === 0) return;
     
     setIsProcessing(true);
-    const finished = await handleBulkAction(selectedIds, bulkAction as any);
+    const finished = await handleBulkAction(selectedIds, bulkAction);
     if (finished) {
       setSelectedIds([]); 
       setBulkAction("");
@@ -62,7 +73,7 @@ export default function BrandList({
       <ul className="flex items-center gap-1 text-[13px] mb-3 text-[#646970]">
         <li>
           <button 
-            onClick={() => { setCurrentFilter("active"); setSelectedIds([]); }} 
+            onClick={() => { setCurrentFilter("active"); setSelectedIds([]); setCurrentPage(1); }}
             className={`${currentFilter === "active" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#0a4b78]"}`}
           >
             All <span className="text-[#646970] font-normal">({counts.all})</span>
@@ -73,7 +84,7 @@ export default function BrandList({
             <li className="text-[#c3c4c7]">|</li>
             <li>
               <button 
-                onClick={() => { setCurrentFilter("trash"); setSelectedIds([]); }} 
+                onClick={() => { setCurrentFilter("trash"); setSelectedIds([]); setCurrentPage(1); }}
                 className={`${currentFilter === "trash" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#0a4b78]"}`}
               >
                 Trash <span className="text-[#646970] font-normal">({counts.trash})</span>
@@ -88,7 +99,7 @@ export default function BrandList({
         <div className="flex items-center gap-1">
           <select 
             value={bulkAction}
-            onChange={(e) => setBulkAction(e.target.value)}
+            onChange={(e) => setBulkAction(e.target.value as typeof bulkAction)}
             disabled={isProcessing || brands.length === 0}
             className="px-2 py-[3px] bg-white border border-[#8c8f94] rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
           >
@@ -117,7 +128,7 @@ export default function BrandList({
 
       {/* WP List Table */}
       <div className="bg-white border border-[#c3c4c7] shadow-sm">
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[600px]">
             
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
@@ -136,6 +147,7 @@ export default function BrandList({
                 <th className="p-2 w-48">Description</th>
                 <th className="p-2 w-32">Website</th>
                 <th className="p-2 w-24">Country</th>
+                <th className="p-2 w-20 text-center">Featured</th>
                 <th className="p-2 w-16 text-center">Count</th>
               </tr>
             </thead>
@@ -143,7 +155,7 @@ export default function BrandList({
             <tbody className="divide-y divide-[#f0f0f1]">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-[#50575e]">
+                  <td colSpan={8} className="p-10 text-center text-[#50575e]">
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="animate-spin text-[#2271b1]" size={20}/>
                       <span>Loading brands...</span>
@@ -152,21 +164,21 @@ export default function BrandList({
                 </tr>
               ) : brands.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-[#50575e] italic">
+                  <td colSpan={8} className="p-8 text-center text-[#50575e] italic">
                     No brands found.
                   </td>
                 </tr>
               ) : (
-                <BrandRow 
-                  brands={brands} 
-                  handleEdit={handleEdit} 
-                  handleDelete={handleDelete} 
-                  handleRestore={handleRestore} 
-                  handleForceDelete={handleForceDelete} 
+                <BrandRow
+                  brands={paginatedBrands}
+                  handleEdit={handleEdit}
+                  handleDelete={handleDelete}
+                  handleRestore={handleRestore}
+                  handleForceDelete={handleForceDelete}
                   searchQuery={searchQuery}
-                  selectedIds={selectedIds} 
-                  handleSelectOne={handleSelectOne} 
-                  currentFilter={currentFilter} 
+                  selectedIds={selectedIds}
+                  handleSelectOne={handleSelectOne}
+                  currentFilter={currentFilter}
                 />
               )}
             </tbody>
@@ -188,14 +200,43 @@ export default function BrandList({
                 <th className="p-2">Description</th>
                 <th className="p-2">Website</th>
                 <th className="p-2">Country</th>
+                <th className="p-2 text-center">Featured</th>
                 <th className="p-2 text-center">Count</th>
               </tr>
             </tfoot>
 
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-3 py-2 border-t border-[#c3c4c7] bg-[#f6f7f7]">
+            <span className="text-[12px] text-[#646970]">
+              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="px-1.5 py-[3px] bg-white border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] disabled:opacity-40"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span className="text-[12px] text-[#646970] px-2">
+                {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-1.5 py-[3px] bg-white border border-[#c3c4c7] rounded-[3px] text-[#8c8f94] hover:text-[#2271b1] disabled:opacity-40"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      
+
     </div>
   );
 }

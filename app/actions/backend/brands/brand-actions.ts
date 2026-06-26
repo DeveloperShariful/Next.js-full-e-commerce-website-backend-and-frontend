@@ -26,6 +26,7 @@ const brandSchema = z.object({
   website: z.string().url("Invalid website URL").optional().nullable().or(z.literal("")),
   countryOfOrigin: z.string().optional().nullable(),
   logo: z.string().optional().nullable(),
+  isFeatured: z.coerce.boolean().default(false),
   metaTitle: z.string().optional().nullable(),
   metaDesc: z.string().optional().nullable(),
 });
@@ -41,9 +42,12 @@ async function getDbUserId(): Promise<string | null> {
   if (!session?.user?.email) return null;
   const dbUser = await db.user.findUnique({
     where: { email: session.user.email },
-    select: { id: true },
+    select: { id: true, role: true },
   });
-  return dbUser?.id ?? null;
+  if (!dbUser) return null;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "MANAGER", "EDITOR"] as const;
+  if (!(allowed as readonly string[]).includes(dbUser.role)) return null;
+  return dbUser.id;
 }
 
 async function generateUniqueSlug(
@@ -93,6 +97,7 @@ function buildChangeDelta(
     "website",
     "countryOfOrigin",
     "logo",
+    "isFeatured",
     "metaTitle",
     "metaDesc",
   ];
@@ -113,7 +118,8 @@ function buildChangeDelta(
 // ==========================================
 
 export async function getBrands(
-  filter: "active" | "trash" = "active"
+  filter: "active" | "trash" = "active",
+  query = ""
 ): Promise<{
   success: boolean;
   data: BrandWithCount[];
@@ -125,10 +131,20 @@ export async function getBrands(
       db.brand.count({ where: { deletedAt: { not: null } } }),
     ]);
 
-    const whereClause: Prisma.BrandWhereInput =
+    const baseWhere: Prisma.BrandWhereInput =
       filter === "trash"
         ? { deletedAt: { not: null } }
         : { deletedAt: null };
+
+    const whereClause: Prisma.BrandWhereInput = query.trim()
+      ? {
+          ...baseWhere,
+          OR: [
+            { name: { contains: query.trim(), mode: "insensitive" } },
+            { slug: { contains: query.trim(), mode: "insensitive" } },
+          ],
+        }
+      : baseWhere;
 
     const brands = await db.brand.findMany({
       where: whereClause,
@@ -172,6 +188,7 @@ export async function createBrand(
     website: formData.get("website") || null,
     countryOfOrigin: formData.get("countryOfOrigin") || null,
     logo: formData.get("logo") || null,
+    isFeatured: formData.get("isFeatured") === "true",
     metaTitle: formData.get("metaTitle") || null,
     metaDesc: formData.get("metaDesc") || null,
   });
@@ -192,6 +209,7 @@ export async function createBrand(
         website: data.website || null,
         countryOfOrigin: data.countryOfOrigin ?? null,
         logo: data.logo ?? null,
+        isFeatured: data.isFeatured,
         metaTitle: data.metaTitle ?? null,
         metaDesc: data.metaDesc ?? null,
       },
@@ -240,6 +258,7 @@ export async function updateBrand(
     website: formData.get("website") || null,
     countryOfOrigin: formData.get("countryOfOrigin") || null,
     logo: formData.get("logo") || null,
+    isFeatured: formData.get("isFeatured") === "true",
     metaTitle: formData.get("metaTitle") || null,
     metaDesc: formData.get("metaDesc") || null,
   });
@@ -269,6 +288,7 @@ export async function updateBrand(
         website: data.website || null,
         countryOfOrigin: data.countryOfOrigin ?? null,
         logo: data.logo ?? null,
+        isFeatured: data.isFeatured,
         metaTitle: data.metaTitle ?? null,
         metaDesc: data.metaDesc ?? null,
       },

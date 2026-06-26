@@ -8,9 +8,17 @@ import { CouponFormType } from "../../types";
 import { searchProductsForCoupon, searchCategoriesForCoupon } from "@/app/actions/backend/coupon/search-resources";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
+interface SearchProduct {
+  id: string;
+  name: string;
+  sku: string | null;
+  image: string | null;
+  price: number;
+}
+
 interface TabUsageRestrictionProps {
   formData: CouponFormType;
-  updateField: (field: keyof CouponFormType, value: any) => void;
+  updateField: (field: keyof CouponFormType, value: CouponFormType[keyof CouponFormType]) => void;
 }
 
 export const TabUsageRestriction = ({ formData, updateField }: TabUsageRestrictionProps) => {
@@ -18,14 +26,14 @@ export const TabUsageRestriction = ({ formData, updateField }: TabUsageRestricti
   
   // --- States for Dynamic Multi-Select Search ---
   const [productQuery, setProductQuery] = useState("");
-  const [productResults, setProductResults] = useState<any[]>([]);
+  const [productResults, setProductResults] = useState<SearchProduct[]>([]);
   const [searchingProduct, setSearchingProduct] = useState(false);
 
   const [categoryQuery, setCategoryQuery] = useState("");
-  const [categoryResults, setCategoryResults] = useState<any[]>([]);
+  const [categoryResults, setCategoryResults] = useState<{ id: string; name: string }[]>([]);
   const [searchingCategory, setSearchingCategory] = useState(false);
 
-  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<SearchProduct[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<{id: string, name: string}[]>([]);
 
   const TooltipHelp = ({ text }: { text: string }) => (
@@ -47,7 +55,7 @@ export const TabUsageRestriction = ({ formData, updateField }: TabUsageRestricti
       }
   };
 
-  const addProduct = (prod: any) => {
+  const addProduct = (prod: SearchProduct) => {
       if (!formData.productIds.includes(prod.id)) {
           updateField("productIds", [...formData.productIds, prod.id]);
           setSelectedProducts([...selectedProducts, prod]);

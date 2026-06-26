@@ -1,12 +1,13 @@
 // File: app/(backend)/admin/Header-Sideber/sidebar/menu-config.ts
 
 import {
-  // আপনার আগের আইকনগুলো...
   LayoutDashboard, ShoppingCart, Package, Users,
   TicketPercent, BarChart3, Settings,
-  FileText, ShieldCheck, MessageSquare, ScrollText,
+  ShieldCheck, MessageSquare, ScrollText,
   Undo2, Megaphone, Truck, MedalIcon, MessageCircle,
-  Handshake, Link, Network, UserPlus, Facebook, Wallet, RefreshCw, Heart
+  Handshake, Link, Network, UserPlus, Facebook, Wallet, RefreshCw, Heart,
+  BadgeDollarSign, LayoutGrid, Award, SlidersHorizontal, Tag, Star, Boxes,
+  Code2, Search, Plug
 } from "lucide-react";
 import { Role } from "@prisma/client";
 
@@ -45,14 +46,13 @@ export const sidebarConfig: SidebarGroup[] = [
         icon: Package,
         // 🚀 All Catalog Items are now children
         submenu: [
-           { name: "All Products", href: "/admin/products", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
-           { name: "Categories", href: "/admin/categories", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
-           { name: "Brands", href: "/admin/brands" , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
-           { name: "Attributes", href: "/admin/attributes", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
-           { name: "Tags", href: "/admin/tags", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
-           { name: "Reviews", href: "/admin/reviews", roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
-           { name: "Inventory", href: "/admin/inventory" , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
-           
+           { name: "All Products", href: "/admin/products",  icon: Package,            roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+           { name: "Categories",   href: "/admin/categories", icon: LayoutGrid,         roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+           { name: "Brands",       href: "/admin/brands",     icon: Award,              roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+           { name: "Attributes",   href: "/admin/attributes", icon: SlidersHorizontal,  roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+           { name: "Tags",         href: "/admin/tags",        icon: Tag,               roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+           { name: "Reviews",      href: "/admin/reviews",     icon: Star,              roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+           { name: "Inventory",    href: "/admin/inventory",   icon: Boxes,             roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
         ]
       },
       { name: "Orders", href: "/admin/orders", icon: ShoppingCart, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
@@ -63,27 +63,34 @@ export const sidebarConfig: SidebarGroup[] = [
   {
     title: "Operations",
     items: [
-      { name: "Invoices", href: "/admin/invoices", icon: FileText },
       { name: "Shipments", href: "/admin/shipments", icon: Truck },
-      { name: "Refunds", href: "/admin/refunds", icon: Undo2, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]  },
       { name: "Support Ticket", href: "/admin/support", icon: MessageSquare },
       { name: "Warranty-Cliem", href: "/admin/warranty-claims", icon: Megaphone },
-      { name: "Wallet", href: "/admin/wallet", icon: Wallet, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
-      { name: "Subscriptions", href: "/admin/subscriptions", icon: RefreshCw, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+      {
+        name: "Finance",
+        href: "/admin/wallet",
+        icon: BadgeDollarSign,
+        roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER],
+        submenu: [
+          { name: "Wallet", href: "/admin/wallet", icon: Wallet, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+          { name: "Refunds", href: "/admin/refunds", icon: Undo2, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+          { name: "Subscriptions", href: "/admin/subscriptions", icon: RefreshCw, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+        ]
+      },
     ]
   },
   {
     title: "Marketing",
-    items: [ { 
-        name: "Marketing", // Parent Item
-        href: "/admin/marketing",    // Double Click Link
-        icon: Package,
+    items: [ {
+        name: "Integrations",
+        href: "/admin/marketing",
+        icon: Plug,
         submenu: [
-         { name: "Klaviyo", href: "/admin/marketing/klaviyo", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-         { name: "Facebook", href: "/admin/marketing/facebook", icon: UserPlus, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-         { name: "Tag-Manager", href: "/admin/marketing/tag-manager", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-         { name: "Merchant Center", href: "/admin/marketing/merchant-center", icon: Link, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-         { name: "Search-Console", href: "/admin/marketing/search-console", icon: Network, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Klaviyo",        href: "/admin/marketing/klaviyo",         icon: Network,   roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Facebook",       href: "/admin/marketing/facebook",        icon: Facebook,  roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Tag Manager",    href: "/admin/marketing/tag-manager",     icon: Code2,     roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Merchant Center",href: "/admin/marketing/merchant-center", icon: Link,      roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+         { name: "Search Console", href: "/admin/marketing/search-console",  icon: Search,    roles: [Role.SUPER_ADMIN, Role.ADMIN] },
         ]
       },
       { name: "Coupons", href: "/admin/coupons", icon: TicketPercent , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]},

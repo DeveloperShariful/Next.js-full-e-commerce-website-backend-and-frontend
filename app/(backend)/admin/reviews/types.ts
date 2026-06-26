@@ -1,4 +1,4 @@
-//app/(backend)/admin/reviews/types.ts
+// File: app/(backend)/admin/reviews/types.ts
 
 export type ReviewStatus = "PENDING" | "APPROVED" | "SPAM" | "TRASH";
 
@@ -8,7 +8,7 @@ export interface ReviewData {
   title: string | null;
   content: string | null;
   isVerified: boolean;
-  status: string; // "pending", "approved", "rejected" (spam)
+  status: ReviewStatus;
   images: string[];
   reply: string | null;
   deletedAt: Date | null;
@@ -24,8 +24,8 @@ export interface ReviewData {
     slug: string;
     featuredImage: string | null;
     _count?: {
-      reviews: number; // 🚀 New: Total approved reviews for this product
-    }
+      reviews: number;
+    } | null;
   };
 }
 

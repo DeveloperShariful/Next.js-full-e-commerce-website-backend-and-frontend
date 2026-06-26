@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/backend/product/product-utils"; 
 import { auth } from "@/auth";
 
@@ -112,22 +112,18 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
     const email = session.user.email;
     if (!email) return { success: false, message: "User email not found" };
 
-    let dbUser = await db.user.findUnique({ where: { email: email } });
+    const dbUser = await db.user.findUnique({
+        where: { email },
+        select: { id: true, role: true },
+    });
 
     if (!dbUser) {
-        try {
-            dbUser = await db.user.create({
-                data: {
-                    email: email,
-                    name: session.user.name || "Admin User",
-                    role: "ADMIN",
-                    image: session.user.image
-                }
-            });
-        } catch (error) {
-            console.error("USER_SYNC_ERROR", error);
-            return { success: false, message: "Failed to sync user profile" };
-        }
+        return { success: false, message: "User account not found. Please sign in again." };
+    }
+
+    const allowedRoles: Role[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.EDITOR];
+    if (!allowedRoles.includes(dbUser.role as Role)) {
+        return { success: false, message: "Forbidden: insufficient permissions to manage products." };
     }
 
     const data = parseProductFormData(formData);
@@ -165,12 +161,25 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         let locationId = "";
         
         if (data.trackQuantity || data.productType === 'VARIABLE') {
-            const loc = await db.location.findFirst({ where: { isDefault: true }, select: { id: true } });
+            const loc = await db.location.findFirst({
+                where: { isDefault: true, isActive: true },
+                select: { id: true },
+            });
             if (loc) {
                 locationId = loc.id;
             } else {
-                const newLoc = await db.location.create({ data: { name: "Main Warehouse", isDefault: true } });
-                locationId = newLoc.id;
+                const anyActive = await db.location.findFirst({
+                    where: { isActive: true },
+                    select: { id: true },
+                });
+                if (anyActive) {
+                    locationId = anyActive.id;
+                } else {
+                    const newLoc = await db.location.create({
+                        data: { name: "Main Warehouse", isDefault: true, isActive: true },
+                    });
+                    locationId = newLoc.id;
+                }
             }
         }
 

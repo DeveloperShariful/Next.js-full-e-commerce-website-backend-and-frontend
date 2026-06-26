@@ -79,13 +79,21 @@ export interface LocationData {
   };
 }
 
+export interface StockTransferItem {
+  productId: string;
+  variantId?: string | null;
+  quantity: number;
+  name?: string;
+  sku?: string;
+}
+
 export interface StockTransferData {
   id: string;
   reference: string;
   fromLocationId: string;
   toLocationId: string;
   status: string;
-  items: any;
+  items: StockTransferItem[];
   createdAt: Date;
   fromLocation: { name: string };
   toLocation: { name: string };

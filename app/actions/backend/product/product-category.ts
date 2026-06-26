@@ -3,11 +3,14 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { auth } from "@/auth"; 
 
-// --- Types ---
+// ==========================================
+// TYPES
+// ==========================================
+
 export type CategoryNode = {
   id: string;
   name: string;
@@ -23,263 +26,491 @@ export type CategoryWithDetails = Prisma.CategoryGetPayload<{
   };
 }>;
 
-// --- Zod Schema ---
+// ==========================================
+// ZOD SCHEMA
+// ==========================================
+
 const categorySchema = z.object({
   name: z.string().min(1, "Category name is required"),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
   parentId: z.string().optional().nullable(),
   image: z.string().optional().nullable(),
-  mediaId: z.string().optional().nullable(), 
+  mediaId: z.string().optional().nullable(),
   slug: z.string().optional(),
-  metaTitle: z.string().optional(),
-  metaDesc: z.string().optional(),
+  metaTitle: z.string().optional().nullable(),
+  metaDesc: z.string().optional().nullable(),
   isActive: z.coerce.boolean().default(true),
+  menuOrder: z.coerce.number().int().nonnegative().default(0),
 });
 
-// --- Helper: Get DB User ID ---
-async function getDbUserId() {
-    const session = await auth();
-    if (!session?.user?.email) return null;
-    const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
-    return dbUser?.id;
+type CategoryInput = z.infer<typeof categorySchema>;
+
+// ==========================================
+// HELPERS
+// ==========================================
+
+async function getDbUserId(): Promise<string | null> {
+  const session = await auth();
+  if (!session?.user?.email) return null;
+  const dbUser = await db.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true },
+  });
+  return dbUser?.id ?? null;
 }
 
-// --- Helper: Optimized Unique Slug Generator ---
-async function generateUniqueSlug(name: string, requestedSlug?: string, ignoreId?: string) {
-  let baseSlug = requestedSlug && requestedSlug.trim() !== "" ? requestedSlug : name;
+async function generateUniqueSlug(
+  name: string,
+  requestedSlug?: string | null,
+  ignoreId?: string
+): Promise<string> {
+  let base =
+    requestedSlug && requestedSlug.trim() !== "" ? requestedSlug : name;
 
-  baseSlug = baseSlug.toLowerCase().trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  base = base
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
   const collisions = await db.category.findMany({
-    where: { 
-      slug: { startsWith: baseSlug }, 
-      ...(ignoreId ? { id: { not: ignoreId } } : {}) 
+    where: {
+      slug: { startsWith: base },
+      ...(ignoreId ? { id: { not: ignoreId } } : {}),
     },
-    select: { slug: true }
+    select: { slug: true },
   });
 
-  if (collisions.length === 0) return baseSlug;
+  if (collisions.length === 0) return base;
+  const exactMatch = collisions.some((c) => c.slug === base);
+  if (!exactMatch) return base;
 
-  const exactMatch = collisions.some(c => c.slug === baseSlug);
-  if (!exactMatch) return baseSlug;
-
-  const suffixes = collisions.map(c => {
-    const parts = c.slug.split(`${baseSlug}-`);
+  const suffixes = collisions.map((c) => {
+    const parts = c.slug.split(`${base}-`);
     return parts.length > 1 ? parseInt(parts[1]) || 0 : 0;
   });
-  
-  const maxSuffix = Math.max(...suffixes);
-  return `${baseSlug}-${maxSuffix + 1}`;
+
+  return `${base}-${Math.max(...suffixes) + 1}`;
 }
 
-// --- 1. CREATE CATEGORY ---
-export async function createCategory(formData: FormData) {
-  try {
-    const userId = await getDbUserId();
-    if (!userId) return { success: false, error: "Unauthorized access." };
+function buildChangeDelta(
+  oldData: CategoryWithDetails,
+  newData: CategoryInput
+): Record<string, { old: unknown; new: unknown }> {
+  const changes: Record<string, { old: unknown; new: unknown }> = {};
 
-    const rawData = {
-      name: formData.get("name"),
-      description: formData.get("description"),
-      parentId: formData.get("parentId") === "none" ? null : formData.get("parentId"),
-      image: formData.get("image"),
-      mediaId: formData.get("mediaId"), 
-      slug: formData.get("slug"),
-      metaTitle: formData.get("metaTitle"),
-      metaDesc: formData.get("metaDesc"),
-      isActive: formData.get("isActive"),
-    };
+  const comparisons: Array<{
+    field: keyof CategoryInput;
+    oldKey: keyof CategoryWithDetails;
+  }> = [
+    { field: "name", oldKey: "name" },
+    { field: "description", oldKey: "description" },
+    { field: "parentId", oldKey: "parentId" },
+    { field: "image", oldKey: "image" },
+    { field: "mediaId", oldKey: "mediaId" },
+    { field: "metaTitle", oldKey: "metaTitle" },
+    { field: "metaDesc", oldKey: "metaDesc" },
+    { field: "isActive", oldKey: "isActive" },
+    { field: "menuOrder", oldKey: "menuOrder" },
+  ];
 
-    const validation = categorySchema.safeParse(rawData);
-    if (!validation.success) {
-      return { success: false, error: validation.error.issues[0].message };
+  for (const { field, oldKey } of comparisons) {
+    const oldVal = (oldData[oldKey] as unknown) ?? null;
+    const newVal = (newData[field] as unknown) ?? null;
+    if (oldVal !== newVal) {
+      changes[field] = { old: oldVal, new: newVal };
     }
-    const data = validation.data;
+  }
 
-    const slug = await generateUniqueSlug(data.name, data.slug);
+  return changes;
+}
 
+function parseFormData(formData: FormData, includeId = false) {
+  return {
+    ...(includeId ? { id: (formData.get("id") as string | null)?.trim() } : {}),
+    name: formData.get("name"),
+    description: formData.get("description") || null,
+    parentId:
+      formData.get("parentId") === "none"
+        ? null
+        : formData.get("parentId") || null,
+    image: formData.get("image") || null,
+    mediaId: formData.get("mediaId") || null,
+    slug: formData.get("slug") || undefined,
+    metaTitle: formData.get("metaTitle") || null,
+    metaDesc: formData.get("metaDesc") || null,
+    isActive: formData.get("isActive"),
+    menuOrder: formData.get("menuOrder"),
+  };
+}
+
+// ==========================================
+// 1. GET CATEGORIES (with filter + counts)
+// ==========================================
+
+export async function getCategories(
+  filter: "active" | "trash" = "active"
+): Promise<{
+  success: boolean;
+  data: CategoryWithDetails[];
+  counts: { active: number; trash: number; all: number };
+}> {
+  try {
+    const [activeCount, trashCount] = await Promise.all([
+      db.category.count({ where: { deletedAt: null } }),
+      db.category.count({ where: { deletedAt: { not: null } } }),
+    ]);
+
+    const whereClause: Prisma.CategoryWhereInput =
+      filter === "trash"
+        ? { deletedAt: { not: null } }
+        : { deletedAt: null };
+
+    const categories = await db.category.findMany({
+      where: whereClause,
+      include: {
+        parent: { select: { name: true } },
+        _count: { select: { products: true } },
+      },
+      orderBy: { menuOrder: "asc" },
+    });
+
+    return {
+      success: true,
+      data: categories,
+      counts: {
+        active: activeCount,
+        trash: trashCount,
+        all: activeCount + trashCount,
+      },
+    };
+  } catch (error) {
+    console.error("GET_CATEGORIES_ERROR", error);
+    return {
+      success: false,
+      data: [],
+      counts: { active: 0, trash: 0, all: 0 },
+    };
+  }
+}
+
+// ==========================================
+// 2. GET CATEGORY TREE (dropdowns)
+// ==========================================
+
+export async function getCategoryTree(): Promise<CategoryNode[]> {
+  try {
+    return await db.category.findMany({
+      where: { deletedAt: null },
+      select: { id: true, name: true, parentId: true, slug: true },
+      orderBy: { menuOrder: "asc" },
+    });
+  } catch {
+    return [];
+  }
+}
+
+// ==========================================
+// 3. CREATE CATEGORY
+// ==========================================
+
+export async function createCategory(
+  formData: FormData
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const validation = categorySchema.safeParse(parseFormData(formData));
+  if (!validation.success) {
+    return { success: false, error: validation.error.issues[0].message };
+  }
+
+  const data = validation.data;
+  const slug = await generateUniqueSlug(data.name, data.slug);
+
+  try {
     const category = await db.category.create({
       data: {
         name: data.name,
         slug,
-        description: data.description || null,
-        image: data.image || null,
-        mediaId: data.mediaId || null, 
-        parentId: data.parentId || null,
-        metaTitle: data.metaTitle || null,
-        metaDesc: data.metaDesc || null,
-        isActive: data.isActive
-      }
+        description: data.description ?? null,
+        image: data.image ?? null,
+        mediaId: data.mediaId ?? null,
+        parentId: data.parentId ?? null,
+        metaTitle: data.metaTitle ?? null,
+        metaDesc: data.metaDesc ?? null,
+        isActive: data.isActive,
+        menuOrder: data.menuOrder,
+      },
     });
 
     await db.activityLog.create({
-        data: {
-            userId,
-            action: "CREATED_CATEGORY",
-            entityType: "Category",
-            entityId: category.id,
-            details: { name: category.name, slug: category.slug }
-        }
+      data: {
+        userId,
+        action: "CATEGORY_CREATED",
+        entityType: "Category",
+        entityId: category.id,
+        details: {
+          name: category.name,
+          slug: category.slug,
+          parentId: category.parentId ?? null,
+          isActive: category.isActive,
+          menuOrder: category.menuOrder,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
 
     revalidatePath("/admin/categories");
     return { success: true, message: "Category created successfully." };
-
-  } catch (error: any) {
+  } catch (error) {
     console.error("CREATE_CATEGORY_ERROR", error);
-    return { success: false, error: "Database Error: Could not create category." };
+    return { success: false, error: "Database error: could not create category." };
   }
 }
 
-// --- 2. UPDATE CATEGORY ---
-export async function updateCategory(formData: FormData) {
+// ==========================================
+// 4. UPDATE CATEGORY
+// ==========================================
+
+export async function updateCategory(
+  formData: FormData
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const id = (formData.get("id") as string | null)?.trim();
+  if (!id) return { success: false, error: "Category ID missing." };
+
+  const validation = categorySchema.safeParse(parseFormData(formData));
+  if (!validation.success) {
+    return { success: false, error: validation.error.issues[0].message };
+  }
+
+  const data = validation.data;
+
+  if (data.parentId === id) {
+    return { success: false, error: "A category cannot be its own parent." };
+  }
+
+  const oldData = await db.category.findUnique({
+    where: { id },
+    include: {
+      parent: { select: { name: true } },
+      _count: { select: { products: true } },
+    },
+  });
+
+  if (!oldData) return { success: false, error: "Category not found." };
+
+  const slug = await generateUniqueSlug(data.name, data.slug, id);
+
   try {
-    const userId = await getDbUserId();
-    if (!userId) return { success: false, error: "Unauthorized access." };
-
-    const id = formData.get("id") as string;
-    if (!id) return { success: false, error: "Category ID missing." };
-
-    const rawData = {
-      name: formData.get("name"),
-      description: formData.get("description"),
-      parentId: formData.get("parentId") === "none" ? null : formData.get("parentId"),
-      image: formData.get("image"),
-      mediaId: formData.get("mediaId"),
-      slug: formData.get("slug"),
-      metaTitle: formData.get("metaTitle"),
-      metaDesc: formData.get("metaDesc"),
-      isActive: formData.get("isActive"),
-    };
-
-    const validation = categorySchema.safeParse(rawData);
-    if (!validation.success) {
-      return { success: false, error: validation.error.issues[0].message };
-    }
-    const data = validation.data;
-
-    if (data.parentId === id) {
-      return { success: false, error: "A category cannot be its own parent." };
-    }
-
-    let slug = undefined;
-    if (data.slug || data.name) {
-       slug = await generateUniqueSlug(data.name, data.slug, id);
-    }
-
-    const oldData = await db.category.findUnique({ where: { id } });
-
-    const updatedCategory = await db.category.update({
+    await db.category.update({
       where: { id },
       data: {
         name: data.name,
-        slug: slug,
-        description: data.description || null,
-        image: data.image || null,
-        mediaId: data.mediaId || null,
-        parentId: data.parentId || null,
-        metaTitle: data.metaTitle || null,
-        metaDesc: data.metaDesc || null,
-        isActive: data.isActive
-      }
+        slug,
+        description: data.description ?? null,
+        image: data.image ?? null,
+        mediaId: data.mediaId ?? null,
+        parentId: data.parentId ?? null,
+        metaTitle: data.metaTitle ?? null,
+        metaDesc: data.metaDesc ?? null,
+        isActive: data.isActive,
+        menuOrder: data.menuOrder,
+      },
     });
 
-    if (oldData) {
-        const changes: any = {};
-        if (oldData.name !== data.name) changes.name = { old: oldData.name, new: data.name };
-        if (oldData.isActive !== data.isActive) changes.isActive = { old: oldData.isActive, new: data.isActive };
-        
-        if (Object.keys(changes).length > 0) {
-            await db.activityLog.create({
-                data: {
-                    userId,
-                    action: "UPDATED_CATEGORY",
-                    entityType: "Category",
-                    entityId: id,
-                    details: changes
-                }
-            });
-        }
-    }
+    const changes = buildChangeDelta(oldData, data);
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "CATEGORY_UPDATED",
+        entityType: "Category",
+        entityId: id,
+        details: {
+          categoryName: oldData.name,
+          newSlug: slug,
+          changedFields: Object.keys(changes),
+          changes,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
 
     revalidatePath("/admin/categories");
     return { success: true, message: "Category updated successfully." };
-
-  } catch (error: any) {
+  } catch (error) {
     console.error("UPDATE_CATEGORY_ERROR", error);
     return { success: false, error: "Failed to update category." };
   }
 }
 
-// --- 3. DELETE CATEGORY ---
-export async function deleteCategory(id: string) {
+// ==========================================
+// 5. SOFT DELETE (MOVE TO TRASH)
+// ==========================================
+
+export async function deleteCategory(
+  id: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const category = await db.category.findUnique({
+    where: { id },
+    select: { name: true, slug: true, deletedAt: true },
+  });
+
+  if (!category) return { success: false, error: "Category not found." };
+  if (category.deletedAt) {
+    return { success: false, error: "Category is already in trash." };
+  }
+
+  const [productCount, childCount] = await Promise.all([
+    db.product.count({
+      where: { categories: { some: { id } }, deletedAt: null },
+    }),
+    db.category.count({ where: { parentId: id, deletedAt: null } }),
+  ]);
+
+  if (productCount > 0) {
+    return {
+      success: false,
+      error: `Cannot delete: ${productCount} active product(s) are linked to this category.`,
+    };
+  }
+
+  if (childCount > 0) {
+    return {
+      success: false,
+      error: `Cannot delete: ${childCount} sub-category(ies) exist. Delete or move them first.`,
+    };
+  }
+
   try {
-    const userId = await getDbUserId();
-    if (!userId) return { success: false, error: "Unauthorized access." };
-
-    const categoryToDelete = await db.category.findUnique({ 
-        where: { id },
-        select: { name: true } 
+    await db.category.update({
+      where: { id },
+      data: { deletedAt: new Date() },
     });
 
-    if (!categoryToDelete) return { success: false, error: "Category not found." };
-
-    // ✅ FIX: Updated from categoryId to 'categories: { some: { id } }' due to Many-to-Many relation
-    const productCount = await db.product.count({ 
-        where: { categories: { some: { id: id } } } 
-    });
-    
-    if (productCount > 0) return { success: false, error: `Contains ${productCount} products.` };
-
-    const childCount = await db.category.count({ where: { parentId: id } });
-    if (childCount > 0) return { success: false, error: "Has sub-categories." };
-
-    await db.category.delete({ where: { id } });
-    
     await db.activityLog.create({
-        data: {
-            userId,
-            action: "DELETED_CATEGORY",
-            entityType: "Category",
-            entityId: id,
-            details: { name: categoryToDelete.name }
-        }
+      data: {
+        userId,
+        action: "CATEGORY_SOFT_DELETED",
+        entityType: "Category",
+        entityId: id,
+        details: {
+          name: category.name,
+          slug: category.slug,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
 
     revalidatePath("/admin/categories");
-    return { success: true, message: "Category deleted." };
-  } catch (error: any) {
-    return { success: false, error: "Delete failed." };
+    return { success: true, message: "Category moved to trash." };
+  } catch (error) {
+    console.error("DELETE_CATEGORY_ERROR", error);
+    return { success: false, error: "Internal error during deletion." };
   }
 }
 
-// --- 4. GET ALL CATEGORIES ---
-export async function getCategories() {
+// ==========================================
+// 6. RESTORE FROM TRASH
+// ==========================================
+
+export async function restoreCategory(
+  id: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const category = await db.category.findUnique({
+    where: { id },
+    select: { name: true, slug: true, deletedAt: true },
+  });
+
+  if (!category) return { success: false, error: "Category not found." };
+  if (!category.deletedAt) {
+    return { success: false, error: "Category is not in trash." };
+  }
+
   try {
-    const categories = await db.category.findMany({
-      include: {
-        parent: { select: { name: true } },
-        _count: { select: { products: true } }
+    await db.category.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "CATEGORY_RESTORED",
+        entityType: "Category",
+        entityId: id,
+        details: {
+          name: category.name,
+          slug: category.slug,
+        } as unknown as Prisma.InputJsonValue,
       },
-      orderBy: { name: 'asc' } 
     });
-    return { success: true, data: categories };
+
+    revalidatePath("/admin/categories");
+    return { success: true, message: "Category restored from trash." };
   } catch (error) {
-    return { success: false, data: [] };
+    console.error("RESTORE_CATEGORY_ERROR", error);
+    return { success: false, error: "Failed to restore category." };
   }
 }
 
-// --- 5. GET CATEGORY TREE ---
-export async function getCategoryTree() {
+// ==========================================
+// 7. FORCE DELETE (PERMANENT)
+// ==========================================
+
+export async function forceDeleteCategory(
+  id: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const category = await db.category.findUnique({
+    where: { id },
+    select: { name: true, slug: true },
+  });
+
+  if (!category) return { success: false, error: "Category not found." };
+
+  const productCount = await db.product.count({
+    where: { categories: { some: { id } } },
+  });
+
+  if (productCount > 0) {
+    return {
+      success: false,
+      error: `Cannot permanently delete: ${productCount} product(s) still linked.`,
+    };
+  }
+
   try {
-    return await db.category.findMany({
-      select: { id: true, name: true, parentId: true, slug: true },
-      orderBy: { name: 'asc' }
+    await db.category.delete({ where: { id } });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "CATEGORY_FORCE_DELETED",
+        entityType: "Category",
+        entityId: id,
+        details: {
+          name: category.name,
+          slug: category.slug,
+          permanent: true,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
+
+    revalidatePath("/admin/categories");
+    return { success: true, message: "Category permanently deleted." };
   } catch (error) {
-    return [];
+    console.error("FORCE_DELETE_CATEGORY_ERROR", error);
+    return { success: false, error: "Failed to permanently delete category." };
   }
 }

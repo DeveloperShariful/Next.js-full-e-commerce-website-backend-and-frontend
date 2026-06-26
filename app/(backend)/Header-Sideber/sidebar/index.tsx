@@ -41,7 +41,7 @@ export default function AdminSidebar({ user }: AdminSidebarProps) {
   return (
     <aside
       className="hidden md:flex flex-col h-[calc(100vh-46px)] sticky top-[46px] bg-[#1d2327] text-[#c3c4c7] z-40 relative transition-[width] duration-200"
-      style={{ width: isCollapsed ? 46 : 224 }}
+      style={{ width: isCollapsed ? 46 : 178 }}
     >
       {/* Toggle button — TOP */}
       <button

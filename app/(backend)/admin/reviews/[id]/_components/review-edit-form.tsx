@@ -63,7 +63,6 @@ export default function ReviewEditForm({ initialData }: ReviewEditFormProps) {
         content: formData.content,
         rating: formData.rating,
         status: formData.status,
-        createdAt: new Date(formData.createdAt) // Parse back to Date object
       });
 
       if (res.success) {
@@ -182,15 +181,15 @@ export default function ReviewEditForm({ initialData }: ReviewEditFormProps) {
               </p>
               <div className="flex flex-col gap-1.5 pl-5">
                 <label className="flex items-center gap-2 text-[13px] text-[#3c434a] cursor-pointer">
-                  <input type="radio" name="status" value="APPROVED" checked={formData.status === "APPROVED"} onChange={(e) => setFormData({...formData, status: e.target.value as any})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
+                  <input type="radio" name="status" value="APPROVED" checked={formData.status === "APPROVED"} onChange={(e) => setFormData({...formData, status: e.target.value as "PENDING" | "APPROVED" | "SPAM" | "TRASH"})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
                   Approved
                 </label>
                 <label className="flex items-center gap-2 text-[13px] text-[#3c434a] cursor-pointer">
-                  <input type="radio" name="status" value="PENDING" checked={formData.status === "PENDING"} onChange={(e) => setFormData({...formData, status: e.target.value as any})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
+                  <input type="radio" name="status" value="PENDING" checked={formData.status === "PENDING"} onChange={(e) => setFormData({...formData, status: e.target.value as "PENDING" | "APPROVED" | "SPAM" | "TRASH"})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
                   Pending
                 </label>
                 <label className="flex items-center gap-2 text-[13px] text-[#3c434a] cursor-pointer">
-                  <input type="radio" name="status" value="SPAM" checked={formData.status === "SPAM"} onChange={(e) => setFormData({...formData, status: e.target.value as any})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
+                  <input type="radio" name="status" value="SPAM" checked={formData.status === "SPAM"} onChange={(e) => setFormData({...formData, status: e.target.value as "PENDING" | "APPROVED" | "SPAM" | "TRASH"})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
                   Spam
                 </label>
               </div>

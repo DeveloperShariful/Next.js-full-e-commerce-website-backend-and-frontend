@@ -15,7 +15,7 @@ export function TransfersView() {
   const fetchTransfers = useCallback(async () => {
     setLoading(true);
     const res = await getStockTransfers();
-    if (res.success) setTransfers(res.data as StockTransferData[]);
+    if (res.success) setTransfers(res.data as unknown as StockTransferData[]);
     setLoading(false);
   }, []);
 

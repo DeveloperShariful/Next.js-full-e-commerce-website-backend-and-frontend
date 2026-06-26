@@ -7,7 +7,7 @@ import { CouponFormType } from "../../types";
 
 interface TabUsageLimitsProps {
   formData: CouponFormType;
-  updateField: (field: keyof CouponFormType, value: any) => void;
+  updateField: (field: keyof CouponFormType, value: CouponFormType[keyof CouponFormType]) => void;
 }
 
 export const TabUsageLimits = ({ formData, updateField }: TabUsageLimitsProps) => {

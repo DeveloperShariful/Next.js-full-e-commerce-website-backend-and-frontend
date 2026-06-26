@@ -10,16 +10,18 @@ interface CouponPublishSidebarProps {
   formData: CouponFormType;
   setFormData: React.Dispatch<React.SetStateAction<CouponFormType>>;
   handleSave: (e?: React.FormEvent) => void;
+  onTrash?: () => void;
   isPending: boolean;
   isEditMode?: boolean;
 }
 
-export const CouponPublishSidebar = ({ 
-    formData, 
-    setFormData, 
-    handleSave, 
+export const CouponPublishSidebar = ({
+    formData,
+    setFormData,
+    handleSave,
+    onTrash,
     isPending,
-    isEditMode = false 
+    isEditMode = false,
 }: CouponPublishSidebarProps) => {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -71,8 +73,9 @@ export const CouponPublishSidebar = ({
                     
                     {/* Trash Button (Only visible in edit mode) */}
                     {isEditMode ? (
-                        <button 
-                            type="button" 
+                        <button
+                            type="button"
+                            onClick={onTrash}
                             disabled={isPending}
                             className="text-[13px] text-[#d63638] hover:text-[#d63638] hover:underline disabled:opacity-50 font-medium transition-colors"
                         >

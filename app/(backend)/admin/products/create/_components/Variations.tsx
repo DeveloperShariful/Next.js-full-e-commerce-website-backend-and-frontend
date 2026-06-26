@@ -7,7 +7,9 @@ import { useFormContext, useFieldArray } from "react-hook-form";
 import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Trash2, Wand2, MapPin, Box, X, Plus, Settings2, Search, CheckSquare, Square, Filter } from "lucide-react"; 
 import { getLocations } from "@/app/actions/backend/product/product-read";
-import { ProductFormData, Variation } from "../types";
+import { ProductFormData, Variation, InventoryItem } from "../types";
+
+type VarImage = string | { url: string; mediaId?: string | null; altText?: string; id?: string };
 import MediaPickerModal, { PickedMedia } from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { useGlobalStore } from "@/app/providers/global-store-provider"; 
 import Image from "next/image";
@@ -72,7 +74,7 @@ export default function Variations() {
         const confirmGen = window.confirm("This will merge new combinations with existing ones. Continue?");
         if (!confirmGen) return;
 
-        const cartesian = (...a: any[][]) => a.reduce((a, b) => a.flatMap(d => b.map(e => [d, e].flat())));
+        const cartesian = (...a: string[][]): string[][] => a.reduce((acc: string[][], b: string[]) => acc.flatMap(d => b.map(e => [...d, e])), [[]]);
         const arraysToCombine = varAttrs.map(a => a.values);
         const combinations = varAttrs.length === 1 ? arraysToCombine[0].map(v => [v]) : cartesian(...arraysToCombine);
 
@@ -235,10 +237,9 @@ export default function Variations() {
         setBulkWeight(""); setBulkLength(""); setBulkWidth(""); setBulkHeight("");
     };
 
-    const updateVar = (index: number, field: keyof Variation, value: any) => {
+    const updateVar = (index: number, field: keyof Variation, value: Variation[keyof Variation]) => {
         const newVars = [...variations];
-        // @ts-ignore
-        newVars[index][field] = value;
+        (newVars[index] as Record<string, Variation[keyof Variation]>)[field as string] = value;
         setValue("variations", newVars, { shouldDirty: true });
     };
 
@@ -262,7 +263,7 @@ export default function Variations() {
             url: m.url, mediaId: m.id, altText: m.altText || "", id: undefined,
         }));
         const currentImages = variations[mediaModalIndex].images || [];
-        const existingUrls = currentImages.map((img: any) => typeof img === 'string' ? img : img.url);
+        const existingUrls = currentImages.map((img: VarImage) => typeof img === 'string' ? img : img.url);
         const uniqueNewImages = newImagesObj.filter(img => !existingUrls.includes(img.url));
         updateVar(mediaModalIndex, 'images', [...currentImages, ...uniqueNewImages]);
         setMediaModalIndex(null);
@@ -517,7 +518,7 @@ export default function Variations() {
                                         <div className="w-full md:w-40 shrink-0">
                                             <label className="text-xs font-bold block mb-2 text-gray-700">Variant Images</label>
                                             <div className="grid grid-cols-4 sm:grid-cols-2 gap-2 mb-2">
-                                                {v.images?.map((img: any, imgIdx: number) => (
+                                                {v.images?.map((img: VarImage, imgIdx: number) => (
                                                     <div key={imgIdx} className="relative aspect-square border rounded overflow-hidden group/img">
                                                         <Image src={typeof img === 'object' ? img.url : img} alt="" fill className="object-cover" />
                                                         <button type="button" onClick={() => removeVarImage(realIndex, imgIdx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 opacity-0 group-hover/img:opacity-100 transition"><Trash2 size={10}/></button>
@@ -616,25 +617,25 @@ export default function Variations() {
 
 interface StockManagerProps {
     locations: { id: string; name: string }[];
-    currentVar: any;
+    currentVar: Variation;
     onClose: () => void;
-    onSave: (newInv: any[], newTotal: number) => void;
+    onSave: (newInv: InventoryItem[], newTotal: number) => void;
 }
 
 function StockManagerModal({ locations, currentVar, onClose, onSave }: StockManagerProps) {
-    const [localInv, setLocalInv] = useState<any[]>(currentVar.inventoryData || []);
-    
+    const [localInv, setLocalInv] = useState<InventoryItem[]>(currentVar.inventoryData || []);
+
     const handleUpdate = (locId: string, qty: number) => {
-        const exists = localInv.find((i: any) => i.locationId === locId);
+        const exists = localInv.find((i: InventoryItem) => i.locationId === locId);
         if (exists) {
-            setLocalInv(localInv.map((i: any) => i.locationId === locId ? { ...i, quantity: qty } : i));
+            setLocalInv(localInv.map((i: InventoryItem) => i.locationId === locId ? { ...i, quantity: qty } : i));
         } else {
             setLocalInv([...localInv, { locationId: locId, quantity: qty }]);
         }
     };
 
-    const getQty = (locId: string) => localInv.find((i: any) => i.locationId === locId)?.quantity || 0;
-    const total = localInv.reduce((acc: number, curr: any) => acc + (parseInt(curr.quantity) || 0), 0);
+    const getQty = (locId: string) => localInv.find((i: InventoryItem) => i.locationId === locId)?.quantity || 0;
+    const total = localInv.reduce((acc: number, curr: InventoryItem) => acc + (curr.quantity || 0), 0);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

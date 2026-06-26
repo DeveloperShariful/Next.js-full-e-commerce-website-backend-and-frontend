@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { db } from '@/lib/prisma';
 import { ProductType, ProductStatus, Prisma } from '@prisma/client';
-import ProductTable from './_components/product-table';
+import ProductTable, { ProductRow } from './_components/product-table';
 import ProductLogViewer from './_components/ProductLogViewer';
 import ImportExportButtons from './_components/ImportExportButtons';
 import { serializeData } from "@/app/actions/backend/product/product-utils";
@@ -96,7 +96,7 @@ export default async function ProductListPage(props: ProductsPageProps) {
     })
   ]);
 
-  const serializedProducts = serializeData(products);
+  const serializedProducts = serializeData(products) as unknown as ProductRow[];
   const totalPages = Math.ceil(totalProducts / limit);
 
   const counts = {

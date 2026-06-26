@@ -1,5 +1,7 @@
 // File Location: app/admin/coupons/types.ts
 
+import type { Prisma } from "@prisma/client";
+
 // Enum mapped from Prisma Schema
 export type DiscountTypeEnum = 'PERCENTAGE' | 'FIXED_AMOUNT' | 'FREE_SHIPPING' | 'BUY_X_GET_Y' | 'FIXED_CART' | 'FIXED_PRODUCT';
 
@@ -23,13 +25,14 @@ export interface CouponType {
   excludeSaleItems: boolean;
   productIds: string[];
   categoryIds: string[];
-  ruleLogic: Record<string, unknown> | null; // Json field
+  ruleLogic: Prisma.JsonValue | null; // Json field
   isActive: boolean;
   affiliateCommissionRate: number | null;
   affiliateId: string | null;
+  createdBy: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
-  deletedAt: string | Date | null; 
+  deletedAt: string | Date | null;
 }
 
 // ==========================================
@@ -69,9 +72,13 @@ export interface CouponFormType {
   allowedEmails: string; // Saved inside ruleLogic JSON
   
   // Usage Limits Tab
-  usageLimit: number | ""; 
-  usagePerUser: number | ""; 
-  
+  usageLimit: number | "";
+  usagePerUser: number | "";
+
+  // Affiliate Tab
+  affiliateId: string | null;
+  affiliateCommissionRate: number | "";
+
   // Status
   isActive: boolean;
 }

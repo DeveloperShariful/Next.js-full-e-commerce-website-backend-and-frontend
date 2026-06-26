@@ -11,7 +11,7 @@ export interface CategoryData {
   metaTitle: string | null;
   metaDesc: string | null;
   deletedAt: Date | null; // 🚀 NEW: Added to track trash status
-  _count?: { products: number };
-  parent?: { name: string };
+  _count?: { products: number } | null;
+  parent?: { name: string } | null;
   children?: CategoryData[];
 }

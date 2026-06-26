@@ -152,7 +152,11 @@ export function SidebarItem({ item, isCollapsed = false }: SidebarItemProps) {
                     : "text-[#c3c4c7] hover:text-[#72aee6] hover:bg-[#2c3338]"
                 )}
               >
-                <span className={cn("w-1 h-1 rounded-full shrink-0", isSubActive ? "bg-[#72aee6]" : "bg-[#50575e]")} />
+                {sub.icon ? (
+                  <sub.icon size={14} strokeWidth={1.5} className={cn("shrink-0", isSubActive ? "text-[#72aee6]" : "text-[#a7aaad]")} />
+                ) : (
+                  <span className={cn("w-1 h-1 rounded-full shrink-0", isSubActive ? "bg-[#72aee6]" : "bg-[#50575e]")} />
+                )}
                 {sub.name}
               </Link>
             );
@@ -170,13 +174,17 @@ export function SidebarItem({ item, isCollapsed = false }: SidebarItemProps) {
                 key={sub.href}
                 href={sub.href}
                 className={cn(
-                  "flex items-center gap-2 pl-8 pr-3 py-1.5 text-[13px] font-normal transition-colors relative",
+                  "flex items-center gap-2 pl-6 pr-3 py-1.5 text-[13px] font-normal transition-colors relative",
                   isSubActive
                     ? "text-white font-medium"
                     : "text-[#c3c4c7] hover:text-[#72aee6]"
                 )}
               >
-                <span className={cn("w-1 h-1 rounded-full shrink-0", isSubActive ? "bg-[#72aee6]" : "bg-transparent")} />
+                {sub.icon ? (
+                  <sub.icon size={14} strokeWidth={1.5} className={cn("shrink-0", isSubActive ? "text-[#72aee6]" : "text-[#a7aaad]")} />
+                ) : (
+                  <span className={cn("w-1 h-1 rounded-full shrink-0", isSubActive ? "bg-[#72aee6]" : "bg-transparent")} />
+                )}
                 {sub.name}
               </Link>
             );

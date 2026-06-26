@@ -136,7 +136,7 @@ export async function duplicateProduct(id: string) {
                     data: {
                         productId: newProduct.id,
                         name: v.name,
-                        sku: v.sku ? `${v.sku}-COPY-${Math.floor(Math.random() * 1000)}` : null,
+                        sku: v.sku ? `${v.sku}-COPY-${Date.now().toString(36).toUpperCase()}` : null,
                         price: v.price,
                         stock: v.stock,
                         attributes: v.attributes as unknown as Prisma.InputJsonValue,

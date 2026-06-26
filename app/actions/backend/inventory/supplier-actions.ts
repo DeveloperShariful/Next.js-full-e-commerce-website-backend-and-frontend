@@ -1,131 +1,330 @@
-//app/actions/admin/inventory/supplier-actions.ts
-
+// File: app/actions/backend/inventory/supplier-actions.ts
 "use server";
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/auth";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 // ==========================================
-// 1. SUPPLIER CRUD
+// TYPES
 // ==========================================
-export async function getSuppliers(searchQuery: string = "") {
+
+export type SupplierWithCount = Prisma.SupplierGetPayload<{
+  include: { _count: { select: { purchaseOrders: true } } };
+}>;
+
+export type PurchaseOrderWithSupplier = Omit<
+  Prisma.PurchaseOrderGetPayload<{
+    include: { supplier: { select: { name: true; email: true } } };
+  }>,
+  "totalCost"
+> & { totalCost: number };
+
+// ==========================================
+// ZOD SCHEMAS
+// ==========================================
+
+const supplierSchema = z.object({
+  name: z.string().min(1, "Supplier name is required"),
+  email: z.string().email("Invalid email").optional().nullable().or(z.literal("")),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  website: z.string().url("Invalid URL").optional().nullable().or(z.literal("")),
+  contactPerson: z.string().optional().nullable(),
+});
+
+const purchaseOrderSchema = z.object({
+  supplierId: z.string().min(1, "Supplier is required"),
+  status: z.string().default("PENDING"),
+  totalCost: z.coerce
+    .number()
+    .nonnegative("Total cost cannot be negative"),
+  notes: z.string().optional().nullable(),
+});
+
+// ==========================================
+// HELPERS
+// ==========================================
+
+async function getDbUserId(): Promise<string | null> {
+  const session = await auth();
+  if (!session?.user?.email) return null;
+  const dbUser = await db.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true },
+  });
+  return dbUser?.id ?? null;
+}
+
+function generateReference(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+}
+
+// ==========================================
+// 1. GET SUPPLIERS
+// ==========================================
+
+export async function getSuppliers(
+  searchQuery = ""
+): Promise<{ success: boolean; data: SupplierWithCount[] }> {
   try {
+    const whereClause: Prisma.SupplierWhereInput = searchQuery
+      ? {
+          OR: [
+            { name: { contains: searchQuery, mode: "insensitive" } },
+            { email: { contains: searchQuery, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
     const suppliers = await db.supplier.findMany({
-      where: searchQuery ? {
-        OR: [
-          { name: { contains: searchQuery, mode: 'insensitive' } },
-          { email: { contains: searchQuery, mode: 'insensitive' } }
-        ]
-      } : {},
-      include: {
-        _count: { select: { purchaseOrders: true } }
-      },
-      orderBy: { createdAt: 'desc' }
+      where: whereClause,
+      include: { _count: { select: { purchaseOrders: true } } },
+      orderBy: { createdAt: "desc" },
     });
+
     return { success: true, data: suppliers };
   } catch (error) {
-    console.error("GET_SUPPLIERS_ERROR:", error);
+    console.error("GET_SUPPLIERS_ERROR", error);
     return { success: false, data: [] };
   }
 }
 
-export async function upsertSupplier(formData: FormData) {
+// ==========================================
+// 2. UPSERT SUPPLIER (create or update)
+// ==========================================
+
+export async function upsertSupplier(
+  formData: FormData
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const id = (formData.get("id") as string | null)?.trim() || null;
+  const isUpdate = !!id;
+
+  const validation = supplierSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email") || null,
+    phone: formData.get("phone") || null,
+    address: formData.get("address") || null,
+    website: formData.get("website") || null,
+    contactPerson: formData.get("contactPerson") || null,
+  });
+
+  if (!validation.success) {
+    return { success: false, error: validation.error.issues[0].message };
+  }
+
+  const data = validation.data;
+  const writeData = {
+    name: data.name,
+    email: data.email || null,
+    phone: data.phone ?? null,
+    address: data.address ?? null,
+    website: data.website || null,
+    contactPerson: data.contactPerson ?? null,
+  };
+
   try {
-    const id = formData.get("id") as string;
-    const data = {
-      name: formData.get("name") as string,
-      email: (formData.get("email") as string) || null,
-      phone: (formData.get("phone") as string) || null,
-      address: (formData.get("address") as string) || null,
-      website: (formData.get("website") as string) || null,
-      contactPerson: (formData.get("contactPerson") as string) || null,
-    };
+    if (isUpdate && id) {
+      const oldSupplier = await db.supplier.findUnique({
+        where: { id },
+        select: { name: true, email: true, phone: true },
+      });
 
-    if (!data.name) return { success: false, error: "Supplier name is required" };
+      await db.supplier.update({ where: { id }, data: writeData });
 
-    if (id) {
-      await db.supplier.update({ where: { id }, data });
+      await db.activityLog.create({
+        data: {
+          userId,
+          action: "SUPPLIER_UPDATED",
+          entityType: "Supplier",
+          entityId: id,
+          details: {
+            supplierName: data.name,
+            changes: {
+              ...(oldSupplier?.name !== data.name
+                ? { name: { old: oldSupplier?.name, new: data.name } }
+                : {}),
+              ...(oldSupplier?.email !== (data.email || null)
+                ? { email: { old: oldSupplier?.email, new: data.email || null } }
+                : {}),
+            },
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
     } else {
-      await db.supplier.create({ data });
+      const supplier = await db.supplier.create({ data: writeData });
+
+      await db.activityLog.create({
+        data: {
+          userId,
+          action: "SUPPLIER_CREATED",
+          entityType: "Supplier",
+          entityId: supplier.id,
+          details: {
+            name: supplier.name,
+            email: supplier.email ?? null,
+            contactPerson: supplier.contactPerson ?? null,
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
     }
 
     revalidatePath("/admin/inventory");
-    return { success: true, message: id ? "Supplier updated." : "Supplier created." };
+    return {
+      success: true,
+      message: isUpdate ? "Supplier updated." : "Supplier created.",
+    };
   } catch (error) {
-    console.error("UPSERT_SUPPLIER_ERROR:", error);
+    console.error("UPSERT_SUPPLIER_ERROR", error);
     return { success: false, error: "Failed to save supplier." };
   }
 }
 
-export async function deleteSupplier(id: string) {
-  try {
-    // Prevent deletion if they have active Purchase Orders
-    const poCount = await db.purchaseOrder.count({ where: { supplierId: id } });
-    if (poCount > 0) {
-      return { success: false, error: `Cannot delete: Supplier has ${poCount} Purchase Orders.` };
-    }
+// ==========================================
+// 3. DELETE SUPPLIER
+// ==========================================
 
+export async function deleteSupplier(
+  id: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const supplier = await db.supplier.findUnique({
+    where: { id },
+    select: { name: true },
+  });
+
+  if (!supplier) return { success: false, error: "Supplier not found." };
+
+  const poCount = await db.purchaseOrder.count({ where: { supplierId: id } });
+  if (poCount > 0) {
+    return {
+      success: false,
+      error: `Cannot delete: Supplier has ${poCount} Purchase Order(s). Archive or reassign them first.`,
+    };
+  }
+
+  try {
     await db.supplier.delete({ where: { id } });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "SUPPLIER_DELETED",
+        entityType: "Supplier",
+        entityId: id,
+        details: {
+          name: supplier.name,
+          permanent: true,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
     revalidatePath("/admin/inventory");
     return { success: true, message: "Supplier deleted." };
   } catch (error) {
+    console.error("DELETE_SUPPLIER_ERROR", error);
     return { success: false, error: "Failed to delete supplier." };
   }
 }
 
 // ==========================================
-// 2. PURCHASE ORDERS (PO)
+// 4. GET PURCHASE ORDERS
 // ==========================================
-export async function getPurchaseOrders() {
+
+export async function getPurchaseOrders(): Promise<{
+  success: boolean;
+  data: PurchaseOrderWithSupplier[];
+}> {
   try {
     const pos = await db.purchaseOrder.findMany({
-      include: {
-        supplier: { select: { name: true, email: true } }
-      },
-      orderBy: { createdAt: 'desc' }
+      include: { supplier: { select: { name: true, email: true } } },
+      orderBy: { createdAt: "desc" },
     });
 
-    // 🚀 FIXED: Convert Prisma Decimal to standard JS Number for the frontend
-    const serializedPos = pos.map(po => ({
+    const serialized: PurchaseOrderWithSupplier[] = pos.map((po) => ({
       ...po,
-      totalCost: Number(po.totalCost) 
+      totalCost: Number(po.totalCost),
     }));
 
-    return { success: true, data: serializedPos };
+    return { success: true, data: serialized };
   } catch (error) {
-    console.error("GET_PO_ERROR:", error);
+    console.error("GET_PO_ERROR", error);
     return { success: false, data: [] };
   }
 }
 
-export async function createPurchaseOrder(formData: FormData) {
+// ==========================================
+// 5. CREATE PURCHASE ORDER
+// ==========================================
+
+export async function createPurchaseOrder(
+  formData: FormData
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const userId = await getDbUserId();
+  if (!userId) return { success: false, error: "Unauthorized access." };
+
+  const validation = purchaseOrderSchema.safeParse({
+    supplierId: formData.get("supplierId"),
+    status: formData.get("status") || "PENDING",
+    totalCost: formData.get("totalCost"),
+    notes: formData.get("notes") || null,
+  });
+
+  if (!validation.success) {
+    return { success: false, error: validation.error.issues[0].message };
+  }
+
+  const data = validation.data;
+
+  const supplier = await db.supplier.findUnique({
+    where: { id: data.supplierId },
+    select: { name: true },
+  });
+
+  if (!supplier) {
+    return { success: false, error: "Supplier not found." };
+  }
+
+  const poNumber = generateReference("PO");
+
   try {
-    const supplierId = formData.get("supplierId") as string;
-    const status = formData.get("status") as string;
-    const totalCost = parseFloat(formData.get("totalCost") as string);
-    const notes = formData.get("notes") as string;
-
-    if (!supplierId || isNaN(totalCost)) {
-      return { success: false, error: "Supplier and valid total cost are required." };
-    }
-
-    // Auto-generate PO Number
-    const poNumber = `PO-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    await db.purchaseOrder.create({
+    const po = await db.purchaseOrder.create({
       data: {
         poNumber,
-        supplierId,
-        status: status || "PENDING",
-        totalCost,
-        notes: notes || null
-      }
+        supplierId: data.supplierId,
+        status: data.status,
+        totalCost: data.totalCost,
+        notes: data.notes ?? null,
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        userId,
+        action: "PURCHASE_ORDER_CREATED",
+        entityType: "PurchaseOrder",
+        entityId: po.id,
+        details: {
+          poNumber,
+          supplierName: supplier.name,
+          supplierId: data.supplierId,
+          status: data.status,
+          totalCost: data.totalCost,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
 
     revalidatePath("/admin/inventory");
     return { success: true, message: "Purchase Order created successfully." };
   } catch (error) {
-    console.error("CREATE_PO_ERROR:", error);
+    console.error("CREATE_PO_ERROR", error);
     return { success: false, error: "Failed to create Purchase Order." };
   }
 }

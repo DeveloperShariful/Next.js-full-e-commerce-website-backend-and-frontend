@@ -7,7 +7,7 @@ import { CouponFormType, DiscountTypeEnum } from "../../types";
 
 interface TabGeneralProps {
   formData: CouponFormType;
-  updateField: (field: keyof CouponFormType, value: any) => void;
+  updateField: (field: keyof CouponFormType, value: CouponFormType[keyof CouponFormType]) => void;
 }
 
 export const TabGeneral = ({ formData, updateField }: TabGeneralProps) => {

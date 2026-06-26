@@ -14,11 +14,40 @@ import { toast } from "sonner";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { PaginationControls } from "./pagination-controls"; 
 
+export interface ProductRow {
+  id: string;
+  productCode: number | null;
+  name: string;
+  slug: string;
+  sku: string | null;
+  price: number;
+  salePrice: number | null;
+  costPerItem: number | null;
+  status: string;
+  productType: string;
+  trackQuantity: boolean;
+  featuredImage: string | null;
+  isFeatured: boolean;
+  updatedAt: string;
+  categories: { id: string; name: string }[];
+  brand: { name: string } | null;
+  tags: { name: string }[];
+  images: { url: string }[];
+  inventoryLevels: { quantity: number }[];
+}
+
+interface ProductCounts {
+  all: number;
+  active: number;
+  draft: number;
+  archived: number;
+}
+
 interface ProductTableProps {
-  products: any[];
-  categories: any[];
-  brands: any[]; 
-  counts: any;
+  products: ProductRow[];
+  categories: { id?: string; name: string }[];
+  brands: { id: string; name: string }[];
+  counts: ProductCounts;
   statusFilter: string;
   totalProducts: number;
   totalPages: number;
@@ -144,7 +173,7 @@ export default function ProductTable({
       });
   };
 
-  const formatDate = (date: Date) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
+  const formatDate = (date: Date | string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
 
   const renderStars = (isFeatured: boolean) => {
     return (
@@ -315,7 +344,7 @@ export default function ProductTable({
               ) : (
                 products.map((product, index) => {
                   const displayImage = product.featuredImage || product.images[0]?.url || null;
-                  const stock = product.inventoryLevels?.reduce((acc: number, curr: any) => acc + curr.quantity, 0) || 0;
+                  const stock = product.inventoryLevels?.reduce((acc: number, curr: { quantity: number }) => acc + curr.quantity, 0) || 0;
                   const isProcessing = loadingId === product.id;
                   
                   const isAlternate = index % 2 !== 0; 
@@ -407,13 +436,13 @@ export default function ProductTable({
                       {/* ✅ FIX: Display multiple categories as comma separated */}
                       <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
                          {product.categories && product.categories.length > 0 
-                            ? product.categories.map((c:any) => c.name).join(', ') 
+                            ? product.categories.map((c: { id: string; name: string }) => c.name).join(', ')
                             : "—"}
                       </td>
                       
                       <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
                          {product.tags && product.tags.length > 0 
-                            ? product.tags.map((t:any) => t.name).join(', ') 
+                            ? product.tags.map((t: { name: string }) => t.name).join(', ') 
                             : "—"}
                       </td>
                       

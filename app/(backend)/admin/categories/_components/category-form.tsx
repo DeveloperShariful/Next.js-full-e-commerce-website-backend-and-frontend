@@ -9,7 +9,7 @@ import { CategoryData } from "../types";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-import { createCategory , updateCategory} from "@/app/actions/backend/categories/actions";
+import { createCategory, updateCategory } from "@/app/actions/backend/product/product-category";
 
 
 interface FormProps {

@@ -6,13 +6,12 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { CategoryData } from "../types";
 
-// 🚀 Importing from the unified actions file
-import { 
-  getCategories, 
-  deleteCategory, 
-  restoreCategory, 
-  forceDeleteCategory 
-} from "@/app/actions/backend/categories/actions";
+import {
+  getCategories,
+  deleteCategory,
+  restoreCategory,
+  forceDeleteCategory,
+} from "@/app/actions/backend/product/product-category";
 
 import CategoryHeader from "./header";
 import CategoryList from "./category-list";
@@ -20,29 +19,40 @@ import CategoryForm from "./category-form";
 
 export default function CategoryView() {
   const [categories, setCategories] = useState<CategoryData[]>([]);
+  // Always active categories for parent dropdowns in forms
+  const [activeCategories, setActiveCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "form">("list");
   const [editingCat, setEditingCat] = useState<Partial<CategoryData> | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // 🚀 New states for Trash filtering and Counts
+
   const [currentFilter, setCurrentFilter] = useState<"active" | "trash">("active");
   const [counts, setCounts] = useState({ active: 0, trash: 0, all: 0 });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getCategories(currentFilter);
-      if (res.success) {
-        setCategories(buildTree(res.data));
-        setCounts(res.counts); // Update the counts from DB
+      const [filteredRes, activeRes] = await Promise.all([
+        getCategories(currentFilter),
+        // Always fetch active categories for the parent dropdown in forms
+        currentFilter === "trash" ? getCategories("active") : Promise.resolve(null),
+      ]);
+
+      if (filteredRes.success) {
+        setCategories(buildTree(filteredRes.data));
+        setCounts(filteredRes.counts);
+      }
+      if (activeRes?.success) {
+        setActiveCategories(buildTree(activeRes.data));
+      } else if (currentFilter === "active" && filteredRes.success) {
+        setActiveCategories(buildTree(filteredRes.data));
       }
     } catch (error) {
       toast.error("Failed to load categories");
     } finally {
       setLoading(false);
     }
-  }, [currentFilter]); // Re-fetch when filter changes
+  }, [currentFilter]);
 
   useEffect(() => {
     fetchData();
@@ -163,9 +173,9 @@ export default function CategoryView() {
           </div>
           
           <div className="max-w-3xl bg-transparent">
-            <CategoryForm 
-              initialData={editingCat} 
-              categories={categories}
+            <CategoryForm
+              initialData={editingCat}
+              categories={activeCategories}
               onSuccess={resetForm}
               isEditing={true}
             />
@@ -187,9 +197,9 @@ export default function CategoryView() {
             
             {/* Left Column (Add Form) */}
             <div className={`w-full lg:w-[32%] xl:w-[28%] shrink-0 ${viewMode === "list" ? "hidden lg:block" : "block"}`}>
-              <CategoryForm 
-                initialData={{}} 
-                categories={categories} // Note: This will only show active/trash based on current view. For forms, you usually want all active parents.
+              <CategoryForm
+                initialData={{}}
+                categories={activeCategories}
                 onSuccess={resetForm}
                 isEditing={false}
               />

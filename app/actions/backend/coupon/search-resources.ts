@@ -3,9 +3,23 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { auth } from "@/auth";
+
+async function isAdminSession(): Promise<boolean> {
+  const session = await auth();
+  if (!session?.user?.email) return false;
+  const dbUser = await db.user.findUnique({
+    where: { email: session.user.email },
+    select: { role: true },
+  });
+  if (!dbUser) return false;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "MANAGER"] as const;
+  return (allowed as readonly string[]).includes(dbUser.role);
+}
 
 // 1. Search Products (✅ FIXED: Added Image and Price)
 export async function searchProductsForCoupon(query: string) {
+  if (!(await isAdminSession())) return [];
   try {
     if (!query || query.length < 2) return [];
 
@@ -42,6 +56,7 @@ export async function searchProductsForCoupon(query: string) {
 
 // 2. Search Categories
 export async function searchCategoriesForCoupon(query: string) {
+  if (!(await isAdminSession())) return [];
   try {
     if (!query || query.length < 2) return [];
 
@@ -60,6 +75,7 @@ export async function searchCategoriesForCoupon(query: string) {
 
 // 3. Search Affiliates
 export async function searchAffiliatesForCoupon(query: string) {
+  if (!(await isAdminSession())) return [];
   try {
     if (!query || query.length < 2) return [];
 

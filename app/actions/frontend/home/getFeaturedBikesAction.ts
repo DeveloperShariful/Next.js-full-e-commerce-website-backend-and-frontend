@@ -1,10 +1,11 @@
 // app/actions/storefront/home/getFeaturedBikesAction.ts
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { db } from "@/lib/prisma";
 import { StorefrontProduct, FeaturedBikesResponse } from "@/app/(frontend)/types";
 
-export async function getFeaturedBikesAction(): Promise<FeaturedBikesResponse> {
+async function _fetchFeaturedBikes(): Promise<FeaturedBikesResponse> {
   try {
     const featuredProducts = await db.product.findMany({
       where: {
@@ -70,4 +71,14 @@ export async function getFeaturedBikesAction(): Promise<FeaturedBikesResponse> {
     console.error("[getFeaturedBikesAction] Error:", error);
     return { success: false, products: [], error: "Failed to fetch featured products" };
   }
+}
+
+const _cachedFeaturedBikes = unstable_cache(
+  _fetchFeaturedBikes,
+  ["homepage-featured-bikes"],
+  { revalidate: 3600, tags: ["products", "featured-bikes"] }
+);
+
+export async function getFeaturedBikesAction(): Promise<FeaturedBikesResponse> {
+  return _cachedFeaturedBikes();
 }

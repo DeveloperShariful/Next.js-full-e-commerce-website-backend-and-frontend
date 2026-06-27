@@ -52,7 +52,7 @@ export async function getFbSettings() {
         fbDomainVerification: config.fbDomainVerification || "",
       }
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching Facebook settings:", error);
     return { success: false, error: "Failed to fetch Facebook settings." };
   }
@@ -103,7 +103,7 @@ export async function updateFbSettings(data: FbSettingsData) {
 
     revalidatePath("/admin/marketing/facebook");
     return { success: true, message: "Facebook settings saved successfully!" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating Facebook settings:", error);
     return { success: false, error: "An error occurred while saving Facebook settings." };
   }

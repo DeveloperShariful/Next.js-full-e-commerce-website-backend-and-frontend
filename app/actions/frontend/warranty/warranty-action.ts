@@ -150,7 +150,7 @@ export async function submitWarrantyClaim(data: ClaimData) {
 
     return { success: true, message: 'Claim submitted successfully!' };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error submitting warranty claim:', error);
     return { success: false, message: 'Internal server error. Please try again.' };
   }

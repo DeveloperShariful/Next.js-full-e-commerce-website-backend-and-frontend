@@ -5,12 +5,23 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { updateClaimStatus, bulkUpdateClaimStatus, deleteClaimPermanently, bulkDeleteClaimsPermanently } from '@/app/actions/backend/warranty/claim-action';
-import Pagination from './Pagination'; 
-import { ClaimStatus } from '@prisma/client'; // 🛑 NEW: Import types
+import Pagination from './Pagination';
+import { ClaimStatus } from '@prisma/client';
 
-export default function WarrantyTableClient({ claims, currentFilter, totalItems, itemsPerPage }: { claims: any[], currentFilter: string, totalItems: number, itemsPerPage: number }) {
+interface WarrantyClaimRow {
+  id: string;
+  name: string;
+  email: string;
+  orderNumber: string;
+  status: ClaimStatus;
+  createdAt: Date | string;
+}
+
+type BulkActionValue = ClaimStatus | 'DELETE_PERMANENTLY' | '';
+
+export default function WarrantyTableClient({ claims, currentFilter, totalItems, itemsPerPage }: { claims: WarrantyClaimRow[], currentFilter: string, totalItems: number, itemsPerPage: number }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkAction, setBulkAction] = useState<ClaimStatus | "">(""); // 🛑 FIXED: Strong Typing
+  const [bulkAction, setBulkAction] = useState<BulkActionValue>('');
   const [isApplying, setIsApplying] = useState(false);
 
   const isTrashView = currentFilter === 'TRASHED';
@@ -31,13 +42,12 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
 
     setIsApplying(true);
 
-    if (bulkAction === 'DELETE_PERMANENTLY' as any) {
+    if (bulkAction === 'DELETE_PERMANENTLY') {
       if (confirm('Are you sure you want to permanently delete these claims? This cannot be undone.')) {
         await bulkDeleteClaimsPermanently(selectedIds);
       }
     } else {
-      // 🛑 FIXED: Passing strongly typed status
-      await bulkUpdateClaimStatus(selectedIds, bulkAction as ClaimStatus);
+      await bulkUpdateClaimStatus(selectedIds, bulkAction);
     }
 
     setSelectedIds([]); 
@@ -49,7 +59,7 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
     <>
       <div className="flex justify-between items-center bg-white p-2 border-y sm:border sm:border-[#c3c4c7] sm:border-b-0 mt-2 -mx-4 sm:mx-0">
         <div className="flex items-center gap-2 px-2 sm:px-0">
-          <select value={bulkAction} onChange={(e) => setBulkAction(e.target.value as any)} className="border border-[#8c8f94] rounded text-[13px] px-2 py-1 outline-none focus:border-[#2271b1]">
+          <select value={bulkAction} onChange={(e) => setBulkAction(e.target.value as BulkActionValue)} className="border border-[#8c8f94] rounded text-[13px] px-2 py-1 outline-none focus:border-[#2271b1]">
             <option value="">Bulk actions</option>
             {isTrashView ? (
               <>

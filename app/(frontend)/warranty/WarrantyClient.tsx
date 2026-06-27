@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { submitWarrantyClaim } from '@/app/actions/frontend/warranty/warranty-action';
 import { saveMediaRecord } from '@/app/actions/backend/media/media-action';
@@ -75,6 +75,21 @@ export default function WarrantyClient() {
   const isGoBikeOnline = formData.shopPurchased === GOBIKE_ONLINE_VALUE;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const shopDropdownRef = useRef<HTMLDivElement>(null);
+  const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
+
+  const selectedShopOption = SHOP_OPTIONS.flatMap(g => g.options).find(o => o.value === formData.shopPurchased);
+  const selectedShopGroup  = SHOP_OPTIONS.find(g => g.options.some(o => o.value === formData.shopPurchased));
+
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (shopDropdownRef.current && !shopDropdownRef.current.contains(e.target as Node)) {
+        setIsShopDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -121,7 +136,7 @@ export default function WarrantyClient() {
       setUploadProgress(100);
       if (fileInputRef.current) fileInputRef.current.value = '';
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
       toast.error('Failed to upload files. Ensure your network is stable and files are valid.');
       setUploadProgress(0);
@@ -134,7 +149,7 @@ export default function WarrantyClient() {
     setUploadedMediaUrls(urls => urls.filter((_, index) => index !== indexToRemove));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isUploading) return alert("Please wait for files to finish uploading.");
     if (uploadedMediaUrls.length === 0) return alert("Please upload at least one video or image.");
@@ -165,8 +180,9 @@ export default function WarrantyClient() {
       setUploadedMediaUrls([]);
       setUploadProgress(0);
 
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to submit claim. Please try again.');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to submit claim. Please try again.';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -259,17 +275,64 @@ export default function WarrantyClient() {
               )}
 
               <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Where did you purchase? *</label>
-                  <select name="shopPurchased" required value={formData.shopPurchased} onChange={handleInputChange} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
-                    {SHOP_OPTIONS.map((group) => (
-                      <optgroup key={group.group} label={group.group}>
-                        {group.options.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Where did you purchase? *</label>
+                <div className="relative" ref={shopDropdownRef}>
+                  {/* Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => setIsShopDropdownOpen(v => !v)}
+                    className={`w-full flex items-center justify-between px-4 py-3 bg-white border-2 rounded-xl text-left transition-all ${isShopDropdownOpen ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-blue-300'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                        {formData.shopPurchased === GOBIKE_ONLINE_VALUE ? (
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        ) : (
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        )}
+                      </div>
+                      <div className="text-left">
+                        <p className="text-[13px] font-bold text-gray-800 leading-tight">{selectedShopOption?.label ?? 'Select store'}</p>
+                        <p className="text-[11px] text-gray-400 leading-tight mt-0.5">{selectedShopGroup?.group}</p>
+                      </div>
+                    </div>
+                    <svg className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+
+                  {/* Dropdown panel */}
+                  {isShopDropdownOpen && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
+                      {SHOP_OPTIONS.map((group) => (
+                        <div key={group.group}>
+                          <div className="px-4 pt-3 pb-1.5">
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">{group.group}</span>
+                          </div>
+                          {group.options.map((opt) => {
+                            const isSelected = formData.shopPurchased === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => ({ ...prev, shopPurchased: opt.value }));
+                                  setIsShopDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-5 py-2.5 text-left text-[13px] transition-colors
+                                  ${isSelected ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                              >
+                                <span>{opt.label}</span>
+                                {isSelected && (
+                                  <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {isGoBikeOnline && (

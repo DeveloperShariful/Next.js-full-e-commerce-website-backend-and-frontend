@@ -4,11 +4,12 @@
 
 import { db } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { sendNotification } from '@/app/api/email/send-notification'; // ✅ NEW: Email trigger
+import { ClaimStatus } from '@prisma/client';
+import { sendNotification } from '@/app/api/email/send-notification';
 
 export async function updateClaimStatus(formData: FormData) {
   const id = formData.get('id') as string;
-  const status = formData.get('status') as any; 
+  const status = formData.get('status') as ClaimStatus;
   if (!id || !status) return;
 
   try {
@@ -46,7 +47,7 @@ export async function updateClaimStatus(formData: FormData) {
 }
 
 // Bulk update also sends emails individually
-export async function bulkUpdateClaimStatus(ids: string[], status: any) {
+export async function bulkUpdateClaimStatus(ids: string[], status: ClaimStatus) {
   if (!ids.length || !status) return { success: false };
   try {
     const claims = await db.warrantyClaim.findMany({ where: { id: { in: ids } } });

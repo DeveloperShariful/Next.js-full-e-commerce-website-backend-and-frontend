@@ -9,6 +9,45 @@ import SubmitStatusButton from './SubmitStatusButton';
 
 export const dynamic = 'force-dynamic';
 
+interface SparePart {
+  id: string;
+  databaseId: string | null;
+  name: string;
+  weight: number;
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  image?: { sourceUrl: string };
+}
+
+interface AddressDetails {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+}
+
+interface OrderItemRow {
+  id: string;
+  productName: string;
+  quantity: number;
+  total: unknown;
+}
+
+interface LocalOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  billingAddress: unknown;
+  shippingAddress: unknown;
+  items: OrderItemRow[];
+}
+
 export default async function SingleClaimPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   const id = resolvedParams.id;
@@ -22,7 +61,7 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
   const cleanOrderNumber = claim.orderNumber.replace('#', '').trim();
 
   // ১. Prisma দিয়ে সরাসরি ডাটাবেজ থেকে স্পেয়ার পার্টস আনা
-  let spareParts: any[] = [];
+  let spareParts: SparePart[] = [];
   try {
     const sparePartsData = await db.product.findMany({
       where: {
@@ -46,7 +85,7 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
     // Mapping to match the expected format for TransdirectClientBox
     spareParts = sparePartsData.map(part => ({
       id: part.id,
-      databaseId: part.productCode,
+      databaseId: part.productCode !== null && part.productCode !== undefined ? String(part.productCode) : null,
       name: part.name,
       weight: part.weight ? Number(part.weight) : 0.5,
       length: part.length ? Number(part.length) : null,
@@ -54,14 +93,14 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
       height: part.height ? Number(part.height) : null,
       image: part.featuredImage ? { sourceUrl: part.featuredImage } : undefined
     }));
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to fetch spare parts from database", error);
   }
 
   // ২. Prisma Order থেকে অর্ডারের ফুল ডিটেইলস আনা
-  let localOrder: any = null;
-  let billingDetails: any = {};
-  let shippingDetails: any = {};
+  let localOrder: LocalOrder | null = null;
+  let billingDetails: AddressDetails = {};
+  let shippingDetails: AddressDetails = {};
 
   try {
     const orderRecord = await db.order.findUnique({
@@ -70,12 +109,15 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
     });
 
     if (orderRecord) {
-      localOrder = orderRecord;
-      // Prisma JSON fields parse
-      billingDetails = typeof orderRecord.billingAddress === 'string' ? JSON.parse(orderRecord.billingAddress) : orderRecord.billingAddress || {};
-      shippingDetails = typeof orderRecord.shippingAddress === 'string' ? JSON.parse(orderRecord.shippingAddress) : orderRecord.shippingAddress || {};
+      localOrder = orderRecord as unknown as LocalOrder;
+      billingDetails = (typeof orderRecord.billingAddress === 'string'
+        ? JSON.parse(orderRecord.billingAddress)
+        : orderRecord.billingAddress ?? {}) as unknown as AddressDetails;
+      shippingDetails = (typeof orderRecord.shippingAddress === 'string'
+        ? JSON.parse(orderRecord.shippingAddress)
+        : orderRecord.shippingAddress ?? {}) as unknown as AddressDetails;
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Database query error for order:", error);
   }
 
@@ -157,7 +199,7 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {localOrder.items?.map((item: any) => (
+                      {localOrder.items?.map((item) => (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="py-2 px-4 text-[#2271b1] font-semibold">{item.productName}</td>
                           <td className="py-2 px-4 text-center">x{item.quantity}</td>

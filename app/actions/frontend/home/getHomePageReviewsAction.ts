@@ -1,9 +1,10 @@
 // app/actions/storefront/home/getHomePageReviewsAction.ts
 "use server";
 
+import { unstable_cache } from "next/cache";
 import { db } from "@/lib/prisma";
 
-export async function getHomePageReviewsAction() {
+async function _fetchHomePageReviews() {
   try {
     // ১. সম্পূর্ণ ডায়নামিক Summary ক্যালকুলেশনের জন্য সব Approved রিভিউ আনা হচ্ছে
     const allApprovedReviews = await db.review.findMany({
@@ -93,4 +94,14 @@ export async function getHomePageReviewsAction() {
       error: "Failed to fetch homepage reviews",
     };
   }
+}
+
+const _cachedHomePageReviews = unstable_cache(
+  _fetchHomePageReviews,
+  ["homepage-reviews"],
+  { revalidate: 3600, tags: ["reviews"] }
+);
+
+export async function getHomePageReviewsAction() {
+  return _cachedHomePageReviews();
 }

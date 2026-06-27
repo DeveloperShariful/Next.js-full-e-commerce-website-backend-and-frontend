@@ -104,7 +104,7 @@ export async function getTransdirectQuotes(formData: FormData) {
       tempBookingId: data.id // This is required for confirmation later
     };
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Transdirect getQuotes Action Error:", error);
     return { success: false, message: 'Internal Server Error. Please check system logs.' };
   }
@@ -238,7 +238,7 @@ export async function confirmTransdirectBooking(formData: FormData) {
 
     return { success: true, message: 'Booking confirmed! Label has been generated.' };
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Transdirect confirmBooking Action Error:", error);
     return { success: false, message: 'Internal Server Error while confirming booking.' };
   }

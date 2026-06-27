@@ -75,8 +75,9 @@ export async function createWarrantyClaimAction(data: WarrantyInput) {
     revalidatePath("/my-account");
     return { success: true, message: "Warranty claim submitted successfully. Our engineers will review it." };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Warranty Claim Error:", error);
-    return { success: false, message: error.message || "Failed to submit warranty claim." };
+    const msg = error instanceof Error ? error.message : "Failed to submit warranty claim.";
+    return { success: false, message: msg };
   }
 }

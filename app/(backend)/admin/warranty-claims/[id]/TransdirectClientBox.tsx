@@ -7,30 +7,54 @@ import { toast } from "sonner";
 import { getTransdirectQuotes, confirmTransdirectBooking } from '@/app/actions/backend/warranty/transdirect-action';
 import Image from 'next/image';
 
-export default function TransdirectClientBox({ 
-  claimId, 
-  status, 
-  trackingNumber, 
-  replacementPart, 
-  spareParts, 
+interface SparePart {
+  id: string;
+  databaseId: string | null;
+  name: string;
+  weight: number;
+  length: number | null;
+  width: number | null;
+  height: number | null;
+  image?: { sourceUrl: string };
+}
+
+interface AddressSuggestion {
+  suburb: string;
+  state: string;
+  postcode: string;
+}
+
+interface ShippingQuote {
+  courier: string;
+  name: string;
+  total: string;
+  transitTime: string;
+}
+
+export default function TransdirectClientBox({
+  claimId,
+  status,
+  trackingNumber,
+  replacementPart,
+  spareParts,
   customerAddress,
-  customerSuburb, 
-  customerPostcode, 
-  customerState 
-}: { 
-  claimId: string, 
-  status: string, 
-  trackingNumber: string | null, 
-  replacementPart: string | null, 
-  spareParts: any[], 
+  customerSuburb,
+  customerPostcode,
+  customerState
+}: {
+  claimId: string,
+  status: string,
+  trackingNumber: string | null,
+  replacementPart: string | null,
+  spareParts: SparePart[],
   customerAddress: string | null,
-  customerSuburb: string | null, 
-  customerPostcode: string | null, 
-  customerState: string | null 
+  customerSuburb: string | null,
+  customerPostcode: string | null,
+  customerState: string | null
 }) {
-  
+
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedPart, setSelectedPart] = useState<any | null>(null);
+  const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
   const [isRebooking, setIsRebooking] = useState(false);
   
   // Professional Address States
@@ -48,8 +72,8 @@ export default function TransdirectClientBox({
   }, [customerAddress, customerSuburb, customerPostcode, customerState]);
 
   // --- Auto Suggestion States ---
-  const [searchInput, setSearchInput] = useState(''); 
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [searchInput, setSearchInput] = useState('');
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   
@@ -57,7 +81,7 @@ export default function TransdirectClientBox({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Quotes & Booking States
-  const [quotes, setQuotes] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<ShippingQuote[]>([]);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [tempBookingId, setTempBookingId] = useState<string | null>(null);
@@ -102,14 +126,14 @@ export default function TransdirectClientBox({
         setSuggestions(data);
         setShowSuggestions(true);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Address lookup failed", error);
     } finally {
       setIsSearchingAddress(false);
     }
   };
 
-  const handleSuggestionSelect = (suggestion: any) => {
+  const handleSuggestionSelect = (suggestion: AddressSuggestion) => {
     setSearchInput(suggestion.suburb); 
     setSuburb(suggestion.suburb);
     setPostcode(suggestion.postcode);
@@ -118,7 +142,7 @@ export default function TransdirectClientBox({
   };
 
   // --- AUTO FETCH QUOTES LOGIC ---
-  const fetchLiveQuotes = async (part: any) => {
+  const fetchLiveQuotes = async (part: SparePart) => {
     if (!suburb || !postcode) {
       toast.error("Please provide at least Suburb and Postcode to get live rates.");
       return;
@@ -166,7 +190,7 @@ export default function TransdirectClientBox({
     setLoadingQuotes(false);
   };
 
-  const handleProductSelect = (part: any) => {
+  const handleProductSelect = (part: SparePart) => {
     setSelectedPart(part);
     setIsOpen(false);
     fetchLiveQuotes(part); 
@@ -181,6 +205,7 @@ export default function TransdirectClientBox({
   const handleConfirmBooking = async () => {
     if (!selectedCourier || !tempBookingId) return toast.error("Please select a courier.");
     if (!address || !suburb || !postcode) return toast.error("Receiver address is incomplete.");
+    if (!selectedPart) return toast.error("Please select a replacement part.");
 
     setLoadingBooking(true);
     const formData = new FormData();
@@ -207,7 +232,7 @@ export default function TransdirectClientBox({
         <span className="text-[#2271b1]">🚚</span> Transdirect Shipping
       </h2>
       
-      <div className="p-5 text-[13px] text-[#3c434a]">
+      <div className="p-1 text-[13px] text-[#3c434a]">
         
         {trackingNumber && !isRebooking ? (
           <div className="bg-[#f0f6fc] border border-[#c3c4c7] p-6 rounded text-center">
@@ -243,46 +268,48 @@ export default function TransdirectClientBox({
             </div>
           </div>
         ) : (
-          
-          <div className="space-y-6">
-            
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-3 border-b border-gray-200 pb-2">
-                <label className="font-bold text-[#1d2327]">1. Verify Receiver Address</label>
-                <button type="button" onClick={handleRefreshQuotes} className="text-[#2271b1] hover:underline text-[12px] flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                  Refresh Quotes
+
+          <div className="space-y-4">
+
+            {/* ── STEP 1: ADDRESS ── */}
+            <div className="rounded-lg border border-[#c3c4c7] overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-[#f0f6fc] border-b border-[#c3c4c7]/60">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#2271b1] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">1</span>
+                  <span className="text-[13px] font-semibold text-[#1d2327]">Verify Receiver Address</span>
+                </div>
+                <button type="button" onClick={handleRefreshQuotes} className="flex items-center gap-1 text-[#2271b1] hover:text-[#135e96] text-[12px] font-medium transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  Refresh
                 </button>
               </div>
-              
-              <div className="grid grid-cols-12 gap-3 relative">
+
+              <div className="p-4 bg-white grid grid-cols-12 gap-3 relative">
                 <div className="col-span-12">
-                  <span className="text-[11px] text-gray-500 block mb-1">Street Address</span>
-                  <input type="text" value={address} onChange={e=>setAddress(e.target.value)} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]" placeholder="e.g. 52 Bligh Ave" />
+                  <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Street Address</label>
+                  <input type="text" value={address} onChange={e => setAddress(e.target.value)}
+                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] focus:ring-2 focus:ring-[#2271b1]/20 transition-all placeholder:text-[#8c8f94]"
+                    placeholder="e.g. 52 Bligh Ave" />
                 </div>
-                
+
                 <div className="col-span-12 md:col-span-6 relative" ref={suggestionRef}>
-                  <span className="text-[11px] text-gray-500 block mb-1">Search Suburb or Postcode</span>
-                  <input 
-                    type="text" 
-                    required 
-                    value={searchInput || suburb} 
-                    onChange={handleLocationSearch} 
-                    className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]" 
-                    placeholder="e.g. Sydney or 2000" 
-                  />
-                  {isSearchingAddress && <div className="absolute right-2 top-8 text-[10px] text-blue-500">Searching...</div>}
-                  
+                  <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Suburb / Postcode</label>
+                  <input type="text" required value={searchInput || suburb} onChange={handleLocationSearch}
+                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] focus:ring-2 focus:ring-[#2271b1]/20 transition-all placeholder:text-[#8c8f94]"
+                    placeholder="e.g. Sydney or 2000" />
+                  {isSearchingAddress && (
+                    <div className="absolute right-3 top-[2.1rem] text-[11px] text-[#2271b1] flex items-center gap-1">
+                      <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      Searching...
+                    </div>
+                  )}
                   {showSuggestions && suggestions.length > 0 && (
-                    <ul className="absolute z-[100] w-[150%] left-0 top-14 bg-white border border-[#c3c4c7] shadow-xl max-h-[250px] overflow-y-auto rounded-md">
+                    <ul className="absolute z-[100] w-full left-0 top-[4rem] bg-white border border-[#c3c4c7] shadow-xl rounded-lg overflow-hidden">
                       {suggestions.map((s, idx) => (
-                        <li 
-                          key={idx} 
-                          onClick={() => handleSuggestionSelect(s)}
-                          className="px-4 py-2 text-[13px] text-[#3c434a] hover:bg-[#2271b1] hover:text-white cursor-pointer border-b border-gray-100 last:border-0 transition-colors flex justify-between"
-                        >
+                        <li key={idx} onClick={() => handleSuggestionSelect(s)}
+                          className="px-4 py-2.5 text-[13px] text-[#3c434a] hover:bg-[#2271b1] hover:text-white cursor-pointer border-b border-[#f0f0f1] last:border-0 transition-colors flex justify-between items-center">
                           <span><strong>{s.suburb}</strong>, {s.state}</span>
-                          <span className="text-gray-400 font-mono">{s.postcode}</span>
+                          <span className="text-[12px] font-mono opacity-70">{s.postcode}</span>
                         </li>
                       ))}
                     </ul>
@@ -290,99 +317,106 @@ export default function TransdirectClientBox({
                 </div>
 
                 <div className="col-span-6 md:col-span-3">
-                  <span className="text-[11px] text-gray-500 block mb-1">State</span>
-                  <input type="text" value={state} onChange={e=>setState(e.target.value)} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 outline-none bg-gray-100" readOnly />
+                  <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">State</label>
+                  <input type="text" value={state} onChange={e => setState(e.target.value)} readOnly
+                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#3c434a] bg-[#f6f7f7] outline-none font-semibold" />
                 </div>
                 <div className="col-span-6 md:col-span-3">
-                  <span className="text-[11px] text-gray-500 block mb-1">Postcode</span>
-                  <input type="text" required value={postcode} onChange={e=>setPostcode(e.target.value)} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 outline-none bg-gray-100" readOnly />
+                  <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Postcode</label>
+                  <input type="text" required value={postcode} onChange={e => setPostcode(e.target.value)} readOnly
+                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#3c434a] bg-[#f6f7f7] outline-none font-semibold" />
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="block font-bold text-[#1d2327] mb-2">2. Select Replacement Part:</label>
-              <div className="relative" ref={dropdownRef}>
-                <div 
-                  onClick={() => { if (!loadingQuotes && status !== 'TRASHED' && status !== 'REJECTED') setIsOpen(!isOpen) }}
-                  className={`w-full border border-[#8c8f94] rounded text-[13px] px-3 py-2 bg-white flex items-center justify-between cursor-pointer ${(loadingQuotes || status === 'TRASHED' || status === 'REJECTED') ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'hover:border-[#2271b1] shadow-sm'}`}
-                >
-                  <div className="flex items-center gap-3 truncate">
-                    {selectedPart ? (
-                      <>
-                        {selectedPart.image?.sourceUrl ? <Image src={selectedPart.image.sourceUrl} alt="Part" width={24} height={24} className="rounded object-cover border border-gray-200" /> : <div className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center text-[10px]">📦</div>}
-                        <span className="truncate pr-4 font-semibold">{selectedPart.name}</span>
-                      </>
-                    ) : <span className="text-gray-500">Search and select a product...</span>}
+            {/* ── STEP 2: PART SELECTOR ── */}
+            <div className="rounded-lg border border-[#c3c4c7] overflow-visible">
+              <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#f0f6fc] border-b border-[#c3c4c7]/60">
+                <span className="w-5 h-5 rounded-full bg-[#2271b1] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">2</span>
+                <span className="text-[13px] font-semibold text-[#1d2327]">Select Replacement Part</span>
+              </div>
+              <div className="p-3 bg-white">
+                <div className="relative" ref={dropdownRef}>
+                  <div
+                    onClick={() => { if (!loadingQuotes && status !== 'TRASHED' && status !== 'REJECTED') setIsOpen(!isOpen); }}
+                    className={`w-full border rounded-md text-[13px] px-3 py-2.5 bg-white flex items-center justify-between cursor-pointer transition-all
+                      ${(loadingQuotes || status === 'TRASHED' || status === 'REJECTED') ? 'opacity-50 cursor-not-allowed bg-[#f6f7f7] border-[#c3c4c7]' : 'border-[#c3c4c7] hover:border-[#2271b1] hover:shadow-sm'}`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      {selectedPart ? (
+                        <>
+                          {selectedPart.image?.sourceUrl
+                            ? <Image src={selectedPart.image.sourceUrl} alt="Part" width={26} height={26} className="rounded-md object-cover border border-[#c3c4c7] flex-shrink-0" />
+                            : <div className="w-6 h-6 bg-[#f0f6fc] rounded-md flex items-center justify-center text-[12px] border border-[#c3c4c7] flex-shrink-0">📦</div>}
+                          <span className="font-semibold text-[#1d2327] truncate">{selectedPart.name}</span>
+                          <span className="text-[11px] text-[#50575e] bg-[#f0f0f1] px-1.5 py-0.5 rounded flex-shrink-0">{selectedPart.weight}kg</span>
+                        </>
+                      ) : <span className="text-[#8c8f94]">Search and select a replacement part...</span>}
+                    </div>
+                    <svg className={`w-4 h-4 text-[#50575e] flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
                   </div>
-                  <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
 
-                {isOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-[#c3c4c7] rounded shadow-lg max-h-[300px] overflow-y-auto">
-                    {spareParts.length === 0 ? (
-                      <div className="p-4 text-gray-500 italic text-center">No products found</div>
-                    ) : (
-                      <ul className="py-1">
-                        {spareParts.map((part) => (
-                          <li 
-                            key={part.id}
-                            onClick={() => handleProductSelect(part)}
-                            className="px-3 py-2.5 hover:bg-[#f0f6fc] cursor-pointer flex items-center gap-3 border-b border-gray-100 last:border-0 transition-colors"
-                          >
-                            {part.image?.sourceUrl ? <Image src={part.image.sourceUrl} alt="Part" width={36} height={36} className="rounded border border-gray-200 object-cover flex-shrink-0" /> : <div className="w-9 h-9 bg-gray-100 border border-gray-200 rounded flex items-center justify-center text-[14px] flex-shrink-0">📦</div>}
-                            <div className="flex flex-col overflow-hidden">
-                               <span className="text-[13px] font-bold text-[#1d2327] truncate">{part.name}</span>
-                               <span className="text-[11px] text-gray-500 mt-0.5">Weight: {part.weight || '0.5'}kg</span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
+                  {isOpen && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-[#c3c4c7] rounded-lg shadow-xl max-h-[280px] overflow-y-auto">
+                      {spareParts.length === 0
+                        ? <div className="p-4 text-[#50575e] italic text-center text-[13px]">No spare parts found</div>
+                        : <ul className="py-1">
+                          {spareParts.map((part) => (
+                            <li key={part.id} onClick={() => handleProductSelect(part)}
+                              className="px-3 py-2.5 hover:bg-[#f0f6fc] cursor-pointer flex items-center gap-3 border-b border-[#f0f0f1] last:border-0 transition-colors">
+                              {part.image?.sourceUrl
+                                ? <Image src={part.image.sourceUrl} alt="Part" width={36} height={36} className="rounded-md border border-[#c3c4c7] object-cover flex-shrink-0" />
+                                : <div className="w-9 h-9 bg-[#f0f6fc] border border-[#c3c4c7] rounded-md flex items-center justify-center text-[14px] flex-shrink-0">📦</div>}
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="text-[13px] font-semibold text-[#1d2327] truncate">{part.name}</span>
+                                <span className="text-[11px] text-[#50575e] mt-0.5">{part.weight || '0.5'} kg</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      }
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Custom Package Dimensions override */}
-            <div className="border border-[#c3c4c7] rounded-lg overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setUseCustomDims(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-2.5 bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[13px] font-semibold text-[#1d2327] transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#2271b1]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                  3. Custom Package Dimensions
-                  {useCustomDims && <span className="text-[11px] font-normal text-green-700 bg-green-100 border border-green-200 px-1.5 py-0.5 rounded">Override Active</span>}
-                </span>
-                <svg className={`w-4 h-4 text-gray-500 transition-transform ${useCustomDims ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+            {/* ── STEP 3: CUSTOM DIMENSIONS (accordion) ── */}
+            <div className="rounded-lg border border-[#c3c4c7] overflow-hidden">
+              <button type="button" onClick={() => setUseCustomDims(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-[#f0f6fc] hover:bg-[#e8f0fa] transition-colors">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#2271b1] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">3</span>
+                  <span className="text-[13px] font-semibold text-[#1d2327]">Custom Package Dimensions</span>
+                  {useCustomDims && (
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">Active</span>
+                  )}
+                </div>
+                <svg className={`w-4 h-4 text-[#50575e] transition-transform ${useCustomDims ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
               </button>
 
               {useCustomDims && (
                 <div className="p-4 border-t border-[#c3c4c7] bg-white">
-                  <p className="text-[12px] text-gray-500 mb-3">Override the product&apos;s saved dimensions for this quote. Leave blank to use product defaults.</p>
+                  <p className="text-[12px] text-[#50575e] mb-3">Leave blank to use the product&apos;s saved dimensions.</p>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="text-[11px] text-gray-500 block mb-1">Weight (kg)</span>
-                      <input type="number" step="0.1" min="0.1" value={customWeight} onChange={e => setCustomWeight(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.weight || 1}kg` : 'e.g. 1.5'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] text-gray-500 block mb-1">Length (cm)</span>
-                      <input type="number" step="1" min="1" value={customLength} onChange={e => setCustomLength(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.length || 10}cm` : 'e.g. 30'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] text-gray-500 block mb-1">Width (cm)</span>
-                      <input type="number" step="1" min="1" value={customWidth} onChange={e => setCustomWidth(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.width || 10}cm` : 'e.g. 20'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] text-gray-500 block mb-1">Height (cm)</span>
-                      <input type="number" step="1" min="1" value={customHeight} onChange={e => setCustomHeight(e.target.value)} placeholder={selectedPart ? `Default: ${selectedPart.height || 10}cm` : 'e.g. 15'} className="w-full border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
-                    </div>
+                    {[
+                      { label: 'Weight (kg)', val: customWeight, set: setCustomWeight, step: '0.1', min: '0.1', ph: selectedPart ? `${selectedPart.weight || 1} kg` : '1.5' },
+                      { label: 'Length (cm)', val: customLength, set: setCustomLength, step: '1', min: '1', ph: selectedPart ? `${selectedPart.length || 10} cm` : '30' },
+                      { label: 'Width (cm)',  val: customWidth,  set: setCustomWidth,  step: '1', min: '1', ph: selectedPart ? `${selectedPart.width  || 10} cm` : '20' },
+                      { label: 'Height (cm)', val: customHeight, set: setCustomHeight, step: '1', min: '1', ph: selectedPart ? `${selectedPart.height || 10} cm` : '15' },
+                    ].map(({ label, val, set, step, min, ph }) => (
+                      <div key={label}>
+                        <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">{label}</label>
+                        <input type="number" step={step} min={min} value={val} onChange={e => set(e.target.value)} placeholder={ph}
+                          className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] focus:ring-2 focus:ring-[#2271b1]/20 transition-all placeholder:text-[#8c8f94]" />
+                      </div>
+                    ))}
                   </div>
-                  <input type="text" value={packageNote} onChange={e => setPackageNote(e.target.value)} placeholder="Package note (optional)" className="w-full mt-3 border border-[#8c8f94] rounded px-2.5 py-1.5 text-[13px] outline-none focus:border-[#2271b1]" />
+                  <input type="text" value={packageNote} onChange={e => setPackageNote(e.target.value)} placeholder="Package note (optional)"
+                    className="w-full mt-3 border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] focus:ring-2 focus:ring-[#2271b1]/20 transition-all placeholder:text-[#8c8f94]" />
                   {selectedPart && (
-                    <button type="button" onClick={() => handleRefreshQuotes()} className="mt-3 w-full border border-[#2271b1] text-[#2271b1] text-[12px] font-semibold py-2 rounded hover:bg-[#2271b1] hover:text-white transition-colors">
+                    <button type="button" onClick={handleRefreshQuotes}
+                      className="mt-3 w-full border border-[#2271b1] text-[#2271b1] text-[12px] font-semibold py-2 rounded-md hover:bg-[#2271b1] hover:text-white transition-colors">
                       Re-fetch Quotes with These Dimensions
                     </button>
                   )}
@@ -390,67 +424,95 @@ export default function TransdirectClientBox({
               )}
             </div>
 
-            <div className="bg-[#f6f7f7] border border-[#c3c4c7] rounded-lg p-4 min-h-[120px] flex flex-col justify-center">
-              
-              {loadingQuotes ? (
-                <div className="flex flex-col items-center justify-center text-gray-500 py-4">
-                  <svg className="animate-spin h-6 w-6 text-[#2271b1] mb-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  <span className="text-[13px] font-semibold text-[#2271b1]">Fetching live rates from Transdirect...</span>
-                </div>
-              ) : apiError ? (
-                <div className="text-red-600 text-[12px] bg-red-50 p-3 rounded border border-red-200 text-center">
-                  <span className="block font-bold mb-1">⚠️ Connection Error</span>
-                  {apiError}
-                </div>
-              ) : quotes.length > 0 ? (
-                <div className="animate-fade-in">
-                  <p className="font-bold text-[#1d2327] mb-3 text-[13px] border-b border-gray-200 pb-2">4. Available Shipping Options</p>
-                  <div className="space-y-2 mb-5 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
-                    {quotes.map((quote, index) => (
-                      <label 
-                        key={index} 
-                        className={`flex items-center justify-between p-3 border rounded cursor-pointer transition-all ${selectedCourier === quote.courier ? 'border-[#2271b1] bg-white shadow-sm ring-1 ring-[#2271b1]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input 
-                            type="radio" 
-                            name="courier" 
-                            value={quote.courier} 
-                            checked={selectedCourier === quote.courier}
-                            onChange={() => setSelectedCourier(quote.courier)}
-                            className="text-[#2271b1] focus:ring-[#2271b1] w-4 h-4 cursor-pointer"
-                          />
-                          <div>
-                            <p className="font-bold text-[#1d2327] text-[13px]">{quote.name}</p>
-                            <p className="text-gray-500 text-[11px] mt-0.5">Estimated Transit: {quote.transitTime}</p>
-                          </div>
-                        </div>
-                        <div className="font-extrabold text-[#2271b1] text-[15px]">
-                          ${parseFloat(quote.total).toFixed(2)}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+            {/* ── STEP 4: SHIPPING QUOTES ── */}
+            <div className="rounded-lg border border-[#c3c4c7] overflow-hidden">
+              <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#f0f6fc] border-b border-[#c3c4c7]/60">
+                <span className="w-5 h-5 rounded-full bg-[#2271b1] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">4</span>
+                <span className="text-[13px] font-semibold text-[#1d2327]">Available Shipping Options</span>
+              </div>
 
-                  <button 
-                    type="button" 
-                    onClick={handleConfirmBooking} 
-                    disabled={loadingBooking || !selectedCourier} 
-                    className="w-full bg-[#2271b1] text-white px-4 py-3 font-bold text-[14px] rounded shadow-sm hover:bg-[#135e96] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
-                  >
-                    {loadingBooking ? (
-                      <><svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing Booking...</>
-                    ) : 'Confirm Booking & Create Label'}
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-4">
-                  <svg className="w-8 h-8 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                  <p className="text-[13px]">Select a product to see live shipping rates.</p>
-                </div>
-              )}
-              
+              <div className="bg-white p-3">
+                {loadingQuotes ? (
+                  <div className="flex flex-col items-center justify-center py-8 gap-2">
+                    <svg className="animate-spin h-7 w-7 text-[#2271b1]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    <span className="text-[13px] font-medium text-[#2271b1]">Fetching live rates…</span>
+                  </div>
+                ) : apiError ? (
+                  <div className="m-1 flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-.75-11.25a.75.75 0 011.5 0v4.5a.75.75 0 01-1.5 0v-4.5zm.75 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/></svg>
+                    <div>
+                      <p className="text-[12px] font-bold text-red-700 mb-0.5">Connection Error</p>
+                      <p className="text-[12px] text-red-600">{apiError}</p>
+                    </div>
+                  </div>
+                ) : quotes.length > 0 ? (
+                  <div className="space-y-2">
+                    {quotes.map((quote, index) => {
+                      const isSelected = selectedCourier === quote.courier;
+                      const isBest = index === 0;
+                      return (
+                        <label key={index}
+                          className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all
+                            ${isSelected
+                              ? 'border-[#2271b1] bg-[#f0f6fc] shadow-sm'
+                              : 'border-[#e2e4e7] bg-white hover:border-[#2271b1]/40 hover:bg-[#f8fafc]'}`}
+                        >
+                          <input type="radio" name="courier" value={quote.courier}
+                            checked={isSelected} onChange={() => setSelectedCourier(quote.courier)}
+                            className="w-4 h-4 accent-[#2271b1] flex-shrink-0 cursor-pointer" />
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[13px] font-bold truncate ${isSelected ? 'text-[#135e96]' : 'text-[#1d2327]'}`}>
+                                {quote.name}
+                              </span>
+                              {isBest && (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                  Best Price
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#50575e] mt-0.5">
+                              <svg className="w-3 h-3 inline mr-0.5 mb-0.5 text-[#8c8f94]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                              {quote.transitTime}
+                            </p>
+                          </div>
+
+                          <div className={`text-right flex-shrink-0 ${isSelected ? 'text-[#135e96]' : 'text-[#1d2327]'}`}>
+                            <span className="text-[16px] font-extrabold">${parseFloat(quote.total).toFixed(2)}</span>
+                          </div>
+                        </label>
+                      );
+                    })}
+
+                    <button type="button" onClick={handleConfirmBooking}
+                      disabled={loadingBooking || !selectedCourier}
+                      className="mt-3 w-full bg-[#2271b1] hover:bg-[#135e96] text-white px-4 py-3 font-bold text-[14px] rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2">
+                      {loadingBooking ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+                          Processing Booking…
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                          Confirm Booking &amp; Create Label
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-[#8c8f94]">
+                    <svg className="w-10 h-10 mb-2 text-[#c3c4c7]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <p className="text-[13px]">Select a part above to see live rates.</p>
+                  </div>
+                )}
+              </div>
             </div>
+
           </div>
         )}
 

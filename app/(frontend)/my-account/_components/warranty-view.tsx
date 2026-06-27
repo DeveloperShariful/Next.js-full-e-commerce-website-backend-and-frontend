@@ -118,12 +118,25 @@ export default function WarrantyView({ initialClaims }: Props) {
 }
 
 // --- SUB-COMPONENT: CLAIM FORM MODAL (WP STYLE) ---
-function ClaimFormModal({ isOpen, onClose, onSuccess }: any) {
+interface ClaimFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+type ClaimFormData = {
+  orderNumber: string;
+  productName: string;
+  description: string;
+  mediaUrl: string;
+};
+
+function ClaimFormModal({ isOpen, onClose, onSuccess }: ClaimFormModalProps) {
   const [isPending, startTransition] = useTransition();
   const [mediaUrl, setMediaUrl] = useState("");
   const [openMediaPicker, setOpenMediaPicker] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, formState: { errors } } = useForm<ClaimFormData>({
     defaultValues: {
       orderNumber: "",
       productName: "",
@@ -132,9 +145,9 @@ function ClaimFormModal({ isOpen, onClose, onSuccess }: any) {
     }
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: ClaimFormData) => {
     startTransition(async () => {
-      const res = await createWarrantyClaimAction({ ...data, mediaUrl });
+      const res = await createWarrantyClaimAction({ ...data, mediaUrl, shopPurchased: 'GoBike Australia' });
       if (res.success) {
         toast.success(res.message);
         onClose();

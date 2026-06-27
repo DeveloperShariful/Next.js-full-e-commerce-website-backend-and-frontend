@@ -20,7 +20,7 @@ class PayPalButtonErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center">
-          PayPal could not load. Please refresh the page to try again.
+          Slow Internet Connection PayPal could not load. Please click Refresh
         </div>
       );
     }
@@ -200,12 +200,12 @@ const PayPalPaymentGatewayComponent = ({
   if (isRejected) {
     return (
       <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center space-y-2">
-        <p>PayPal could not load. Please try again.</p>
+        <p>Slow Internet Connection PayPal could not load. Please click Refresh.</p>
         <button
           onClick={() => window.location.reload()}
           className="inline-block bg-yellow-700 text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-yellow-800 transition-colors"
         >
-          Refresh &amp; Retry
+          Refresh 
         </button>
       </div>
     );
@@ -217,12 +217,12 @@ const PayPalPaymentGatewayComponent = ({
   ) {
     return (
       <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center space-y-2">
-        <p>PayPal could not load. Please try again.</p>
+        <p>Slow Internet Connection PayPal could not load. Please click Refresh.</p>
         <button
           onClick={() => window.location.reload()}
           className="inline-block bg-yellow-700 text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-yellow-800 transition-colors"
         >
-          Refresh &amp; Retry
+          Refresh
         </button>
       </div>
     );

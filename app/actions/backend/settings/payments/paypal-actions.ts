@@ -3,26 +3,19 @@
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@/auth"
+import { security } from "@/lib/security"
 import { Prisma } from "@prisma/client"
-import { z } from "zod" // ✅ FIX 1: Missing import added
+import { z } from "zod"
 import { PaypalSettingsSchema, PaypalSettingsType, SharedGatewaySchema } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
 import { encrypt, decrypt } from "@/app/actions/backend/settings/payments/crypto"
 
-async function getDbUserId(): Promise<string | null> {
-  const session = await auth();
-  if (!session?.user?.email) return null;
-  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
-  return user?.id || null;
-}
-
 // 1. UPDATE PAYPAL SETTINGS
 export async function updatePaypalSettings(
-  id: string, 
-  sharedValues: z.infer<typeof SharedGatewaySchema>, 
+  id: string,
+  sharedValues: z.infer<typeof SharedGatewaySchema>,
   settingsValues: PaypalSettingsType
 ) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     const validatedShared = SharedGatewaySchema.parse(sharedValues);
     const validatedSettings = PaypalSettingsSchema.parse(settingsValues);
@@ -44,7 +37,7 @@ export async function updatePaypalSettings(
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM", action: "UPDATE_PAYPAL_SETTINGS", entity: "PaymentGateway", entityId: id
+      userId: user.id, action: "UPDATE_PAYPAL_SETTINGS", entity: "PaymentGateway", entityId: id
     });
 
     revalidatePath("/admin/settings/payments");
@@ -57,7 +50,7 @@ export async function updatePaypalSettings(
 
 // 2. CONNECT & TEST PAYPAL API KEYS
 export async function connectPaypalKeys(id: string, clientId: string, secretKey: string, isSandbox: boolean) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   
   try {
     // 1. Basic Validation
@@ -105,9 +98,9 @@ export async function connectPaypalKeys(id: string, clientId: string, secretKey:
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM", 
-      action: "CONNECT_PAYPAL_KEYS", 
-      entity: "PaymentGateway", 
+      userId: user.id,
+      action: "CONNECT_PAYPAL_KEYS",
+      entity: "PaymentGateway",
       entityId: id
     });
 
@@ -129,7 +122,7 @@ export async function connectPaypalKeys(id: string, clientId: string, secretKey:
 
 // 3. REFRESH/CREATE PAYPAL WEBHOOK
 export async function refreshPaypalWebhook(id: string) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     const gateway = await db.paymentGateway.findUnique({ where: { id } });
     if (!gateway || !gateway.encryptedSecret || !gateway.publicKey) throw new Error("PayPal is not connected.");
@@ -157,7 +150,14 @@ export async function refreshPaypalWebhook(id: string) {
       headers: { "Authorization": `Bearer ${tokenData.access_token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         url: webhookUrl,
-        event_types: [{ name: "CHECKOUT.ORDER.APPROVED" }, { name: "PAYMENT.CAPTURE.COMPLETED" }, { name: "PAYMENT.CAPTURE.DENIED" }]
+        event_types: [
+          { name: "CHECKOUT.ORDER.APPROVED" },
+          { name: "PAYMENT.CAPTURE.COMPLETED" },
+          { name: "PAYMENT.CAPTURE.DENIED" },
+          { name: "PAYMENT.CAPTURE.DECLINED" },
+          { name: "PAYMENT.CAPTURE.REFUNDED" },
+          { name: "RISK.DISPUTE.CREATED" },
+        ],
       })
     });
 
@@ -167,7 +167,7 @@ export async function refreshPaypalWebhook(id: string) {
     if (createData.name === "WEBHOOK_URL_ALREADY_EXISTS") {
       const listRes = await fetch(`${baseUrl}/v1/notifications/webhooks`, { headers: { "Authorization": `Bearer ${tokenData.access_token}` } });
       const listData = await listRes.json();
-      const existingHook = listData.webhooks?.find((w: any) => w.url === webhookUrl);
+      const existingHook = (listData.webhooks as Array<{ id: string; url: string }> | undefined)?.find((w) => w.url === webhookUrl);
       if (existingHook) finalWebhookId = existingHook.id;
     }
 
@@ -180,7 +180,7 @@ export async function refreshPaypalWebhook(id: string) {
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM", action: "REFRESH_PAYPAL_WEBHOOK", entity: "PaymentGateway", entityId: id
+      userId: user.id, action: "REFRESH_PAYPAL_WEBHOOK", entity: "PaymentGateway", entityId: id
     });
 
     revalidatePath("/admin/settings/payments");
@@ -193,7 +193,7 @@ export async function refreshPaypalWebhook(id: string) {
 
 // 3.5 SAVE MANUAL PAYPAL WEBHOOK ID
 export async function savePaypalManualWebhook(id: string, webhookId: string, webhookUrl: string) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     const encryptedWebhookId = encrypt(webhookId);
 
@@ -206,26 +206,34 @@ export async function savePaypalManualWebhook(id: string, webhookId: string, web
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM", action: "MANUAL_PAYPAL_WEBHOOK_SAVED", entity: "PaymentGateway", entityId: id
+      userId: user.id, action: "MANUAL_PAYPAL_WEBHOOK_SAVED", entity: "PaymentGateway", entityId: id
     });
 
     revalidatePath("/admin/settings/payments");
     return { success: true, message: "Manual Webhook ID saved successfully!" };
-  } catch (error: unknown) {
+  } catch {
     return { success: false, error: "Failed to save webhook manually." };
   }
 }
 
 // 4. DISCONNECT PAYPAL
 export async function disconnectPaypal(id: string) {
+  const user = await security.assertAdmin();
   try {
     await db.paymentGateway.update({
       where: { id },
       data: { publicKey: null, encryptedSecret: null, encryptedWebhook: null, webhookUrl: null, isConnected: false, isEnabled: false }
     });
+    await auditService.log({
+      userId: user.id,
+      action: "DISCONNECT_PAYPAL",
+      entity: "PaymentGateway",
+      entityId: id,
+      newData: { isConnected: false, isEnabled: false, keysCleared: true }
+    });
     revalidatePath("/admin/settings/payments");
     return { success: true, message: "PayPal disconnected successfully." };
-  } catch (error: unknown) {
+  } catch {
     return { success: false, error: "Failed to clear settings" };
   }
 }

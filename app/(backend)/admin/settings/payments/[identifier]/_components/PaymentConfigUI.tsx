@@ -6,7 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { PaymentGatewayUI } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
-import { ArrowLeft, CreditCard, Sliders, Activity, Webhook, Palette, Briefcase, Info } from "lucide-react"
+import { ArrowLeft, CreditCard, Sliders, Activity, Webhook, Palette, Briefcase, Info, type LucideIcon } from "lucide-react"
 
 // Import Stripe Components
 import { Stripe_General_Form } from "./Stripe/Stripe_General_Form"
@@ -30,7 +30,7 @@ interface Props {
 interface TabItem {
   id: string
   label: string
-  icon: any
+  icon: LucideIcon
 }
 
 // Tab Configurations

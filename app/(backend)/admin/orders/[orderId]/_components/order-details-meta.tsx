@@ -536,7 +536,7 @@ export const OrderDetailsMeta = ({ order }: OrderDetailsMetaProps) => {
                         <div className="mt-4 pt-3 border-t border-[#f0f0f1]">
                             <p className="font-semibold text-[#1d2327] mb-1">Customer provided note:</p>
                             <div className="text-[#3c434a] italic bg-[#fcf9e8] p-2.5 border border-[#e5d599] rounded-[3px] shadow-inner text-[12px] whitespace-pre-wrap">
-                                "{order.customerNote || order.deliveryInstructions}"
+                                &quot;{order.customerNote || order.deliveryInstructions}&quot;
                             </div>
                         </div>
                     )}

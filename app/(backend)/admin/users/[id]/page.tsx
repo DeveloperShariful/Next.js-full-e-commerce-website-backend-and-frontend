@@ -2,27 +2,25 @@
 
 import { db } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
-import Link from 'next/link'; 
+import Link from 'next/link';
 import UserFormClient from './UserFormClient';
-import { getAllCountries } from '@/app/actions/backend/settings/general/location-helpers'; // 🛑 NEW: Import dynamic locations
+import { getAllCountries } from '@/app/actions/backend/settings/general/location-helpers';
 
 export const dynamic = 'force-dynamic';
 
 export default async function UserEditPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   const id = resolvedParams.id;
-  
+
   const isNewUser = id === 'add-user';
   let user = null;
 
-  // 🛑 NEW: Fetching dynamic country list for the client form
   const countries = getAllCountries();
 
-  // যদি আইডি থাকে (Edit মোড), তবে ডাটাবেস থেকে ইউজারের ডেটা এবং অ্যাড্রেস আনবে
   if (!isNewUser) {
     user = await db.user.findUnique({
       where: { id },
-      include: { addresses: true } // 🛑 NEW: Fetch billing and shipping addresses
+      include: { addresses: true }
     });
 
     if (!user) {
@@ -30,17 +28,29 @@ export default async function UserEditPage({ params }: { params: Promise<{ id: s
     }
   }
 
-  // Client Component এ পাঠানোর জন্য Data Serialize করা হচ্ছে
+  // Edit mode-এ order activity fetch করো
+  let userActivity: { orderCount: number; totalSpent: number; memberSince: string } | null = null;
+  if (!isNewUser && user) {
+    const orderStats = await db.order.aggregate({
+      where: { userId: user.id, NOT: { status: { equals: 'CANCELLED' } } },
+      _count: { id: true },
+      _sum: { totalPaid: true },
+    });
+    userActivity = {
+      orderCount: orderStats._count.id,
+      totalSpent: Number(orderStats._sum.totalPaid ?? 0),
+      memberSince: user.createdAt.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }),
+    };
+  }
+
   const userData = user ? {
     id: user.id,
     name: user.name || '',
     email: user.email,
     role: user.role,
     isActive: user.isActive,
-    
-    // 🛑 NEW: Extract Billing and Shipping addresses from the array
-    billingAddress: user.addresses.find((addr: any) => addr.type === 'BILLING') || null,
-    shippingAddress: user.addresses.find((addr: any) => addr.type === 'SHIPPING') || null,
+    billingAddress: user.addresses.find((addr) => addr.type === 'BILLING') || null,
+    shippingAddress: user.addresses.find((addr) => addr.type === 'SHIPPING') || null,
   } : null;
 
   return (
@@ -65,6 +75,24 @@ export default async function UserEditPage({ params }: { params: Promise<{ id: s
           &larr; Back to Users
         </Link>
       </div>
+
+      {/* Activity Summary (Edit mode only) */}
+      {userActivity && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-white border border-[#c3c4c7] rounded-sm p-4 shadow-sm">
+            <div className="text-[24px] font-semibold text-[#1d2327] leading-none">{userActivity.orderCount}</div>
+            <div className="text-[12px] text-[#646970] mt-1">Orders placed</div>
+          </div>
+          <div className="bg-white border border-[#c3c4c7] rounded-sm p-4 shadow-sm">
+            <div className="text-[24px] font-semibold text-[#1d2327] leading-none">${userActivity.totalSpent.toFixed(2)}</div>
+            <div className="text-[12px] text-[#646970] mt-1">Total spent</div>
+          </div>
+          <div className="bg-white border border-[#c3c4c7] rounded-sm p-4 shadow-sm">
+            <div className="text-[14px] font-semibold text-[#1d2327] leading-none pt-1">{userActivity.memberSince}</div>
+            <div className="text-[12px] text-[#646970] mt-1">Member since</div>
+          </div>
+        </div>
+      )}
 
       {/* Main Form (Passing countries dynamically) */}
       <UserFormClient initialData={userData} countries={countries} />

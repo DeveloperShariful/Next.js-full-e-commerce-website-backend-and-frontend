@@ -10,6 +10,8 @@ import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+export const maxDuration = 60;
+
 // ============================================================================
 // DYNAMIC STRIPE CREDENTIALS FROM DB
 // ============================================================================
@@ -19,7 +21,7 @@ async function getStripeInstance() {
     throw new Error('Stripe is not configured in the Admin Panel.');
   }
   const secret = decrypt(gateway.encryptedSecret);
-  return new Stripe(secret, { apiVersion: '2025-01-27.acacia' as any, typescript: true });
+  return new Stripe(secret, { apiVersion: '2025-01-27.acacia' as unknown as Stripe.LatestApiVersion });
 }
 
 // ============================================================================
@@ -133,7 +135,7 @@ export async function POST(request: Request) {
           amount: capturedAmount,
           transactionId: paymentIntent.id,
           status: paymentIntent.status,
-          rawResponse: paymentIntent as any,
+          rawResponse: paymentIntent as unknown as Prisma.InputJsonValue,
         },
       });
 

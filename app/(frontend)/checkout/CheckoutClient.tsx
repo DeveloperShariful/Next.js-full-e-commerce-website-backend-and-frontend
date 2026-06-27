@@ -1,7 +1,6 @@
 // app/(frontend)/checkout/CheckoutClient.tsx
 'use client';
 
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { useEffect, useCallback, useReducer, useRef, useState, useMemo } from 'react';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
@@ -27,8 +26,20 @@ import {
 import { getStoredUTM } from '@/components/SourceTracker';
 
 // ============================================================================
-// 0. DEBOUNCE UTILITY
+// 0. HELPERS
 // ============================================================================
+
+// Fire-and-forget: logs client-side checkout errors to DB SystemLog via API.
+// auditService is server-only, so we call the lightweight bridge endpoint.
+function logCheckoutError(step: string, error: string, metadata?: Record<string, unknown>) {
+  fetch('/api/log/payment-error', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ step, error, metadata }),
+  }).catch(() => {});
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout>;
   return function (this: unknown, ...args: Parameters<T>) {
@@ -225,7 +236,11 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
             setStripePaymentIntentId(data.clientSecret.split('_secret_')[0]);
           }
         })
-        .catch(err => console.error('[PI] Creation failed:', err))
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : 'PI creation failed';
+          console.error('[PI] Creation failed:', err);
+          logCheckoutError('STRIPE_PI_CREATION', msg, { total: totals?.total });
+        })
         .finally(() => { isCreatingPIRef.current = false; });
     } else if (stripePaymentIntentId) {
       // Update amount on total change
@@ -259,9 +274,6 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
 
         if (!rateExists && response.availableShippingRates.length > 0) {
           newSelectedShipping = response.availableShippingRates[0].id;
-          // ✅ FIX: No second API call needed — server now falls back to the cheapest
-          // available rate when the saved rate ID is not found in the zone, so
-          // response.totals already reflects the correct shippingTotal.
         }
 
         dispatch({
@@ -274,8 +286,11 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
           },
         });
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Cart sync failed';
       console.error('[Checkout] refetchCartData error:', err);
+      // Fix #7: log cart sync failures to admin SystemLog
+      logCheckoutError('CART_SYNC', msg);
       toast.error('Could not sync with server.');
     } finally {
       dispatch({ type: 'SET_LOADING', key: 'cart', payload: false });
@@ -417,8 +432,13 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
     paymentMethodId?: string;
     is_embedded_redirect?: boolean;
   }) => {
-    // Idempotency: return same order if still in progress
-    if (pendingOrderRef.current && loading.order) return pendingOrderRef.current;
+    // Fix #4: If an order was already created for this checkout session, reuse it.
+    // BEFORE: guard was `pendingOrderRef.current && loading.order` — after order
+    //         creation loading.order becomes false, so a payment retry would create
+    //         a second duplicate DB order.
+    // AFTER:  as long as pendingOrderRef.current is set, return the same order.
+    //         Cleared only on explicit error during order creation.
+    if (pendingOrderRef.current) return pendingOrderRef.current;
 
     const isExpressCheckout = !!paymentData?.shippingAddress;
     if (!isExpressCheckout && !selectedShipping) {
@@ -426,20 +446,44 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
       return null;
     }
 
-    const isBillingValid = customerInfoRef.current.firstName && customerInfoRef.current.email;
-    const isShippingValid =
-      !shipToDifferentRef.current ||
-      (shippingInfoRef.current.firstName && shippingInfoRef.current.email);
+    // Fix #3: Full billing validation — not just firstName + email.
+    // BEFORE: only checked firstName and email → orders with no address/phone/postcode.
+    // AFTER:  all 8 required fields validated with specific error messages.
+    if (!paymentData?.shippingAddress) {
+      const b = customerInfoRef.current;
+      const missing: string[] = [];
+      if (!b.firstName?.trim())  missing.push('First name');
+      if (!b.lastName?.trim())   missing.push('Last name');
+      if (!b.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) missing.push('Valid email');
+      if (!b.address1?.trim())   missing.push('Street address');
+      if (!b.city?.trim())       missing.push('City / Suburb');
+      if (!b.state?.trim())      missing.push('State');
+      if (!b.postcode?.trim())   missing.push('Postcode');
+      if (!b.phone?.trim())      missing.push('Phone number');
 
-    if (!paymentData?.shippingAddress && (!isBillingValid || !isShippingValid)) {
-      toast.error('Please fill in all required billing and shipping details.');
-      return null;
+      if (missing.length > 0) {
+        toast.error(`Please fill in: ${missing.join(', ')}`);
+        return null;
+      }
+
+      if (shipToDifferentRef.current) {
+        const s = shippingInfoRef.current;
+        const shipMissing: string[] = [];
+        if (!s.firstName?.trim()) shipMissing.push('Shipping first name');
+        if (!s.address1?.trim())  shipMissing.push('Shipping street address');
+        if (!s.city?.trim())      shipMissing.push('Shipping city');
+        if (!s.state?.trim())     shipMissing.push('Shipping state');
+        if (!s.postcode?.trim())  shipMissing.push('Shipping postcode');
+        if (shipMissing.length > 0) {
+          toast.error(`Please fill in: ${shipMissing.join(', ')}`);
+          return null;
+        }
+      }
     }
 
     dispatch({ type: 'SET_LOADING', key: 'order', payload: true });
     setOrderPlacementInProgress(true);
 
-    // Affiliate cookies are HttpOnly — read server-side in the API route directly
     const affiliateMetaData: { key: string; value: string }[] = [];
     const utmData = getStoredUTM();
 
@@ -475,11 +519,24 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
         referringSite: utmData.referringSite,
       };
 
-      const response = await fetch('/api/stripe/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderPayload),
-      });
+      // Fix #6: AbortController gives create-order a 30s window.
+      // BEFORE: no timeout — network freeze = spinner forever.
+      // AFTER:  abort after 30s with a clear "timed out" message.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+      let response: Response;
+      try {
+        response = await fetch('/api/stripe/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
       const newOrder = await response.json();
 
       if (!response.ok || !newOrder.success) {
@@ -493,8 +550,18 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
       return result;
     } catch (error: unknown) {
       toast.dismiss();
-      if (error instanceof Error) toast.error(error.message);
-      else toast.error('An error occurred placing order.');
+      const msg = error instanceof Error
+        ? (error.name === 'AbortError' ? 'Order creation timed out. Please try again.' : error.message)
+        : 'An error occurred placing order.';
+      toast.error(msg);
+
+      // Fix #7: log order creation failures to admin SystemLog
+      logCheckoutError('ORDER_CREATION', msg, {
+        paymentMethod: paymentData?.paymentMethodId || selectedPaymentMethod,
+        total: totals?.total,
+        itemCount: cartItems.length,
+      });
+
       dispatch({ type: 'SET_LOADING', key: 'order', payload: false });
       setOrderPlacementInProgress(false);
       pendingOrderRef.current = null;
@@ -558,8 +625,8 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
       <div className="flex flex-col gap-8">
         <ShippingForm
           title={shipToDifferentAddress ? 'Billing Details' : 'Billing & Shipping Details'}
-          onAddressChange={handleAddressChange as any}
-          defaultValues={customerInfo as any}
+          onAddressChange={handleAddressChange}
+          defaultValues={customerInfo}
           sessionKey="checkout_billing_form"
         />
 
@@ -580,8 +647,8 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
           <div className="mt-6">
             <ShippingForm
               title="Shipping Details"
-              onAddressChange={handleShippingAddressChange as any}
-              defaultValues={shippingInfo as any}
+              onAddressChange={handleShippingAddressChange}
+              defaultValues={shippingInfo}
               sessionKey="checkout_shipping_form"
             />
           </div>
@@ -596,7 +663,7 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
       <div className="flex flex-col gap-8">
         <OrderSummary
           cartItems={cartItems}
-          cartData={mappedCartData as any}
+          cartData={mappedCartData}
           onRemoveCoupon={handleRemoveCoupon}
           isRemovingCoupon={loading.removingCoupon}
           onApplyCoupon={handleApplyCoupon}
@@ -617,9 +684,9 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
           isPlacingOrder={loading.order}
           total={finalTotalAmount}
           isShippingSelected={isShippingSelected}
-          customerInfo={customerInfoRef.current as any}
+          customerInfo={customerInfoRef.current}
           cartItems={cartItems}
-          shippingInfo={shipToDifferentRef.current ? (shippingInfoRef.current as any) : (customerInfoRef.current as any)}
+          shippingInfo={shipToDifferentRef.current ? shippingInfoRef.current : customerInfoRef.current}
           selectedShipping={selectedShipping}
           shippingRates={shippingRates}
           appliedCoupons={appliedCoupons}
@@ -634,26 +701,8 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
 }
 
 // ============================================================================
-// 3. WRAPPER — PayPalScriptProvider only, no outer Elements
+// 3. WRAPPER — PayPalScriptProvider is now in checkout/layout.tsx
 // ============================================================================
 export default function CheckoutClient({ paymentGateways, enableCoupons }: { paymentGateways: PaymentGateway[]; enableCoupons: boolean }) {
-  const paypalGateway = paymentGateways.find(g => g.identifier === 'paypal');
-  const paypalClientId = paypalGateway?.publicKey || null;
-
-  const paypalOptions = useMemo(() => ({
-    clientId: paypalClientId || 'test',
-    currency: 'AUD',
-    intent: 'capture',
-    components: 'buttons',
-  }), [paypalClientId]);
-
-  if (paypalClientId) {
-    return (
-      <PayPalScriptProvider options={paypalOptions}>
-        <CheckoutClientComponent paymentGateways={paymentGateways} enableCoupons={enableCoupons} />
-      </PayPalScriptProvider>
-    );
-  }
-
   return <CheckoutClientComponent paymentGateways={paymentGateways} enableCoupons={enableCoupons} />;
 }

@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFormContext, useFieldArray } from "react-hook-form";
 import { getAttributes } from "@/app/actions/backend/product/product-read";
 import { X, ChevronUp, ChevronDown, AlertTriangle, Plus, Check } from "lucide-react";
@@ -15,7 +15,8 @@ interface AttributesProps {
 
 export default function Attributes({ onSubmit, loading }: AttributesProps) {
     const { register, control, setValue, watch, formState: { errors } } = useFormContext<ProductFormValues>();
-    
+    const idCounterRef = useRef(0);
+
     const { fields, append, remove, move } = useFieldArray({
         control,
         name: "attributes"
@@ -37,8 +38,8 @@ export default function Attributes({ onSubmit, loading }: AttributesProps) {
     }, []);
 
     const addAttribute = () => {
-        let newAttr = {
-            id: `temp_${Date.now()}`,
+        const newAttr = {
+            id: `temp_${++idCounterRef.current}`,
             name: "",
             values: [],
             visible: true,

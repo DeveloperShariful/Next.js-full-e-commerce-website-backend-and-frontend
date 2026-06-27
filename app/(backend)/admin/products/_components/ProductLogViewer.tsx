@@ -45,10 +45,8 @@ export default function ProductLogViewer() {
   };
 
   useEffect(() => {
-    if (isOpen) {
-        setPage(1); 
-        fetchLogs(true);
-    }
+    if (!isOpen) return;
+    void (async () => { await fetchLogs(true); })();
   }, [isOpen, actionFilter]);
 
   const toggleSelect = (id: string) => {

@@ -199,8 +199,14 @@ const PayPalPaymentGatewayComponent = ({
 
   if (isRejected) {
     return (
-      <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center">
-        PayPal could not load. Please refresh the page to try again.
+      <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center space-y-2">
+        <p>PayPal could not load. Please try again.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-block bg-yellow-700 text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-yellow-800 transition-colors"
+        >
+          Refresh &amp; Retry
+        </button>
       </div>
     );
   }
@@ -210,8 +216,14 @@ const PayPalPaymentGatewayComponent = ({
     !(window as { paypal?: { Buttons?: unknown } }).paypal?.Buttons
   ) {
     return (
-      <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center">
-        PayPal could not load. Please refresh the page to try again.
+      <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center space-y-2">
+        <p>PayPal could not load. Please try again.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-block bg-yellow-700 text-white text-xs font-semibold px-4 py-1.5 rounded hover:bg-yellow-800 transition-colors"
+        >
+          Refresh &amp; Retry
+        </button>
       </div>
     );
   }
@@ -227,7 +239,14 @@ const PayPalPaymentGatewayComponent = ({
         onError={(err) => {
           toast.dismiss();
           console.error('PayPal transaction failed:', err);
-          toast.error('A PayPal error occurred. Please try again.');
+          // Safari ITP blocks third-party cookies used by PayPal popup.
+          // Detect Safari and give actionable guidance instead of generic error.
+          const isSafari = typeof navigator !== 'undefined' &&
+            /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+          const msg = isSafari
+            ? 'PayPal failed to load in Safari. Please enable "Allow Cross-Website Tracking" in Safari → Settings → Privacy, or use Chrome/Firefox.'
+            : 'A PayPal error occurred. Please try again or use a card payment.';
+          toast.error(msg, { duration: 8000 });
         }}
       />
     </PayPalButtonErrorBoundary>

@@ -170,7 +170,11 @@ export default function UserTableClient({
                     <td className="p-2 align-top pt-3 w-[30%]">
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-sm bg-gray-200 shrink-0 overflow-hidden border border-[#c3c4c7] flex items-center justify-center">
-                          <svg className="w-6 h-6 text-gray-400 mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" fillRule="evenodd"></path></svg>
+                          {user.image ? (
+                            <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" />
+                          ) : (
+                            <svg className="w-6 h-6 text-gray-400 mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" fillRule="evenodd"></path></svg>
+                          )}
                         </div>
                         <div className="w-full">
                           <Link href={`/admin/users/${user.id}`} className="text-[#2271b1] font-bold text-[13px] hover:underline block leading-tight">
@@ -189,6 +193,11 @@ export default function UserTableClient({
                     <td className="p-2 align-top pt-3 text-[#3c434a]">{user.name || '—'}</td>
                     <td className="p-2 align-top pt-3">
                       <a href={`mailto:${user.email}`} className="text-[#2271b1] hover:underline">{user.email}</a>
+                      {user.emailVerified ? (
+                        <span className="ml-1.5 text-[10px] font-medium text-green-600 whitespace-nowrap">✓ Verified</span>
+                      ) : (
+                        <span className="ml-1.5 text-[10px] font-medium text-[#b32d2e] whitespace-nowrap">Unverified</span>
+                      )}
                     </td>
                     <td className="p-2 align-top pt-3 text-[#3c434a]">
                       {/* 🛑 FIX: Uses the formatRole helper */}

@@ -4,6 +4,7 @@ import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
 import { auth } from '@/auth';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+import { auditService } from '@/lib/audit-service';
 
 // ============================================================================
 // INTERFACES
@@ -274,7 +275,8 @@ export async function POST(request: NextRequest) {
     const billingJson = JSON.parse(JSON.stringify(customerInfo));
     const shippingJson = JSON.parse(JSON.stringify(shippingInfo || customerInfo));
     const metadataJson = JSON.parse(JSON.stringify(metaDataArray));
-    const dbOrderItems = validOrderItems.map(({ taxStatus: _ts, ...rest }) => rest);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const dbOrderItems = validOrderItems.map(({ taxStatus: _taxStatus, ...rest }) => rest);
 
     const orderData = {
       status: OrderStatus.PENDING,
@@ -401,6 +403,10 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('[PayPal Create Order Error]:', error);
     const msg = error instanceof Error ? error.message : 'An unexpected error occurred.';
+    if (msg.includes('not configured') || msg.includes('disabled') || msg.includes('Admin Panel')) {
+      auditService.systemLog('ERROR', 'PAYPAL_CONFIG', msg, { route: 'paypal/create-order' })
+        .catch(() => {});
+    }
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -349,7 +349,7 @@ export default function ProductTable({
                   
                   const isAlternate = index % 2 !== 0; 
                   const isSelected = selectedIds.includes(product.id);
-                  let rowBg = isSelected ? 'bg-[#fff8e5]' : isAlternate ? 'bg-[#f9f9f9]' : 'bg-white';
+                  const rowBg = isSelected ? 'bg-[#fff8e5]' : isAlternate ? 'bg-[#f9f9f9]' : 'bg-white';
 
                   return (
                     <tr key={product.id} className={`group align-top transition-colors ${rowBg} hover:bg-[#f0f6fc]`}>

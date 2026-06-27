@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { getShippingResources } from "@/app/actions/backend/order/create_order/get-shipping-resources";
-import { getTransdirectQuotes } from "@/app/actions/backend/order/create_order/get-transdirect-quotes"; 
+import { getTransdirectQuotes } from "@/app/actions/backend/order/create_order/get-transdirect-quotes";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Truck, MapPin, Loader2, Store, CheckCircle } from "lucide-react";
@@ -51,11 +51,11 @@ export const ShippingSelector = ({
 }: ShippingSelectorProps) => {
   const [loadingLocal, setLoadingLocal] = useState(true);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
-  
+
   const [pickupPoints, setPickupPoints] = useState<PickupLocation[]>([]);
   const [localRates, setLocalRates] = useState<ShippingMethod[]>([]);
   const [liveQuotes, setLiveQuotes] = useState<ShippingMethod[]>([]);
-  
+
   const [selectedMethod, setSelectedMethod] = useState<string>("");
 
   const formatServiceName = (name: string) => {
@@ -71,7 +71,7 @@ export const ShippingSelector = ({
       setLoadingLocal(true);
       const res = await getShippingResources();
       setPickupPoints(res.pickupLocations);
-      
+
       const mappedRates = res.shippingRates.map((r) => ({
           id: r.id,
           name: r.name,
@@ -85,47 +85,46 @@ export const ShippingSelector = ({
     loadResources();
   }, []);
 
-  // 🔥 FIX: address অবজেক্টের বদলে স্পেসিফিক ফিল্ড এবং cartItems কে স্ট্রিংফাই করে চেক করা হচ্ছে
   useEffect(() => {
-    if (!address?.postcode || !address?.city || cartItems.length === 0) {
-        setLiveQuotes([]); 
+    let cancelled = false;
+
+    const run = async () => {
+      if (!address?.postcode || !address?.city || cartItems.length === 0) {
+        if (!cancelled) setLiveQuotes([]);
         return;
-    }
+      }
 
-    const fetchLiveQuotes = async () => {
-        setLoadingQuotes(true);
-        setSelectedMethod(""); 
-        onShippingCostChange(0);
+      await new Promise<void>(resolve => setTimeout(resolve, 1000));
+      if (cancelled) return;
 
-        const res = await getTransdirectQuotes({
-            items: cartItems,
-            receiver: {
-                suburb: address.city,
-                postcode: address.postcode,
-                state: address.state
-            }
-        });
+      setLoadingQuotes(true);
+      setSelectedMethod("");
+      onShippingCostChange(0);
 
-        if (res.success) {
-            setLiveQuotes(res.quotes);
-        }
+      const res = await getTransdirectQuotes({
+        items: cartItems,
+        receiver: {
+          suburb: address.city,
+          postcode: address.postcode,
+          state: address.state,
+        },
+      });
+
+      if (!cancelled) {
+        if (res.success) setLiveQuotes(res.quotes);
         setLoadingQuotes(false);
+      }
     };
 
-    const timeout = setTimeout(() => {
-        fetchLiveQuotes();
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-    
-    // ✅ ডিপেন্ডেন্সি অ্যারে আপডেট করা হয়েছে
+    run();
+    return () => { cancelled = true; };
   }, [
-    address?.city, 
-    address?.postcode, 
-    address?.state, 
-    // কার্ট আইটেম চেঞ্জ হলে শুধু তখনই কল হবে, অবজেক্ট রেফারেন্স চেঞ্জ হলে নয়
-    JSON.stringify(cartItems.map(i => ({ id: i.productId, qty: i.quantity })))
-  ]); 
+    address?.city,
+    address?.postcode,
+    address?.state,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    JSON.stringify(cartItems.map(i => ({ id: i.productId, qty: i.quantity }))),
+  ]);
 
   const allMethods = useMemo(() => {
       const filteredLocalRates = localRates.filter(r => {
@@ -137,18 +136,18 @@ export const ShippingSelector = ({
       });
 
       return [
-          ...filteredLocalRates, 
+          ...filteredLocalRates,
           ...liveQuotes,
           ...(pickupPoints.length > 0 ? [{ id: 'pickup_only', name: 'Local Pickup (Store Collection)', price: 0, type: 'pickup' }] : [])
-      ].sort((a, b) => a.price - b.price); 
+      ].sort((a, b) => a.price - b.price);
   }, [localRates, liveQuotes, pickupPoints]);
 
   const handleMethodClick = (methodId: string) => {
       const method = allMethods.find(m => m.id === methodId);
       if (method) {
           setSelectedMethod(methodId);
-          onShippingCostChange(method.price); 
-          
+          onShippingCostChange(method.price);
+
           if (method.type !== 'pickup') {
               onPickupLocationChange(null);
           }
@@ -161,13 +160,13 @@ export const ShippingSelector = ({
         <Truck size={18} className="text-slate-500" />
         <h3 className="font-bold text-sm text-slate-700 uppercase tracking-tight">Shipping Method</h3>
       </div>
-      
+
       <div className="space-y-3">
         <Label className="text-[11px] font-bold text-slate-500 uppercase">Available Options</Label>
-        
+
         {(loadingLocal || loadingQuotes) && (
             <div className="py-4 text-center text-slate-400 text-xs flex items-center justify-center gap-2 bg-slate-50 rounded border border-slate-100">
-                <Loader2 size={14} className="animate-spin text-blue-500"/> 
+                <Loader2 size={14} className="animate-spin text-blue-500"/>
                 <span>Calculating best rates...</span>
             </div>
         )}
@@ -181,11 +180,11 @@ export const ShippingSelector = ({
         {!loadingQuotes && allMethods.length > 0 && (
             <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
                 {allMethods.map((method) => (
-                    <div 
-                        key={method.id} 
+                    <div
+                        key={method.id}
                         className={`relative flex items-center justify-between p-3 rounded-md border cursor-pointer transition-all duration-200 select-none
-                        ${selectedMethod === method.id 
-                            ? 'border-blue-600 bg-blue-50 shadow-sm ring-1 ring-blue-600' 
+                        ${selectedMethod === method.id
+                            ? 'border-blue-600 bg-blue-50 shadow-sm ring-1 ring-blue-600'
                             : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                         }`}
                         onClick={() => handleMethodClick(method.id)}
@@ -193,7 +192,7 @@ export const ShippingSelector = ({
                         <div className={`h-4 w-4 rounded-full border flex items-center justify-center mr-3 ${selectedMethod === method.id ? "border-blue-600" : "border-slate-300"}`}>
                             {selectedMethod === method.id && <div className="h-2 w-2 rounded-full bg-blue-600" />}
                         </div>
-                        
+
                         <div className="flex-1 flex justify-between items-center">
                             <div className="flex flex-col">
                                 <span className={`text-xs font-bold flex items-center gap-2 ${selectedMethod === method.id ? 'text-blue-700' : 'text-slate-700'}`}>
@@ -229,7 +228,7 @@ export const ShippingSelector = ({
           <Label className="text-[11px] font-bold text-green-700 uppercase flex items-center gap-1">
             <Store size={12} /> Select Store Location
           </Label>
-          <select 
+          <select
             className="w-full h-9 text-xs border border-green-200 rounded px-2 bg-white focus:outline-none focus:ring-1 focus:ring-green-500"
             onChange={(e) => onPickupLocationChange(e.target.value)}
           >
@@ -248,16 +247,16 @@ export const ShippingSelector = ({
       <div className="space-y-4">
         <div className="space-y-2">
           <Label className="text-[11px] font-bold text-slate-500 uppercase">Customer Note</Label>
-          <Textarea 
-            placeholder="E.g. Please leave at the front door..." 
+          <Textarea
+            placeholder="E.g. Please leave at the front door..."
             className="text-xs min-h-[60px] resize-none"
             onChange={(e) => onCustomerNoteChange(e.target.value)}
           />
         </div>
         <div className="space-y-2">
           <Label className="text-[11px] font-bold text-slate-500 uppercase">Internal Admin Note</Label>
-          <Textarea 
-            placeholder="Internal records only..." 
+          <Textarea
+            placeholder="Internal records only..."
             className="text-xs min-h-[60px] resize-none bg-slate-50 border-dashed"
             onChange={(e) => onAdminNoteChange(e.target.value)}
           />

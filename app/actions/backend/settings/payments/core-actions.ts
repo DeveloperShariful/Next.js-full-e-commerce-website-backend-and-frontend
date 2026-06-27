@@ -5,17 +5,10 @@
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@/auth"
+import { security } from "@/lib/security"
 import { Prisma, PaymentMode, PaymentProvider } from "@prisma/client"
 import { PaymentGatewayUI, StripeSettingsSchema, PaypalSettingsSchema, OfflineSettingsSchema } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
 import { decrypt } from "@/app/actions/backend/settings/payments/crypto"
-
-async function getDbUserId(): Promise<string | null> {
-  const session = await auth();
-  if (!session?.user?.email) return null;
-  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
-  return user?.id || null;
-}
 
 // 1. Fetch All Gateways with Type-Safe JSON Parsing & Webhook Decryption
 export async function getAllPaymentGateways(): Promise<{ success: boolean; data?: PaymentGatewayUI[]; error?: string }> {
@@ -93,32 +86,32 @@ export async function getAllPaymentGateways(): Promise<{ success: boolean; data?
 
 // 2. Toggle Status (Fully untouched, very robust)
 export async function toggleGatewayStatus(id: string, isEnabled: boolean) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     const oldData = await db.paymentGateway.findUnique({ where: { id } });
     if (!oldData) throw new Error("Gateway not found");
-    
+
     await db.paymentGateway.update({ where: { id }, data: { isEnabled } });
-    
-    await auditService.log({ 
-        userId: userId || "SYSTEM", 
-        action: isEnabled ? "ENABLE_PAYMENT_GATEWAY" : "DISABLE_PAYMENT_GATEWAY", 
-        entity: "PaymentGateway", 
-        entityId: id, 
-        oldData: { isEnabled: oldData.isEnabled }, 
-        newData: { isEnabled } 
+
+    await auditService.log({
+        userId: user.id,
+        action: isEnabled ? "ENABLE_PAYMENT_GATEWAY" : "DISABLE_PAYMENT_GATEWAY",
+        entity: "PaymentGateway",
+        entityId: id,
+        oldData: { isEnabled: oldData.isEnabled },
+        newData: { isEnabled }
     });
-    
+
     revalidatePath("/admin/settings/payments");
     return { success: true };
-  } catch (error: unknown) { 
-    return { success: false, error: "Failed to update status." }; 
+  } catch {
+    return { success: false, error: "Failed to update status." };
   }
 }
 
 // 3. Reset DB Data (Updated JSON Defaults - Removed Klarna/Afterpay boolean flags inside settings)
 export async function resetPaymentGatewaysDB() {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     await db.$transaction(async (tx) => {
       await tx.paymentGateway.deleteMany({});
@@ -151,7 +144,7 @@ export async function resetPaymentGatewaysDB() {
     });
 
     await auditService.log({
-        userId: userId || "SYSTEM",
+        userId: user.id,
         action: "RESET_PAYMENT_GATEWAYS",
         entity: "PaymentGateway",
         entityId: "ALL",
@@ -160,9 +153,9 @@ export async function resetPaymentGatewaysDB() {
 
     revalidatePath("/admin/settings/payments");
     return { success: true };
-  } catch (error: unknown) {
-    console.error("DB Reset Error:", error);
-    await auditService.systemLog("CRITICAL", "RESET_DB_ERROR", "Payment DB reset failed", { error: String(error) });
+  } catch (err: unknown) {
+    console.error("DB Reset Error:", err);
+    await auditService.systemLog("CRITICAL", "RESET_DB_ERROR", "Payment DB reset failed", { error: String(err) });
     return { success: false, error: "Failed to reset DB." };
   }
 }

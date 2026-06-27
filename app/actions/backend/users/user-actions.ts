@@ -4,7 +4,7 @@
 
 import { db } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { Role, AddressType } from '@prisma/client'; 
+import { Role, AddressType, Prisma } from '@prisma/client';
 import { sendNotification } from '@/app/api/email/send-notification';
 import bcrypt from "bcryptjs"; 
 import { nanoid } from 'nanoid'; // ✅ To generate affiliate slug
@@ -20,13 +20,15 @@ const extractAddress = (prefix: 'billing_' | 'shipping_', formData: FormData) =>
     city: (formData.get(`${prefix}city`) as string) || '',
     state: (formData.get(`${prefix}state`) as string) || '',
     postcode: (formData.get(`${prefix}postcode`) as string) || '',
-    country: (formData.get('country') as string) || 'AU', 
+    country: (formData.get(`${prefix}country`) as string) || 'AU',
     phone: (formData.get(`${prefix}phone`) as string) || '',
     email: prefix === 'billing_' ? ((formData.get(`${prefix}email`) as string) || null) : null,
   };
 };
 
-async function saveAddress(userId: string, type: AddressType, addressData: any) {
+type AddressData = ReturnType<typeof extractAddress>;
+
+async function saveAddress(userId: string, type: AddressType, addressData: AddressData) {
   const existingAddress = await db.address.findFirst({
     where: { userId, type }
   });
@@ -130,15 +132,6 @@ export async function createUser(formData: FormData) {
     // Extract and Save Addresses
     const billingData = extractAddress('billing_', formData);
     const shippingData = extractAddress('shipping_', formData);
-    
-    const countries = formData.getAll('country');
-    const states = formData.getAll('state');
-    
-    billingData.country = (countries[0] as string) || 'AU';
-    billingData.state = (states[0] as string) || '';
-    
-    shippingData.country = (countries[1] as string) || billingData.country;
-    shippingData.state = (states[1] as string) || billingData.state;
 
     await saveAddress(newUser.id, AddressType.BILLING, billingData);
     await saveAddress(newUser.id, AddressType.SHIPPING, shippingData);
@@ -146,7 +139,7 @@ export async function createUser(formData: FormData) {
     revalidatePath('/admin/users');
     revalidatePath('/admin/affiliate'); // Also refresh affiliate dashboard
     return { success: true, message: 'New user added successfully.' };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create user failed:', error);
     return { success: false, message: 'Failed to create user. Please try again.' };
   }
@@ -196,25 +189,19 @@ export async function updateUser(formData: FormData) {
 
     const finalName = name?.trim() || nickname?.trim() || "Customer";
 
-    const updateData: any = {
-      name: finalName,
-      email: email.toLowerCase().trim(),
-      role: role,
-      notes: bio?.trim(), 
-      metafields: updatedMetafields 
-    };
-
-    if (image !== undefined) {
-      updateData.image = image || null;
-    }
-
-    if (password && password.trim() !== '') {
-      updateData.password = await bcrypt.hash(password, 10); 
-    }
+    const hashedPassword = password && password.trim() !== '' ? await bcrypt.hash(password, 10) : undefined;
 
     await db.user.update({
       where: { id },
-      data: updateData
+      data: {
+        name: finalName,
+        email: email.toLowerCase().trim(),
+        role: role,
+        notes: bio?.trim(),
+        metafields: updatedMetafields as unknown as Prisma.InputJsonValue,
+        image: image !== undefined ? (image || null) : undefined,
+        password: hashedPassword,
+      }
     });
 
     // ✅ Sync with Affiliate Hub if role was changed to AFFILIATE
@@ -223,15 +210,6 @@ export async function updateUser(formData: FormData) {
     // Extract and Save Addresses for existing user
     const billingData = extractAddress('billing_', formData);
     const shippingData = extractAddress('shipping_', formData);
-    
-    const countries = formData.getAll('country');
-    const states = formData.getAll('state');
-    
-    billingData.country = (countries[0] as string) || 'AU';
-    billingData.state = (states[0] as string) || '';
-    
-    shippingData.country = (countries[1] as string) || billingData.country;
-    shippingData.state = (states[1] as string) || billingData.state;
 
     await saveAddress(id, AddressType.BILLING, billingData);
     await saveAddress(id, AddressType.SHIPPING, shippingData);
@@ -241,7 +219,7 @@ export async function updateUser(formData: FormData) {
     revalidatePath('/admin/affiliate');
     
     return { success: true, message: 'User profile updated successfully.' };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update user failed:', error);
     return { success: false, message: 'Failed to update user profile.' };
   }
@@ -271,7 +249,7 @@ export async function deleteUser(formData: FormData) {
     revalidatePath('/admin/users');
     revalidatePath('/admin/affiliate');
     return { success: true, message: 'User moved to trash successfully.' };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to move user to trash:', error);
     return { success: false, message: 'Failed to delete user.' };
   }
@@ -299,7 +277,7 @@ export async function bulkDeleteUsers(ids: string[]) {
     revalidatePath('/admin/users');
     revalidatePath('/admin/affiliate');
     return { success: true, message: `${ids.length} users deleted successfully.` };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Bulk delete failed:', error);
     return { success: false, message: 'Failed to delete selected users.' };
   }
@@ -329,7 +307,7 @@ export async function bulkChangeRole(ids: string[], newRole: Role) {
     revalidatePath('/admin/users');
     revalidatePath('/admin/affiliate');
     return { success: true, message: `Changed role to ${newRole} for ${ids.length} users.` };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Bulk role change failed:', error);
     return { success: false, message: 'Failed to change roles.' };
   }
@@ -367,8 +345,43 @@ export async function sendPasswordReset(formData: FormData) {
     });
 
     return { success: true, message: `Password reset link sent to ${email}` };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Password reset failed:', error);
     return { success: false, message: 'Failed to send reset link.' };
+  }
+}
+
+// ============================================================================
+// 7. RESET PASSWORD WITH TOKEN (from email link)
+// ============================================================================
+export async function resetPasswordWithToken(token: string, email: string, newPassword: string) {
+  try {
+    const verificationToken = await db.verificationToken.findFirst({
+      where: {
+        identifier: email,
+        token: token,
+        expires: { gt: new Date() },
+      }
+    });
+
+    if (!verificationToken) {
+      return { success: false, message: 'Invalid or expired reset link.' };
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await db.user.update({
+      where: { email: email.toLowerCase().trim() },
+      data: { password: hashedPassword }
+    });
+
+    await db.verificationToken.delete({
+      where: { identifier_token: { identifier: email, token: token } }
+    });
+
+    return { success: true, message: 'Password reset successfully.' };
+  } catch (error: unknown) {
+    console.error('Reset password with token failed:', error);
+    return { success: false, message: 'Failed to reset password. Please try again.' };
   }
 }

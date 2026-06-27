@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+import { auditService } from '@/lib/audit-service';
 
 // ============================================================================
 // DYNAMIC STRIPE CREDENTIALS FROM DB
@@ -13,7 +14,7 @@ async function getStripeInstance() {
     throw new Error('Stripe is not configured in the Admin Panel.');
   }
   const secret = decrypt(gateway.encryptedSecret);
-  return new Stripe(secret, { apiVersion: '2025-01-27.acacia' as any, typescript: true });
+  return new Stripe(secret, { apiVersion: '2025-01-27.acacia' as unknown as Stripe.LatestApiVersion });
 }
 
 interface CartItemDTO {
@@ -149,6 +150,11 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     console.error('[CREATE_PAYMENT_INTENT_ERROR]:', error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
+    // Log gateway config errors to SystemLog so admins can see them in the audit panel
+    if (message.includes('not configured') || message.includes('Admin Panel')) {
+      auditService.systemLog('ERROR', 'STRIPE_CONFIG', message, { route: 'create-payment-intent' })
+        .catch(() => {});
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

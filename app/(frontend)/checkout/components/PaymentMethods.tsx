@@ -5,11 +5,20 @@ import Image from 'next/image';
 import React, { useRef, useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import type { PaymentIntentResult } from '@stripe/stripe-js';
-import ExpressCheckouts from './ExpressCheckouts';
+import ExpressCheckouts, { type CartItemDTO } from './ExpressCheckouts';
 import PayPalPaymentGateway from './PayPalPaymentGateway';
 import StripePaymentGateway from './StripePaymentGateway';
 import PayPalMessage from './PayPalMessage';
 import { toast } from 'sonner';
+
+// Fix #7: fire-and-forget client→server log bridge (auditService is server-only)
+function logCheckoutError(step: string, error: string, metadata?: Record<string, unknown>) {
+  fetch('/api/log/payment-error', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ step, error, metadata }),
+  }).catch(() => {});
+}
 
 // ============================================================================
 // 1. INTERFACES
@@ -62,7 +71,7 @@ interface PaymentMethodsProps {
   isShippingSelected: boolean;
   total: number;
   customerInfo: Partial<AddressDTO>;
-  cartItems: any[];
+  cartItems: CartItemDTO[];
   shippingInfo?: Partial<AddressDTO>;
   selectedShipping: string;
   shippingRates: ShippingRateDTO[];
@@ -231,7 +240,13 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
             return_url: returnUrl,
           });
         } else if (paymentMethodType === 'zip') {
-          confirmResult = await (stripe as any).confirmZipPayment(bnplClientSecret, {
+          // Fix #8: Zip Pay — Stripe SDK types don't include confirmZipPayment yet.
+          // BEFORE: (stripe as any).confirmZipPayment(...) — forbidden `as any`.
+          // AFTER:  `as unknown as` narrows to the expected signature shape,
+          //         which is identical to confirmKlarnaPayment / confirmAfterpayClearpayPayment.
+          type ZipConfirm = (secret: string, opts: { payment_method: { billing_details: typeof billingDetails }; return_url: string }) => Promise<PaymentIntentResult>;
+          const confirmZip = (stripe as unknown as { confirmZipPayment: ZipConfirm }).confirmZipPayment;
+          confirmResult = await confirmZip(bnplClientSecret, {
             payment_method: { billing_details: billingDetails },
             return_url: returnUrl,
           });
@@ -243,7 +258,13 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
 
       } catch (error: unknown) {
         toast.dismiss('bnpl-redirect');
-        toast.error(error instanceof Error ? error.message : 'Redirect failed. Please try again.');
+        const msg = error instanceof Error ? error.message : 'Redirect failed. Please try again.';
+        toast.error(msg);
+        // Fix #7: log BNPL failures to admin SystemLog
+        logCheckoutError('BNPL_REDIRECT', msg, {
+          paymentMethod: selectedPaymentMethod,
+          total,
+        });
         setIsRedirecting(false);
       }
       return;
@@ -293,13 +314,13 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
           publicKey={mainStripeKey}
           clientSecret={stripeClientSecret}
           total={total}
-          onOrderPlace={onPlaceOrder as any}
+          onOrderPlace={onPlaceOrder}
           isShippingSelected={isShippingSelected}
           cartItems={cartItems}
-          customerInfo={customerInfo as any}
+          customerInfo={customerInfo}
           selectedShipping={selectedShipping}
-          shippingRates={shippingRates as any}
-          appliedCoupons={appliedCoupons as any}
+          shippingRates={shippingRates}
+          appliedCoupons={appliedCoupons}
         />
       </div>
 
@@ -346,14 +367,14 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
                   publicKey={mainStripeKey}
                   clientSecret={stripeClientSecret}
                   stripePaymentIntentId={stripePaymentIntentId || null}
-                  onPlaceOrder={onPlaceOrder as any}
-                  customerInfo={customerInfo as any}
+                  onPlaceOrder={onPlaceOrder}
+                  customerInfo={customerInfo}
                   total={total}
                   cartItems={cartItems}
-                  shippingInfo={shippingInfo as any}
+                  shippingInfo={shippingInfo}
                   selectedShipping={selectedShipping}
-                  shippingRates={shippingRates as any}
-                  appliedCoupons={appliedCoupons as any}
+                  shippingRates={shippingRates}
+                  appliedCoupons={appliedCoupons}
                 />
               </div>
             )}
@@ -385,8 +406,8 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
               customerInfo={customerInfo}
               shippingInfo={shippingInfo}
               selectedShipping={selectedShipping}
-              shippingRates={shippingRates as any}
-              appliedCoupons={appliedCoupons as any}
+              shippingRates={shippingRates}
+              appliedCoupons={appliedCoupons}
               orderNotes={orderNotes}
             />
           </div>

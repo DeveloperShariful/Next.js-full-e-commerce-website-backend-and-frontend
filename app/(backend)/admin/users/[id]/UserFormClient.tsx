@@ -9,16 +9,18 @@ import { Role } from '@prisma/client';
 import { State } from 'country-state-city';
 import MediaPickerModal from '@/app/(backend)/admin/media/_components/MediaPickerModal';
 
-import { createUser, updateUser } from '@/app/actions/backend/users/user-actions';
+import { createUser, updateUser, sendPasswordReset } from '@/app/actions/backend/users/user-actions';
 
 export default function UserFormClient({ initialData, countries }: { initialData: any, countries: any[] }) {
   const router = useRouter();
   const isEditing = !!initialData;
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // WordPress Style Password Generator State
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [generatedPassword, setGeneratedPassword] = useState('');
+  const [passwordValue, setPasswordValue] = useState('');
   
   // App Password State
   const [appName, setAppName] = useState('');
@@ -88,6 +90,19 @@ export default function UserFormClient({ initialData, countries }: { initialData
     toast.success('Billing address copied to shipping.');
   };
 
+  const getPasswordStrength = (pwd: string) => {
+    if (!pwd) return { label: '', bgColor: '', textColor: '', width: '0%' };
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    if (score <= 2) return { label: 'Weak', bgColor: 'bg-red-500', textColor: 'text-red-600', width: '33%' };
+    if (score <= 3) return { label: 'Medium', bgColor: 'bg-yellow-500', textColor: 'text-yellow-600', width: '66%' };
+    return { label: 'Strong', bgColor: 'bg-green-500', textColor: 'text-green-600', width: '100%' };
+  };
+
   const generatePassword = () => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
     let password = "";
@@ -95,6 +110,7 @@ export default function UserFormClient({ initialData, countries }: { initialData
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setGeneratedPassword(password);
+    setPasswordValue(password);
     setShowPasswordInput(true);
   };
 
@@ -293,16 +309,30 @@ export default function UserFormClient({ initialData, countries }: { initialData
               ) : (
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <input 
-                      name="password" 
-                      type="text" 
-                      defaultValue={generatedPassword} 
-                      className={`${inputClass} !w-full sm:!w-[280px] font-mono`} 
+                    <input
+                      name="password"
+                      type="text"
+                      value={passwordValue}
+                      onChange={(e) => setPasswordValue(e.target.value)}
+                      className={`${inputClass} !w-full sm:!w-[280px] font-mono`}
                     />
-                    <button type="button" onClick={() => setShowPasswordInput(false)} className={actionBtnClass}>
+                    <button type="button" onClick={() => { setShowPasswordInput(false); setPasswordValue(''); }} className={actionBtnClass}>
                       Cancel
                     </button>
                   </div>
+                  {passwordValue && (
+                    <div className="w-full sm:w-[280px]">
+                      <div className="h-1.5 bg-[#f0f0f1] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${getPasswordStrength(passwordValue).bgColor}`}
+                          style={{ width: getPasswordStrength(passwordValue).width }}
+                        />
+                      </div>
+                      <span className={`text-[11px] font-medium mt-0.5 inline-block ${getPasswordStrength(passwordValue).textColor}`}>
+                        {getPasswordStrength(passwordValue).label}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </td>
@@ -312,11 +342,25 @@ export default function UserFormClient({ initialData, countries }: { initialData
             <tr className="border-b border-[#c3c4c7] lg:border-transparent block lg:table-row">
               <th className={thClass}>Password Reset</th>
               <td className={tdClass}>
-                <button type="button" className={secondaryBtnClass}>
-                  Send Reset Link
+                <button
+                  type="button"
+                  disabled={resetLoading}
+                  className={`${secondaryBtnClass} disabled:opacity-50`}
+                  onClick={async () => {
+                    if (!initialData?.email) return;
+                    setResetLoading(true);
+                    const fd = new FormData();
+                    fd.append('email', initialData.email);
+                    const res = await sendPasswordReset(fd);
+                    if (res.success) toast.success(res.message);
+                    else toast.error(res.message);
+                    setResetLoading(false);
+                  }}
+                >
+                  {resetLoading ? 'Sending…' : 'Send Reset Link'}
                 </button>
                 <span className={descClass}>
-                  Send a link to reset their password. This will not change their password, nor will it force a change.
+                  Send a password reset link to {initialData?.email}. This will not change their password immediately.
                 </span>
               </td>
             </tr>

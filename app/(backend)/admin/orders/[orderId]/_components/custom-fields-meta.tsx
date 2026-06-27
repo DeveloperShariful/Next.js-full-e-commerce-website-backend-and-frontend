@@ -35,7 +35,7 @@ export const CustomFieldsMeta = ({ order }: CustomFieldsMetaProps) => {
 
   // ✅ STRICT JSON PARSING
   const metadataObj = typeof order.metadata === 'object' && order.metadata !== null 
-    ? (order.metadata as Record<string, any>) 
+    ? (order.metadata as unknown as Record<string, unknown>)
     : {};
 
   const systemKeys = ['downloadable_permissions', 'stripe_intent', 'paypal_id'];

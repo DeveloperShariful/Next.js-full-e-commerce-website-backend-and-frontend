@@ -5,27 +5,20 @@
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@/auth"
+import { security } from "@/lib/security"
 import Stripe from "stripe"
 import { Prisma } from "@prisma/client"
-import { z } from "zod" // ✅ FIX 1: Missing import added
+import { z } from "zod"
 import { StripeSettingsSchema, StripeSettingsType, SharedGatewaySchema } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
 import { encrypt, decrypt } from "@/app/actions/backend/settings/payments/crypto"
 
-async function getDbUserId(): Promise<string | null> {
-  const session = await auth();
-  if (!session?.user?.email) return null;
-  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
-  return user?.id || null;
-}
-
 // 1. UPDATE STRIPE SETTINGS
 export async function updateStripeSettings(
-  id: string, 
-  sharedValues: z.infer<typeof SharedGatewaySchema>, 
+  id: string,
+  sharedValues: z.infer<typeof SharedGatewaySchema>,
   settingsValues: StripeSettingsType
 ) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     const validatedShared = SharedGatewaySchema.parse(sharedValues);
     const validatedSettings = StripeSettingsSchema.parse(settingsValues);
@@ -47,7 +40,7 @@ export async function updateStripeSettings(
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM",
+      userId: user.id,
       action: "UPDATE_STRIPE_SETTINGS",
       entity: "PaymentGateway",
       entityId: id,
@@ -64,11 +57,11 @@ export async function updateStripeSettings(
 
 // 2. CONNECT & TEST STRIPE API KEYS
 export async function connectStripeKeys(id: string, publicKey: string, secretKey: string) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     if (!publicKey || !secretKey) throw new Error("Both Public and Secret keys are required.");
 
-    const stripe = new Stripe(secretKey, { apiVersion: "2025-01-27.acacia" as any, typescript: true });
+    const stripe = new Stripe(secretKey, { apiVersion: "2025-01-27.acacia" as unknown as Stripe.LatestApiVersion });
     await stripe.balance.retrieve(); 
 
     const encryptedSecret = encrypt(secretKey);
@@ -83,7 +76,7 @@ export async function connectStripeKeys(id: string, publicKey: string, secretKey
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM", action: "CONNECT_STRIPE_KEYS", entity: "PaymentGateway", entityId: id
+      userId: user.id, action: "CONNECT_STRIPE_KEYS", entity: "PaymentGateway", entityId: id
     });
 
     revalidatePath("/admin/settings/payments");
@@ -96,7 +89,7 @@ export async function connectStripeKeys(id: string, publicKey: string, secretKey
 
 // 3. REFRESH/CREATE STRIPE WEBHOOK
 export async function refreshStripeWebhook(id: string) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     const gateway = await db.paymentGateway.findUnique({ where: { id } });
     if (!gateway || !gateway.encryptedSecret) throw new Error("Stripe is not connected. Save API keys first.");
@@ -104,7 +97,7 @@ export async function refreshStripeWebhook(id: string) {
     const secretKey = decrypt(gateway.encryptedSecret);
     if (!secretKey) throw new Error("Failed to decrypt Stripe secret key.");
 
-    const stripe = new Stripe(secretKey, { apiVersion: "2025-01-27.acacia" as any, typescript: true });
+    const stripe = new Stripe(secretKey, { apiVersion: "2025-01-27.acacia" as unknown as Stripe.LatestApiVersion });
 
     let appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     if (appUrl.endsWith("/")) appUrl = appUrl.slice(0, -1);
@@ -118,7 +111,13 @@ export async function refreshStripeWebhook(id: string) {
 
     const newWebhook = await stripe.webhookEndpoints.create({
       url: webhookUrl,
-      enabled_events: ["payment_intent.succeeded", "payment_intent.payment_failed", "charge.refunded", "charge.dispute.created"],
+      enabled_events: [
+        "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+        "payment_intent.canceled",
+        "charge.refunded",
+        "charge.dispute.created",
+      ],
     });
 
     const encryptedWebhookSecret = encrypt(newWebhook.secret as string);
@@ -129,7 +128,7 @@ export async function refreshStripeWebhook(id: string) {
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM", action: "REFRESH_STRIPE_WEBHOOK", entity: "PaymentGateway", entityId: id
+      userId: user.id, action: "REFRESH_STRIPE_WEBHOOK", entity: "PaymentGateway", entityId: id
     });
 
     revalidatePath("/admin/settings/payments");
@@ -142,7 +141,7 @@ export async function refreshStripeWebhook(id: string) {
 
 // 3.5 SAVE MANUAL WEBHOOK SECRET
 export async function saveManualWebhook(id: string, webhookSecret: string, webhookUrl: string) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   try {
     const encryptedWebhookSecret = encrypt(webhookSecret);
 
@@ -155,12 +154,12 @@ export async function saveManualWebhook(id: string, webhookSecret: string, webho
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM", action: "MANUAL_WEBHOOK_SAVED", entity: "PaymentGateway", entityId: id
+      userId: user.id, action: "MANUAL_WEBHOOK_SAVED", entity: "PaymentGateway", entityId: id
     });
 
     revalidatePath("/admin/settings/payments");
     return { success: true, message: "Manual Webhook saved successfully!" };
-  } catch (error: unknown) {
+  } catch {
     return { success: false, error: "Failed to save webhook manually." };
   }
 }
@@ -168,14 +167,22 @@ export async function saveManualWebhook(id: string, webhookSecret: string, webho
 
 // 4. DISCONNECT STRIPE
 export async function disconnectStripe(id: string) {
+  const user = await security.assertAdmin();
   try {
     await db.paymentGateway.update({
       where: { id },
       data: { publicKey: null, encryptedSecret: null, encryptedWebhook: null, webhookUrl: null, isConnected: false, isEnabled: false }
     });
+    await auditService.log({
+      userId: user.id,
+      action: "DISCONNECT_STRIPE",
+      entity: "PaymentGateway",
+      entityId: id,
+      newData: { isConnected: false, isEnabled: false, keysCleared: true }
+    });
     revalidatePath("/admin/settings/payments");
     return { success: true, message: "Stripe disconnected and keys removed." };
-  } catch (error: unknown) {
+  } catch {
     return { success: false, error: "Failed to disconnect." };
   }
 }

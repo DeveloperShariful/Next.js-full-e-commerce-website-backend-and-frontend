@@ -5,25 +5,18 @@
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auditService } from "@/lib/audit-service"
-import { auth } from "@/auth"
+import { security } from "@/lib/security"
 import { Prisma } from "@prisma/client"
 import { z } from "zod"
 import { SharedGatewaySchema, OfflineSettingsSchema, OfflineSettingsType } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
 
-async function getDbUserId(): Promise<string | null> {
-  const session = await auth();
-  if (!session?.user?.email) return null;
-  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
-  return user?.id || null;
-}
-
 // 1. UPDATE OFFLINE SETTINGS (Bank Transfer, COD, Cheque)
 export async function updateOfflineSettings(
-  id: string, 
-  sharedValues: z.infer<typeof SharedGatewaySchema>, 
+  id: string,
+  sharedValues: z.infer<typeof SharedGatewaySchema>,
   settingsValues: OfflineSettingsType
 ) {
-  const userId = await getDbUserId();
+  const user = await security.assertAdmin();
   
   try {
     const validatedShared = SharedGatewaySchema.parse(sharedValues);
@@ -50,7 +43,7 @@ export async function updateOfflineSettings(
     });
 
     await auditService.log({
-      userId: userId || "SYSTEM",
+      userId: user.id,
       action: "UPDATE_OFFLINE_PAYMENT",
       entity: "PaymentGateway",
       entityId: id,

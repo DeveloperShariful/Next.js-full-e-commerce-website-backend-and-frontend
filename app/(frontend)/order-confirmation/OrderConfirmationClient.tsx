@@ -14,6 +14,9 @@ const STEPS = [
   { id: 3, label: 'Almost Done' },
 ] as const;
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+
 export default function OrderConfirmationClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,6 +24,8 @@ export default function OrderConfirmationClient() {
 
   const [step, setStep] = useState<Step>(1);
   const [error, setError] = useState('');
+  // null = not retrying, {attempt: N} = on retry N
+  const [retryInfo, setRetryInfo] = useState<{ attempt: number } | null>(null);
 
   useEffect(() => {
     const orderId = searchParams.get('order_id');
@@ -34,31 +39,56 @@ export default function OrderConfirmationClient() {
     }
 
     const verifyStripePayment = async () => {
-      try {
-        const response = await fetch('/api/stripe/capture-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId, paymentIntentId }),
-        });
+      let lastError = 'Payment verification failed. Please try again.';
 
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-          throw new Error(data.message || 'Payment verification failed or was declined.');
+      // BEFORE: single attempt — any network blip showed "Verification Failed"
+      //         even when payment actually succeeded.
+      // AFTER:  3 attempts with 2s delay. Webhook also rescues stuck orders
+      //         independently, so user sees success even on temporary failures.
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          if (attempt > 1) {
+            setRetryInfo({ attempt });
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          }
+
+          const response = await fetch('/api/stripe/capture-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, paymentIntentId }),
+          });
+
+          const data = await response.json();
+
+          // Payment was declined — no point retrying, error immediately
+          if (response.status === 402) {
+            setError(data.message || 'Your payment was declined. Please try a different payment method.');
+            return;
+          }
+
+          if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Payment verification failed. Please try again.');
+          }
+
+          // Success path
+          setRetryInfo(null);
+          setStep(2);
+          await clearCart();
+          setStep(3);
+          setTimeout(() => {
+            router.replace(`/order-success?order_id=${orderId}&key=${orderKey}`);
+          }, 1500);
+          return;
+
+        } catch (err: unknown) {
+          lastError = err instanceof Error ? err.message : 'An unknown error occurred.';
+          console.error(`Payment Verification Error (attempt ${attempt}/${MAX_RETRIES}):`, err);
         }
-
-        setStep(2);
-        await clearCart();
-
-        setStep(3);
-        setTimeout(() => {
-          router.replace(`/order-success?order_id=${orderId}&key=${orderKey}`);
-        }, 1500);
-
-      } catch (err: unknown) {
-        console.error('Payment Verification Error:', err);
-        const msg = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(msg);
       }
+
+      // All retries exhausted
+      setRetryInfo(null);
+      setError(lastError);
     };
 
     verifyStripePayment();
@@ -113,7 +143,7 @@ export default function OrderConfirmationClient() {
           <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-5" />
 
           <h1 className="text-lg md:text-xl font-bold text-gray-800 mb-2">
-            {step === 1 && 'Verifying your payment...'}
+            {step === 1 && (retryInfo ? `Retrying… (${retryInfo.attempt}/${MAX_RETRIES})` : 'Verifying your payment...')}
             {step === 2 && 'Confirming your order...'}
             {step === 3 && 'Payment successful! Redirecting...'}
           </h1>

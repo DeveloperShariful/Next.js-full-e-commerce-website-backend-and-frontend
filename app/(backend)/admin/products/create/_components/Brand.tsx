@@ -116,7 +116,7 @@ export default function Brand() {
                             onClick={addNewBrand} 
                             className="w-full py-1.5 mt-1 bg-[#f6f7f7] border border-[#c3c4c7] text-[13px] font-medium text-[#2271b1] hover:bg-[#f0f0f1] rounded-[3px] transition-colors"
                         >
-                            + Add "{input}"
+                            + Add &quot;{input}&quot;
                         </button>
                     )}
                 </div>

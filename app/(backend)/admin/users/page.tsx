@@ -117,16 +117,19 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       name: true,
       email: true,
       role: true,
+      image: true,
       createdAt: true,
-      affiliateAccount: { select: { id: true } } // Bring relation to determine true role
+      emailVerified: true,
+      affiliateAccount: { select: { id: true } }
     }
   });
 
   const users = usersRaw.map(user => ({
     ...user,
-    // ✅ Automatically display as 'AFFILIATE' in the UI if they have an AffiliateAccount
     role: user.affiliateAccount ? 'AFFILIATE' : user.role,
     createdAt: user.createdAt.toISOString(),
+    emailVerified: !!user.emailVerified,
+    image: user.image ?? null,
   }));
 
   return (

@@ -82,7 +82,7 @@ export default function BundleItems() {
                 <p className="m-0 font-semibold mb-1 text-[#1d2327]">Bundle Product Logic:</p>
                 <ul className="m-0 pl-[20px] list-disc text-[#646970]">
                     <li>Search and add existing products to create a bundle.</li>
-                    <li>The "Price" in General tab will be the total price of this bundle.</li>
+                    <li>The &quot;Price&quot; in General tab will be the total price of this bundle.</li>
                     <li>Inventory will be deducted from each child product automatically when sold.</li>
                 </ul>
             </div>

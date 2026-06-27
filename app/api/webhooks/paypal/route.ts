@@ -7,6 +7,7 @@ import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { resyncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sendNotification } from '@/app/api/email/send-notification';
+import { auditService } from '@/lib/audit-service';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -300,12 +301,88 @@ export async function POST(request: Request) {
             }
         }
 
-        // 🛡️ 5. Process SCENARIO 3: DENIED/DECLINED
+        // 🛡️ 5. PAYMENT.CAPTURE.DENIED / DECLINED — with reason detail
         else if (event.event_type === 'PAYMENT.CAPTURE.DENIED' || event.event_type === 'PAYMENT.CAPTURE.DECLINED') {
             const wcOrderId = String(event.resource.custom_id);
             if (wcOrderId) {
-                await db.order.update({ where: { id: wcOrderId }, data: { status: OrderStatus.FAILED, paymentStatus: PaymentStatus.UNPAID } });
-                await db.orderNote.create({ data: { orderId: wcOrderId, content: `❌ Payment declined via Webhook.`, isSystem: true } });
+                // BEFORE: note only said "Payment declined" — no detail.
+                // AFTER: includes reason code + processor response for diagnosis.
+                const reasonCode = String(event.resource.status_details?.[0]?.reason ?? event.event_type);
+                const processorCode = String(event.resource.seller_receivable_breakdown?.gross_amount?.value ?? '');
+                const note = `❌ PayPal payment ${event.event_type === 'PAYMENT.CAPTURE.DENIED' ? 'denied' : 'declined'} — Reason: ${reasonCode}${processorCode ? ` | Amount: $${processorCode}` : ''} | TXN: ${event.resource.id}`;
+
+                await db.$transaction([
+                    db.order.update({ where: { id: wcOrderId }, data: { status: OrderStatus.FAILED, paymentStatus: PaymentStatus.UNPAID } }),
+                    db.orderNote.create({ data: { orderId: wcOrderId, content: note, isSystem: true } }),
+                ]).catch(err => console.error('[PayPal Webhook] DENIED update error:', err));
+            }
+        }
+
+        // 🛡️ 6. PAYMENT.CAPTURE.REFUNDED — auto-sync when refund issued via PayPal dashboard
+        else if (event.event_type === 'PAYMENT.CAPTURE.REFUNDED') {
+            const wcOrderId = String(event.resource.custom_id ?? event.resource.invoice_id ?? '');
+            const refundedAmount = Number(event.resource.amount?.value ?? 0);
+            const currency = String(event.resource.amount?.currency_code ?? 'AUD');
+
+            if (wcOrderId && refundedAmount > 0) {
+                const order = await db.order.findUnique({ where: { id: wcOrderId }, select: { id: true, total: true, status: true, paymentStatus: true } });
+                if (order) {
+                    const isFullRefund = Math.abs(Number(order.total) - refundedAmount) < 0.05;
+                    await db.$transaction([
+                        db.order.update({
+                            where: { id: wcOrderId },
+                            data: {
+                                status: isFullRefund ? OrderStatus.REFUNDED : order.status,
+                                paymentStatus: isFullRefund ? PaymentStatus.REFUNDED : order.paymentStatus,
+                            },
+                        }),
+                        db.orderNote.create({
+                            data: {
+                                orderId: wcOrderId,
+                                content: `💰 PayPal refund processed: ${currency} $${refundedAmount.toFixed(2)} (${isFullRefund ? 'Full refund' : 'Partial refund'}) | Refund ID: ${event.resource.id}`,
+                                isSystem: true,
+                            },
+                        }),
+                    ]).catch(err => console.error('[PayPal Webhook] Refund sync error:', err));
+                }
+            }
+        }
+
+        // 🛡️ 7. RISK.DISPUTE.CREATED — PayPal dispute/chargeback filed
+        // Money may be automatically held by PayPal. Admin must respond immediately.
+        else if (event.event_type === 'RISK.DISPUTE.CREATED') {
+            const disputeId   = String(event.resource.dispute_id ?? event.resource.id ?? '');
+            const disputeAmt  = Number(event.resource.disputed_transactions?.[0]?.seller_transaction_id ? 0 : event.resource.dispute_amount?.value ?? 0);
+            const disputeNote = `⚠️ PAYPAL DISPUTE FILED — Dispute ID: ${disputeId} | Reason: ${event.resource.reason ?? 'Unknown'} | Amount: $${disputeAmt.toFixed(2)}`;
+
+            // Try to find the order via the disputed transaction
+            const txnId = String(event.resource.disputed_transactions?.[0]?.seller_transaction_id ?? '');
+            if (txnId) {
+                const txn = await db.orderTransaction.findFirst({
+                    where: { transactionId: txnId },
+                    select: { orderId: true },
+                });
+                if (txn?.orderId) {
+                    // Do not change order status — DISPUTED not in enum. Admin sees dispute via note + CRITICAL SystemLog.
+                    await db.orderNote.create({
+                        data: { orderId: txn.orderId, content: disputeNote, isSystem: true },
+                    }).catch(err => console.error('[PayPal Webhook] Dispute note error:', err));
+
+                    auditService.systemLog(
+                        'CRITICAL',
+                        'PAYPAL_DISPUTE',
+                        `⚠️ PayPal dispute on order ${txn.orderId} — Respond immediately`,
+                        { orderId: txn.orderId, disputeId, reason: event.resource.reason, amount: disputeAmt }
+                    ).catch(() => {});
+                } else {
+                    // Order not found by transaction — still log the critical alert
+                    auditService.systemLog(
+                        'CRITICAL',
+                        'PAYPAL_DISPUTE',
+                        `⚠️ PayPal dispute filed — ${disputeNote}`,
+                        { disputeId, txnId, reason: event.resource.reason }
+                    ).catch(() => {});
+                }
             }
         }
 

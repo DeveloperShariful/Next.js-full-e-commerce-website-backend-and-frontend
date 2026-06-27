@@ -45,7 +45,9 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
 
   // URL প্যারাম সিঙ্ক করা
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuery(searchParams.get("query") || "");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPaymentMethod(searchParams.get("paymentMethod") || "all");
   }, [searchParams]);
 

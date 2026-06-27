@@ -4,7 +4,7 @@ import { db } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { InvoiceView } from "./_components/invoice-view";
 
-const serializeData = (data: any) => {
+const serializeData = (data: unknown) => {
   return JSON.parse(JSON.stringify(data, (key, value) => {
     if (value && typeof value === 'object' && !Array.isArray(value) && value.toString && value.constructor.name === 'Decimal') {
       return Number(value);

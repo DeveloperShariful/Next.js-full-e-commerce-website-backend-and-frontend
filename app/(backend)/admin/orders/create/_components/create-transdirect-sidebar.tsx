@@ -19,7 +19,8 @@ export const CreateTransdirectSidebar = ({ orderData, setOrderData }: CreateTran
   const { formatPrice } = useGlobalStore();
   
   const [loadingShipping, setLoadingShipping] = useState(false);
-  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  interface ShippingOption { id: string; name: string; price: number; type: string; transit_time?: string; }
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
 
   // 🔥 IRON-CLAD GATEKEEPER: Prevents continuous API calls
   const lastQuotePayload = useRef<string>("");
@@ -54,8 +55,8 @@ export const CreateTransdirectSidebar = ({ orderData, setOrderData }: CreateTran
 
         try {
             const localRes = await getShippingResources();
-            const localRates = (localRes.shippingRates || []).map((r: any) => ({
-                id: r.id, name: r.name, price: Number(r.price), type: 'local'
+            const localRates = (localRes.shippingRates || []).map((r) => ({
+                id: r.id, name: r.name, price: Number(r.price), type: 'local' as const
             }));
 
             const tdRes = await getTransdirectQuotes({

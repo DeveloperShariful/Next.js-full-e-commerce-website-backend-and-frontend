@@ -3,10 +3,11 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronUp, ChevronDown, CheckCircle, AlertTriangle } from "lucide-react";
+import { ChevronUp, ChevronDown, CheckCircle } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { OrderDetailsType } from "../types";
 
-export const AffiliateSidebar = ({ order }: { order: any }) => {
+export const AffiliateSidebar = ({ order }: { order: OrderDetailsType }) => {
   const [isOpen, setIsOpen] = useState(true);
   const { formatPrice } = useGlobalStore();
 
@@ -45,11 +46,11 @@ export const AffiliateSidebar = ({ order }: { order: any }) => {
                     <div className="bg-white border border-[#c3c4c7] p-2 rounded-[3px] shadow-sm">
                         <div className="mb-1">
                             <span className="font-semibold text-[#646970]">Partner:</span>{" "}
-                            <a href={`/admin/affiliates/${order.affiliate.id}`} className="text-[#2271b1] hover:underline">
-                                {order.affiliate.user?.name || "Unknown"}
+                            <a href={`/admin/affiliates/${order.affiliate?.id}`} className="text-[#2271b1] hover:underline">
+                                {order.affiliate?.user?.name || "Unknown"}
                             </a>
                         </div>
-                        {order.discount?.affiliateId === order.affiliate.id && (
+                        {order.discount?.affiliateId === order.affiliate?.id && (
                             <div className="mb-1">
                                 <span className="font-semibold text-[#646970]">Coupon Used:</span>{" "}
                                 <span className="font-mono text-[#1d2327]">{order.couponCode}</span>
@@ -59,8 +60,8 @@ export const AffiliateSidebar = ({ order }: { order: any }) => {
                             <span className="font-semibold text-[#646970]">Rate:</span>{" "}
                             {(() => {
                                 const ref = order.referrals?.[0];
-                                const type = ref?.commissionType ?? order.affiliate.commissionType;
-                                const rate = ref?.commissionRate ?? order.affiliate.commissionRate;
+                                const type = ref?.commissionType ?? order.affiliate?.commissionType;
+                                const rate = ref?.commissionRate ?? order.affiliate?.commissionRate;
                                 if (!rate && rate !== 0) return "—";
                                 return type === "PERCENTAGE" ? `${rate}%` : formatPrice(rate);
                             })()}

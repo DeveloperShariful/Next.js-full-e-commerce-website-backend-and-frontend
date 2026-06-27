@@ -89,14 +89,21 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
   };
 
   const statuses = [
-    { id: "all", label: "All", countKey: "all" },
-    { id: "PENDING", label: "Pending payment", countKey: "pending" },
-    { id: "PROCESSING", label: "Processing", countKey: "processing" },
-    { id: "DELIVERED", label: "Completed", countKey: "completed" },
-    { id: "CANCELLED", label: "Cancelled", countKey: "cancelled" },
-    { id: "REFUNDED", label: "Refunded", countKey: "refunded" },
-    { id: "FAILED", label: "Failed", countKey: "failed" },
-    { id: "trash", label: "Trash", countKey: "trash" },
+    { id: "all",               label: "All",               countKey: "all" },
+    { id: "PENDING",           label: "Pending payment",   countKey: "pending" },
+    { id: "AWAITING_PAYMENT",  label: "Awaiting payment",  countKey: "awaitingPayment" },
+    { id: "PROCESSING",        label: "Processing",        countKey: "processing" },
+    { id: "PACKED",            label: "Packed",            countKey: "packed" },
+    { id: "SHIPPED",           label: "Shipped",           countKey: "shipped" },
+    { id: "DELIVERED",         label: "Completed",         countKey: "completed" },
+    { id: "READY_FOR_PICKUP",  label: "Ready for Pickup",  countKey: "readyForPickup" },
+    { id: "CANCELLED",         label: "Cancelled",         countKey: "cancelled" },
+    { id: "REFUNDED",          label: "Refunded",          countKey: "refunded" },
+    { id: "RETURNED",          label: "Returned",          countKey: "returned" },
+    { id: "PARTIALLY_PAID",    label: "Partially Paid",    countKey: "partiallyPaid" },
+    { id: "FAILED",            label: "Failed",            countKey: "failed" },
+    { id: "DRAFT",             label: "Draft",             countKey: "draft" },
+    { id: "trash",             label: "Trash",             countKey: "trash" },
   ];
 
   return (

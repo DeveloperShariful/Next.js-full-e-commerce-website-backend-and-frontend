@@ -44,36 +44,20 @@ export async function updateOrderStatus(formData: FormData) {
     // 🔥 FIXED: Centralized Email Logic
     const emailPromises = [];
 
-    // A. Order Status Changed?
+    // A. Order Status Changed? sendOrderEmail auto-notifies admin internally
     if (status && status !== existingOrder.status) {
-        // Customer Email
         emailPromises.push(sendOrderEmail(orderId, `ORDER_${status}`));
-        
-        // Admin Alert (Example Logic)
-        if (status === 'CANCELLED' || status === 'PENDING') {
-            emailPromises.push(sendOrderEmail(orderId, `ADMIN_ORDER_${status}`));
-        }
     }
 
     // B. Payment Status Changed?
     if (paymentStatus && paymentStatus !== existingOrder.paymentStatus) {
         emailPromises.push(sendOrderEmail(orderId, `PAYMENT_${paymentStatus}`));
-        
-        if (paymentStatus === 'REFUNDED') {
-            emailPromises.push(sendOrderEmail(orderId, `ADMIN_PAYMENT_${paymentStatus}`));
-        }
     }
 
     // C. Fulfillment Status Changed?
     if (fulfillmentStatus && fulfillmentStatus !== existingOrder.fulfillmentStatus) {
-        let trigger = `FULFILLMENT_${fulfillmentStatus}`;
-        if (fulfillmentStatus === 'PARTIALLY_FULFILLED') trigger = 'FULFILLMENT_PARTIALLY_FULFILLED';
-        
+        const trigger = `FULFILLMENT_${fulfillmentStatus}`;
         emailPromises.push(sendOrderEmail(orderId, trigger));
-
-        if (fulfillmentStatus === 'RETURNED') {
-            emailPromises.push(sendOrderEmail(orderId, `ADMIN_FULFILLMENT_RETURNED`));
-        }
     }
 
     await Promise.all(emailPromises);

@@ -6,9 +6,41 @@ import { format } from "date-fns";
 import { InvoiceActions } from "./invoice-actions";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
+interface InvoiceItem {
+  id: string;
+  productName: string;
+  variantName: string | null;
+  price: number;
+  quantity: number;
+  total: number;
+}
+
+interface InvoiceOrder {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  billingAddress: Record<string, string>;
+  items: InvoiceItem[];
+  user: { email: string; phone: string | null } | null;
+  guestEmail: string | null;
+  paymentStatus: string;
+  paymentGateway: string | null;
+  subtotal: number;
+  shippingTotal: number;
+  discountTotal: number;
+  total: number;
+}
+
+interface InvoiceSettings {
+  storeName: string | null;
+  storeEmail: string | null;
+  storePhone: string | null;
+  storeAddress: Record<string, string> | null;
+}
+
 interface InvoiceViewProps {
-    order: any;
-    settings: any;
+    order: InvoiceOrder;
+    settings: InvoiceSettings | null;
 }
 
 export const InvoiceView = ({ order, settings }: InvoiceViewProps) => {
@@ -99,7 +131,7 @@ export const InvoiceView = ({ order, settings }: InvoiceViewProps) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {order.items.map((item: any) => (
+                                {order.items.map((item) => (
                                     <tr key={item.id}>
                                         <td className="py-4">
                                             <p className="font-bold text-sm text-slate-800">{item.productName}</p>

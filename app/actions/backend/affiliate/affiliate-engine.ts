@@ -436,7 +436,7 @@ export async function processOrder(orderId: string) {
       data: {
         channel: "EMAIL",
         recipient: affiliate.user.email,
-        templateSlug: "REFERRAL_PENDING",
+        templateSlug: "referral_pending",
         status: "PENDING",
         userId: affiliate.userId,
         content: "",

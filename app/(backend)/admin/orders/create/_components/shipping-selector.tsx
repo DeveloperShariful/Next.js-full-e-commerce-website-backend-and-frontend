@@ -9,13 +9,34 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Truck, MapPin, Loader2, Store, CheckCircle } from "lucide-react";
 
+interface ShippingMethod {
+  id: string;
+  name: string;
+  price: number;
+  type: string;
+  desc?: string;
+  transit_time?: string;
+}
+
+interface PickupLocation {
+  id: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+}
+
+interface CartItemBasic {
+  productId: string | null;
+  quantity: number;
+}
+
 interface ShippingSelectorProps {
   onPickupLocationChange: (id: string | null) => void;
   onShippingCostChange: (cost: number) => void;
   onAdminNoteChange: (note: string) => void;
   onCustomerNoteChange: (note: string) => void;
   address?: { city: string; postcode: string; state: string } | null;
-  cartItems: any[];
+  cartItems: CartItemBasic[];
   formatPrice: (price: number) => string;
 }
 
@@ -31,9 +52,9 @@ export const ShippingSelector = ({
   const [loadingLocal, setLoadingLocal] = useState(true);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
   
-  const [pickupPoints, setPickupPoints] = useState<any[]>([]);
-  const [localRates, setLocalRates] = useState<any[]>([]);
-  const [liveQuotes, setLiveQuotes] = useState<any[]>([]);
+  const [pickupPoints, setPickupPoints] = useState<PickupLocation[]>([]);
+  const [localRates, setLocalRates] = useState<ShippingMethod[]>([]);
+  const [liveQuotes, setLiveQuotes] = useState<ShippingMethod[]>([]);
   
   const [selectedMethod, setSelectedMethod] = useState<string>("");
 
@@ -51,11 +72,11 @@ export const ShippingSelector = ({
       const res = await getShippingResources();
       setPickupPoints(res.pickupLocations);
       
-      const mappedRates = res.shippingRates.map((r: any) => ({
+      const mappedRates = res.shippingRates.map((r) => ({
           id: r.id,
           name: r.name,
           price: Number(r.price),
-          type: 'local',
+          type: 'local' as const,
           desc: r.zone?.name || "Flat Rate"
       }));
       setLocalRates(mappedRates);

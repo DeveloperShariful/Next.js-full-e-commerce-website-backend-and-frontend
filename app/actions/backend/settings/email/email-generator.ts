@@ -2,11 +2,58 @@
 
 import { format } from "date-fns";
 
+interface EmailOrderItem {
+  productName: string;
+  sku: string | null;
+  variantName: string | null;
+  quantity: number;
+  price: number;
+}
+
+interface EmailOrder {
+  id?: string;
+  orderNumber: string;
+  createdAt: string | Date;
+  currency: string;
+  total: number;
+  subtotal: number;
+  shippingTotal: number;
+  taxTotal: number;
+  refundedAmount: number;
+  discountTotal: number;
+  shippingMethod: string | null;
+  shippingTrackingNumber: string | null;
+  paymentMethod: string | null;
+  billingAddress: Record<string, string>;
+  shippingAddress: Record<string, string>;
+  user: { name: string | null; email: string } | null;
+  guestEmail: string | null;
+  items: EmailOrderItem[];
+  shippingTrackingUrl?: string | null;
+}
+
+interface EmailConfig {
+  baseColor: string | null;
+  backgroundColor: string | null;
+  bodyBackgroundColor: string | null;
+  headerImage: string | null;
+  senderName: string;
+  senderEmail: string;
+  footerText: string | null;
+}
+
+interface EmailTemplate {
+  triggerEvent: string | null;
+  subject: string;
+  heading: string | null;
+  content: string;
+}
+
 interface EmailGeneratorProps {
-  order?: any;
-  config: any;
-  template: any;
-  metadata?: any;
+  order?: EmailOrder;
+  config: EmailConfig;
+  template: EmailTemplate;
+  metadata?: Record<string, unknown>;
 }
 
 const getReadablePaymentMethod = (method: string | null) => {
@@ -44,33 +91,37 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://gobike.au";
 
-  let variables: any = {};
+  type TemplateVars = Record<string, string | number | null | undefined>;
+  let variables: TemplateVars = {};
 
-  if (template.triggerEvent.includes("WARRANTY")) {
+  const metaStr = (key: string, fallback = "") =>
+    typeof metadata?.[key] === "string" ? (metadata[key] as string) : fallback;
+
+  if (template.triggerEvent?.includes("WARRANTY")) {
       variables = {
-          customer_name: metadata?.customer_name || "Customer",
-          order_number: metadata?.order_number || "N/A",
-          shop_purchased: metadata?.shop_purchased || "GoBike Australia",
-          description: metadata?.description || "No description provided.",
-          replacement_part: metadata?.replacement_part || "Replacement Part",
-          tracking_number: metadata?.tracking_number || "N/A",
-          courier: metadata?.courier || "Courier",
+          customer_name: metaStr("customer_name", "Customer"),
+          order_number: metaStr("order_number", "N/A"),
+          shop_purchased: metaStr("shop_purchased", "GoBike Australia"),
+          description: metaStr("description", "No description provided."),
+          replacement_part: metaStr("replacement_part", "Replacement Part"),
+          tracking_number: metaStr("tracking_number", "N/A"),
+          courier: metaStr("courier", "Courier"),
       };
   } else if (template.triggerEvent === "PASSWORD_RESET") {
       variables = {
-          customer_name: metadata?.customer_name || "Customer",
-          reset_link: metadata?.reset_link || `${appUrl}/reset-password`,
+          customer_name: metaStr("customer_name", "Customer"),
+          reset_link: metaStr("reset_link", `${appUrl}/reset-password`),
       };
   } else if (template.triggerEvent === "NEWSLETTER_SUBSCRIPTION") {
       variables = {
-          customer_name: metadata?.customer_name || "Subscriber",
+          customer_name: metaStr("customer_name", "Subscriber"),
       };
   } else if (template.triggerEvent === "CONTACT_FORM_SUBMISSION" || template.triggerEvent === "CONTACT_FORM_CUSTOMER") {
       variables = {
-          customer_name: metadata?.customer_name || "Customer",
-          customer_email: metadata?.customer_email || "Not Provided",
-          customer_phone: metadata?.customer_phone || "Not Provided",
-          message: metadata?.message || "No message content",
+          customer_name: metaStr("customer_name", "Customer"),
+          customer_email: metaStr("customer_email", "Not Provided"),
+          customer_phone: metaStr("customer_phone", "Not Provided"),
+          message: metaStr("message", "No message content"),
       };
   } else if (order) {
       const currency = order.currency || "$";
@@ -85,11 +136,19 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
           total_amount: formatMoney(order.total),
           payment_method: getReadablePaymentMethod(order.paymentMethod),
           tracking_number: order.shippingTrackingNumber || "N/A",
-          courier: order.shippingProvider || "Courier",
+          courier: order.shippingMethod || "Standard Shipping",
           order_date: format(new Date(order.createdAt), "MMMM do, yyyy"),
           shipping_address: `${shipping.address1 || ''} ${shipping.city || ''}`,
           billing_address: `${billing.address1 || ''} ${billing.city || ''}`
       };
+  } else if (metadata) {
+      // Generic fallback: affiliate events, custom templates, etc.
+      // Replace all metadata keys as template variables in email body
+      for (const [key, value] of Object.entries(metadata)) {
+          if (key !== "_replyTo" && value !== null && value !== undefined) {
+              variables[key] = String(value);
+          }
+      }
   }
 
   let introText = safeReplace(template.content, variables);
@@ -99,13 +158,13 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
   // ============================================================
   let orderDetailsHtml = "";
 
-  if (order && !template.triggerEvent.includes("WARRANTY") && template.triggerEvent !== "PASSWORD_RESET" && template.triggerEvent !== "NEWSLETTER_SUBSCRIPTION" && !template.triggerEvent.includes("CONTACT_FORM")) {
+  if (order && !template.triggerEvent?.includes("WARRANTY") && template.triggerEvent !== "PASSWORD_RESET" && template.triggerEvent !== "NEWSLETTER_SUBSCRIPTION" && !template.triggerEvent?.includes("CONTACT_FORM")) {
       const currency = order.currency || "$";
       const formatMoney = (amount: number) => {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount).replace('USD', currency);
       };
 
-      const productRows = order.items.map((item: any) => `
+      const productRows = order.items.map((item) => `
         <tr style="border-bottom: 1px solid #ebebeb;">
           <td class="ptd" style="padding: 14px 16px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; vertical-align: top;">
             <div class="pname" style="font-size: 15px; font-weight: 600; line-height: 1.4;">${item.productName}</div>
@@ -232,8 +291,8 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
   // WARRANTY MEDIA
   // ==========================================
   let mediaHtml = "";
-  if (template.triggerEvent === "WARRANTY_CLAIM_ADMIN" && metadata?.media_urls) {
-      const links = metadata.media_urls.split(',').map((url: string) => url.trim());
+  if (template.triggerEvent === "WARRANTY_CLAIM_ADMIN" && typeof metadata?.media_urls === "string") {
+      const links = (metadata.media_urls as string).split(',').map((url: string) => url.trim());
       mediaHtml = `
         <h2 class="sec-h2" style="color: ${baseColor}; font-size: 20px; margin-top: 32px; margin-bottom: 14px; border-top: 1px solid #eee; padding-top: 24px; text-align: center;">Customer Uploaded Media</h2>
         <div style="background: #f8f9fa; padding: 16px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center;">

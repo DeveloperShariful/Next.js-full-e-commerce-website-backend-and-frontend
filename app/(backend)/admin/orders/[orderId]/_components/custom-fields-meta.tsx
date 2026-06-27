@@ -7,11 +7,10 @@ import { ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { updateOrderMetadata, deleteOrderMetadata, getUniqueMetaKeys } from "@/app/actions/backend/order/order-meta-actions";
 
-// ✅ STRICT TYPES IMPORT
-import { OrderDetailsType } from "../types";
+import { OrderMetaBase } from "../types";
 
 interface CustomFieldsMetaProps {
-  order: OrderDetailsType;
+  order: OrderMetaBase;
 }
 
 export const CustomFieldsMeta = ({ order }: CustomFieldsMetaProps) => {

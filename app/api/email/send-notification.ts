@@ -5,13 +5,13 @@
 import { db } from "@/lib/prisma";
 
 interface NotificationPayload {
-  trigger: string;      
-  recipient: string;    
+  trigger: string;
+  recipient: string;
   channel?: "EMAIL" | "SMS" | "PUSH";
-  data?: any;           
-  orderId?: string;     
-  userId?: string;     
-  replyTo?: string; // <<< নতুন অপশন যুক্ত করা হলো >>>
+  data?: Record<string, unknown>;
+  orderId?: string;
+  userId?: string;
+  replyTo?: string;
 }
 
 export async function sendNotification({ 
@@ -114,8 +114,9 @@ export async function sendNotification({
 
     return { success: true };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown notification error";
     console.error("NOTIFICATION_ERROR", error);
-    return { success: false, error: error.message };
+    return { success: false, error: msg };
   }
 }

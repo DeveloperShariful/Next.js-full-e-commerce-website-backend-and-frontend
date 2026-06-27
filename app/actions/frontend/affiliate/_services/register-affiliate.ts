@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { requireUser } from "../auth-helper";
 import { nanoid } from "nanoid";
 import { revalidatePath } from "next/cache";
+import { sendNotification } from "@/app/api/email/send-notification";
 
 interface AffiliateRegistrationConfig {
   registrationEnabled?: boolean;
@@ -107,7 +108,18 @@ export async function registerAffiliateAction(data?: RegisterInput) {
       // non-critical — continue even if coupon code collision
     }
 
-    // 7. Revalidate & Return Success
+    // 7. Send welcome email (fire-and-forget)
+    const user = await db.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
+    if (user?.email) {
+      sendNotification({
+        trigger: "AFFILIATE_WELCOME",
+        recipient: user.email,
+        userId,
+        data: { affiliate_name: user.name || "Partner" },
+      }).catch(err => console.error("[RegisterAffiliate] Welcome email failed:", err));
+    }
+
+    // 8. Revalidate & Return Success
     revalidatePath("/affiliates");
     return { success: true, message: "Account created successfully!" };
 

@@ -2,13 +2,14 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Edit2, Loader2, Search, X } from "lucide-react";
-import { toast } from "sonner"; 
+import { toast } from "sonner";
 import { searchCustomers } from "@/app/actions/backend/order/create_order/search-resources";
-import { searchTransdirectLocations } from "@/app/actions/backend/order/transdirect-locations"; 
-import { OrderDataType, CustomerType } from "../types"; 
+import { searchTransdirectLocations } from "@/app/actions/backend/order/transdirect-locations";
+import { getTaxRate } from "@/app/actions/backend/order/create_order/get-tax-rate";
+import { OrderDataType, CustomerType } from "../types";
 
 interface CreateDetailsMetaProps {
   orderData: OrderDataType;
@@ -32,6 +33,16 @@ export const CreateDetailsMeta = ({ orderData, setOrderData }: CreateDetailsMeta
   // 🔥 FIXED: Separate search states for Billing and Shipping
   const [billSearch, setBillSearch] = useState(orderData.billing.city || orderData.billing.postcode || "");
   const [shipSearch, setShipSearch] = useState(orderData.shipping.city || orderData.shipping.postcode || "");
+
+  // Auto-fetch tax rate when billing country/state changes
+  useEffect(() => {
+    const country = orderData.billing.country;
+    const state = orderData.billing.state;
+    if (!country) return;
+    getTaxRate(country, state || undefined).then(({ rate, taxName }) => {
+      setOrderData((prev) => ({ ...prev, taxRate: rate, taxName }));
+    });
+  }, [orderData.billing.country, orderData.billing.state]);
 
   const updateGeneral = (field: keyof OrderDataType, value: string | Date | CustomerType | null) => {
       setOrderData((prev) => ({ ...prev, [field]: value }));

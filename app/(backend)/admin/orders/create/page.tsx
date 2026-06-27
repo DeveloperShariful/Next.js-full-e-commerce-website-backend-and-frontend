@@ -50,6 +50,7 @@ export default function CreateOrderPage() {
     customerNote: "",
     adminNote: "",
     customFields: [],
+    paymentMethod: "Manual",
   });
 
   // Totals Calculation (Real-time WooCommerce Recalculate)
@@ -101,7 +102,7 @@ export default function CreateOrderPage() {
         address: orderData.shipping.address1 ? orderData.shipping : orderData.billing,
         adminNote: orderData.adminNote || null,
         customerNote: orderData.customerNote || null,
-        paymentMethod: "Manual",
+        paymentMethod: orderData.paymentMethod || "Manual",
         currency: currency,
         status: isDraft ? "DRAFT" : orderData.status,
         paymentStatus: isDraft ? "UNPAID" : (totals.finalTotal === 0 ? "PAID" : "UNPAID"),
@@ -145,9 +146,8 @@ export default function CreateOrderPage() {
           <CreateDetailsMeta orderData={orderData} setOrderData={setOrderData} />
           <CreateItemsMeta orderData={orderData} setOrderData={setOrderData} totals={totals} />
           
-          {/* Note: Dummy order object is passed to reuse the Edit Page's UI Box safely */}
-          <CustomFieldsMeta order={{ id: "new", metadata: {} } as any} />
-          <DownloadablePermissionsMeta order={{ id: "new", metadata: {} } as any} />
+          <CustomFieldsMeta order={{ id: "new", metadata: null }} />
+          <DownloadablePermissionsMeta order={{ id: "new", metadata: null }} />
         </div>
 
         {/* === RIGHT COLUMN === */}

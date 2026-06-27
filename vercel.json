@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/affiliate-check",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/email/process-email-queue",
+      "schedule": "0 * * * *"
     }
   ]
 }

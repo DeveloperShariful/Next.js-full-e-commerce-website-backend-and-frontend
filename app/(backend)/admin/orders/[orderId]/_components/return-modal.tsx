@@ -19,10 +19,16 @@ import { toast } from "sonner";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { updateReturnRequest } from "@/app/actions/backend/order/update-return";
 
+interface ReturnRequestItem {
+  id: string;
+  reason: string;
+  status: string;
+}
+
 interface ReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  returnReq: any;  
+  returnReq: ReturnRequestItem;
 }
 
 export const ReturnModal = ({ isOpen, onClose, returnReq }: ReturnModalProps) => {

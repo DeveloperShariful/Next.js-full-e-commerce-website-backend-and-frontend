@@ -14,10 +14,17 @@ import { processRefund } from "@/app/actions/backend/order/process-refund";
 import { useGlobalStore } from "@/app/providers/global-store-provider"; 
 import { useRouter } from "next/navigation";
 
+interface RefundOrder {
+  id: string;
+  total: number;
+  refundedAmount: number;
+  paymentGateway: string | null;
+}
+
 interface RefundModalProps {
   isOpen: boolean;
   onClose: () => void;
-  order: any;
+  order: RefundOrder;
 }
 
 export const RefundModal = ({ isOpen, onClose, order }: RefundModalProps) => {

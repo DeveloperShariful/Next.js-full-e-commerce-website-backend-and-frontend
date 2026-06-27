@@ -100,7 +100,7 @@ export async function processPendingReferrals() {
                 data: {
                     channel: "EMAIL",
                     recipient: user.email,
-                    templateSlug: "COMMISSION_APPROVED",
+                    templateSlug: "commission_earned",
                     status: "PENDING",
                     userId: affiliate.userId,
                     content: "",
@@ -161,7 +161,7 @@ export async function runTierUpgrades() {
                    data: {
                        channel: "EMAIL",
                        recipient: affiliate.user.email,
-                       templateSlug: "TIER_UPGRADED",
+                       templateSlug: "tier_upgraded",
                        status: "PENDING",
                        userId: affiliate.userId,
                        content: "",

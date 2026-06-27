@@ -6,7 +6,7 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import Stripe from "stripe";
 import { decrypt } from "@/app/actions/backend/settings/payments/crypto";
-import { restockInventory } from "./order-utils";
+import { restockInventory, sendOrderEmail } from "./order-utils";
 
 export async function processRefund(formData: FormData) {
   try {
@@ -213,6 +213,9 @@ export async function processRefund(formData: FormData) {
                 }
             });
         });
+
+        // Notify customer + admin about the refund
+        await sendOrderEmail(orderId, "PAYMENT_REFUNDED");
 
         revalidatePath(`/admin/orders/${orderId}`);
         return { success: true, message: "Refund processed successfully" };

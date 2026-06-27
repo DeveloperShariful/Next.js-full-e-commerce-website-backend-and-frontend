@@ -12,7 +12,28 @@ import { validateDiscount } from "@/app/actions/backend/order/create_order/valid
 import { getTransdirectQuotes } from "@/app/actions/backend/order/create_order/get-transdirect-quotes"; 
 import { getShippingResources } from "@/app/actions/backend/order/create_order/get-shipping-resources";
 
-import { OrderDataType, OrderTotalsType, CartItemType } from "../types"; 
+import { OrderDataType, OrderTotalsType, CartItemType } from "../types";
+
+interface ProductVariant {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  sku: string | null;
+  weight: number;
+}
+
+interface ProductSearchResult {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  sku: string | null;
+  featuredImage: string | null;
+  image?: string | null;
+  weight: number;
+  variants: ProductVariant[];
+}
 
 interface CreateItemsMetaProps {
   orderData: OrderDataType;
@@ -28,7 +49,7 @@ export const CreateItemsMeta = ({ orderData, setOrderData, totals }: CreateItems
   const [showCustomItem, setShowCustomItem] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
   const [customItem, setCustomItem] = useState({ name: "", price: "", quantity: "1" });
@@ -41,9 +62,11 @@ export const CreateItemsMeta = ({ orderData, setOrderData, totals }: CreateItems
   const [loadingLocal, setLoadingLocal] = useState(true);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
   
-  const [pickupPoints, setPickupPoints] = useState<any[]>([]);
-  const [localRates, setLocalRates] = useState<any[]>([]);
-  const [liveQuotes, setLiveQuotes] = useState<any[]>([]);
+  interface ShippingOption { id: string; name: string; price: number; type: string; desc?: string; transit_time?: string; }
+  interface PickupPoint { id: string; name: string; address?: string | null; city?: string | null; }
+  const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]);
+  const [localRates, setLocalRates] = useState<ShippingOption[]>([]);
+  const [liveQuotes, setLiveQuotes] = useState<ShippingOption[]>([]);
   
   const [selectedMethodId, setSelectedMethodId] = useState<string>("");
 
@@ -61,7 +84,7 @@ export const CreateItemsMeta = ({ orderData, setOrderData, totals }: CreateItems
       const res = await getShippingResources();
       setPickupPoints(res.pickupLocations || []);
       
-      const mappedRates = (res.shippingRates || []).map((r: any) => ({
+      const mappedRates = (res.shippingRates || []).map((r) => ({
           id: r.id, name: r.name, price: Number(r.price), type: 'local', desc: r.zone?.name || "Flat Rate"
       }));
       setLocalRates(mappedRates);
@@ -172,7 +195,7 @@ export const CreateItemsMeta = ({ orderData, setOrderData, totals }: CreateItems
       }
   };
 
-  const handleAddProduct = (prod: any, variant?: any) => {
+  const handleAddProduct = (prod: ProductSearchResult, variant?: ProductVariant) => {
       const price = variant ? variant.price : prod.price;
       const stock = variant ? variant.stock : prod.stock;
       const name = variant ? `${prod.name} - ${variant.name}` : prod.name;
@@ -193,7 +216,7 @@ export const CreateItemsMeta = ({ orderData, setOrderData, totals }: CreateItems
       } else {
           const newItem: CartItemType = {
               productId: prod.id, variantId: variant?.id || null,
-              name, price: Number(price), quantity: 1, sku,
+              name, price: Number(price), quantity: 1, sku: sku ?? '',
               image: prod.featuredImage || prod.image || null,
               weight: Number(variant?.weight || prod.weight || 0),
           };

@@ -115,7 +115,7 @@ export async function verifyDocumentAction(accountId: string, docIndex: number):
           data: {
               channel: "EMAIL",
               recipient: affiliate.user.email,
-              templateSlug: "KYC_VERIFIED",
+              templateSlug: "kyc_verified",
               status: "PENDING",
               userId: affiliate.userId,
               content: "", 
@@ -175,7 +175,7 @@ export async function rejectDocumentAction(accountId: string, docIndex: number, 
           data: {
               channel: "EMAIL",
               recipient: affiliate.user.email,
-              templateSlug: "KYC_REJECTED",
+              templateSlug: "kyc_rejected",
               status: "PENDING",
               userId: affiliate.userId,
               content: "",

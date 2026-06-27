@@ -6,6 +6,16 @@ import nodemailer from "nodemailer";
 import { generateEmailHtml } from "@/app/actions/backend/settings/email/email-generator";
 
 export async function GET(req: Request) {
+  // Verify cron secret (query param OR Vercel's Bearer header)
+  const { searchParams } = new URL(req.url);
+  const querySecret = searchParams.get("secret");
+  const authHeader = req.headers instanceof Headers ? req.headers.get("authorization") : null;
+  const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (querySecret !== process.env.CRON_SECRET && bearerSecret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const config = await db.emailConfiguration.findUnique({ where: { id: "email_config" } });
 
@@ -13,13 +23,29 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: "Email system disabled or config missing." }, { status: 200 });
     }
 
+    // ─── STUCK RECOVERY ──────────────────────────────────────────────────────
+    // Server crash হলে PROCESSING এ আটকে যাওয়া items ৫ মিনিট পরে PENDING এ ফেরে
+    const stuckCutoff = new Date(Date.now() - 5 * 60 * 1000);
+    const recovered = await db.notificationQueue.updateMany({
+      where: {
+        status: "PROCESSING",
+        updatedAt: { lt: stuckCutoff },
+        attempts: { lt: 3 }
+      },
+      data: { status: "PENDING" }
+    });
+    if (recovered.count > 0) {
+      console.log(`[EmailQueue] Recovered ${recovered.count} stuck PROCESSING items`);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const pendingItems = await db.notificationQueue.findMany({
       where: {
         status: "PENDING",
         attempts: { lt: 3 }
       },
-      take: 5,
-      orderBy: { createdAt: 'asc' }
+      take: 20,
+      orderBy: { createdAt: "asc" }
     });
 
     if (pendingItems.length === 0) {
@@ -27,24 +53,28 @@ export async function GET(req: Request) {
     }
 
     const transporter = nodemailer.createTransport({
-      host: config.smtpHost || "smtp.gmail.com",
+      host: config.smtpHost ?? undefined,
       port: Number(config.smtpPort) || 587,
-      secure: config.encryption === 'ssl',
-      auth: { user: config.smtpUser, pass: config.smtpPassword },
+      secure: config.encryption === "ssl",
+      auth: {
+        user: config.smtpUser ?? undefined,
+        pass: config.smtpPassword ?? undefined
+      },
       tls: { rejectUnauthorized: false }
-    } as any);
+    });
 
-    // FIX 1: Lock uses "PROCESSING" not "FAILED" — a server crash leaves items
-    //         in "PROCESSING" (recoverable) instead of permanently "FAILED".
-    // FIX 2: Promise.allSettled replaces sequential for-loop — all items send concurrently.
-    const results = await Promise.allSettled(pendingItems.map(async (item) => {
+    // ── SEQUENTIAL processing: one email at a time (prevents SMTP rate-limit)
+    // Even with 50+ emails queued, each is sent individually and safely logged.
+    let processedCount = 0;
+
+    for (const item of pendingItems) {
       // Atomic lock: only one worker can flip PENDING → PROCESSING per item
       const lock = await db.notificationQueue.updateMany({
         where: { id: item.id, status: "PENDING" },
         data: { status: "PROCESSING" }
       });
 
-      if (lock.count === 0) return false; // Already locked by another worker
+      if (lock.count === 0) continue; // Already locked by another worker
 
       let subject = `[${item.templateSlug}]`;
 
@@ -57,8 +87,8 @@ export async function GET(req: Request) {
 
         let htmlBody = "";
         subject = template.subject;
-        const meta = item.metadata as any;
-        const customReplyTo = meta?._replyTo;
+        const meta = item.metadata as Record<string, unknown>;
+        const customReplyTo = typeof meta?._replyTo === "string" ? meta._replyTo : null;
 
         if (item.orderId) {
           const order = await db.order.findUnique({
@@ -66,7 +96,9 @@ export async function GET(req: Request) {
             include: { items: true, user: true }
           });
           if (order) {
-            htmlBody = generateEmailHtml({ order, config, template, metadata: meta });
+            type GeneratorOrder = NonNullable<Parameters<typeof generateEmailHtml>[0]['order']>;
+            const serializedOrder = JSON.parse(JSON.stringify(order)) as unknown as GeneratorOrder;
+            htmlBody = generateEmailHtml({ order: serializedOrder, config, template, metadata: meta });
             subject = subject
               .replace(/{order_number}/g, order.orderNumber)
               .replace(/{customer_name}/g, order.user?.name || order.guestEmail || "Customer");
@@ -77,8 +109,8 @@ export async function GET(req: Request) {
           htmlBody = generateEmailHtml({ config, template, metadata: meta });
           if (meta) {
             Object.keys(meta).forEach(key => {
-              if (key !== '_replyTo') {
-                subject = subject.replace(new RegExp(`{${key}}`, "g"), meta[key]);
+              if (key !== "_replyTo") {
+                subject = subject.replace(new RegExp(`{${key}}`, "g"), String(meta[key]));
               }
             });
           }
@@ -86,7 +118,7 @@ export async function GET(req: Request) {
 
         await transporter.sendMail({
           from: `"${config.senderName}" <${config.senderEmail}>`,
-          replyTo: customReplyTo || config.senderEmail,
+          replyTo: customReplyTo || config.senderEmail || undefined,
           to: item.recipient,
           subject,
           html: htmlBody,
@@ -105,22 +137,23 @@ export async function GET(req: Request) {
               status: "SENT",
               orderId: item.orderId,
               userId: item.userId,
-              metadata: item.metadata || {}
+              metadata: item.metadata ?? {}
             }
           })
         ]);
 
-        return true;
+        processedCount++;
 
-      } catch (error: any) {
-        console.error(`Queue Item Fail ID: ${item.id} - ${error.message}`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        console.error(`[EmailQueue] Failed ID: ${item.id} — ${msg}`);
 
         await db.$transaction([
           db.notificationQueue.update({
             where: { id: item.id },
             data: {
               attempts: { increment: 1 },
-              error: error.message,
+              error: msg,
               status: item.attempts >= 2 ? "FAILED" : "PENDING"
             }
           }),
@@ -130,19 +163,15 @@ export async function GET(req: Request) {
               subject: subject || `[${item.templateSlug}]`,
               templateSlug: item.templateSlug,
               status: "FAILED",
-              errorMessage: error.message,
+              errorMessage: msg,
               orderId: item.orderId,
               userId: item.userId,
-              metadata: item.metadata || {}
+              metadata: item.metadata ?? {}
             }
           })
         ]);
-
-        return false;
       }
-    }));
-
-    const processedCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+    }
 
     return NextResponse.json({
       success: true,
@@ -150,7 +179,8 @@ export async function GET(req: Request) {
       total: pendingItems.length
     });
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

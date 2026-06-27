@@ -206,7 +206,7 @@ export async function markAsPaid(payoutId: string, transactionId?: string, note?
       data: {
         channel: "EMAIL",
         recipient: payout.affiliate.user.email,
-        templateSlug: "PAYOUT_PROCESSED",
+        templateSlug: "payout_processed",
         status: "PENDING",
         userId: payout.affiliate.userId,
         content: "",
@@ -283,7 +283,7 @@ export async function rejectPayout(payoutId: string, reason: string) {
             data: {
                 channel: "EMAIL",
                 recipient: payout.affiliate.user.email,
-                templateSlug: "PAYOUT_REJECTED",
+                templateSlug: "payout_rejected",
                 status: "PENDING",
                 userId: payout.affiliate.userId,
                 content: "",

@@ -8,10 +8,16 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { updateDisputeStatus } from "@/app/actions/backend/order/update-dispute";
 
+interface DisputeItem {
+  id: string;
+  gatewayDisputeId: string;
+  status: string;
+}
+
 interface DisputeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  dispute: any;
+  dispute: DisputeItem;
 }
 
 export const DisputeModal = ({ isOpen, onClose, dispute }: DisputeModalProps) => {

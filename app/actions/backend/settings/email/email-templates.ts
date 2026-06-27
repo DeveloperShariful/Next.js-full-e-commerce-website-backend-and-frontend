@@ -57,9 +57,9 @@ const DEFAULT_TEMPLATES = [
         content: '<p>Hi {customer_name},</p><p>We are writing to confirm that your order <strong>#{order_number}</strong> has been cancelled as per your request or due to payment timeout.</p><p>If this was a mistake or you would like to place a new order, please visit our website again. We’d love to welcome you back!</p>' 
     },
     { 
-        slug: 'order_status_refunded', 
-        name: 'Order Status: Refunded', 
-        triggerEvent: 'ORDER_REFUNDED_STATUS', 
+        slug: 'order_status_refunded',
+        name: 'Order Status: Refunded',
+        triggerEvent: 'ORDER_REFUNDED',
         recipientType: 'customer', 
         subject: 'Order #{order_number} Marked as Refunded', 
         content: '<p>Hi {customer_name},</p><p>The status of your order <strong>#{order_number}</strong> has been updated to Refunded. The funds should appear in your original payment method within a few business days depending on your bank.</p>' 
@@ -366,13 +366,85 @@ const DEFAULT_TEMPLATES = [
         subject: 'We have received your message!', 
         content: '<p>Hi {customer_name},</p><p>Thank you for reaching out to GoBike Australia. This is an automated email to let you know that we have successfully received your message.</p><p>Our support team will review your inquiry and get back to you within 24-48 business hours.</p><p>For your records, here is a copy of your message:</p><div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; margin-top: 15px; color: #555;">{message}</div><p>Best regards,<br/>The GoBike Team</p>' 
     },
-    { 
-        slug: 'contact_form_submission', 
-        name: 'Admin: New Contact Message', 
-        triggerEvent: 'CONTACT_FORM_SUBMISSION', 
-        recipientType: 'admin', 
-        subject: '[New Contact Message] from {customer_name}', 
-        content: '<p>You have received a new message from the website contact form.</p><p><strong>Name:</strong> {customer_name}<br/><strong>Email:</strong> {customer_email}<br/><strong>Phone:</strong> {customer_phone}</p><div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; margin-top: 15px;"><strong>Message:</strong><br/><br/>{message}</div>' 
+    {
+        slug: 'contact_form_submission',
+        name: 'Admin: New Contact Message',
+        triggerEvent: 'CONTACT_FORM_SUBMISSION',
+        recipientType: 'admin',
+        subject: '[New Contact Message] from {customer_name}',
+        content: '<p>You have received a new message from the website contact form.</p><p><strong>Name:</strong> {customer_name}<br/><strong>Email:</strong> {customer_email}<br/><strong>Phone:</strong> {customer_phone}</p><div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; margin-top: 15px;"><strong>Message:</strong><br/><br/>{message}</div>'
+    },
+
+    // =======================================================================
+    // --- RETURN REQUESTS ---
+    // =======================================================================
+    {
+        slug: 'return_approved',
+        name: 'Return Request Approved',
+        triggerEvent: 'RETURN_APPROVED',
+        recipientType: 'customer',
+        subject: 'Your Return Request for Order #{order_number} has been Approved',
+        content: '<p>Hi {customer_name},</p><p>Great news! Your return request for order <strong>#{order_number}</strong> has been approved by our team.</p><p>Please follow the instructions you receive separately for returning the items. Once we receive the goods, your refund or exchange will be processed promptly.</p><p>Thank you for your patience.</p>'
+    },
+    {
+        slug: 'return_rejected',
+        name: 'Return Request Rejected',
+        triggerEvent: 'RETURN_REJECTED',
+        recipientType: 'customer',
+        subject: 'Update on Your Return Request for Order #{order_number}',
+        content: '<p>Hi {customer_name},</p><p>We have reviewed your return request for order <strong>#{order_number}</strong>. Unfortunately, we are unable to approve this return at this time.</p><p>If you believe this decision is in error or you need further assistance, please reply to this email and our support team will be happy to help.</p>'
+    },
+
+    // =======================================================================
+    // 🆕 NEW: MISSING ORDER STATUS TEMPLATES (schema-compliant)
+    // =======================================================================
+    {
+        slug: 'order_created',
+        name: 'Order Confirmation',
+        triggerEvent: 'ORDER_CREATED',
+        recipientType: 'customer',
+        subject: 'Order Confirmation: Your Order #{order_number}',
+        content: '<p>Hi {customer_name},</p><p>Thank you for your order! We have successfully received your order <strong>#{order_number}</strong> and will begin processing it shortly.</p><p>You will receive email updates as your order progresses. If you have any questions, simply reply to this email.</p><p>Thank you for choosing us!</p>'
+    },
+    {
+        slug: 'order_draft',
+        name: 'Order Draft Saved',
+        triggerEvent: 'ORDER_DRAFT',
+        recipientType: 'customer',
+        subject: 'Draft Saved: Your Order #{order_number}',
+        content: '<p>Hi {customer_name},</p><p>Your order <strong>#{order_number}</strong> has been saved as a draft. To complete your purchase, please log in and finalise your order at your convenience.</p><p>If you need any help, feel free to reply to this email.</p>'
+    },
+    {
+        slug: 'order_awaiting_payment',
+        name: 'Awaiting Payment',
+        triggerEvent: 'ORDER_AWAITING_PAYMENT',
+        recipientType: 'customer',
+        subject: 'Payment Required: Your Order #{order_number}',
+        content: '<p>Hi {customer_name},</p><p>Your order <strong>#{order_number}</strong> is currently awaiting payment. Please complete your payment to confirm your order and ensure timely dispatch of your items.</p><p>Your total amount is <strong>{total_amount}</strong>. If you believe this is an error or need assistance, please reply to this email.</p>'
+    },
+    {
+        slug: 'order_returned',
+        name: 'Order Returned',
+        triggerEvent: 'ORDER_RETURNED',
+        recipientType: 'customer',
+        subject: 'Return Processed: Your Order #{order_number}',
+        content: '<p>Hi {customer_name},</p><p>We have received and processed the return for your order <strong>#{order_number}</strong>. Our team is now inspecting the returned items.</p><p>We will be in touch shortly regarding your refund or exchange. Thank you for your patience.</p>'
+    },
+    {
+        slug: 'order_ready_for_pickup',
+        name: 'Ready for Pickup',
+        triggerEvent: 'ORDER_READY_FOR_PICKUP',
+        recipientType: 'customer',
+        subject: 'Ready for Pickup: Your Order #{order_number} is Waiting!',
+        content: '<p>Hi {customer_name},</p><p>Great news! Your order <strong>#{order_number}</strong> is now packed and ready for collection at our store.</p><p>Please bring a copy of this email or your order number when you visit. Our team looks forward to seeing you!</p>'
+    },
+    {
+        slug: 'order_partially_paid',
+        name: 'Partial Payment Received',
+        triggerEvent: 'ORDER_PARTIALLY_PAID',
+        recipientType: 'customer',
+        subject: 'Partial Payment Received for Order #{order_number}',
+        content: '<p>Hi {customer_name},</p><p>We have received a partial payment for your order <strong>#{order_number}</strong>. Your total order value is <strong>{total_amount}</strong>.</p><p>Please arrange the remaining balance at your earliest convenience to avoid any delays in processing your order. If you have any questions, please reply to this email.</p>'
     }
 ];
 
@@ -414,9 +486,10 @@ export async function syncEmailTemplates() {
                     isEnabled: true,
                 },
             });
-        } catch (e: any) {
+        } catch (e: unknown) {
+            const err = e as { code?: string; message?: string };
             // If slug conflicts with a different record, update that record's triggerEvent
-            if (e?.code === 'P2002') {
+            if (err?.code === 'P2002') {
                 try {
                     await db.emailTemplate.upsert({
                         where: { slug: tmpl.slug },
@@ -432,11 +505,12 @@ export async function syncEmailTemplates() {
                             isEnabled: true,
                         },
                     });
-                } catch (e2: any) {
-                    errors.push(`${tmpl.triggerEvent}: ${e2?.message}`);
+                } catch (e2: unknown) {
+                    const err2 = e2 as { message?: string };
+                    errors.push(`${tmpl.triggerEvent}: ${err2?.message}`);
                 }
             } else {
-                errors.push(`${tmpl.triggerEvent}: ${e?.message}`);
+                errors.push(`${tmpl.triggerEvent}: ${err?.message}`);
             }
         }
     }

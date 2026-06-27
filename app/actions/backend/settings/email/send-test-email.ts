@@ -75,7 +75,7 @@ export async function sendTestEmail(recipientEmail: string, templateId?: string)
           customer_phone: '0483 821 059',
         };
 
-        emailHtml = generateEmailHtml({ order: sampleOrder, config, template, metadata: sampleMetadata });
+        emailHtml = generateEmailHtml({ order: sampleOrder ?? undefined, config, template, metadata: sampleMetadata });
       } else {
         emailHtml = buildSimpleTestHtml(config);
       }
@@ -103,21 +103,30 @@ export async function sendTestEmail(recipientEmail: string, templateId?: string)
 
     return { success: true, message: "Test email sent successfully!" };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown SMTP error";
     console.error("SMTP_TEST_ERROR", error);
     await db.emailLog.create({
         data: {
             recipient: recipientEmail,
             subject: "Test Email Failed",
             status: "FAILED",
-            errorMessage: error.message
+            errorMessage: msg
         }
     });
-    return { success: false, error: error.message };
+    return { success: false, error: msg };
   }
 }
 
-function buildSimpleTestHtml(config: any): string {
+interface TestEmailConfig {
+  backgroundColor: string | null;
+  bodyBackgroundColor: string | null;
+  baseColor: string | null;
+  headerImage: string | null;
+  footerText: string | null;
+}
+
+function buildSimpleTestHtml(config: TestEmailConfig): string {
   const bg = config.backgroundColor || "#f7f7f7";
   const bodyBg = config.bodyBackgroundColor || "#ffffff";
   const baseColor = config.baseColor || "#2271b1";

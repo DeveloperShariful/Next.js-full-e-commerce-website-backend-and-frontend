@@ -283,7 +283,7 @@ export const OrderItemsMeta = ({ order }: OrderItemsMetaProps) => {
       </div>
 
       {/* Refund Modal */}
-      <RefundModal isOpen={isRefundOpen} onClose={() => setIsRefundOpen(false)} order={order as any} />
+      <RefundModal isOpen={isRefundOpen} onClose={() => setIsRefundOpen(false)} order={order} />
 
     </div>
   );

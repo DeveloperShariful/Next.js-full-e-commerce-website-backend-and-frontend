@@ -5,8 +5,41 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { PrintButton } from "@/app/(backend)/admin/orders/[orderId]/invoice/_components/print-button"; // ✅ Absolute Path
 
+interface PrintItem {
+  id: string;
+  productName: string;
+  variantName: string | null;
+  price: number;
+  quantity: number;
+  total: number;
+}
+
+interface PrintOrder {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  currency: string;
+  billingAddress: Record<string, string>;
+  items: PrintItem[];
+  user: { email: string; phone: string | null } | null;
+  guestEmail: string | null;
+  paymentStatus: string;
+  paymentGateway: string | null;
+  subtotal: number;
+  shippingTotal: number;
+  discountTotal: number;
+  total: number;
+}
+
+interface PrintSettings {
+  storeName: string | null;
+  storeEmail: string | null;
+  storePhone: string | null;
+  storeAddress: Record<string, string> | null;
+}
+
 // 🔥 Helper to serialize Decimal & Date
-const serializeData = (data: any) => {
+const serializeData = (data: unknown) => {
   return JSON.parse(JSON.stringify(data, (key, value) => {
     if (value && typeof value === 'object' && !Array.isArray(value) && value.toString && value.constructor.name === 'Decimal') {
       return Number(value);
@@ -51,9 +84,9 @@ export default async function PrintBatchPage(props: PrintBatchPageProps) {
   const rawSettings = await db.storeSettings.findUnique({ where: { id: "settings" } });
 
   // 3. Serialize Data
-  const orders = serializeData(rawOrders);
-  const settings = serializeData(rawSettings);
-  const storeAddr: any = settings?.storeAddress || {};
+  const orders = serializeData(rawOrders) as PrintOrder[];
+  const settings = serializeData(rawSettings) as PrintSettings | null;
+  const storeAddr: Record<string, string> = settings?.storeAddress || {};
 
   return (
     <div className="min-h-screen bg-slate-100 p-8 flex flex-col items-center print:bg-white print:p-0">
@@ -64,8 +97,8 @@ export default async function PrintBatchPage(props: PrintBatchPageProps) {
       </div>
 
       <div className="w-full max-w-[210mm] space-y-12 print:space-y-0">
-        {orders.map((order: any, index: number) => {
-            const billing: any = order.billingAddress || {};
+        {orders.map((order, index) => {
+            const billing: Record<string, string> = order.billingAddress || {};
             
             return (
                 <div key={order.id} className={`bg-white shadow-lg p-12 min-h-[297mm] relative print:shadow-none print:break-after-page ${index > 0 ? "mt-10 print:mt-0" : ""}`}>
@@ -131,7 +164,7 @@ export default async function PrintBatchPage(props: PrintBatchPageProps) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {order.items.map((item: any) => (
+                            {order.items.map((item) => (
                                 <tr key={item.id}>
                                     <td className="py-4">
                                         <p className="font-bold text-sm text-slate-800">{item.productName}</p>

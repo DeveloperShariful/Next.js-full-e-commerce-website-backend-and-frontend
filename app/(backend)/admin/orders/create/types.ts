@@ -61,6 +61,7 @@ export interface OrderDataType {
   customerNote: string;
   adminNote: string;
   customFields: CustomFieldType[];
+  paymentMethod: string;
 }
 
 export interface OrderTotalsType {

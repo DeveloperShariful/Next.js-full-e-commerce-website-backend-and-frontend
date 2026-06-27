@@ -143,7 +143,6 @@ export async function createManualOrder(data: CreateOrderPayload) {
         await updateAnalytics(total);
       }
       await sendOrderEmail(order.id, "ORDER_CREATED");
-      await sendOrderEmail(order.id, "ORDER_CREATED_ADMIN");
     }
 
     return { success: true, orderId: order.id };

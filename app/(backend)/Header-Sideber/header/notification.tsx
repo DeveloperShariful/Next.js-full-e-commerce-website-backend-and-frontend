@@ -67,9 +67,9 @@ export function Notifications() {
   // Initial load
   useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
-  // Auto-refresh every 60 seconds
+  // Auto-refresh every 2 hours
   useEffect(() => {
-    const interval = setInterval(loadNotifications, 60_000);
+    const interval = setInterval(loadNotifications, 7_200_000);
     return () => clearInterval(interval);
   }, [loadNotifications]);
 

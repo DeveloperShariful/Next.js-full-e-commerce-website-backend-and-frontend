@@ -9,6 +9,9 @@ import Link from "next/link";
 import { OrderDetailsMeta } from "./_components/order-details-meta";
 import { OrderIssuesMeta } from "./_components/order-issues-meta";
 import { OrderItemsMeta } from "./_components/order-items-meta";
+import { OrderShipmentsMeta } from "./_components/order-shipments-meta";
+import { OrderRefundsMeta } from "./_components/order-refunds-meta";
+import { OrderTransactionsMeta } from "./_components/order-transactions-meta";
 import { CustomerHistoryMeta } from "./_components/customer-history-meta";
 import { CustomFieldsMeta } from "./_components/custom-fields-meta";
 import { DownloadablePermissionsMeta } from "./_components/downloadable-permissions-meta";
@@ -61,26 +64,34 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
 
   return (
     <div className="max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
-      
+
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-[23px] font-normal text-[#1d2327] m-0 leading-none">
             Edit order
         </h1>
-        <Link 
-            href="/admin/orders/create" 
+        <Link
+            href="/admin/orders/create"
             className="border border-[#2271b1] text-[#2271b1] hover:bg-[#f6f7f7] hover:text-[#135e96] hover:border-[#135e96] transition-colors px-2.5 py-0.5 text-[13px] rounded-[3px] font-medium ml-2 shadow-sm"
         >
             Add new order
         </Link>
       </div>
 
+      {/* Order Actions — mobile only, always at top */}
+      <div className="block lg:hidden mb-5">
+        <OrderSidebarActions order={order} />
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
-        
+
         {/* === LEFT COLUMN === */}
         <div className="w-full lg:w-[70%] xl:w-[82%] space-y-5">
           <OrderDetailsMeta order={order} />
           <OrderIssuesMeta order={order} />
           <OrderItemsMeta order={order} />
+          <OrderShipmentsMeta shipments={order.shipments} />
+          <OrderRefundsMeta refunds={order.refunds} />
+          <OrderTransactionsMeta transactions={order.transactions} />
           <CustomerHistoryMeta history={customerHistory} />
           <CustomFieldsMeta order={order} />
           <DownloadablePermissionsMeta order={order} />
@@ -88,7 +99,10 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
 
         {/* === RIGHT COLUMN === */}
         <div className="w-full lg:w-[30%] xl:w-[18%] space-y-5">
-            <OrderSidebarActions order={order} />
+            {/* Order Actions — desktop only, in sidebar */}
+            <div className="hidden lg:block">
+              <OrderSidebarActions order={order} />
+            </div>
             <TransdirectSidebar order={order} />
             <OrderSidebarNotes order={order} />
             <SecuritySidebar order={order} />

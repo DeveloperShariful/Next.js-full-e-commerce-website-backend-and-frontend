@@ -16,6 +16,7 @@ import AnalyticsDashboard from "./analytics-dashboard";
 import PartnersManager from "./Management/partners-manager";
 import FinanceManager from "./Management/finance-manager";
 import KycManager from "./Management/kyc-manager";
+import ReferralsManager from "./Management/referrals-manager";
 import CreativeList from "./Marketing/creative-manager";
 import CampaignsContestsManager from "./Marketing/campaigns-contests-manager";
 import CouponTagManager from "./Marketing/coupon-tag-manager";
@@ -31,6 +32,7 @@ interface SidebarCounts {
   payouts?: number;
   kyc?: number;
   fraud?: number;
+  referrals?: number;
 }
 
 interface Props {
@@ -84,6 +86,7 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
       section: "Management",
       items: [
         { id: "partners", label: "Partners", icon: Users },
+        { id: "referrals", label: "Referrals & Commissions", icon: Network, badgeKey: "referrals" as keyof SidebarCounts },
         { id: "payouts", label: "Payouts & Ledger", icon: CreditCard, badgeKey: "payouts" as keyof SidebarCounts },
         { id: "kyc", label: "KYC Verification", icon: ShieldCheck, badgeKey: "kyc" as keyof SidebarCounts },
       ],
@@ -158,6 +161,14 @@ export default function AffiliateMainView({ initialData, currentView, counts }: 
 
       case "kyc":
         return initialData.kyc ? <KycManager initialDocuments={initialData.kyc.documents} /> : null;
+
+      case "referrals":
+        return initialData.referrals ? (
+          <ReferralsManager
+            data={initialData.referrals}
+            currentPage={Number(searchParams.get("page")) || 1}
+          />
+        ) : null;
 
       case "campaigns":
         return initialData.campaigns ? (

@@ -8,11 +8,10 @@ import { toast } from "sonner";
 import { searchDownloadableProducts } from "@/app/actions/backend/order/search-downloadable";
 import { updateOrderMetadata } from "@/app/actions/backend/order/order-meta-actions";
 
-// ✅ STRICT TYPES IMPORT
-import { OrderDetailsType } from "../types";
+import { OrderMetaBase } from "../types";
 
 interface DownloadablePermissionsMetaProps {
-  order: OrderDetailsType;
+  order: OrderMetaBase;
 }
 
 export const DownloadablePermissionsMeta = ({ order }: DownloadablePermissionsMetaProps) => {
@@ -20,16 +19,20 @@ export const DownloadablePermissionsMeta = ({ order }: DownloadablePermissionsMe
   const [isPending, startTransition] = useTransition();
 
   const [query, setQuery] = useState<string>("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string }[]>([]);
   const [searching, setSearching] = useState<boolean>(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<{ id: string; name: string } | null>(null);
 
-  // ✅ STRICT JSON PARSING
-  const metadataObj = typeof order.metadata === 'object' && order.metadata !== null 
-    ? (order.metadata as Record<string, any>) 
+  interface DownloadablePermission { id: string; name: string; grantedAt: string; }
+
+  const metadataObj = typeof order.metadata === 'object' && order.metadata !== null
+    ? (order.metadata as Record<string, unknown>)
     : {};
-    
-  const currentPermissions = metadataObj.downloadable_permissions || [];
+
+  const rawPerms = metadataObj.downloadable_permissions;
+  const currentPermissions: DownloadablePermission[] = Array.isArray(rawPerms)
+    ? (rawPerms as DownloadablePermission[])
+    : [];
 
   // --- Search Handler ---
   const handleSearch = async (val: string) => {
@@ -55,7 +58,7 @@ export const DownloadablePermissionsMeta = ({ order }: DownloadablePermissionsMe
   const handleGrantAccess = () => {
     if (!selectedProduct) return toast.error("Please select a product first.");
 
-    const alreadyExists = currentPermissions.find((p: any) => p.id === selectedProduct.id);
+    const alreadyExists = currentPermissions.find((p) => p.id === selectedProduct.id);
     if (alreadyExists) return toast.error("Access already granted for this product.");
 
     const newPermissions = [...currentPermissions, { id: selectedProduct.id, name: selectedProduct.name, grantedAt: new Date().toISOString() }];
@@ -77,7 +80,7 @@ export const DownloadablePermissionsMeta = ({ order }: DownloadablePermissionsMe
   const handleRevokeAccess = (productId: string) => {
     if (!confirm("Are you sure you want to revoke access?")) return;
 
-    const newPermissions = currentPermissions.filter((p: any) => p.id !== productId);
+    const newPermissions = currentPermissions.filter((p) => p.id !== productId);
 
     startTransition(async () => {
       const res = await updateOrderMetadata(order.id, "downloadable_permissions", newPermissions);
@@ -107,7 +110,7 @@ export const DownloadablePermissionsMeta = ({ order }: DownloadablePermissionsMe
             {/* List of Granted Products */}
             {currentPermissions.length > 0 && (
                 <div className="mb-4 bg-[#f6f7f7] border border-[#e2e4e7] rounded-[3px]">
-                    {currentPermissions.map((perm: any) => (
+                    {currentPermissions.map((perm) => (
                         <div key={perm.id} className="p-3 border-b border-[#e2e4e7] last:border-0 flex justify-between items-center">
                             <div className="flex items-center gap-2 text-[13px] text-[#2271b1] font-medium">
                                 <Package size={14} className="text-[#646970]"/>

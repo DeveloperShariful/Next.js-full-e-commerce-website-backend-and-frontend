@@ -130,14 +130,21 @@ export async function getOrders(
     }));
 
     const counts = {
-      all: statusCounts.reduce((acc, curr) => acc + curr._count.status, 0),
-      pending: statusCounts.find(s => s.status === 'PENDING')?._count.status || 0,
-      processing: statusCounts.find(s => s.status === 'PROCESSING')?._count.status || 0,
-      completed: statusCounts.find(s => s.status === 'DELIVERED')?._count.status || 0, 
-      cancelled: statusCounts.find(s => s.status === 'CANCELLED')?._count.status || 0,
-      refunded: statusCounts.find(s => s.status === 'REFUNDED')?._count.status || 0,
-      failed: statusCounts.find(s => s.status === 'FAILED')?._count.status || 0,
-      trash: trashCount
+      all:             statusCounts.reduce((acc, curr) => acc + curr._count.status, 0),
+      pending:         statusCounts.find(s => s.status === 'PENDING')?._count.status || 0,
+      processing:      statusCounts.find(s => s.status === 'PROCESSING')?._count.status || 0,
+      completed:       statusCounts.find(s => s.status === 'DELIVERED')?._count.status || 0,
+      cancelled:       statusCounts.find(s => s.status === 'CANCELLED')?._count.status || 0,
+      refunded:        statusCounts.find(s => s.status === 'REFUNDED')?._count.status || 0,
+      failed:          statusCounts.find(s => s.status === 'FAILED')?._count.status || 0,
+      draft:           statusCounts.find(s => s.status === 'DRAFT')?._count.status || 0,
+      awaitingPayment: statusCounts.find(s => s.status === 'AWAITING_PAYMENT')?._count.status || 0,
+      packed:          statusCounts.find(s => s.status === 'PACKED')?._count.status || 0,
+      shipped:         statusCounts.find(s => s.status === 'SHIPPED')?._count.status || 0,
+      returned:        statusCounts.find(s => s.status === 'RETURNED')?._count.status || 0,
+      readyForPickup:  statusCounts.find(s => s.status === 'READY_FOR_PICKUP')?._count.status || 0,
+      partiallyPaid:   statusCounts.find(s => s.status === 'PARTIALLY_PAID')?._count.status || 0,
+      trash:           trashCount
     };
 
     return { 

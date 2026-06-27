@@ -142,7 +142,7 @@ export async function approveAffiliateAction(id: string): Promise<ActionResponse
             data: {
                 channel: "EMAIL",
                 recipient: updated.user.email,
-                templateSlug: "AFFILIATE_APPROVED",
+                templateSlug: "affiliate_approved",
                 status: "PENDING",
                 userId: updated.userId,
                 content: "",
@@ -193,7 +193,7 @@ export async function rejectAffiliateAction(id: string, reason: string): Promise
             data: {
                 channel: "EMAIL",
                 recipient: updated.user.email,
-                templateSlug: "AFFILIATE_REJECTED",
+                templateSlug: "affiliate_rejected",
                 status: "PENDING",
                 userId: updated.userId,
                 content: "", 

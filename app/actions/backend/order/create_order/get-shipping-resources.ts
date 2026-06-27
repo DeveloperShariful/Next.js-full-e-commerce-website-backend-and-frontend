@@ -5,10 +5,10 @@
 import { db } from "@/lib/prisma";
 
 // Helper to safely convert Decimal to Number
-const toNumber = (val: any) => {
+const toNumber = (val: unknown): number => {
     if (!val) return 0;
-    if (typeof val === 'object' && 'toNumber' in val) {
-        return val.toNumber();
+    if (typeof val === 'object' && val !== null && 'toNumber' in val) {
+        return (val as { toNumber(): number }).toNumber();
     }
     return Number(val);
 };

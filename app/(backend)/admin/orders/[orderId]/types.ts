@@ -79,6 +79,37 @@ export interface OrderAffiliate {
   } | null;
 }
 
+export interface OrderReferral {
+  commissionRate: number | null;
+  commissionType: string;
+  commissionAmount: number | null;
+}
+
+export interface OrderShipment {
+  id: string;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  courier: string | null;
+  courierName: string | null;
+  connote: string | null;
+  shippedDate: string | Date;
+  deliveredDate: string | Date | null;
+  lastTrackingStatus: string | null;
+  labelUrl: string | null;
+  invoiceUrl: string | null;
+  numberOfParcels: number;
+  manifestId: string | null;
+}
+
+export interface OrderRefund {
+  id: string;
+  amount: number;
+  reason: string | null;
+  status: string;
+  gatewayRefundId: string | null;
+  createdAt: string | Date;
+}
+
 export interface OrderDispute {
   id: string;
   gatewayDisputeId: string;
@@ -139,7 +170,7 @@ export interface OrderDetailsType {
   // JSON Fields
   shippingAddress: AddressJson;
   billingAddress: AddressJson;
-  metadata: Record<string, any> | null;
+  metadata: Record<string, unknown> | null;
   
   // Extras
   couponCode: string | null;
@@ -171,12 +202,21 @@ export interface OrderDetailsType {
   user: OrderUser | null;
   items: OrderItem[];
   transactions: OrderTransaction[];
+  shipments: OrderShipment[];
+  refunds: OrderRefund[];
   orderNotes: OrderNote[];
   affiliate: OrderAffiliate | null;
   disputes: OrderDispute[];
   returns: OrderReturn[];
-  discount?: { id: string; code: string } | null;
+  discount?: { id: string; code: string; affiliateId?: string | null } | null;
+  referrals?: OrderReferral[];
   _count?: { items: number };
+}
+
+// Minimal type for components that only need id + metadata (used on both create and edit pages)
+export interface OrderMetaBase {
+  id: string;
+  metadata: Record<string, unknown> | null;
 }
 
 // Type for Customer History Box

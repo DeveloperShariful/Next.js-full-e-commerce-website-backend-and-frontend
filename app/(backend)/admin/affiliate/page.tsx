@@ -18,8 +18,9 @@ import * as kycService from "@/app/actions/backend/affiliate/_services/kyc-servi
 import * as ledgerService from "@/app/actions/backend/affiliate/_services/ledger-service";
 import * as analyticsService from "@/app/actions/backend/affiliate/_services/dashboard-service";
 import * as couponTagService from "@/app/actions/backend/affiliate/_services/coupon-tag-service";
-import * as logService from "@/app/actions/backend/affiliate/_services/log-service"; 
-import { serializePrismaData } from "@/lib/format-data"; 
+import * as logService from "@/app/actions/backend/affiliate/_services/log-service";
+import * as referralService from "@/app/actions/backend/affiliate/_services/referral-service";
+import { serializePrismaData } from "@/lib/format-data";
 
 export const metadata = {
   title: "Affiliate Program | WP Admin Style",
@@ -53,12 +54,13 @@ export default async function AffiliateMasterPage({
     data.config = await configService.getSettings();
 
     // Sidebar badge counts — always fetched regardless of current view
-    const [pendingPayoutsCount, pendingKycCount, highRiskCount] = await Promise.all([
+    const [pendingPayoutsCount, pendingKycCount, highRiskCount, pendingReferralsCount] = await Promise.all([
       db.affiliatePayout.count({ where: { status: "PENDING" } }),
       db.affiliateAccount.count({ where: { kycStatus: "PENDING" } }),
       db.affiliateAccount.count({ where: { riskScore: { gt: 50 } } }),
+      db.referral.count({ where: { status: "PENDING" } }),
     ]);
-    data.counts = { payouts: pendingPayoutsCount, kyc: pendingKycCount, fraud: highRiskCount };
+    data.counts = { payouts: pendingPayoutsCount, kyc: pendingKycCount, fraud: highRiskCount, referrals: pendingReferralsCount };
 
     switch (currentView) {
       case "overview":
@@ -155,6 +157,10 @@ export default async function AffiliateMasterPage({
 
       case "kyc":
         data.kyc = await kycService.getDocuments(page, 20, params.status);
+        break;
+
+      case "referrals":
+        data.referrals = await referralService.getReferrals(page, 20, params.status, search);
         break;
 
       case "general":

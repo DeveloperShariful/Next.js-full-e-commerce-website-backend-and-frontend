@@ -90,7 +90,7 @@ export async function previewEmailTemplate(templateId: string) {
     };
 
     const html = generateEmailHtml({
-      order: sampleOrder,
+      order: sampleOrder ?? undefined,
       config: fakeConfig,
       template,
       metadata: sampleMetadata,
@@ -192,7 +192,7 @@ export async function previewEmailTemplateWithOverrides(
     };
 
     const html = generateEmailHtml({
-      order: sampleOrder,
+      order: sampleOrder ?? undefined,
       config: fakeConfig,
       template: mergedTemplate,
       metadata: sampleMetadata,

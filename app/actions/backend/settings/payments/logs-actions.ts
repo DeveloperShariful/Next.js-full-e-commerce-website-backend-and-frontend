@@ -1,10 +1,69 @@
-//File 1: app/actions/backend/settings/payments/logs-actions.ts
-
 "use server"
 
 import { db } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
+
+// ─── WEBHOOK LOGS ─────────────────────────────────────────────────────────────
+
+export interface WebhookLogItem {
+  id: string
+  provider: string
+  eventId: string
+  eventType: string
+  processed: boolean
+  processingError: string | null
+  retryCount: number
+  createdAt: Date
+  payload: unknown
+}
+
+export async function getWebhookLogs(daysLimit = 30): Promise<{ success: boolean; data?: WebhookLogItem[]; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.email) return { success: false, error: "Unauthorized" };
+
+    const dateLimit = new Date();
+    dateLimit.setDate(dateLimit.getDate() - daysLimit);
+
+    const logs = await db.paymentWebhookLog.findMany({
+      where: { createdAt: { gte: dateLimit } },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    });
+
+    return { success: true, data: logs };
+  } catch (error) {
+    console.error("Failed to fetch webhook logs:", error);
+    return { success: false, error: "Failed to load webhook logs." };
+  }
+}
+
+export async function bulkDeleteWebhookLogs(ids: string[]): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    await db.paymentWebhookLog.deleteMany({ where: { id: { in: ids } } });
+    revalidatePath("/admin/settings/payments/logs");
+    return { success: true, message: `Deleted ${ids.length} webhook logs.` };
+  } catch (error) {
+    return { success: false, error: "Failed to delete webhook logs." };
+  }
+}
+
+export async function autoCleanupWebhookLogs(): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const deleted = await db.paymentWebhookLog.deleteMany({
+      where: { createdAt: { lt: thirtyDaysAgo } },
+    });
+
+    revalidatePath("/admin/settings/payments/logs");
+    return { success: true, message: `Deleted ${deleted.count} old webhook logs.` };
+  } catch (error) {
+    return { success: false, error: "Failed to cleanup webhook logs." };
+  }
+}
 
 // 1. Fetch All Logs (Admin Actions + System Errors/Transactions)
 export async function getPaymentLogs(daysLimit = 30) {

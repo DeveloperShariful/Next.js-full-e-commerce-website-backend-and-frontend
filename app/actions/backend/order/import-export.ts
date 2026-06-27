@@ -114,7 +114,8 @@ const parseAddress = (
   email: string,
   phone: string
 ): Record<string, string> => {
-  const [firstName = "", ...lastParts] = (name || "").trim().split(" ");
+  const nameParts = (name || "").trim().split(/\s+/); // multiple spaces handle করা
+  const [firstName = "", ...lastParts] = nameParts;
   const lastName = lastParts.join(" ");
 
   if (!fullAddress || fullAddress.trim() === "") {

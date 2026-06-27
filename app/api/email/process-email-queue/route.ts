@@ -6,14 +6,17 @@ import nodemailer from "nodemailer";
 import { generateEmailHtml } from "@/app/actions/backend/settings/email/email-generator";
 
 export async function GET(req: Request) {
-  // Verify cron secret (query param OR Vercel's Bearer header)
-  const { searchParams } = new URL(req.url);
-  const querySecret = searchParams.get("secret");
-  const authHeader = req.headers instanceof Headers ? req.headers.get("authorization") : null;
-  const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  // CRON_SECRET set থাকলেই auth enforce করা হবে (localhost-এ সাধারণত set থাকে না → skip)
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const { searchParams } = new URL(req.url);
+    const querySecret = searchParams.get("secret");
+    const authHeader = req.headers instanceof Headers ? req.headers.get("authorization") : null;
+    const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-  if (querySecret !== process.env.CRON_SECRET && bearerSecret !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (querySecret !== cronSecret && bearerSecret !== cronSecret) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   try {
@@ -99,9 +102,11 @@ export async function GET(req: Request) {
             type GeneratorOrder = NonNullable<Parameters<typeof generateEmailHtml>[0]['order']>;
             const serializedOrder = JSON.parse(JSON.stringify(order)) as unknown as GeneratorOrder;
             htmlBody = generateEmailHtml({ order: serializedOrder, config, template, metadata: meta });
+            const billing = order.billingAddress as Record<string, string> | null;
+            const guestName = billing ? `${billing.firstName || ""} ${billing.lastName || ""}`.trim() : "";
             subject = subject
               .replace(/{order_number}/g, order.orderNumber)
-              .replace(/{customer_name}/g, order.user?.name || order.guestEmail || "Customer");
+              .replace(/{customer_name}/g, order.user?.name || guestName || order.guestEmail || "Customer");
           }
         }
 

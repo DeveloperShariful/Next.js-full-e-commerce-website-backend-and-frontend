@@ -97,15 +97,18 @@ export async function sendNotification({
       }
     });
 
-    // ব্যাকগ্রাউন্ডে কিউ প্রসেসরকে কল করা হচ্ছে
+    // ব্যাকগ্রাউন্ডে কিউ প্রসেসরকে কল করা হচ্ছে (fire-and-forget — order কে block করে না)
     try {
         const isLocal = process.env.NODE_ENV === 'development';
-        const fallbackUrl = isLocal ? "http://localhost:3000" : "https://gobike.au";
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || fallbackUrl;
-        
+        // localhost-এ NEXT_PUBLIC_APP_URL production-এ point করে, তাই development-এ localhost force করা হচ্ছে
+        const appUrl = isLocal ? "http://localhost:3000" : (process.env.NEXT_PUBLIC_APP_URL || "https://gobike.au");
+
         fetch(`${appUrl}/api/email/process-email-queue`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.CRON_SECRET || ''}`,
+            },
             cache: 'no-store'
         }).catch(err => console.error("Auto-trigger queue failed", err));
     } catch (e) {

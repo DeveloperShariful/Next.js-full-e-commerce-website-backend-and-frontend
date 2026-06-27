@@ -29,6 +29,7 @@ async function getStripeConfig() {
 }
 
 export async function POST(request: Request) {
+  let webhookEventId: string | undefined;
   try {
     const body = await request.text();
     const headerList = await headers();
@@ -49,9 +50,10 @@ export async function POST(request: Request) {
     }
 
     // 🛡️ 2. Log Webhook Event to DB
+    webhookEventId = event.id;
     await db.paymentWebhookLog.upsert({
         where: { eventId: event.id },
-        update: { processed: false },
+        update: { processed: false, processingError: null },
         create: {
             provider: 'stripe',
             eventId: event.id,
@@ -229,7 +231,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
 
   } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Unknown error";
     console.error("❌ [Stripe Webhook Critical Error]:", error);
+    if (webhookEventId) {
+      await db.paymentWebhookLog.update({
+        where: { eventId: webhookEventId },
+        data: { processingError: errMsg, retryCount: { increment: 1 } },
+      }).catch(() => {});
+    }
     return NextResponse.json({ error: "Failed to process webhook" }, { status: 500 });
   }
 }

@@ -70,6 +70,7 @@ async function verifyPayPalWebhook(accessToken: string, reqBody: Record<string, 
 }
 
 export async function POST(request: Request) {
+    let webhookEventId: string | undefined;
     try {
         const bodyText = await request.text();
         const event = JSON.parse(bodyText);
@@ -88,12 +89,13 @@ export async function POST(request: Request) {
         }
 
         // 🛡️ 2. Log Webhook Event to DB
+        webhookEventId = String(event.id);
         await db.paymentWebhookLog.upsert({
-            where: { eventId: String(event.id) },
-            update: { processed: false },
+            where: { eventId: webhookEventId },
+            update: { processed: false, processingError: null },
             create: {
                 provider: 'paypal',
-                eventId: String(event.id),
+                eventId: webhookEventId,
                 eventType: String(event.event_type),
                 payload: event
             }
@@ -313,7 +315,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true }, { status: 200 });
 
     } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : "Unknown error";
         console.error("❌ [PayPal Webhook Error]:", error);
+        if (webhookEventId) {
+            await db.paymentWebhookLog.update({
+                where: { eventId: webhookEventId },
+                data: { processingError: errMsg, retryCount: { increment: 1 } },
+            }).catch(() => {});
+        }
         return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
     }
 }

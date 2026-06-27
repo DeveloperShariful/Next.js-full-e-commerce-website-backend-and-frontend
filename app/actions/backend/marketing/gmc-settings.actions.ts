@@ -2,10 +2,10 @@
 
 "use server";
 
-import { db } from "@/lib/prisma"; 
+import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { security } from "@/lib/security";
 
-// টাইপ ডিফাইন করা, যাতে টাইপস্ক্রিপ্টে কোনো এরর না আসে
 export interface GmcSettingsData {
   gmcContentApiEnabled: boolean;
   gmcMerchantId: string;
@@ -20,12 +20,8 @@ export interface ConversionSettingsData {
 }
 
 // ============================================================================
-// 1. GET GMC SETTINGS
+// 1. GET GMC SETTINGS (read-only — no assertAdmin needed, page is middleware-protected)
 // ============================================================================
-/**
- * ড্যাশবোর্ড লোড হওয়ার সময় এই ফাংশন কল হবে।
- * এটি কারেন্ট সেটিংস এবং গুগল কানেক্টেড আছে কি না, তার স্টেটাস পাঠাবে।
- */
 export async function getGmcSettings() {
   try {
     const config = await db.marketingIntegration.findUnique({
@@ -35,21 +31,16 @@ export async function getGmcSettings() {
         gmcMerchantId: true,
         gmcTargetCountry: true,
         gmcLanguage: true,
-        googleAccountId: true,     // UI তে দেখানোর জন্য (Connected as: xyz@gmail.com)
-        googleRefreshToken: true,  // এটি থাকলে বুঝবো কানেকশন ফুললি একটিভ
+        googleAccountId: true,
+        // Only read boolean — never send the actual token to the client
+        googleRefreshToken: true,
       },
     });
 
-    // যদি ডাটাবেসে এন্ট্রি না থাকে, তবে ডিফল্ট ভ্যালু পাঠাবো
     if (!config) {
       return {
         success: true,
-        data: {
-          gmcContentApiEnabled: false,
-          gmcMerchantId: "",
-          gmcTargetCountry: "AU",
-          gmcLanguage: "en",
-        },
+        data: { gmcContentApiEnabled: false, gmcMerchantId: "", gmcTargetCountry: "AU", gmcLanguage: "en" },
         isConnected: false,
         accountEmail: null,
       };
@@ -63,10 +54,10 @@ export async function getGmcSettings() {
         gmcTargetCountry: config.gmcTargetCountry || "AU",
         gmcLanguage: config.gmcLanguage || "en",
       },
-      isConnected: !!config.googleRefreshToken, // Refresh Token থাকলেই কানেক্টেড
+      isConnected: !!config.googleRefreshToken,
       accountEmail: config.googleAccountId,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching GMC settings:", error);
     return { success: false, error: "Failed to fetch settings." };
   }
@@ -75,28 +66,20 @@ export async function getGmcSettings() {
 // ============================================================================
 // 2. UPDATE GMC SETTINGS
 // ============================================================================
-/**
- * সেটিংস ফর্ম সাবমিট হলে এই ফাংশন ডাটা আপডেট করবে। 
- * ইনপুট ভ্যালিডেশন এবং স্যানিটাইজেশন এখানেই হবে।
- */
 export async function updateGmcSettings(data: GmcSettingsData) {
+  await security.assertAdmin();
   try {
-    // Basic Validation
     if (data.gmcContentApiEnabled && !data.gmcMerchantId) {
-      return { 
-        success: false, 
-        error: "Merchant Center ID is required to enable Content API." 
-      };
+      return { success: false, error: "Merchant Center ID is required to enable Content API." };
     }
 
-    // Upsert method ব্যবহার করা হয়েছে যাতে প্রথমবার হলে Create হয়, না হলে Update হয়।
     await db.marketingIntegration.upsert({
       where: { id: "marketing_config" },
       update: {
         gmcContentApiEnabled: data.gmcContentApiEnabled,
         gmcMerchantId: data.gmcMerchantId.trim(),
-        gmcTargetCountry: data.gmcTargetCountry.toUpperCase(), // ISO format e.g., 'AU'
-        gmcLanguage: data.gmcLanguage.toLowerCase(), // e.g., 'en'
+        gmcTargetCountry: data.gmcTargetCountry.toUpperCase(),
+        gmcLanguage: data.gmcLanguage.toLowerCase(),
       },
       create: {
         id: "marketing_config",
@@ -107,30 +90,19 @@ export async function updateGmcSettings(data: GmcSettingsData) {
       },
     });
 
-    // Next.js এর ক্যাশ ক্লিয়ার করে পেজ রিফ্রেশ করার জন্য
     revalidatePath("/admin/marketing/merchant-center");
-
-    return { 
-      success: true, 
-      message: "Settings saved successfully." 
-    };
-  } catch (error: any) {
+    return { success: true, message: "Settings saved successfully." };
+  } catch (error: unknown) {
     console.error("Error updating GMC settings:", error);
-    return { 
-      success: false, 
-      error: "An error occurred while saving settings." 
-    };
+    return { success: false, error: "An error occurred while saving settings." };
   }
 }
 
 // ============================================================================
-// 🚀 3. SAVE GOOGLE ADS CONVERSION & TRACKING SETTINGS
+// 3. SAVE GOOGLE ADS CONVERSION & TRACKING SETTINGS
 // ============================================================================
-/**
- * এটি ফ্রন্টএন্ড সেটিংস থেকে আসা কনভার্সন আইডি, লেবেল এবং
- * এনহ্যান্সড ট্র্যাকিং অপশনটি ডাটাবেজে আপডেট করবে।
- */
 export async function saveGoogleAdsConversionSettings(data: ConversionSettingsData) {
+  await security.assertAdmin();
   try {
     await db.marketingIntegration.update({
       where: { id: "marketing_config" },
@@ -141,18 +113,11 @@ export async function saveGoogleAdsConversionSettings(data: ConversionSettingsDa
       },
     });
 
-    // Next.js ক্যাশ রিসেট করা
     revalidatePath("/admin/marketing/merchant-center");
-
-    return { 
-      success: true, 
-      message: "Conversion tracking settings updated successfully." 
-    };
-  } catch (error: any) {
+    return { success: true, message: "Conversion tracking settings updated successfully." };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to save conversion settings.";
     console.error("Error saving Google Ads conversion settings:", error);
-    return { 
-      success: false, 
-      error: error.message || "Failed to save conversion settings." 
-    };
+    return { success: false, error: msg };
   }
 }

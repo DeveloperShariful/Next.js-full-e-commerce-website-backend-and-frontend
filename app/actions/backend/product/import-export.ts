@@ -452,7 +452,9 @@ export async function importProductsCSV(
         const gender  = nullIfEmpty(row["Meta: _wc_gla_gender"]  || row["Meta: fb_gender"]);
         const ageGroup = nullIfEmpty(row["Meta: _wc_gla_ageGroup"] || row["Meta: fb_age_group"]);
         const googleProductCategory = nullIfEmpty(row["Meta: _wc_gla_product_category"]);
-        const googleTitle = nullIfEmpty(row["Meta: rank_math_title"]);
+        // rank_math_title contains SEO template vars (%title% %sep% %sitename%) — NOT suitable for Google Shopping title
+        // Use WC Google Listings & Ads title if present, otherwise leave null so product name is used
+        const googleTitle = nullIfEmpty(row["Meta: _wc_gla_title"] || row["Meta: _wc_gla_custom_title"]) ?? null;
         const googleDescription = nullIfEmpty(row["Meta: _wc_gla_description"] || row["Meta: fb_product_description"]);
 
         // ── SEO ──

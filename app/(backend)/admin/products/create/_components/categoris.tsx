@@ -10,9 +10,9 @@ import { ProductFormData } from "../types";
 
 export default function Categories() {
     const { watch, setValue } = useFormContext<ProductFormData>();
-    
-    // ✅ FIX: Multiple Categories array watch
+
     const currentCategoryIds = watch("categoryIds") || [];
+    const currentGoogleCategory = watch("googleProductCategory") || "";
     
     const [dbCategories, setDbCategories] = useState<CategoryNode[]>([]);
     const [input, setInput] = useState("");
@@ -49,29 +49,32 @@ export default function Categories() {
     };
 
     // ✅ FIX: Handle Multiple Checkbox Selection
-    const handleToggle = (categoryId: string) => {
+    const handleToggle = (categoryId: string, googleCategoryName: string | null) => {
         let newSelection = [...currentCategoryIds];
-        
+
         if (newSelection.includes(categoryId)) {
-            // Remove if already selected
             newSelection = newSelection.filter(id => id !== categoryId);
         } else {
-            // Add if not selected
             newSelection.push(categoryId);
+            // Auto-fill Google Product Category from category mapping if field is empty
+            if (googleCategoryName && !currentGoogleCategory.trim()) {
+                setValue("googleProductCategory", googleCategoryName, { shouldDirty: true });
+            }
         }
-        
+
         setValue("categoryIds", newSelection, { shouldDirty: true });
     };
 
     // Add New Category (Temp)
     const addCategory = () => {
         if(!input.trim()) return;
-        
-        const newCat: CategoryNode = { 
-            id: `temp_${Date.now()}`, 
+
+        const newCat: CategoryNode = {
+            id: `temp_${Date.now()}`,
             name: input.trim(),
             slug: input.trim().toLowerCase().replace(/\s+/g, '-'),
             parentId: null,
+            googleCategoryName: null,
             children: []
         };
         
@@ -94,7 +97,7 @@ export default function Categories() {
                             <input 
                                 type="checkbox" 
                                 checked={currentCategoryIds.includes(cat.id)} 
-                                onChange={() => handleToggle(cat.id)}
+                                onChange={() => handleToggle(cat.id, cat.googleCategoryName)}
                                 className="mt-[2px] w-[14px] h-[14px] text-[#2271b1] border-[#8c8f94] rounded-[2px] focus:ring-[#2271b1]"
                             />
                             <span className="leading-tight">{cat.name}</span>

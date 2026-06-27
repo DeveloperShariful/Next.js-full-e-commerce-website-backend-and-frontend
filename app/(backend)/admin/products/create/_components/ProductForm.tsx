@@ -196,29 +196,45 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                         <Publish isEdit={isEdit} loading={isSubmitting || isPending} onSubmit={handleSubmit(onSubmit, onFormError)} />
                     </div>
 
-                    <div className="space-y-1">
-                        <input 
+                    <div className="space-y-1.5">
+                        <input
                             {...methods.register("name")}
                             placeholder="Product Name"
                             className="w-full px-3 py-2 bg-white border border-[#8c8f94] text-[18px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none rounded-[3px] transition-shadow"
                         />
-                        {methods.watch("name") && (
-                            <div className="text-[12px] flex flex-wrap items-center gap-1 text-[#646970] mt-1 ml-1">
-                                <span className="font-semibold text-[#50575e]">Permalink:</span>
-                                <span className="text-[#2271b1]">
+                        {/* Permalink row — always visible */}
+                        <div className="flex items-center gap-1.5 bg-white border border-[#dcdcde] rounded-[3px] px-2.5 py-1.5 text-[12px] text-[#646970] overflow-hidden">
+                            <span className="font-semibold text-[#50575e] shrink-0">Permalink:</span>
+                            <div className="flex items-center min-w-0 flex-1 overflow-hidden">
+                                <span className="text-[#646970] shrink-0 truncate max-w-[160px] sm:max-w-none">
                                     {origin ? `${origin}/product/` : '/product/'}
                                 </span>
-                                <input 
+                                <input
                                     {...methods.register("slug", {
                                         onChange: (e) => {
                                             const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
                                             setValue("slug", val, { shouldDirty: true });
                                         }
                                     })}
-                                    className="bg-transparent border border-transparent hover:border-[#8c8f94] px-1 py-0.5 rounded-sm text-[12px] text-[#2271b1] underline focus:border-[#2271b1] outline-none min-w-[50px]"
+                                    placeholder={
+                                        watch("name")
+                                            ? watch("name").toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').slice(0, 40)
+                                            : "product-slug"
+                                    }
+                                    className="bg-transparent border-none text-[#2271b1] font-medium underline focus:outline-none min-w-[60px] w-auto placeholder:text-[#2271b1] placeholder:opacity-60"
                                 />
                             </div>
-                        )}
+                            {isEdit && origin && watch("slug") && (
+                                <a
+                                    href={`${origin}/product/${watch("slug")}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="shrink-0 text-[11px] text-[#2271b1] hover:text-[#0a4b78] border border-[#dcdcde] rounded px-1.5 py-0.5 hover:bg-[#f6f7f7] transition-colors whitespace-nowrap"
+                                >
+                                    View ↗
+                                </a>
+                            )}
+                        </div>
                     </div>
                     
                     <Description />

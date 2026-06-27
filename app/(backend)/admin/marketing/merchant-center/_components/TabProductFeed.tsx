@@ -1,472 +1,640 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useTransition, useState, Fragment } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { 
-  updateProductChannelVisibility, 
+import {
   bulkUpdateProductVisibility,
-  syncSingleProductStatusFromGoogle // 🚀 NEW: সিঙ্গেল প্রোডাক্ট লাইভ স্ক্যানার অ্যাকশন ইম্পোর্ট
+  syncSingleProductStatusFromGoogle,
+  syncLiveProductStatuses,
 } from "@/app/actions/backend/marketing/gmc-product-sync.actions";
 
+// ─────────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────────
+interface GoogleIssue {
+  code?: string;
+  servability?: "disapproved" | "demoted" | "unaffected";
+  resolution?: "merchant_action" | "pending_processing";
+  attributeName?: string;
+  destination?: string;
+  description?: string;
+  detail?: string;
+  documentation?: string;
+}
+
+interface SyncLog {
+  id: string;
+  status: "SYNCED" | "FAILED" | "PENDING" | "EXCLUDED";
+  errorMessage: string | null;
+  googleIssues: unknown;
+  lastSyncedAt: string | null;
+  product: { id: string; name: string; slug: string; featuredImage: string | null; sku: string | null };
+}
+
 interface Props {
-  syncLogs: any[];
+  syncLogs: SyncLog[];
   totalProducts: number;
 }
 
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+function parseGoogleIssues(raw: unknown): GoogleIssue[] {
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) return parsed as GoogleIssue[];
+    if (typeof parsed === "object" && parsed !== null) return [parsed as GoogleIssue];
+  } catch { /* unparseable */ }
+  return [];
+}
+
+function severityConfig(s?: string) {
+  if (s === "disapproved") return {
+    bg: "bg-red-50", border: "border-red-200", text: "text-red-700",
+    dot: "bg-red-500", headerBg: "bg-red-100", headerText: "text-red-800",
+    badge: "bg-red-100 text-red-700", label: "Disapproved", icon: "✕",
+  };
+  if (s === "demoted") return {
+    bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700",
+    dot: "bg-amber-500", headerBg: "bg-amber-100", headerText: "text-amber-800",
+    badge: "bg-amber-100 text-amber-700", label: "Demoted", icon: "▼",
+  };
+  return {
+    bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700",
+    dot: "bg-yellow-400", headerBg: "bg-yellow-100", headerText: "text-yellow-800",
+    badge: "bg-yellow-100 text-yellow-700", label: "Warning", icon: "⚠",
+  };
+}
+
+function smartAction(log: SyncLog, issues: GoogleIssue[]) {
+  const combined = (issues.map(i => `${i.code ?? ""} ${i.attributeName ?? ""} ${i.description ?? ""}`).join(" ")).toLowerCase();
+  if (combined.includes("color") || combined.includes("size") || combined.includes("category") || combined.includes("mapping") || combined.includes("google_product_category"))
+    return { label: "Fix attribute mapping", href: "/admin/marketing/merchant-center?tab=attributes" };
+  if (combined.includes("image") || combined.includes("thumbnail"))
+    return { label: "Edit product images", href: `/admin/products/create?id=${log.product.id}` };
+  if (combined.includes("price") || combined.includes("currency"))
+    return { label: "Check product price", href: `/admin/products/create?id=${log.product.id}` };
+  return { label: "Edit product", href: `/admin/products/create?id=${log.product.id}` };
+}
+
+// ─────────────────────────────────────────────────────────────
+// ISSUE TABLE COMPONENT — structured, destination-first
+// ─────────────────────────────────────────────────────────────
+function IssueTable({ issues, errorMessage }: { issues: GoogleIssue[]; errorMessage: string | null }) {
+  if (issues.length === 0 && !errorMessage) return null;
+
+  if (issues.length === 0) {
+    return (
+      <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <span className="text-red-500 text-lg mt-0.5">✕</span>
+        <p className="text-[13px] text-red-700 m-0">{errorMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-[#e2e8f0] overflow-hidden">
+      {/* Header row */}
+      <div className="hidden sm:grid grid-cols-[110px_160px_1fr_auto] gap-0 bg-[#f8fafc] border-b border-[#e2e8f0] px-4 py-2">
+        <span className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">Severity</span>
+        <span className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">Destination</span>
+        <span className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">Issue</span>
+        <span className="text-[11px] font-semibold text-[#64748b] uppercase tracking-wider text-right">Action</span>
+      </div>
+
+      {/* Issue rows */}
+      <div className="divide-y divide-[#f1f5f9]">
+        {issues.map((issue, idx) => {
+          const cfg = severityConfig(issue.servability);
+          return (
+            <div key={idx} className={`${cfg.bg} sm:grid sm:grid-cols-[110px_160px_1fr_auto] sm:gap-4 flex flex-col gap-2 px-4 py-3`}>
+
+              {/* Severity */}
+              <div className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                  {cfg.label}
+                </span>
+              </div>
+
+              {/* Destination */}
+              <div className="flex items-center sm:block">
+                <span className="sm:hidden text-[10px] text-[#64748b] font-semibold mr-1.5 uppercase">Dest:</span>
+                {issue.destination ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono bg-white border border-[#e2e8f0] text-[#374151] px-2 py-0.5 rounded-md">
+                    <svg className="w-3 h-3 text-[#6366f1]" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                    {issue.destination}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-[#94a3b8]">—</span>
+                )}
+              </div>
+
+              {/* Description + detail */}
+              <div className="min-w-0">
+                <p className={`text-[12px] font-semibold ${cfg.text} leading-snug`}>
+                  {issue.description ?? issue.code ?? "Unknown issue"}
+                </p>
+                {issue.detail && (
+                  <p className="text-[11px] text-[#64748b] mt-0.5 leading-relaxed">{issue.detail}</p>
+                )}
+                {issue.attributeName && (
+                  <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 bg-white border border-[#e2e8f0] text-[#374151] rounded">
+                    Attribute: <strong>{issue.attributeName}</strong>
+                  </span>
+                )}
+              </div>
+
+              {/* Resolution + help */}
+              <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2 sm:gap-1.5 sm:min-w-[90px]">
+                {issue.resolution === "merchant_action" && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                    Fix required
+                  </span>
+                )}
+                {issue.resolution === "pending_processing" && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    Processing
+                  </span>
+                )}
+                {issue.documentation && (
+                  <a
+                    href={issue.documentation}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] text-[#2271b1] hover:text-[#135e96] font-semibold"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Help
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────
 export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-
-  // local States
+  const [isSyncing, setIsSyncing] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Record<string, "SYNCED" | "EXCLUDED">>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  // Bulk Selection States
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState<string>("");
-
-  // 🚀 NEW: লাইভ স্ক্যানিং লোডিং স্টেট (ID ধারণ করবে)
   const [isScanning, setIsScanning] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  // Stats Calculation
-  const activeCount = syncLogs.filter(log => log.status === "SYNCED" && !log.googleIssues).length;
-  const disapprovedCount = syncLogs.filter(log => log.status === "FAILED").length;
-  const warningCount = syncLogs.filter(log => log.status === "SYNCED" && log.googleIssues).length;
-  const notSyncedCount = syncLogs.filter(log => log.status === "PENDING").length;
+  const activeCount = syncLogs.filter(l => l.status === "SYNCED" && parseGoogleIssues(l.googleIssues).length === 0).length;
+  const disapprovedCount = syncLogs.filter(l => l.status === "FAILED").length;
+  const warningCount = syncLogs.filter(l => l.status === "SYNCED" && parseGoogleIssues(l.googleIssues).length > 0).length;
+  const notSyncedCount = syncLogs.filter(l => l.status === "PENDING").length;
+  const hasPendingChanges = Object.keys(pendingChanges).length > 0;
 
-  // Google Issue Parser
-  const getGoogleIssueText = (log: any): string => {
-    if (log.googleIssues) {
-      try {
-        const issues = typeof log.googleIssues === "string" 
-          ? JSON.parse(log.googleIssues) 
-          : log.googleIssues;
+  const toggleExpand = (id: string) =>
+    setExpandedRows(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-        if (Array.isArray(issues) && issues.length > 0) {
-          const firstIssue = issues[0];
-          return firstIssue.message || firstIssue.description || firstIssue.reason || log.errorMessage || "Unknown Error.";
-        }
-        
-        if (typeof issues === "object" && issues !== null) {
-          return (issues as any).message || (issues as any).description || log.errorMessage || "Unknown Error.";
-        }
-      } catch (e) {
-        console.error("Failed to parse googleIssues:", e);
-      }
-    }
-    return log.errorMessage || "Unknown Error.";
-  };
-
-  // Smart Suggested Action (Correct Edit URL)
-  const getSuggestedAction = (log: any, issueText: string) => {
-    const text = issueText.toLowerCase();
-    const productId = log.product?.id;
-    
-    if (text.includes("color") || text.includes("size") || text.includes("attribute") || text.includes("category") || text.includes("mapping")) {
-      return (
-        <Link href="/admin/marketing/merchant-center?tab=attributes" className="text-[#2271b1] hover:underline font-semibold">
-          Fix attribute mapping &rarr;
-        </Link>
-      );
-    }
-    
-    return (
-      <Link href={`/admin/products/create?id=${productId}`} className="text-[#2271b1] hover:underline font-semibold">
-        Edit product data &rarr;
-      </Link>
-    );
-  };
-
-  // local Dropdown change handler
   const handleDropdownChange = (productId: string, value: "SYNCED" | "EXCLUDED") => {
-    setSuccessMsg(null);
-    setErrorMsg(null);
-    setPendingChanges({
-      ...pendingChanges,
-      [productId]: value
-    });
+    setSuccessMsg(null); setErrorMsg(null);
+    setPendingChanges(prev => ({ ...prev, [productId]: value }));
   };
 
-  // individual Checkbox selection
-  const handleSelectRow = (productId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedProductIds([...selectedProductIds, productId]);
-    } else {
-      setSelectedProductIds(selectedProductIds.filter(id => id !== productId));
-    }
-  };
+  const handleSelectRow = (id: string, checked: boolean) =>
+    setSelectedProductIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id));
 
-  // master Checkbox (Select/Unselect All)
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedProductIds(syncLogs.map(log => log.product.id));
-    } else {
-      setSelectedProductIds([]);
-    }
-  };
+  const handleSelectAll = (checked: boolean) =>
+    setSelectedProductIds(checked ? syncLogs.map(l => l.product.id) : []);
 
-  // Per-row pending changes save handler
   const handleSavePendingChanges = () => {
-    if (Object.keys(pendingChanges).length === 0) return;
-
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    const payload = Object.entries(pendingChanges).map(([productId, status]) => ({
-      productId,
-      status,
-    }));
-
+    if (!Object.keys(pendingChanges).length) return;
+    setErrorMsg(null); setSuccessMsg(null);
+    const payload = Object.entries(pendingChanges).map(([productId, status]) => ({ productId, status }));
     startTransition(async () => {
       const res = await bulkUpdateProductVisibility(payload);
-      if (res.success) {
-        setSuccessMsg(res.message || "Changes saved and synced successfully!");
-        setPendingChanges({});
-        router.refresh();
-      } else {
-        setErrorMsg(res.error || "Failed to save changes.");
-      }
+      if (res.success) { setSuccessMsg(res.message || "Changes saved!"); setPendingChanges({}); router.refresh(); }
+      else setErrorMsg(res.error || "Failed to save changes.");
     });
   };
 
-  // Bulk Apply Handler
   const handleSaveAndSync = () => {
-    if (!bulkAction || selectedProductIds.length === 0) return;
-    
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    const payload = selectedProductIds.map(id => ({
-      productId: id,
-      status: bulkAction as "SYNCED" | "EXCLUDED"
-    }));
-
+    if (!bulkAction || !selectedProductIds.length) return;
+    setErrorMsg(null); setSuccessMsg(null);
+    const payload = selectedProductIds.map(id => ({ productId: id, status: bulkAction as "SYNCED" | "EXCLUDED" }));
     startTransition(async () => {
       const res = await bulkUpdateProductVisibility(payload);
-      
-      if (res.success) {
-        setSuccessMsg(res.message || "Bulk operation completed successfully!");
-        setSelectedProductIds([]); 
-        setBulkAction(""); 
-        router.refresh(); 
-      } else {
-        setErrorMsg(res.error || "Failed to process bulk operation.");
-      }
+      if (res.success) { setSuccessMsg(res.message || "Done!"); setSelectedProductIds([]); setBulkAction(""); router.refresh(); }
+      else setErrorMsg(res.error || "Failed.");
     });
   };
 
-  // 🚀 NEW: এক ক্লিকে সিঙ্গেল প্রোডাক্ট লাইভ স্ক্যান করার মাস্টার হ্যান্ডলার
-  const handleScanSingleProduct = async (productId: string) => {
-    setIsScanning(productId);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
+  const handleScanSingle = async (productId: string) => {
+    setIsScanning(productId); setErrorMsg(null); setSuccessMsg(null);
     const res = await syncSingleProductStatusFromGoogle(productId);
-
-    if (res.success) {
-      setSuccessMsg("Live status updated from Google successfully!");
-      router.refresh(); // নতুন রিয়েল ডাটা UI তে পুশ করবে
-    } else {
-      setErrorMsg(res.error || "Failed to fetch live status from Google.");
-    }
+    if (res.success) { setSuccessMsg("Live status updated from Google!"); router.refresh(); }
+    else setErrorMsg(res.error || "Scan failed.");
     setIsScanning(null);
   };
 
-  // Dynamic Channel Visibility Text
-  const getChannelVisibility = (status: string): string => {
-    switch (status) {
-      case "SYNCED":
-        return "Sync and show";
-      case "EXCLUDED":
-        return "Do not sync (Hide)";
-      case "PENDING":
-        return "Not synced (Pending)";
-      default:
-        return "Not synced";
-    }
+  const handleRefreshAll = async () => {
+    setIsSyncing(true); setErrorMsg(null); setSuccessMsg(null);
+    const res = await syncLiveProductStatuses();
+    if (res.success) { setSuccessMsg("All statuses refreshed from Google!"); router.refresh(); }
+    else setErrorMsg("Failed to refresh statuses from Google.");
+    setIsSyncing(false);
   };
 
-  const hasPendingChanges = Object.keys(pendingChanges).length > 0;
-
   return (
-    <div className="w-full text-[#3c434a] pb-10">
-      
-      {/* Overview Box */}
-      <div className="bg-white border border-[#ccd0d4] rounded-[3px] mb-8 overflow-hidden">
-        <h2 className="text-[14px] font-semibold text-[#1d2327] border-b border-[#ccd0d4] px-4 py-3 m-0">
-          Overview
-        </h2>
-        
-        {/* Responsive Grid Layout */}
-        <div className="grid grid-cols-3 md:grid-cols-5 gap-[1px] bg-[#ccd0d4]">
-          <div className="bg-white p-4 sm:p-6">
-            <p className="text-[13px] text-[#1d2327] m-0 mb-4 font-medium">Active</p>
-            <p className="text-[24px] sm:text-[28px] text-[#1d2327] font-normal m-0">{activeCount}</p>
-          </div>
-          <div className="bg-white p-4 sm:p-6">
-            <p className="text-[13px] text-[#1d2327] m-0 mb-4 font-medium">Expiring</p>
-            <p className="text-[24px] sm:text-[28px] text-[#1d2327] font-normal m-0">0</p>
-          </div>
-          <div className="bg-white p-4 sm:p-6">
-            <p className="text-[13px] text-[#1d2327] m-0 mb-4 font-medium">Pending / Warnings</p>
-            <p className="text-[24px] sm:text-[28px] text-[#1d2327] font-normal m-0">{warningCount}</p>
-          </div>
-          <div className="bg-white p-4 sm:p-6">
-            <p className="text-[13px] text-[#1d2327] m-0 mb-4 font-medium">Disapproved</p>
-            <p className="text-[24px] sm:text-[28px] text-[#d63638] font-normal m-0">{disapprovedCount}</p>
-          </div>
-          <div className="bg-white p-4 sm:p-6">
-            <p className="text-[13px] text-[#1d2327] m-0 mb-4 font-medium">Not Synced</p>
-            <p className="text-[24px] sm:text-[28px] text-[#1d2327] font-normal m-0">{notSyncedCount}</p>
-          </div>
-          <div className="bg-white p-4 sm:p-6 hidden max-md:block"></div>
-        </div>
+    <div className="w-full text-[#3c434a] pb-10 space-y-6">
 
-        {/* Responsive Info Box */}
-        <div className="bg-[#f9f9f9] border-t border-[#ccd0d4] p-4 text-[12px] sm:text-[13px] flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-            <span className="w-[100px] text-[#646970] font-medium flex-shrink-0">Feed setup:</span>
-            <div className="flex items-center gap-1.5 font-semibold text-[#00a32a]">
-              <span className="w-4 h-4 bg-[#00a32a] text-white rounded-full flex items-center justify-center text-[10px] font-bold">✓</span> 
-              Product feed setup completed
-              {disapprovedCount > 0 && <span className="text-[#646970] ml-2 font-normal text-[11px] sm:text-[12px]">• {disapprovedCount} issues to resolve</span>}
+      {/* ── STAT CARDS ───────────────────────────────────────────────────── */}
+      <div className="bg-white border border-[#ccd0d4] rounded-lg overflow-hidden shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ccd0d4] px-5 py-3">
+          <h2 className="text-[15px] font-semibold text-[#1d2327]">Product Feed Overview</h2>
+          <button
+            onClick={handleRefreshAll}
+            disabled={isSyncing}
+            className="inline-flex items-center gap-2 bg-white border border-[#ccd0d4] text-[#2271b1] rounded-md px-4 py-1.5 text-[12px] font-semibold hover:bg-[#f0f6fc] hover:border-[#2271b1] disabled:opacity-50 transition-all cursor-pointer shadow-sm"
+          >
+            <svg className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isSyncing ? "Refreshing…" : "Refresh from Google"}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-[#e5e7eb]">
+          {[
+            { label: "Active", value: activeCount, color: "text-emerald-600", bg: "bg-emerald-50", icon: "✓" },
+            { label: "Warnings", value: warningCount, color: "text-amber-600", bg: "bg-amber-50", icon: "⚠" },
+            { label: "Disapproved", value: disapprovedCount, color: "text-red-600", bg: "bg-red-50", icon: "✕" },
+            { label: "Not Synced", value: notSyncedCount, color: "text-slate-500", bg: "bg-slate-50", icon: "○" },
+            { label: "Total", value: totalProducts, color: "text-[#1d2327]", bg: "bg-white", icon: "#" },
+          ].map(({ label, value, color, bg, icon }) => (
+            <div key={label} className={`${bg} p-5`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-[13px] font-bold ${color}`}>{icon}</span>
+                <span className="text-[12px] text-[#6b7280] font-medium">{label}</span>
+              </div>
+              <p className={`text-[32px] font-light leading-none ${color}`}>{value}</p>
             </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-            <span className="w-[100px] text-[#646970] font-medium flex-shrink-0">Account status:</span>
-            <div className="flex items-center gap-1.5 font-semibold text-[#00a32a]">
-              <span className="w-4 h-4 bg-[#00a32a] text-white rounded-full flex items-center justify-center text-[10px] font-bold">✓</span> 
-              Approved
-              <span className="text-[#646970] ml-2 font-normal text-[11px] sm:text-[12px]">• Your product listings are on Google.</span>
-            </div>
-          </div>
+          ))}
         </div>
-      </div>
-
-      {/* Notices */}
-      {successMsg && (
-        <div className="bg-white border-l-4 border-[#00a32a] shadow-sm p-3 mb-5">
-          <p className="text-[13px] m-0"><strong>Success:</strong> {successMsg}</p>
-        </div>
-      )}
-      {errorMsg && (
-        <div className="bg-white border-l-4 border-[#d63638] shadow-sm p-3 mb-5">
-          <p className="text-[13px] m-0"><strong>Error:</strong> {errorMsg}</p>
-        </div>
-      )}
-
-      {/* Issues Table */}
-      {disapprovedCount > 0 && (
-        <div className="bg-white border border-[#ccd0d4] rounded-[3px] mb-8">
-          <div className="flex items-center border-b border-[#ccd0d4]">
-            <h2 className="text-[16px] font-normal text-[#1d2327] px-6 py-4 m-0">Issues to resolve</h2>
+        {disapprovedCount > 0 && (
+          <div className="bg-red-50 border-t border-red-200 px-5 py-2.5 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+            <p className="text-[12px] text-red-700 font-medium m-0">
+              <strong>{disapprovedCount} product{disapprovedCount > 1 ? "s" : ""}</strong> disapproved by Google — click <strong>Refresh from Google</strong> for the latest status, then expand each product to see full issue details.
+            </p>
           </div>
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left text-[13px] min-w-[700px] border-collapse">
-              <thead className="bg-[#f9f9f9] border-b border-[#ccd0d4]">
-                <tr>
-                  <th className="py-3 px-6 font-semibold text-[#1d2327] w-[50px] text-center">Type</th>
-                  <th className="py-3 px-6 font-semibold text-[#1d2327]">Affected product</th>
-                  <th className="py-3 px-6 font-semibold text-[#1d2327]">Issue (GMC Live Error)</th>
-                  <th className="py-3 px-6 font-semibold text-[#1d2327]">Suggested action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {syncLogs.filter(log => log.status === "FAILED").map((log) => {
-                  const issueText = getGoogleIssueText(log);
-                  return (
-                    <tr key={log.id} className="border-b border-[#f0f0f1] hover:bg-[#f6f7f7]">
-                      <td className="py-3 px-6 text-center">
-                        <span className="text-[#d63638] font-bold border border-[#d63638] rounded-full w-5 h-5 inline-flex items-center justify-center">!</span>
-                      </td>
-                      <td className="py-3 px-6">
-                        <Link href={`/admin/products/create?id=${log.product?.id}`} className="text-[#2271b1] hover:underline font-semibold">
-                          {log.product?.name}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-6 text-[#d63638] font-medium max-w-[300px] truncate" title={issueText}>
-                        {issueText}
-                      </td>
-                      <td className="py-3 px-6">
-                        {getSuggestedAction(log, issueText)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Actions Header */}
-      <div className="flex items-center gap-2 mb-4 bg-white border border-[#ccd0d4] p-3 rounded-[3px] shadow-sm max-w-fit">
-        <select 
-          value={bulkAction} 
-          onChange={(e) => setBulkAction(e.target.value)}
-          className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] bg-white outline-none cursor-pointer"
-        >
-          <option value="">Bulk Actions</option>
-          <option value="SYNCED">Sync and show Selected</option>
-          <option value="EXCLUDED">Do not sync (Hide) Selected</option>
-        </select>
-        <button 
-          onClick={handleSaveAndSync}
-          disabled={isPending || !bulkAction || selectedProductIds.length === 0}
-          className="bg-[#f6f7f7] text-[#2271b1] border border-[#ccd0d4] hover:bg-[#f0f0f1] rounded-[3px] px-4 py-1.5 text-[13px] font-semibold cursor-pointer disabled:opacity-50 transition-colors"
-        >
-          {isPending ? "Applying..." : "Apply"}
-        </button>
-        {selectedProductIds.length > 0 && (
-          <span className="text-[12px] text-[#646970] ml-2">
-            <strong>{selectedProductIds.length}</strong> items selected
-          </span>
         )}
       </div>
 
-      {/* Main Product Feed Table */}
-      <div className="bg-white border border-[#ccd0d4] rounded-[3px]">
-        <div className="flex items-center justify-between border-b border-[#ccd0d4] px-4 py-3 bg-[#f9f9f9]">
-          <h2 className="text-[16px] font-semibold text-[#1d2327] m-0">Product Feed</h2>
-          
-          {hasPendingChanges && (
-            <button
-              onClick={handleSavePendingChanges}
-              disabled={isPending}
-              className="bg-[#2271b1] hover:bg-[#135e96] text-white border-none rounded-[3px] px-4 py-1.5 text-[12px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+      {/* ── NOTICES ──────────────────────────────────────────────────────── */}
+      {successMsg && (
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+          <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">✓</span>
+          <p className="text-[13px] text-emerald-800 font-medium m-0">{successMsg}</p>
+        </div>
+      )}
+      {errorMsg && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-4">
+          <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">✕</span>
+          <p className="text-[13px] text-red-800 font-medium m-0">{errorMsg}</p>
+        </div>
+      )}
+
+      {/* ── ISSUES TO RESOLVE ────────────────────────────────────────────── */}
+      {disapprovedCount > 0 && (
+        <div className="bg-white border border-[#ccd0d4] rounded-lg overflow-hidden shadow-sm">
+          <div className="border-b border-[#ccd0d4] px-5 py-4 flex items-center gap-3 bg-[#fef2f2]">
+            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+              <span className="text-red-600 text-[14px] font-bold">!</span>
+            </div>
+            <div>
+              <h2 className="text-[14px] font-bold text-[#1d2327] m-0">
+                Issues to Resolve
+                <span className="ml-2 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full align-middle">{disapprovedCount}</span>
+              </h2>
+              <p className="text-[11px] text-[#6b7280] m-0 mt-0.5">Products below are disapproved by Google. Expand each card to see full issue details including which destination is affected.</p>
+            </div>
+          </div>
+
+          <div className="divide-y divide-[#f1f5f9]">
+            {syncLogs.filter(log => log.status === "FAILED").map(log => {
+              const issues = parseGoogleIssues(log.googleIssues);
+              const isExpanded = expandedRows.has(log.id);
+              const action = smartAction(log, issues);
+              const disapprovedIssues = issues.filter(i => i.servability === "disapproved");
+              const otherIssues = issues.filter(i => i.servability !== "disapproved");
+
+              return (
+                <div key={log.id} className="hover:bg-[#fafafa] transition-colors">
+                  {/* Product header */}
+                  <div className="px-4 py-4">
+                    {/* Top row: icon + name (full width on mobile) */}
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-red-600 text-[12px] font-bold">✕</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/admin/products/create?id=${log.product.id}`}
+                          className="text-[#2271b1] hover:text-[#135e96] font-semibold text-[13px] sm:text-[14px] hover:underline leading-snug block break-words"
+                        >
+                          {log.product.name}
+                        </Link>
+                        {log.product.sku && (
+                          <span className="text-[11px] text-[#9ca3af] font-mono break-all">SKU: {log.product.sku}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Second row: action button + date — below name on mobile */}
+                    <div className="flex flex-wrap items-center gap-2 mt-3 ml-10">
+                      {/* Actions */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={action.href}
+                          className="inline-flex items-center gap-1.5 bg-[#2271b1] hover:bg-[#135e96] text-white text-[11px] font-semibold px-3 py-1.5 rounded-md transition-colors whitespace-nowrap"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          {action.label}
+                        </Link>
+                        <span className="text-[10px] text-[#9ca3af]">
+                          {log.lastSyncedAt ? new Date(log.lastSyncedAt).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" }) : "Never checked"}
+                        </span>
+                      </div>
+
+                      {/* Issue count summary chips */}
+                      {disapprovedIssues.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-red-100 text-red-700 px-2.5 py-1 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          {disapprovedIssues.length} Disapproved
+                        </span>
+                      )}
+                      {otherIssues.length > 0 && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          {otherIssues.length} Warning{otherIssues.length > 1 ? "s" : ""}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => toggleExpand(log.id)}
+                        className="inline-flex items-center gap-1 text-[11px] text-[#2271b1] font-semibold hover:underline bg-transparent border-none cursor-pointer p-0"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                            Hide issue details
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            View all {issues.length} issue{issues.length !== 1 ? "s" : ""} with destination
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded issue table */}
+                  {isExpanded && (
+                    <div className="px-5 pb-5 ml-10">
+                      <IssueTable issues={issues} errorMessage={log.errorMessage} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── PRODUCT FEED TABLE ───────────────────────────────────────────── */}
+      <div className="bg-white border border-[#ccd0d4] rounded-lg overflow-hidden shadow-sm">
+        {/* Table toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ccd0d4] px-5 py-3 bg-[#f9fafb]">
+          <h2 className="text-[14px] font-semibold text-[#1d2327]">All Products</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={bulkAction}
+              onChange={e => setBulkAction(e.target.value)}
+              className="border border-[#d1d5db] rounded-md px-3 py-1.5 text-[12px] bg-white outline-none cursor-pointer text-[#374151]"
             >
-              {isPending ? "Saving..." : "Save & Sync Changes"}
+              <option value="">Bulk Actions</option>
+              <option value="SYNCED">Sync &amp; Show Selected</option>
+              <option value="EXCLUDED">Hide Selected</option>
+            </select>
+            <button
+              onClick={handleSaveAndSync}
+              disabled={isPending || !bulkAction || !selectedProductIds.length}
+              className="bg-white border border-[#d1d5db] text-[#374151] hover:bg-[#f3f4f6] rounded-md px-3 py-1.5 text-[12px] font-semibold cursor-pointer disabled:opacity-40 transition-colors"
+            >
+              {isPending ? "Applying…" : "Apply"}
             </button>
-          )}
+            {selectedProductIds.length > 0 && (
+              <span className="text-[12px] text-[#6b7280]"><strong>{selectedProductIds.length}</strong> selected</span>
+            )}
+            {hasPendingChanges && (
+              <button
+                onClick={handleSavePendingChanges}
+                disabled={isPending}
+                className="bg-[#2271b1] hover:bg-[#135e96] text-white border-none rounded-md px-4 py-1.5 text-[12px] font-semibold cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {isPending ? "Saving…" : `Save & Sync (${Object.keys(pendingChanges).length})`}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* DYNAMIC RESPONSIVE TABLE */}
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-[13px] min-w-[750px] border-collapse">
-            <thead className="bg-[#f9f9f9] border-b border-[#ccd0d4]">
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[13px] border-collapse min-w-[720px]">
+            <thead className="bg-[#f9fafb] border-b border-[#e5e7eb]">
               <tr>
-                <th className="py-3 px-4 w-[40px]">
-                  <input 
-                    type="checkbox" 
+                <th className="py-3 px-4 w-10">
+                  <input type="checkbox"
                     checked={selectedProductIds.length === syncLogs.length && syncLogs.length > 0}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="border-[#8c8f94] rounded-[3px] cursor-pointer" 
+                    onChange={e => handleSelectAll(e.target.checked)}
+                    className="cursor-pointer w-4 h-4 rounded"
                   />
                 </th>
-                <th className="py-3 px-4 font-semibold text-[#1d2327] w-[45%]">Product Title</th>
-                <th className="py-3 px-4 font-semibold text-[#1d2327] w-[25%]">Channel Visibility</th>
-                <th className="py-3 px-4 font-semibold text-[#1d2327] w-[20%]">Status</th>
-                <th className="py-3 px-4 w-[80px]"></th>
+                <th className="py-3 px-4 font-semibold text-[#374151] text-[12px] uppercase tracking-wide w-[40%]">Product</th>
+                <th className="py-3 px-4 font-semibold text-[#374151] text-[12px] uppercase tracking-wide w-[18%]">Visibility</th>
+                <th className="py-3 px-4 font-semibold text-[#374151] text-[12px] uppercase tracking-wide">Google Status</th>
+                <th className="py-3 px-4 font-semibold text-[#374151] text-[12px] uppercase tracking-wide w-[90px] text-center">Synced</th>
+                <th className="py-3 px-4 w-[60px]" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#f1f5f9]">
               {syncLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-[#646970]">No products synced yet.</td>
+                  <td colSpan={6} className="py-16 text-center text-[#9ca3af] text-[13px]">
+                    No products found. Make sure you have active products in your store.
+                  </td>
                 </tr>
               ) : (
                 syncLogs.map(log => {
-                  const pId = log.product?.id;
+                  const pId = log.product.id;
                   const isModified = pendingChanges[pId] !== undefined;
                   const currentStatus = isModified ? pendingChanges[pId] : log.status;
-                  const visibilityText = getChannelVisibility(currentStatus);
                   const isChecked = selectedProductIds.includes(pId);
+                  const issues = parseGoogleIssues(log.googleIssues);
+                  const isExpanded = expandedRows.has(log.id);
+                  const hasIssues = issues.length > 0 || (log.status === "FAILED" && !!log.errorMessage);
 
                   return (
-                    <tr key={log.id} className={`border-b border-[#f0f0f1] hover:bg-[#f6f7f7] ${isModified ? "bg-[#fffdf0]" : ""} ${isChecked ? "bg-[#f0f6ea]" : ""}`}>
-                      <td className="py-3 px-4">
-                        <input 
-                          type="checkbox" 
-                          checked={isChecked}
-                          onChange={(e) => handleSelectRow(pId, e.target.checked)}
-                          className="border-[#8c8f94] rounded-[3px] cursor-pointer" 
-                        />
-                      </td>
-                      <td className="py-3 px-4 text-[#1d2327] font-medium leading-relaxed">
-                        {log.product?.name}
-                        {log.status === "PENDING" && <span className="ml-2 text-[10px] bg-[#646970] text-white px-1.5 py-0.5 rounded font-bold">Not Synced</span>}
-                        {isModified && <span className="ml-2 text-[10px] bg-[#dba617] text-white px-1.5 py-0.5 rounded font-bold">Unsaved</span>}
-                      </td>
-                      
-                      <td className="py-3 px-4">
-                        <select
-                          value={currentStatus === "EXCLUDED" ? "EXCLUDED" : currentStatus === "PENDING" ? "EXCLUDED" : "SYNCED"}
-                          onChange={(e) => handleDropdownChange(pId, e.target.value as "SYNCED" | "EXCLUDED")}
-                          className="border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[13px] focus:outline-none bg-white cursor-pointer"
-                        >
-                          <option value="SYNCED">Sync and show</option>
-                          <option value="EXCLUDED">Do not sync (Hide)</option>
-                        </select>
-                      </td>
+                    <Fragment key={log.id}>
+                      <tr className={`transition-colors ${isModified ? "bg-amber-50" : isChecked ? "bg-blue-50" : "hover:bg-[#f9fafb]"}`}>
+                        <td className="py-3 px-4">
+                          <input type="checkbox" checked={isChecked}
+                            onChange={e => handleSelectRow(pId, e.target.checked)}
+                            className="cursor-pointer w-4 h-4 rounded"
+                          />
+                        </td>
 
-                      {/* STATUS COLUMN WITH INSTANT DIAGNOSTICS SCANNER */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          {log.status === "SYNCED" && !log.googleIssues && <span className="text-[#00a32a] font-semibold">✓ Approved</span>}
-                          {log.status === "SYNCED" && log.googleIssues && <span className="text-[#dba617] font-semibold">⚠ Approved (With Warnings)</span>}
-                          {log.status === "FAILED" && <span className="text-[#d63638] font-semibold">✗ Disapproved</span>}
-                          {log.status === "EXCLUDED" && <span className="text-[#646970] font-semibold">Excluded</span>}
-                          {log.status === "PENDING" && <span className="text-[#646970] font-semibold">Pending</span>}
+                        {/* Product */}
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-[#1d2327] leading-tight">
+                            {log.product.name}
+                            {isModified && <span className="ml-2 text-[10px] bg-amber-400 text-white px-1.5 py-0.5 rounded font-bold">Unsaved</span>}
+                          </div>
+                          {log.product.sku && <div className="text-[11px] text-[#9ca3af] mt-0.5 font-mono">SKU: {log.product.sku}</div>}
+                        </td>
 
-                          {/* 🚀 NEW: 🔍 Instant Scan Button */}
-                          {log.status !== "PENDING" && log.status !== "EXCLUDED" && (
-                            <button
-                              onClick={() => handleScanSingleProduct(pId)}
-                              disabled={isScanning === pId}
-                              title="Scan live status from Google"
-                              className="bg-transparent border-none text-[#2271b1] hover:text-[#135e96] font-semibold text-[12px] cursor-pointer disabled:opacity-50 p-0 flex items-center gap-1"
-                            >
-                              {isScanning === pId ? (
-                                <span className="animate-pulse">Scanning...</span>
-                              ) : (
-                                "🔍 Scan"
+                        {/* Visibility */}
+                        <td className="py-3 px-4">
+                          <select
+                            value={currentStatus === "EXCLUDED" ? "EXCLUDED" : "SYNCED"}
+                            onChange={e => handleDropdownChange(pId, e.target.value as "SYNCED" | "EXCLUDED")}
+                            className="border border-[#d1d5db] rounded-md px-2 py-1 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#2271b1] bg-white cursor-pointer text-[#374151]"
+                          >
+                            <option value="SYNCED">Sync &amp; Show</option>
+                            <option value="EXCLUDED">Hide</option>
+                          </select>
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3 px-4">
+                          <div className="flex flex-col gap-1">
+                            {/* Status badge */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {log.status === "SYNCED" && issues.length === 0 && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Approved
+                                </span>
                               )}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <Link href={`/admin/products/create?id=${pId}`} className="text-[#2271b1] hover:underline">Edit</Link>
-                      </td>
-                    </tr>
+                              {log.status === "SYNCED" && issues.length > 0 && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Approved with warnings
+                                </span>
+                              )}
+                              {log.status === "FAILED" && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Disapproved ({issues.length})
+                                </span>
+                              )}
+                              {log.status === "EXCLUDED" && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Excluded
+                                </span>
+                              )}
+                              {log.status === "PENDING" && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" /> Pending
+                                </span>
+                              )}
+                              {log.status !== "EXCLUDED" && (
+                                <button
+                                  onClick={() => handleScanSingle(pId)}
+                                  disabled={isScanning === pId}
+                                  className="text-[10px] text-[#2271b1] hover:underline bg-transparent border-none cursor-pointer p-0 disabled:opacity-50 font-medium"
+                                >
+                                  {isScanning === pId ? "Scanning…" : "↻ Scan"}
+                                </button>
+                              )}
+                            </div>
+                            {/* Expand toggle */}
+                            {hasIssues && (
+                              <button
+                                onClick={() => toggleExpand(log.id)}
+                                className="text-[10px] text-[#2271b1] hover:underline bg-transparent border-none cursor-pointer p-0 text-left w-fit font-medium"
+                              >
+                                {isExpanded ? "▲ Hide details" : `▼ View ${issues.length} issue${issues.length !== 1 ? "s" : ""}`}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Last synced */}
+                        <td className="py-3 px-4 text-center">
+                          <span className="text-[11px] text-[#9ca3af]">
+                            {log.lastSyncedAt
+                              ? new Date(log.lastSyncedAt).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })
+                              : "—"}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-4 text-right">
+                          <Link href={`/admin/products/create?id=${pId}`} className="text-[12px] text-[#2271b1] hover:underline font-medium">
+                            Edit
+                          </Link>
+                        </td>
+                      </tr>
+
+                      {/* Expanded issue detail inside table */}
+                      {isExpanded && hasIssues && (
+                        <tr className="bg-[#f8fafc]">
+                          <td colSpan={6} className="px-4 py-4 sm:px-10">
+                            <IssueTable issues={issues} errorMessage={log.errorMessage} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })
               )}
             </tbody>
           </table>
         </div>
-        
-        {/* Bulk Actions Footer */}
-        <div className="border-t border-[#ccd0d4] px-4 py-3 flex items-center justify-between gap-4 text-[13px] text-[#646970] bg-[#f9f9f9]">
+
+        {/* Footer */}
+        <div className="border-t border-[#e5e7eb] px-5 py-3 flex flex-wrap items-center justify-between gap-3 bg-[#f9fafb] text-[12px] text-[#6b7280]">
           <div>
             {hasPendingChanges && (
               <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSavePendingChanges}
-                  disabled={isPending}
-                  className="bg-[#2271b1] hover:bg-[#135e96] text-white border-none rounded-[3px] px-5 py-2 text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                <button onClick={handleSavePendingChanges} disabled={isPending}
+                  className="bg-[#2271b1] hover:bg-[#135e96] text-white border-none rounded-md px-5 py-2 text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
                 >
-                  {isPending ? "Syncing with Google..." : "Save & Sync Changes"}
+                  {isPending ? "Syncing with Google…" : "Save & Sync Changes"}
                 </button>
-                <button 
-                  onClick={() => setPendingChanges({})} 
-                  className="text-[13px] text-[#d63638] hover:underline bg-transparent border-none p-0 cursor-pointer"
+                <button onClick={() => setPendingChanges({})}
+                  className="text-[12px] text-red-600 hover:underline bg-transparent border-none p-0 cursor-pointer"
                 >
-                  Discard Changes
+                  Discard
                 </button>
               </div>
             )}
           </div>
-          <div className="flex gap-1">
-            <button className="border border-[#ccd0d4] bg-white px-2 py-1 rounded-[3px] text-[#8c8f94]" disabled>{"<"}</button>
-            <button className="border border-[#ccd0d4] bg-white px-2 py-1 rounded-[3px] text-[#8c8f94]" disabled>{">"}</button>
-          </div>
+          <span>{syncLogs.length} product{syncLogs.length !== 1 ? "s" : ""}</span>
         </div>
       </div>
-
     </div>
   );
 }

@@ -16,6 +16,7 @@ export type CategoryNode = {
   name: string;
   slug: string;
   parentId: string | null;
+  googleCategoryName: string | null;
   children?: CategoryNode[];
 };
 
@@ -206,7 +207,7 @@ export async function getCategoryTree(): Promise<CategoryNode[]> {
   try {
     return await db.category.findMany({
       where: { deletedAt: null },
-      select: { id: true, name: true, parentId: true, slug: true },
+      select: { id: true, name: true, parentId: true, slug: true, googleCategoryName: true },
       orderBy: { menuOrder: "asc" },
     });
   } catch {

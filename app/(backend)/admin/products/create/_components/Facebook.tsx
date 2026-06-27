@@ -193,11 +193,11 @@ export default function Facebook() {
           <input
             type="text"
             {...register("googleProductCategory")}
-            placeholder="e.g. Sporting Goods > Cycling > Bicycles"
+            placeholder="e.g. 3618 - Sporting Goods > Cycling"
             className={inputClass}
           />
           <p className="text-[11px] text-[#646970] mt-1">
-            Used for both Facebook and Google Shopping catalog classification.
+            Shared with Google Shopping. Use the <strong>Merchant Center</strong> tab for autocomplete search.
           </p>
         </div>
       </div>

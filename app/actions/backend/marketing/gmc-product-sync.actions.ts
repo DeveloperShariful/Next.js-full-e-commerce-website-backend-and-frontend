@@ -4,17 +4,75 @@
 
 import { google } from "googleapis";
 import { db } from "@/lib/prisma";
-import { Prisma } from "@prisma/client"; // JSON null এবং DbNull এরর সমাধানের জন্য প্রিজমা ইম্পোর্ট
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { security } from "@/lib/security";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://yourdomain.com";
 
 // ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+interface GmcConfig {
+  googleRefreshToken: string | null;
+  gmcMerchantId: string | null;
+  gmcLanguage: string | null;
+  gmcTargetCountry: string | null;
+  gmcContentApiEnabled: boolean;
+  gmcAttributeMapping: Prisma.JsonValue;
+}
+
+interface ProductAttribute {
+  name: string;
+  values: string[];
+}
+
+interface ProductTag {
+  name: string;
+}
+
+interface ProductForSync {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  shortDescription: string | null;
+  googleTitle: string | null;
+  googleDescription: string | null;
+  googleIsBundle: boolean;
+  googleProductCategory: string | null;
+  featuredImage: string | null;
+  price: Prisma.Decimal;
+  stock: number;
+  trackQuantity: boolean;
+  condition: string;
+  barcode: string | null;
+  mpn: string | null;
+  gender: string | null;
+  ageGroup: string | null;
+  weight: Prisma.Decimal | null;
+  length: Prisma.Decimal | null;
+  width: Prisma.Decimal | null;
+  height: Prisma.Decimal | null;
+  size: string | null;
+  color: string | null;
+  material: string | null;
+  pattern: string | null;
+  productType: string | null;
+  metafields: Prisma.JsonValue;
+  brand: { name: string } | null;
+  tags: ProductTag[];
+  attributes: ProductAttribute[];
+  categories: { id: string; name: string; googleCategoryName: string | null }[];
+  images: { url: string }[];
+}
+
+// ============================================================================
 // 1. GET GOOGLE CLIENT
 // ============================================================================
-async function getGoogleContentClient(config: any) {
+async function getGoogleContentClient(config: GmcConfig) {
   if (!config.googleRefreshToken || !config.gmcMerchantId) {
     throw new Error("Google account is not fully connected or Merchant ID is missing.");
   }
@@ -26,35 +84,68 @@ async function getGoogleContentClient(config: any) {
 // ============================================================================
 // 2. HELPER: DYNAMIC ATTRIBUTE EXTRACTOR
 // ============================================================================
-function extractMappedValue(mappedKeys: string[], product: any) {
-  if (!mappedKeys || !Array.isArray(mappedKeys) || mappedKeys.length === 0) return undefined;
+function extractMappedValue(mappedKeys: string[], product: ProductForSync): string | undefined {
+  if (!mappedKeys || mappedKeys.length === 0) return undefined;
 
   for (const key of mappedKeys) {
     if (key === "product_tags" && product.tags?.length > 0) {
-      return product.tags.map((t: any) => t.name).join(", ");
+      return product.tags.map((t) => t.name).join(", ");
     }
     if (key === "product_type") {
-      return product.productType;
+      return product.productType ?? undefined;
     }
     if (key.startsWith("attr_")) {
       const targetSlug = key.replace("attr_", "");
-      const foundAttr = product.attributes?.find((a: any) => {
-        const attrSlug = a.name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-');
+      const foundAttr = product.attributes?.find((a) => {
+        const attrSlug = a.name.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-");
         return attrSlug === targetSlug;
       });
-
-      if (foundAttr && foundAttr.values && foundAttr.values.length > 0) {
+      if (foundAttr && foundAttr.values.length > 0) {
         return foundAttr.values.join("/");
       }
     }
   }
-  return undefined; 
+  return undefined;
 }
 
 // ============================================================================
-// 3. MAIN PRODUCT SYNC ENGINE (With Dynamic Stock & Auto Bypasses)
+// 3. HELPER: FORMAT URL (replaces dev/local URLs with real site URL)
+// ============================================================================
+function formatGmcUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  // Replace any localhost or staging origin with the real production SITE_URL
+  return url.replace(/^https?:\/\/(localhost:\d+|[^/]*sharifulbuilds\.com)/, SITE_URL);
+}
+
+// ============================================================================
+// 4. HELPER: STRIP HTML
+// ============================================================================
+function stripHtmlTags(html: string): string {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// ============================================================================
+// 4b. HELPER: PARSE GOOGLE TAXONOMY ID
+// Google's taxonomy file format: "3951 - Vehicles & Parts > Vehicles > Cycles > Electric Bikes"
+// Content API only accepts: "3951" (ID) or "Vehicles & Parts > ..." (path) — NOT the combined format
+// This extracts the numeric ID which is the most reliable format
+// ============================================================================
+function parseTaxonomyId(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  // e.g. "3951 - Vehicles & Parts > ..." → "3951"
+  const match = trimmed.match(/^(\d+)\s*-/);
+  if (match) return match[1];
+  // If it's already a pure number or pure path, return as-is
+  return trimmed || undefined;
+}
+
+// ============================================================================
+// 5. MAIN PRODUCT SYNC ENGINE
 // ============================================================================
 export async function syncProductToGoogle(productId: string) {
+  await security.assertAdmin();
   try {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
 
@@ -69,30 +160,36 @@ export async function syncProductToGoogle(productId: string) {
         categories: { select: { id: true, name: true, googleCategoryName: true } },
         images: {
           where: { variantId: null },
-          orderBy: { position: 'asc' },
-          select: { url: true }
-        }
+          orderBy: { position: "asc" },
+          select: { url: true },
+        },
       },
-    });
+    }) as ProductForSync | null;
 
     if (!product) return { success: false, error: "Product not found." };
 
-    const mappingRules = config.gmcAttributeMapping 
-      ? (typeof config.gmcAttributeMapping === "string" ? JSON.parse(config.gmcAttributeMapping) : config.gmcAttributeMapping)
-      : null;
+    const mappingRules =
+      config.gmcAttributeMapping
+        ? typeof config.gmcAttributeMapping === "string"
+          ? JSON.parse(config.gmcAttributeMapping)
+          : (config.gmcAttributeMapping as Record<string, unknown>)
+        : null;
 
-    const shoppingContent = await getGoogleContentClient(config);
+    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
 
-    // 🚀 উকমার্স স্টাইল: কাস্টম টাইটেল ও ডেসক্রিপশন না থাকলে প্রোডাক্টের অরিজিনাল ভ্যালু ডাইনামিকলি ফলব্যাক হবে
-    const finalTitle = product.googleTitle && product.googleTitle.trim() !== "" 
-      ? product.googleTitle 
-      : product.name;
+    // Ignore googleTitle if it contains SEO template variables (e.g. from WooCommerce Rank Math import)
+    const isSeoTemplate = (s: string) => /%[a-z_]+%/i.test(s);
+    const finalTitle =
+      product.googleTitle && product.googleTitle.trim() !== "" && !isSeoTemplate(product.googleTitle)
+        ? product.googleTitle
+        : product.name;
 
-    const finalDescription = product.googleDescription && product.googleDescription.trim() !== ""
-      ? product.googleDescription
-      : (product.description || product.shortDescription || product.name);
+    const finalDescription =
+      product.googleDescription && product.googleDescription.trim() !== ""
+        ? product.googleDescription
+        : product.description || product.shortDescription || product.name;
 
-    // `metafields` (JSON কলাম) থেকে সাইজ, কালার, ম্যাটেরিয়াল ডেটাগুলো বের করে নেওয়া
+    // Extract Google-specific fields from metafields JSON
     let google_size = "";
     let google_size_system = "";
     let google_size_type = "";
@@ -103,28 +200,29 @@ export async function syncProductToGoogle(productId: string) {
     let google_adult_content = false;
     let google_availability_date = "";
 
+    // Start with Facebook/shared column values as base fallback
+    if (product.size) google_size = product.size;
+    if (product.color) google_color = product.color;
+    if (product.material) google_material = product.material;
+    if (product.pattern) google_pattern = product.pattern;
+
+    // Google-specific metafields take priority — they override the shared columns
     if (product.metafields && typeof product.metafields === "object" && !Array.isArray(product.metafields)) {
-      const meta = product.metafields as Record<string, any>;
-      google_size = meta.google_size || "";
-      google_size_system = meta.google_size_system || "";
-      google_size_type = meta.google_size_type || "";
-      google_color = meta.google_color || "";
-      google_material = meta.google_material || "";
-      google_pattern = meta.google_pattern || "";
-      google_adult_content = meta.google_adult_content === true;
-      google_availability_date = meta.google_availability_date || "";
+      const meta = product.metafields as unknown as Record<string, unknown>;
+      if (typeof meta.google_size === "string" && meta.google_size) google_size = meta.google_size;
+      if (typeof meta.google_size_system === "string") google_size_system = meta.google_size_system;
+      if (typeof meta.google_size_type === "string") google_size_type = meta.google_size_type;
+      if (typeof meta.google_color === "string" && meta.google_color) google_color = meta.google_color;
+      if (typeof meta.google_material === "string" && meta.google_material) google_material = meta.google_material;
+      if (typeof meta.google_pattern === "string" && meta.google_pattern) google_pattern = meta.google_pattern;
+      if (meta.google_adult_content === true) google_adult_content = true;
+      if (typeof meta.google_availability_date === "string") google_availability_date = meta.google_availability_date;
       if (meta.google_multipack) {
-        google_multipack = parseInt(meta.google_multipack) || undefined;
+        google_multipack = parseInt(String(meta.google_multipack)) || undefined;
       }
     }
 
-    // Direct product fields override metafields if set
-    if (product.size)     google_size     = product.size;
-    if (product.color)    google_color    = product.color;
-    if (product.material) google_material = product.material;
-    if (product.pattern)  google_pattern  = product.pattern;
-
-    const googleProductParams: any = {
+    const googleProductParams: Record<string, unknown> = {
       offerId: product.id,
       title: finalTitle,
       description: stripHtmlTags(finalDescription),
@@ -133,12 +231,10 @@ export async function syncProductToGoogle(productId: string) {
       contentLanguage: config.gmcLanguage || "en",
       targetCountry: config.gmcTargetCountry || "AU",
       channel: "online",
-      
-      availability: (product.trackQuantity === false || product.stock > 0) ? "in stock" : "out of stock",
-      condition: product.condition.toLowerCase(), // NEW, REFURBISHED, USED এনাম ডাইনামিকলি কনভার্ট হবে
-      price: { value: Number(product.price).toFixed(2), currency: "AUD" }, 
-      
-      brand: product.brand?.name || "GoBike",
+      availability: product.trackQuantity === false || product.stock > 0 ? "in stock" : "out of stock",
+      condition: product.condition.toLowerCase(),
+      price: { value: Number(product.price).toFixed(2), currency: "AUD" },
+      brand: product.brand?.name || "Generic",
       gtin: product.barcode || undefined,
       mpn: product.mpn || undefined,
       gender: product.gender || undefined,
@@ -147,36 +243,29 @@ export async function syncProductToGoogle(productId: string) {
     };
 
     if (product.images && product.images.length > 1) {
-      googleProductParams.additionalImageLinks = product.images
-        .slice(1, 11)
-        .map((img) => formatGmcUrl(img.url));
+      googleProductParams.additionalImageLinks = product.images.slice(1, 11).map((img) => formatGmcUrl(img.url));
     }
 
-    // গুগল প্রোডাক্ট ক্যাটাগরি ম্যাপিং
-    let googleCategory = product.googleProductCategory || product.categories.find(c => c.googleCategoryName)?.googleCategoryName;
-    if (!googleCategory && mappingRules?.attributes?.defaultCategory) {
-      googleCategory = mappingRules.attributes.defaultCategory;
-    }
-    if (googleCategory) {
-      googleProductParams.googleProductCategory = googleCategory;
-    }
+    // Category mapping — parse taxonomy ID from stored value
+    // (taxonomy file stores "3951 - Vehicles & Parts > ...", API needs just "3951")
+    const rawGoogleCategory =
+      product.googleProductCategory ||
+      product.categories.find((c) => c.googleCategoryName)?.googleCategoryName ||
+      (mappingRules?.attributes?.defaultCategory as string | undefined);
+    const googleCategory = parseTaxonomyId(rawGoogleCategory);
+    if (googleCategory) googleProductParams.googleProductCategory = googleCategory;
 
     if (product.categories.length > 0) {
-      googleProductParams.productTypes = [
-        product.categories.map((c) => c.name).join(" > ")
-      ];
+      googleProductParams.productTypes = [product.categories.map((c) => c.name).join(" > ")];
     }
 
-    if (product.weight) {
-      googleProductParams.shippingWeight = { value: Number(product.weight), unit: "kg" };
-    }
+    if (product.weight) googleProductParams.shippingWeight = { value: Number(product.weight), unit: "kg" };
     if (product.length && product.width && product.height) {
       googleProductParams.shippingLength = { value: Number(product.length), unit: "cm" };
       googleProductParams.shippingWidth = { value: Number(product.width), unit: "cm" };
       googleProductParams.shippingHeight = { value: Number(product.height), unit: "cm" };
     }
 
-    // সাইজ, কালার, ম্যাটেরিয়াল ডেটাগুলো গুগল ফিড প্যারামিটারসে ইনজেক্ট করা হচ্ছে
     if (google_size) googleProductParams.sizes = [google_size];
     if (google_size_system) googleProductParams.sizeSystem = google_size_system;
     if (google_size_type) googleProductParams.sizeType = google_size_type;
@@ -189,28 +278,34 @@ export async function syncProductToGoogle(productId: string) {
       googleProductParams.availabilityDate = new Date(google_availability_date).toISOString();
     }
 
-    if (mappingRules && mappingRules.attributes) {
-      if (!googleProductParams.color) googleProductParams.color = extractMappedValue(mappingRules.attributes.color, product);
+    // Apply attribute mapping rules
+    if (mappingRules?.attributes) {
+      const attrs = mappingRules.attributes as Record<string, string[]>;
+      if (!googleProductParams.color) googleProductParams.color = extractMappedValue(attrs.color ?? [], product);
       if (!googleProductParams.sizes) {
-        const sizeVal = extractMappedValue(mappingRules.attributes.size, product);
+        const sizeVal = extractMappedValue(attrs.size ?? [], product);
         if (sizeVal) googleProductParams.sizes = [sizeVal];
       }
-      if (!googleProductParams.material) googleProductParams.material = extractMappedValue(mappingRules.attributes.material, product);
-      if (!googleProductParams.pattern) googleProductParams.pattern = extractMappedValue(mappingRules.attributes.pattern, product);
-      if (!googleProductParams.gender) googleProductParams.gender = extractMappedValue(mappingRules.attributes.gender, product);
-      if (!googleProductParams.ageGroup) googleProductParams.ageGroup = extractMappedValue(mappingRules.attributes.ageGroup, product);
+      if (!googleProductParams.material) googleProductParams.material = extractMappedValue(attrs.material ?? [], product);
+      if (!googleProductParams.pattern) googleProductParams.pattern = extractMappedValue(attrs.pattern ?? [], product);
+      if (!googleProductParams.gender) googleProductParams.gender = extractMappedValue(attrs.gender ?? [], product);
+      if (!googleProductParams.ageGroup) googleProductParams.ageGroup = extractMappedValue(attrs.ageGroup ?? [], product);
     }
 
-    if (mappingRules && mappingRules.customLabels) {
-      googleProductParams.customLabel0 = extractMappedValue(mappingRules.customLabels.customLabel0, product);
-      googleProductParams.customLabel1 = extractMappedValue(mappingRules.customLabels.customLabel1, product);
-      googleProductParams.customLabel2 = extractMappedValue(mappingRules.customLabels.customLabel2, product);
-      googleProductParams.customLabel3 = extractMappedValue(mappingRules.customLabels.customLabel3, product);
-      googleProductParams.customLabel4 = extractMappedValue(mappingRules.customLabels.customLabel4, product);
+    if (mappingRules?.customLabels) {
+      const labels = mappingRules.customLabels as Record<string, string[]>;
+      googleProductParams.customLabel0 = extractMappedValue(labels.customLabel0 ?? [], product);
+      googleProductParams.customLabel1 = extractMappedValue(labels.customLabel1 ?? [], product);
+      googleProductParams.customLabel2 = extractMappedValue(labels.customLabel2 ?? [], product);
+      googleProductParams.customLabel3 = extractMappedValue(labels.customLabel3 ?? [], product);
+      googleProductParams.customLabel4 = extractMappedValue(labels.customLabel4 ?? [], product);
     }
 
-    Object.keys(googleProductParams).forEach(key => {
-      if (googleProductParams[key] === undefined || googleProductParams[key] === "") delete googleProductParams[key];
+    // Remove undefined / empty string values
+    Object.keys(googleProductParams).forEach((key) => {
+      if (googleProductParams[key] === undefined || googleProductParams[key] === "") {
+        delete googleProductParams[key];
+      }
     });
 
     const response = await shoppingContent.products.insert({
@@ -224,7 +319,7 @@ export async function syncProductToGoogle(productId: string) {
         status: "SYNCED",
         channelProductId: response.data.id,
         errorMessage: null,
-        googleIssues: Prisma.DbNull, 
+        googleIssues: Prisma.DbNull,
         lastSyncedAt: new Date(),
       },
       create: {
@@ -237,27 +332,27 @@ export async function syncProductToGoogle(productId: string) {
     });
 
     return { success: true, message: "Product synced successfully." };
+  } catch (error: unknown) {
+    const errorObj = error as { response?: { data?: { error?: { message?: string; errors?: unknown[] } } }; message?: string };
+    const errorMessage = errorObj.response?.data?.error?.message ?? (error instanceof Error ? error.message : "Unknown error");
+    const errorDetails = errorObj.response?.data?.error?.errors ?? null;
 
-  } catch (error: any) {
-    console.error("GMC Sync Error for product:", productId, error.message);
-
-    const errorMessage = error.response?.data?.error?.message || error.message;
-    const errorDetails = error.response?.data?.error?.errors || null; 
+    console.error("GMC Sync Error for product:", productId, errorMessage);
 
     await db.productChannelStatus.upsert({
-      where: { productId_channel: { productId: productId, channel: "GOOGLE" } },
+      where: { productId_channel: { productId, channel: "GOOGLE" } },
       update: {
         status: "FAILED",
-        errorMessage: errorMessage,
-        googleIssues: errorDetails || Prisma.DbNull, 
+        errorMessage,
+        googleIssues: (errorDetails as Prisma.InputJsonValue) ?? Prisma.DbNull,
         lastSyncedAt: new Date(),
       },
       create: {
-        productId: productId,
+        productId,
         channel: "GOOGLE",
         status: "FAILED",
-        errorMessage: errorMessage,
-        googleIssues: errorDetails || Prisma.DbNull,
+        errorMessage,
+        googleIssues: (errorDetails as Prisma.InputJsonValue) ?? Prisma.DbNull,
         lastSyncedAt: new Date(),
       },
     });
@@ -267,61 +362,38 @@ export async function syncProductToGoogle(productId: string) {
 }
 
 // ============================================================================
-// 4. REMOVE PRODUCT FROM GOOGLE (With 404 "Not Found" Bypass!)
+// 6. REMOVE PRODUCT FROM GOOGLE
 // ============================================================================
 export async function removeProductFromGoogle(productId: string) {
+  await security.assertAdmin();
   try {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
-    if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) return { success: false };
+    if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) return { success: false, error: "GMC not enabled." };
 
-    const shoppingContent = await getGoogleContentClient(config);
-
+    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
     const lang = (config.gmcLanguage || "en").toLowerCase().trim();
     const country = (config.gmcTargetCountry || "AU").toUpperCase().trim();
-    
     const googleProductId = `online:${lang}:${country}:${productId}`;
 
-    await shoppingContent.products.delete({
-      merchantId: config.gmcMerchantId,
-      productId: googleProductId,
-    });
+    await shoppingContent.products.delete({ merchantId: config.gmcMerchantId, productId: googleProductId });
 
     await db.productChannelStatus.upsert({
       where: { productId_channel: { productId, channel: "GOOGLE" } },
-      update: {
-        status: "EXCLUDED",
-        errorMessage: "Manually removed from sales channel.",
-        googleIssues: Prisma.DbNull, 
-      },
-      create: {
-        productId,
-        channel: "GOOGLE",
-        status: "EXCLUDED",
-        errorMessage: "Manually removed from sales channel.",
-      }
+      update: { status: "EXCLUDED", errorMessage: "Manually removed from sales channel.", googleIssues: Prisma.DbNull },
+      create: { productId, channel: "GOOGLE", status: "EXCLUDED", errorMessage: "Manually removed from sales channel." },
     });
 
     return { success: true };
-  } catch (error: any) {
-    const statusCode = error.response?.status || error.status || 400;
-    const errorMessage = error.response?.data?.error?.message || error.message;
+  } catch (error: unknown) {
+    const errorObj = error as { response?: { status?: number }; status?: number; message?: string };
+    const statusCode = errorObj.response?.status ?? errorObj.status ?? 400;
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
     if (statusCode === 404 || errorMessage.toLowerCase().includes("not found")) {
-      console.warn(`GMC Delete: Product ${productId} already deleted on Google side. Marking local status as EXCLUDED.`);
-      
       await db.productChannelStatus.upsert({
         where: { productId_channel: { productId, channel: "GOOGLE" } },
-        update: {
-          status: "EXCLUDED",
-          errorMessage: "Manually removed from sales channel.",
-          googleIssues: Prisma.DbNull,
-        },
-        create: {
-          productId,
-          channel: "GOOGLE",
-          status: "EXCLUDED",
-          errorMessage: "Manually removed from sales channel.",
-        }
+        update: { status: "EXCLUDED", errorMessage: "Manually removed from sales channel.", googleIssues: Prisma.DbNull },
+        create: { productId, channel: "GOOGLE", status: "EXCLUDED", errorMessage: "Manually removed from sales channel." },
       });
       return { success: true };
     }
@@ -332,9 +404,10 @@ export async function removeProductFromGoogle(productId: string) {
 }
 
 // ============================================================================
-// 5. UPDATE PRODUCT CHANNEL VISIBILITY
+// 7. UPDATE PRODUCT CHANNEL VISIBILITY
 // ============================================================================
 export async function updateProductChannelVisibility(productId: string, status: "SYNCED" | "EXCLUDED") {
+  await security.assertAdmin();
   try {
     if (status === "EXCLUDED") {
       const res = await removeProductFromGoogle(productId);
@@ -343,146 +416,153 @@ export async function updateProductChannelVisibility(productId: string, status: 
       const res = await syncProductToGoogle(productId);
       if (!res.success) return { success: false, error: res.error };
     }
-    
     revalidatePath("/admin/marketing/merchant-center");
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, error: msg };
   }
 }
 
 // ============================================================================
-// 6. BATCH SAVE & SYNC CONTROLLER
+// 8. BATCH SYNC CONTROLLER (parallel with concurrency limit)
 // ============================================================================
 export async function bulkUpdateProductVisibility(
   updates: { productId: string; status: "SYNCED" | "EXCLUDED" }[]
 ) {
+  await security.assertAdmin();
   try {
     if (!updates || updates.length === 0) return { success: true };
 
-    for (const update of updates) {
-      if (update.status === "EXCLUDED") {
-        const res = await removeProductFromGoogle(update.productId);
-        if (!res.success) {
-          return { success: false, error: `Failed for product ID ${update.productId}: ${res.error}` };
-        }
-      } else {
-        const res = await syncProductToGoogle(update.productId);
-        if (!res.success) {
-          return { success: false, error: `Failed for product ID ${update.productId}: ${res.error}` };
-        }
-      }
+    // Process in chunks of 5 to avoid Google API rate limits
+    const CHUNK_SIZE = 5;
+    const errors: string[] = [];
+
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + CHUNK_SIZE);
+      const results = await Promise.all(
+        chunk.map((update) =>
+          update.status === "EXCLUDED"
+            ? removeProductFromGoogle(update.productId)
+            : syncProductToGoogle(update.productId)
+        )
+      );
+      results.forEach((res, idx) => {
+        if (!res.success) errors.push(`Product ${chunk[idx].productId}: ${res.error}`);
+      });
     }
 
     revalidatePath("/admin/marketing/merchant-center");
+
+    if (errors.length > 0) {
+      return { success: false, error: `${errors.length} product(s) failed: ${errors[0]}` };
+    }
     return { success: true, message: "Bulk sync completed successfully!" };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to process bulk sync.";
     console.error("Error in bulkUpdateProductVisibility:", error);
-    return { success: false, error: error.message || "Failed to process bulk sync." };
+    return { success: false, error: msg };
   }
 }
 
 // ============================================================================
-// 7. SYNC LIVE PRODUCT STATUSES FROM GOOGLE (With Race Condition Fix)
+// 9. SYNC LIVE PRODUCT STATUSES FROM GOOGLE (on-demand, not on every page load)
 // ============================================================================
 export async function syncLiveProductStatuses() {
+  await security.assertAdmin();
   try {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
     if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) return { success: false };
 
-    const shoppingContent = await getGoogleContentClient(config);
+    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
 
-    const response = await shoppingContent.productstatuses.list({
-      merchantId: config.gmcMerchantId,
-    });
-
+    const response = await shoppingContent.productstatuses.list({ merchantId: config.gmcMerchantId });
     const googleStatuses = response.data.resources || [];
     if (googleStatuses.length === 0) return { success: true };
 
-    for (const gStatus of googleStatuses) {
-      const parts = gStatus.productId?.split(":");
-      const localProductId = parts ? parts[parts.length - 1] : null;
+    // Batch-fetch all local statuses and product IDs to avoid N+1 queries
+    const [existingStatuses, existingProducts] = await Promise.all([
+      db.productChannelStatus.findMany({
+        where: { channel: "GOOGLE" },
+        select: { productId: true, status: true },
+      }),
+      db.product.findMany({
+        where: { deletedAt: null },
+        select: { id: true },
+      }),
+    ]);
 
-      if (!localProductId) continue;
+    const excludedSet = new Set(
+      existingStatuses.filter((s) => s.status === "EXCLUDED").map((s) => s.productId)
+    );
+    const validProductIds = new Set(existingProducts.map((p) => p.id));
 
-      const existingStatus = await db.productChannelStatus.findUnique({
-        where: { productId_channel: { productId: localProductId, channel: "GOOGLE" } },
-        select: { status: true }
-      });
+    // Build upsert operations
+    const upsertOps = googleStatuses
+      .map((gStatus) => {
+        const parts = gStatus.productId?.split(":");
+        const localProductId = parts ? parts[parts.length - 1] : null;
+        if (!localProductId || excludedSet.has(localProductId) || !validProductIds.has(localProductId)) {
+          return null;
+        }
 
-      if (existingStatus?.status === "EXCLUDED") {
-        continue; 
-      }
+        const destinationStatuses = gStatus.destinationStatuses || [];
+        const isDisapproved = destinationStatuses.some((d) => d.status === "disapproved");
+        const isPending = destinationStatuses.some((d) => d.status === "pending");
 
-      const localProductExists = await db.product.findUnique({
-        where: { id: localProductId },
-        select: { id: true }
-      });
-      if (!localProductExists) continue;
+        let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "SYNCED";
+        let errorMessage: string | null = null;
+        let googleIssues: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
 
-      const destinationStatuses = gStatus.destinationStatuses || [];
-      const isDisapproved = destinationStatuses.some(d => d.status === "disapproved");
-      const isPending = destinationStatuses.some(d => d.status === "pending");
+        if (isDisapproved) {
+          finalStatus = "FAILED";
+          const issues = gStatus.itemLevelIssues || [];
+          errorMessage = issues.length > 0 ? issues[0].description ?? "Disapproved by Google." : "Disapproved by Google.";
+          googleIssues = issues as unknown as Prisma.InputJsonValue;
+        } else if (isPending) {
+          finalStatus = "PENDING";
+          errorMessage = "Pending policy review by Google.";
+        }
 
-      let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "SYNCED";
-      let errorMessage: string | null = null;
-      let googleIssues: any = null;
+        return db.productChannelStatus.upsert({
+          where: { productId_channel: { productId: localProductId, channel: "GOOGLE" } },
+          update: { status: finalStatus, errorMessage, googleIssues, lastSyncedAt: new Date() },
+          create: { productId: localProductId, channel: "GOOGLE", status: finalStatus, errorMessage, googleIssues, lastSyncedAt: new Date() },
+        });
+      })
+      .filter(Boolean);
 
-      if (isDisapproved) {
-        finalStatus = "FAILED";
-        const issues = gStatus.itemLevelIssues || [];
-        errorMessage = issues.length > 0 ? issues[0].description || "Disapproved by Google." : "Disapproved by Google.";
-        googleIssues = issues;
-      } else if (isPending) {
-        finalStatus = "PENDING";
-        errorMessage = "Pending policy review by Google.";
-      }
-
-      await db.productChannelStatus.upsert({
-        where: { productId_channel: { productId: localProductId, channel: "GOOGLE" } },
-        update: {
-          status: finalStatus,
-          errorMessage: errorMessage,
-          googleIssues: googleIssues || Prisma.DbNull,
-          lastSyncedAt: new Date(),
-        },
-        create: {
-          productId: localProductId,
-          channel: "GOOGLE",
-          status: finalStatus,
-          errorMessage: errorMessage,
-          googleIssues: googleIssues || Prisma.DbNull,
-          lastSyncedAt: new Date(),
-        },
-      });
+    if (upsertOps.length > 0) {
+      await Promise.all(upsertOps);
     }
 
     return { success: true };
-  } catch (error: any) {
-    console.error("Error syncing live product statuses:", error.message);
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error syncing live product statuses:", msg);
+    return { success: false, error: msg };
   }
 }
 
 // ============================================================================
-// 🚀 8. NEW: SYNC SINGLE LIVE PRODUCT STATUS FROM GOOGLE (Instant Diagnostics)
+// 10. SYNC SINGLE LIVE PRODUCT STATUS (instant diagnostics)
 // ============================================================================
 export async function syncSingleProductStatusFromGoogle(productId: string) {
+  await security.assertAdmin();
   try {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
     if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) {
       return { success: false, error: "GMC is not enabled." };
     }
 
-    const shoppingContent = await getGoogleContentClient(config);
+    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
     const lang = (config.gmcLanguage || "en").toLowerCase().trim();
     const country = (config.gmcTargetCountry || "AU").toUpperCase().trim();
-    
     const googleProductId = `online:${lang}:${country}:${productId}`;
 
     let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "PENDING";
     let errorMessage: string | null = null;
-    let googleIssues: any = null;
+    let googleIssues: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
 
     try {
       const response = await shoppingContent.productstatuses.get({
@@ -492,22 +572,24 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
 
       const gStatus = response.data;
       const destinationStatuses = gStatus.destinationStatuses || [];
-      const isDisapproved = destinationStatuses.some(d => d.status === "disapproved");
-      const isPending = destinationStatuses.some(d => d.status === "pending");
+      const isDisapproved = destinationStatuses.some((d) => d.status === "disapproved");
+      const isPending = destinationStatuses.some((d) => d.status === "pending");
 
       if (isDisapproved) {
         finalStatus = "FAILED";
         const issues = gStatus.itemLevelIssues || [];
-        errorMessage = issues.length > 0 ? issues[0].description || "Disapproved by Google." : "Disapproved by Google.";
-        googleIssues = issues;
+        errorMessage = issues.length > 0 ? issues[0].description ?? "Disapproved by Google." : "Disapproved by Google.";
+        // Store ALL issues for detailed UI display
+        googleIssues = issues as unknown as Prisma.InputJsonValue;
       } else if (isPending) {
         finalStatus = "PENDING";
         errorMessage = "Pending policy review by Google.";
       } else {
         finalStatus = "SYNCED";
       }
-    } catch (apiError: any) {
-      if (apiError.status === 404 || apiError.message?.toLowerCase().includes("not found")) {
+    } catch (apiError: unknown) {
+      const errObj = apiError as { status?: number; message?: string };
+      if (errObj.status === 404 || errObj.message?.toLowerCase().includes("not found")) {
         finalStatus = "PENDING";
         errorMessage = "Not synced yet or pending policy review by Google.";
       } else {
@@ -517,49 +599,21 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
 
     const updatedStatus = await db.productChannelStatus.upsert({
       where: { productId_channel: { productId, channel: "GOOGLE" } },
-      update: {
-        status: finalStatus,
-        errorMessage: errorMessage,
-        googleIssues: googleIssues || Prisma.DbNull,
-        lastSyncedAt: new Date(),
-      },
-      create: {
-        productId,
-        channel: "GOOGLE",
-        status: finalStatus,
-        errorMessage: errorMessage,
-        googleIssues: googleIssues || Prisma.DbNull,
-        lastSyncedAt: new Date(),
-      },
+      update: { status: finalStatus, errorMessage, googleIssues, lastSyncedAt: new Date() },
+      create: { productId, channel: "GOOGLE", status: finalStatus, errorMessage, googleIssues, lastSyncedAt: new Date() },
     });
 
     revalidatePath("/admin/marketing/merchant-center");
-    
-    return { 
-      success: true, 
-      status: updatedStatus.status, 
-      errorMessage: updatedStatus.errorMessage, 
-      googleIssues: updatedStatus.googleIssues 
+
+    return {
+      success: true,
+      status: updatedStatus.status,
+      errorMessage: updatedStatus.errorMessage,
+      googleIssues: updatedStatus.googleIssues,
     };
-  } catch (error: any) {
-    console.error("Error in syncSingleProductStatusFromGoogle:", error.message);
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error in syncSingleProductStatusFromGoogle:", msg);
+    return { success: false, error: msg };
   }
-}
-
-// Helpers
-function stripHtmlTags(html: string): string {
-  if (!html) return "";
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function formatGmcUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  if (url.includes("localhost:3000")) {
-    return url.replace("http://localhost:3000", "https://gobike.au");
-  }
-  if (url.includes("sharifulbuilds.com")) {
-    return url.replace("https://sharifulbuilds.com", "https://gobike.au");
-  }
-  return url;
 }

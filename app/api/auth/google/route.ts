@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       console.warn("Google OAuth Error:", error);
       // WooCommerce স্টাইলে নোটিফিকেশন দেখানোর জন্য URL এ প্যারামিটার পাঠানো
       return NextResponse.redirect(
-        new URL(`/admin/marketing/merchant-center?status=error&message=${error}`, request.url)
+        new URL(`/admin/marketing/merchant-center?status=error&message=${encodeURIComponent(error)}`, request.url)
       );
     }
 

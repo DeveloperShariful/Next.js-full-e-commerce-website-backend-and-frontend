@@ -28,6 +28,15 @@ export const metadata: Metadata = {
     locale: 'en_AU',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@GoBikeAU',
+    title: 'Terms and Conditions | GoBike Australia',
+    description: 'Please read the official terms and conditions for using the GoBike Australia website, purchasing products, and our warranty policies.',
+    images: ['https://gobikes.au/wp-content/uploads/2025/11/gobike-au-1-year-warranty-kids-ebikes.jpg'],
+  },
+  keywords: ['gobike terms and conditions', 'kids electric bike purchase terms australia', 'gobike warranty terms', 'electric bike terms of service australia'],
+  robots: { index: true, follow: true },
 };
 
 

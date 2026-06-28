@@ -34,6 +34,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: 'GoBike Australia',
       type: 'website',
     },
+    twitter: {
+      card: 'summary_large_image',
+      site: '@GoBikeAU',
+      title: `${formattedTitle} | Kids Electric Bike Hub | GoBike Australia`,
+      description: `Explore all ${formattedTitle} for kids electric dirt bikes and balance bikes.`,
+    },
   };
 }
 

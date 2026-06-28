@@ -29,7 +29,7 @@ type SectionComponent = ComponentType;
 export const productLayoutMap: { [key: string]: SectionComponent[] } = {
   
   // GoBike 16 Design
-  'gobike-16-inch-electric-bike-for-kids-riding-fun-for-ages-5-9': [
+  'ebike-for-sale-16-inch-gobike-ages-5-9': [
     OverviewSection16,
     BalanceSection16,
     KeyFeaturesSection16,
@@ -45,7 +45,7 @@ export const productLayoutMap: { [key: string]: SectionComponent[] } = {
   ],
 
   // GoBike 20 Design
-  'gobike-20-inch-electric-bike-for-kids-teens-for-ages-8-14': [
+  '20-inch-electric-bikes-for-sale-ebike-for-kids': [
     OverviewSection20,
     PowerSection20,
     KeyFeaturesSection20,
@@ -53,7 +53,7 @@ export const productLayoutMap: { [key: string]: SectionComponent[] } = {
   ],
   
   // GoBike 24 Design 
-  'gobike-24-inch-electric-bike-for-teens-high-speed-performance-for-ages-13': [
+  'gobike-24-inch-electric-bike-teens-high-speed-performance-for-ages-13': [
     OverviewSection24,
     PowerSection24,
     KeyFeaturesSection24,

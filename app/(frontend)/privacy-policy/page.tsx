@@ -26,6 +26,15 @@ export const metadata: Metadata = {
     locale: 'en_AU',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@GoBikeAU',
+    title: 'Privacy Policy | GoBike Australia',
+    description: 'Read how GoBike Australia collects, uses, and protects your personal data. Your privacy is important to us.',
+    images: ['https://gobikes.au/wp-content/uploads/2025/11/gobike-au-1-year-warranty-kids-ebikes.jpg'],
+  },
+  keywords: ['gobike privacy policy', 'kids electric bike data privacy australia', 'gobike australia data protection', 'privacy policy electric bike'],
+  robots: { index: true, follow: true },
 };
 
 export default function PrivacyPolicyPage() {

@@ -27,6 +27,15 @@ export const metadata: Metadata = {
     locale: 'en_AU',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@GoBikeAU',
+    title: 'Return and Refund Policy | GoBike Australia',
+    description: 'Learn about our 30-day return policy and process for refunds and exchanges at GoBike Australia.',
+    images: ['https://gobikes.au/wp-content/uploads/2025/11/gobike-au-1-year-warranty-kids-ebikes.jpg'],
+  },
+  keywords: ['gobike return policy', 'kids electric bike refund australia', 'gobike refund and returns', 'electric bike return policy australia'],
+  robots: { index: true, follow: true },
 };
 
 // SEO Schema ডেটা

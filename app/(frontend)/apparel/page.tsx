@@ -60,9 +60,17 @@ export async function generateMetadata({ searchParams }: {
       locale: 'en_AU',
       type: 'website',
     },
+    twitter: {
+      card: 'summary_large_image',
+      site: '@GoBikeAU',
+      title,
+      description,
+      images: ['https://gobikes.au/wp-content/uploads/2025/11/gobike-apparel-collection.jpg'],
+    },
+    keywords: ['gobike kids t-shirts', 'kids electric bike apparel australia', 'gobike riding gear', 'kids bike clothing australia', 'gobike official merchandise'],
     other: {
-      'article:modified_time': currentDate, 
-      'og:updated_time': currentDate, 
+      'article:modified_time': currentDate,
+      'og:updated_time': currentDate,
       'last-modified': currentDate,
     }
   };

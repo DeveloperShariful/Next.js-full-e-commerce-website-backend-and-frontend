@@ -61,7 +61,7 @@ const slidesData = [
     subtitle: "The Extreme Machine",
     title: "GOBIKE 24",
     desc: "The ultimate electric dirt bike for teens and adults aged 12+. Unleash raw power with a massive 2500W motor hitting top speeds of 61km/h. Featuring fully adjustable hydraulic suspension and 24-inch Kenda fat tires.",
-    link: "/product/gobike-24-inch-electric-bike-for-teens-high-speed-performance-for-ages-13",
+    link: "/product/gobike-24-inch-electric-bike-teens-high-speed-performance-for-ages-13",
     img: "https://gobikes.au/wp-content/uploads/2025/12/Slider-1-scaled.webp",
     alt: "GoBike 24 Inch Electric Dirt Bike",
     width: 1000, height: 774
@@ -70,7 +70,7 @@ const slidesData = [
     subtitle: "The Ultimate Weapon",
     title: "GOBIKE 20",
     desc: "The best 20-inch kids electric bike on the market. Built tough for young adventurers and teens, it delivers powerful performance, long battery life with a 10Ah battery, and reliable fun every ride.",
-    link: "/product/gobike-20-inch-electric-bike-for-kids-teens-for-ages-8-14",
+    link: "/product/20-inch-electric-bikes-for-sale-ebike-for-kids",
     img: "https://gobikes.au/wp-content/uploads/2025/08/Gobike-electric-bike-kids-ebike20-inch-ages-for10-16-1-1.webp",
     alt: "GoBike 20 Electric Bike",
     width: 1000, height: 774
@@ -79,7 +79,7 @@ const slidesData = [
     subtitle: "The All-Rounder",
     title: "GOBIKE 16",
     desc: "The fastest 16-inch kids electric bike on the market! Designed for confident young riders. Three speed modes, hydraulic disc brakes, and front suspension.",
-    link: "/product/gobike-16-inch-electric-bike-for-kids-riding-fun-for-ages-5-9",
+    link: "/product/ebike-for-sale-16-inch-gobike-ages-5-9",
     img: "https://gobikes.au/wp-content/uploads/2025/08/Gobike-electric-bike-kids-ebike20-inch-ages-for10-16-2.webp",
     alt: "GoBike 16 Electric Bike",
     width: 1000, height: 849
@@ -250,21 +250,21 @@ const products = [
     altText: "GoBike 16 Kids Electric Bike with 3 speed modes",
     name: "GoBike 16-inch",
     feature: "Best for Ages 5-9 | With 3-Speed Modes, Dual Hydraulic Brakes and Front Suspension.",
-    link: "product/gobike-16-inch-electric-bike-for-kids-riding-fun-for-ages-5-9"
+    link: "product/ebike-for-sale-16-inch-gobike-ages-5-9"
   },
   {
     imgSrc: "https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/GoBike%2020%20All-Terrain%20Kids%20Electric%20Bike-VjbYiNh19Dw9o3ZlSgPMSJmqtdI6vL.webp",
     altText: "GoBike 20 All-Terrain Kids Electric Bike",
     name: "GoBike 20-inch",
     feature: "Serious Bike for Ages 8-14 | A powerful and reliable bike for the bigger kids.",
-    link: "product/gobike-20-inch-electric-bike-for-kids-teens-for-ages-8-14"
+    link: "product/20-inch-electric-bikes-for-sale-ebike-for-kids"
   },
   {
     imgSrc: "https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/GoBike%2024-inch%20Electric%20Bike%20for%20Teens%20and%20adult-twug31TuTZNZYI9sQtfLqjXu3MHgKU.webp",
     altText: "GoBike 24-inch Electric Bike for Teens",
     name: "GoBike 24-inch",
     feature: "Perfect for Ages 13+ | High-Speed Performance Electric Bike for Teens and adults.",
-    link: "product/gobike-24-inch-electric-bike-for-teens-high-speed-performance-for-ages-13"
+    link: "product/gobike-24-inch-electric-bike-teens-high-speed-performance-for-ages-13"
   }
 ];
 

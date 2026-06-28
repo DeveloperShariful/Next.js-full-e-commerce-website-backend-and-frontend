@@ -27,11 +27,47 @@ export const metadata: Metadata = {
     locale: 'en_AU',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@GoBikeAU',
+    title: 'About GoBike Australia | Our Story & Mission',
+    description: 'Discover GoBike Australia and our mission to build safe, fun, and high-performance kids e-bikes.',
+    images: ['https://gobikes.au/wp-content/uploads/2025/11/shop-now-gobike-12-ebike-sale.jpg'],
+  },
+  keywords: ['about gobike australia', 'kids electric bike company australia', 'gobike founders', 'kids ebike brand australia', 'electric bike australia'],
+  robots: { index: true, follow: true },
+};
+
+const aboutJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "GoBike Australia",
+  "url": "https://gobike.au",
+  "foundingDate": "2023",
+  "description": "GoBike Australia creates safe, high-performance electric balance bikes for kids aged 2-16.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Camden",
+    "addressRegion": "NSW",
+    "addressCountry": "AU"
+  },
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "telephone": "+61-426-067-277",
+    "contactType": "customer service",
+    "email": "gobike@gobike.au",
+    "areaServed": "AU"
+  },
+  "sameAs": ["https://twitter.com/GoBikeAU"]
 };
 
 export default function AboutPage() {
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutJsonLd) }}
+      />
       <Breadcrumbs />
       
       {/* .about-us-page-wrapper replaced */}

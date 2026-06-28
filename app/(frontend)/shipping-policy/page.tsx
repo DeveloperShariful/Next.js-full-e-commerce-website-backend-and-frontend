@@ -27,6 +27,14 @@ export const metadata: Metadata = {
     locale: 'en_AU',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@GoBikeAU',
+    title: 'Shipping Policy | Fast Delivery Kids Electric Bikes Australia',
+    description: 'Fast and safe shipping for all kids electric bikes and parts across Australia.',
+    images: ['https://gobikes.au/wp-content/uploads/2025/11/gobike-ebike-safe-speed-modes.jpg'],
+  },
+  robots: { index: true, follow: true },
 };
 
 // --- Structured Data (Schema) ---

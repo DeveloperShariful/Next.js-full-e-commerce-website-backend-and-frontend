@@ -27,6 +27,15 @@ export const metadata: Metadata = {
     locale: 'en_AU',
     type: 'website',
   },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@GoBikeAU',
+    title: 'Frequently Asked Questions (FAQ) | GoBike Australia',
+    description: 'Find answers to common questions about our kids electric bikes, shipping, warranty, safety, and more.',
+    images: ['https://gobikes.au/wp-content/uploads/2025/10/gobike-au-1-year-warranty-kids-ebikes.webp'],
+  },
+  keywords: ['kids electric bike faq', 'gobike australia questions', 'kids ebike warranty', 'electric balance bike safety', 'electric bike shipping australia'],
+  robots: { index: true, follow: true },
 };
 
 // SEO এর জন্য সম্পূর্ণ JSON-LD ডেটা

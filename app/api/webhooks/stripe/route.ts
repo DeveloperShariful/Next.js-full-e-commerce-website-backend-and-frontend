@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
-import { resyncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
 
@@ -91,20 +91,20 @@ export async function POST(request: Request) {
       if (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID) {
           // ✅ Backup: payment done but TransDirect not synced yet → resync
           if (order.transdirectOrderStatus !== 'booked') {
-              console.log(`🔄 [Stripe Webhook] Order ${orderId} paid but not synced to TransDirect. Backup resync...`);
-              resyncOrderToTransdirect(orderId).catch(err =>
-                  console.error('[Stripe Webhook] Backup TransDirect resync failed:', err)
-              );
+              console.log(`🔄 [Stripe Webhook] Order ${orderId} paid but not synced to TransDirect. Backup sync...`);
+              try {
+                  await syncOrderToTransdirect(orderId);
+              } catch (err) {
+                  console.error('[Stripe Webhook] Backup TransDirect sync failed:', err);
+              }
           }
-          // Mark abandoned checkout as recovered (non-blocking)
           const alreadyEmail = order.guestEmail || order.user?.email;
-          if (alreadyEmail) {
-            db.abandonedCheckout.updateMany({
-              where: { email: alreadyEmail, isRecovered: false },
-              data: { isRecovered: true, recoveredAt: new Date() },
-            }).catch(() => {});
-          }
-          await db.paymentWebhookLog.update({ where: { eventId: event.id }, data: { processed: true } });
+          await Promise.allSettled([
+            alreadyEmail
+              ? db.abandonedCheckout.updateMany({ where: { email: alreadyEmail, isRecovered: false }, data: { isRecovered: true, recoveredAt: new Date() } })
+              : Promise.resolve(),
+            db.paymentWebhookLog.update({ where: { eventId: event.id }, data: { processed: true } }),
+          ]);
           return NextResponse.json({ received: true, message: "Already processed by frontend" });
       }
 
@@ -165,28 +165,16 @@ export async function POST(request: Request) {
       });
 
       console.log(`🎉 [Stripe Webhook] Rescue Successful! Order #${orderId} updated.`);
-      resyncOrderToTransdirect(orderId).catch(err =>
-        console.error('[Stripe Webhook] TransDirect resync failed:', err)
-      );
+      try {
+          await syncOrderToTransdirect(orderId);
+      } catch (err) {
+          console.error('[Stripe Webhook] TransDirect sync failed:', err);
+      }
 
-      // Email + Affiliate backup — duplicate-safe: order was PENDING before rescue,
-      // so capture-order never ran these. If webhook fires again, order is now
-      // PROCESSING and we return early at the top → these never run twice.
+      // Post-rescue side effects — email + abandonedCheckout + analytics run in parallel
       const rescueEmail = order.guestEmail || order.user?.email;
-      // Mark abandoned checkout as recovered (non-blocking)
-      if (rescueEmail) {
-        db.abandonedCheckout.updateMany({
-          where: { email: rescueEmail, isRecovered: false },
-          data: { isRecovered: true, recoveredAt: new Date() },
-        }).catch(() => {});
-      }
-      if (rescueEmail) {
-        sendNotification({ trigger: 'ORDER_PROCESSING', recipient: rescueEmail, orderId })
-          .catch(err => console.error('[Stripe Webhook] Customer email failed:', err));
-      }
-      sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId })
-        .catch(err => console.error('[Stripe Webhook] Admin email failed:', err));
 
+      // Affiliate — fire-and-forget (external API, non-critical)
       if (process.env.INTERNAL_API_KEY) {
         fetch(`${APP_URL}/api/affiliate/process-order`, {
           method: 'POST',
@@ -195,25 +183,37 @@ export async function POST(request: Request) {
         }).catch(err => console.error('[Stripe Webhook] Affiliate trigger failed:', err));
       }
 
-      // Analytics backup — only runs here because frontend capture-order failed
-      // (duplicate-safe: if capture-order succeeded, order is already PROCESSING and we returned early above)
-      const rescuedOrder = await db.order.findUnique({
-        where: { id: orderId },
-        select: { subtotal: true, discountTotal: true, taxTotal: true, shippingTotal: true, isFirstOrder: true },
-      });
-      const rescueItems = await db.orderItem.findMany({
-        where: { orderId },
-        select: { productId: true, quantity: true, total: true },
-      });
+      // Fetch analytics data (2 queries in parallel)
+      const [rescuedOrder, rescueItems] = await Promise.all([
+        db.order.findUnique({
+          where: { id: orderId },
+          select: { subtotal: true, discountTotal: true, taxTotal: true, shippingTotal: true, isFirstOrder: true },
+        }),
+        db.orderItem.findMany({
+          where: { orderId },
+          select: { productId: true, quantity: true, total: true },
+        }),
+      ]);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const sideEffects: Promise<unknown>[] = [
+        sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId }),
+      ];
+      if (rescueEmail) {
+        sideEffects.push(
+          db.abandonedCheckout.updateMany({ where: { email: rescueEmail, isRecovered: false }, data: { isRecovered: true, recoveredAt: new Date() } }),
+          sendNotification({ trigger: 'ORDER_PROCESSING', recipient: rescueEmail, orderId }),
+        );
+      }
       if (rescuedOrder && rescueItems.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const sub = Number(rescuedOrder.subtotal);
+        const sub  = Number(rescuedOrder.subtotal);
         const disc = Number(rescuedOrder.discountTotal);
-        const tax = Number(rescuedOrder.taxTotal);
+        const tax  = Number(rescuedOrder.taxTotal);
         const ship = Number(rescuedOrder.shippingTotal);
         const totalSold = rescueItems.reduce((s, i) => s + i.quantity, 0);
-        Promise.allSettled([
+        sideEffects.push(
           db.analytics.upsert({
             where: { date: today },
             create: { date: today, grossSales: sub, netSales: sub - disc, totalTax: tax, totalShipping: ship, totalDiscounts: disc, totalOrders: 1, productsSold: totalSold, newCustomers: rescuedOrder.isFirstOrder ? 1 : 0, returningCustomers: rescuedOrder.isFirstOrder ? 0 : 1 },
@@ -226,8 +226,9 @@ export async function POST(request: Request) {
               update: { itemsSold: { increment: quantity }, netSales: { increment: Number(total) } },
             })
           ),
-        ]).catch(err => console.error('[Stripe Webhook] Analytics rescue failed:', err));
+        );
       }
+      await Promise.allSettled(sideEffects);
     }
 
     // 🛡️ 6. payment_intent.payment_failed — with full decline reason

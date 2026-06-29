@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity-logger";
 
 // ==========================================
 // TYPES
@@ -160,26 +161,23 @@ export async function upsertLocation(
         },
       });
 
-      await db.activityLog.create({
-        data: {
-          userId,
-          action: "LOCATION_UPDATED",
-          entityType: "Location",
-          entityId: id,
-          details: {
-            name: data.name,
-            changes: {
-              ...(oldLocation?.name !== data.name
-                ? { name: { old: oldLocation?.name, new: data.name } }
-                : {}),
-              ...(oldLocation?.isDefault !== data.isDefault
-                ? { isDefault: { old: oldLocation?.isDefault, new: data.isDefault } }
-                : {}),
-              ...(oldLocation?.isActive !== data.isActive
-                ? { isActive: { old: oldLocation?.isActive, new: data.isActive } }
-                : {}),
-            },
-          } as unknown as Prisma.InputJsonValue,
+      await logActivity({
+        action: "LOCATION_UPDATED",
+        entityType: "Location",
+        entityId: id,
+        details: {
+          name: data.name,
+          changes: {
+            ...(oldLocation?.name !== data.name
+              ? { name: { old: oldLocation?.name, new: data.name } }
+              : {}),
+            ...(oldLocation?.isDefault !== data.isDefault
+              ? { isDefault: { old: oldLocation?.isDefault, new: data.isDefault } }
+              : {}),
+            ...(oldLocation?.isActive !== data.isActive
+              ? { isActive: { old: oldLocation?.isActive, new: data.isActive } }
+              : {}),
+          },
         },
       });
     } else {
@@ -193,17 +191,14 @@ export async function upsertLocation(
         },
       });
 
-      await db.activityLog.create({
-        data: {
-          userId,
-          action: "LOCATION_CREATED",
-          entityType: "Location",
-          entityId: location.id,
-          details: {
-            name: location.name,
-            isDefault: location.isDefault,
-            isActive: location.isActive,
-          } as unknown as Prisma.InputJsonValue,
+      await logActivity({
+        action: "LOCATION_CREATED",
+        entityType: "Location",
+        entityId: location.id,
+        details: {
+          name: location.name,
+          isDefault: location.isDefault,
+          isActive: location.isActive,
         },
       });
     }
@@ -256,16 +251,13 @@ export async function deleteLocation(
   try {
     await db.location.delete({ where: { id } });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "LOCATION_DELETED",
-        entityType: "Location",
-        entityId: id,
-        details: {
-          name: location.name,
-          permanent: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "LOCATION_DELETED",
+      entityType: "Location",
+      entityId: id,
+      details: {
+        name: location.name,
+        permanent: true,
       },
     });
 
@@ -351,19 +343,16 @@ export async function createStockTransfer(payload: {
       },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "STOCK_TRANSFER_CREATED",
-        entityType: "StockTransfer",
-        entityId: transfer.id,
-        details: {
-          reference,
-          fromLocation: fromLoc.name,
-          toLocation: toLoc.name,
-          itemCount: data.items.length,
-          totalQuantity: data.items.reduce((sum, i) => sum + i.quantity, 0),
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "STOCK_TRANSFER_CREATED",
+      entityType: "StockTransfer",
+      entityId: transfer.id,
+      details: {
+        reference,
+        fromLocation: fromLoc.name,
+        toLocation: toLoc.name,
+        itemCount: data.items.length,
+        totalQuantity: data.items.reduce((sum, i) => sum + i.quantity, 0),
       },
     });
 

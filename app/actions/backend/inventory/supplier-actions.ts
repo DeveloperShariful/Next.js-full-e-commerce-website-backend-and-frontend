@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity-logger";
 
 // ==========================================
 // TYPES
@@ -137,39 +138,33 @@ export async function upsertSupplier(
 
       await db.supplier.update({ where: { id }, data: writeData });
 
-      await db.activityLog.create({
-        data: {
-          userId,
-          action: "SUPPLIER_UPDATED",
-          entityType: "Supplier",
-          entityId: id,
-          details: {
-            supplierName: data.name,
-            changes: {
-              ...(oldSupplier?.name !== data.name
-                ? { name: { old: oldSupplier?.name, new: data.name } }
-                : {}),
-              ...(oldSupplier?.email !== (data.email || null)
-                ? { email: { old: oldSupplier?.email, new: data.email || null } }
-                : {}),
-            },
-          } as unknown as Prisma.InputJsonValue,
+      await logActivity({
+        action: "SUPPLIER_UPDATED",
+        entityType: "Supplier",
+        entityId: id,
+        details: {
+          supplierName: data.name,
+          changes: {
+            ...(oldSupplier?.name !== data.name
+              ? { name: { old: oldSupplier?.name, new: data.name } }
+              : {}),
+            ...(oldSupplier?.email !== (data.email || null)
+              ? { email: { old: oldSupplier?.email, new: data.email || null } }
+              : {}),
+          },
         },
       });
     } else {
       const supplier = await db.supplier.create({ data: writeData });
 
-      await db.activityLog.create({
-        data: {
-          userId,
-          action: "SUPPLIER_CREATED",
-          entityType: "Supplier",
-          entityId: supplier.id,
-          details: {
-            name: supplier.name,
-            email: supplier.email ?? null,
-            contactPerson: supplier.contactPerson ?? null,
-          } as unknown as Prisma.InputJsonValue,
+      await logActivity({
+        action: "SUPPLIER_CREATED",
+        entityType: "Supplier",
+        entityId: supplier.id,
+        details: {
+          name: supplier.name,
+          email: supplier.email ?? null,
+          contactPerson: supplier.contactPerson ?? null,
         },
       });
     }
@@ -213,16 +208,13 @@ export async function deleteSupplier(
   try {
     await db.supplier.delete({ where: { id } });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "SUPPLIER_DELETED",
-        entityType: "Supplier",
-        entityId: id,
-        details: {
-          name: supplier.name,
-          permanent: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "SUPPLIER_DELETED",
+      entityType: "Supplier",
+      entityId: id,
+      details: {
+        name: supplier.name,
+        permanent: true,
       },
     });
 
@@ -305,19 +297,16 @@ export async function createPurchaseOrder(
       },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "PURCHASE_ORDER_CREATED",
-        entityType: "PurchaseOrder",
-        entityId: po.id,
-        details: {
-          poNumber,
-          supplierName: supplier.name,
-          supplierId: data.supplierId,
-          status: data.status,
-          totalCost: data.totalCost,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "PURCHASE_ORDER_CREATED",
+      entityType: "PurchaseOrder",
+      entityId: po.id,
+      details: {
+        poNumber,
+        supplierName: supplier.name,
+        supplierId: data.supplierId,
+        status: data.status,
+        totalCost: data.totalCost,
       },
     });
 

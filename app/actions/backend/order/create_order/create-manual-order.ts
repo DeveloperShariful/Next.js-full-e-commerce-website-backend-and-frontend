@@ -7,6 +7,7 @@ import { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { generateNextOrderNumber } from "@/app/actions/backend/order/create_order/generate-order-number";
 import { updateAnalytics, sendOrderEmail, mul } from "@/app/actions/backend/order/order-utils";
 import type { CreateOrderPayload, CartItemType } from "@/app/(backend)/admin/orders/create/types";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function createManualOrder(data: CreateOrderPayload) {
   try {
@@ -144,6 +145,13 @@ export async function createManualOrder(data: CreateOrderPayload) {
       }
       await sendOrderEmail(order.id, "ORDER_CREATED");
     }
+
+    await logActivity({
+      action: 'ORDER_CREATED',
+      entityType: 'Order',
+      entityId: order.id,
+      details: { orderNumber, total, status: isDraft ? 'DRAFT' : (status || 'PENDING'), isDraft: !!isDraft },
+    });
 
     return { success: true, orderId: order.id };
 

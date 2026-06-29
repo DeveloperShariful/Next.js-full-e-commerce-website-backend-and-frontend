@@ -6,8 +6,9 @@ import { db } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Role, AddressType, Prisma } from '@prisma/client';
 import { sendNotification } from '@/app/api/email/send-notification';
-import bcrypt from "bcryptjs"; 
-import { nanoid } from 'nanoid'; // ✅ To generate affiliate slug
+import bcrypt from "bcryptjs";
+import { nanoid } from 'nanoid';
+import { logActivity } from '@/lib/activity-logger';
 
 // Helper function to extract address data from FormData
 const extractAddress = (prefix: 'billing_' | 'shipping_', formData: FormData) => {
@@ -136,8 +137,15 @@ export async function createUser(formData: FormData) {
     await saveAddress(newUser.id, AddressType.BILLING, billingData);
     await saveAddress(newUser.id, AddressType.SHIPPING, shippingData);
     
+    await logActivity({
+      action: 'USER_CREATED',
+      entityType: 'User',
+      entityId: newUser.id,
+      details: { email: newUser.email, role: role || 'CUSTOMER' },
+    });
+
     revalidatePath('/admin/users');
-    revalidatePath('/admin/affiliate'); // Also refresh affiliate dashboard
+    revalidatePath('/admin/affiliate');
     return { success: true, message: 'New user added successfully.' };
   } catch (error: unknown) {
     console.error('Create user failed:', error);
@@ -214,10 +222,17 @@ export async function updateUser(formData: FormData) {
     await saveAddress(id, AddressType.BILLING, billingData);
     await saveAddress(id, AddressType.SHIPPING, shippingData);
     
+    await logActivity({
+      action: 'USER_UPDATED',
+      entityType: 'User',
+      entityId: id,
+      details: { email: email.toLowerCase().trim(), role },
+    });
+
     revalidatePath('/admin/users');
     revalidatePath(`/admin/users/${id}`);
     revalidatePath('/admin/affiliate');
-    
+
     return { success: true, message: 'User profile updated successfully.' };
   } catch (error: unknown) {
     console.error('Update user failed:', error);
@@ -246,6 +261,12 @@ export async function deleteUser(formData: FormData) {
         });
     });
     
+    await logActivity({
+      action: 'USER_TRASHED',
+      entityType: 'User',
+      entityId: id,
+    });
+
     revalidatePath('/admin/users');
     revalidatePath('/admin/affiliate');
     return { success: true, message: 'User moved to trash successfully.' };
@@ -272,6 +293,12 @@ export async function bulkDeleteUsers(ids: string[]) {
             where: { userId: { in: ids } },
             data: { deletedAt: new Date(), status: "REJECTED" }
         });
+    });
+
+    await logActivity({
+      action: 'USER_BULK_TRASHED',
+      entityType: 'User',
+      details: { count: ids.length },
     });
 
     revalidatePath('/admin/users');
@@ -303,6 +330,12 @@ export async function bulkChangeRole(ids: string[], newRole: Role) {
             await ensureAffiliateAccount(user.id, newRole, user.name || "Customer");
         }
     }
+
+    await logActivity({
+      action: 'USER_BULK_ROLE_CHANGED',
+      entityType: 'User',
+      details: { count: ids.length, role: newRole },
+    });
 
     revalidatePath('/admin/users');
     revalidatePath('/admin/affiliate');

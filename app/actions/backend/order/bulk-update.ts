@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { OrderStatus } from "@prisma/client";
 import { restockInventory, sendOrderEmail } from "./order-utils";
+import { logActivity } from "@/lib/activity-logger";
 
 // সাকসেস স্ট্যাটাস এরে (টাইপ সেফ)
 const SUCCESS_STATUSES: OrderStatus[] = [
@@ -162,6 +163,12 @@ export async function bulkUpdateOrderStatus(orderIds: string[], status: OrderSta
       await sendOrderEmail(order.id, `ORDER_${status}`);
     }
 
+    await logActivity({
+      action: "ORDER_BULK_UPDATED",
+      entityType: "Order",
+      details: { count: orderIds.length, status, orderIds },
+    });
+
     revalidatePath("/admin/orders");
     return { success: true, message: `${orderIds.length} orders updated to ${status}` };
 
@@ -179,9 +186,15 @@ export async function deleteOrder(orderId: string, force: boolean = false) {
 
     if (force) {
       // 🔴 Permanent Delete (ইতিমধ্যে ট্র্যাশে পাঠানো হয়েছে, তাই নতুন করে অ্যানালিটিক্স মাইনাস হবে না)
-      await db.order.delete({
-        where: { id: orderId }
+      await db.order.delete({ where: { id: orderId } });
+
+      await logActivity({
+        action: "ORDER_DELETED",
+        entityType: "Order",
+        entityId: orderId,
+        details: { permanent: true },
       });
+
       revalidatePath("/admin/orders");
       return { success: true, message: "Order permanently deleted" };
     } else {
@@ -191,8 +204,15 @@ export async function deleteOrder(orderId: string, force: boolean = false) {
 
       await db.order.update({
         where: { id: orderId },
-        data: { deletedAt: new Date() } 
+        data: { deletedAt: new Date() },
       });
+
+      await logActivity({
+        action: "ORDER_TRASHED",
+        entityType: "Order",
+        entityId: orderId,
+      });
+
       revalidatePath("/admin/orders");
       return { success: true, message: "Moved to trash" };
     }
@@ -213,7 +233,13 @@ export async function restoreOrder(orderId: string) {
 
     await db.order.update({
       where: { id: orderId },
-      data: { deletedAt: null } 
+      data: { deletedAt: null },
+    });
+
+    await logActivity({
+      action: "ORDER_RESTORED",
+      entityType: "Order",
+      entityId: orderId,
     });
 
     revalidatePath("/admin/orders");

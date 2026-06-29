@@ -5,14 +5,13 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ProductStatus, Prisma } from "@prisma/client";
-import { auth } from "@/auth"; 
+import { auth } from "@/auth";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function duplicateProduct(id: string) {
   try {
     const session = await auth();
     if (!session || !session.user || !session.user.email) return { success: false, message: "Unauthorized" };
-    
-    const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
 
     const original = await db.product.findUnique({
       where: { id },
@@ -40,7 +39,7 @@ export async function duplicateProduct(id: string) {
     const newSku = original.sku ? `${original.sku}-COPY-${timestamp}` : null;
     const newName = `${original.name} (Copy)`;
 
-    await db.$transaction(async (tx) => {
+    const duplicatedId = await db.$transaction(async (tx) => {
         
         // ✅ FIX: Multiple Categories Connection
         const categoriesConnect = original.categories.length > 0 
@@ -183,20 +182,17 @@ export async function duplicateProduct(id: string) {
             });
         }
 
-        if (dbUser) {
-            await tx.activityLog.create({
-                data: {
-                    userId: dbUser.id,
-                    action: "DUPLICATED_PRODUCT",
-                    entityType: "Product",
-                    entityId: newProduct.id,
-                    details: { 
-                        originalId: id, 
-                        newName: newName 
-                    }
-                }
-            });
-        }
+        return newProduct.id;
+    });
+
+    await logActivity({
+        action: "DUPLICATED_PRODUCT",
+        entityType: "Product",
+        entityId: duplicatedId,
+        details: {
+            originalId: id,
+            newName: newName,
+        },
     });
 
     revalidatePath("/admin/products");

@@ -5,6 +5,7 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { DisputeStatus } from "@prisma/client";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function updateDisputeStatus(formData: FormData) {
   try {
@@ -38,6 +39,13 @@ export async function updateDisputeStatus(formData: FormData) {
             }
         });
     }
+
+    await logActivity({
+      action: 'DISPUTE_STATUS_UPDATED',
+      entityType: 'Order',
+      entityId: dispute.orderId,
+      details: { disputeId, status },
+    });
 
     revalidatePath(`/admin/orders/${dispute.orderId}`);
     return { success: true, message: "Dispute status updated" };

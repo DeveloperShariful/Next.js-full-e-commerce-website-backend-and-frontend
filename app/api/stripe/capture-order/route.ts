@@ -7,6 +7,7 @@ import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { cookies } from 'next/headers';
 import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { logActivity } from '@/lib/activity-logger';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -168,6 +169,15 @@ export async function POST(request: Request) {
     });
 
     console.log(`🎉 [Stripe Capture] Order ${orderId} → PROCESSING. Stock decremented.`);
+
+    // Activity log — fire-and-forget, never blocks the response
+    logActivity({
+      action: 'CHECKOUT_ORDER_PLACED',
+      entityType: 'Order',
+      entityId: orderId,
+      details: { gateway: 'stripe', amount: capturedAmount, transactionId: paymentIntent.id },
+      userId: currentOrder.userId ?? undefined,
+    }).catch(() => {});
 
     // TransDirect auto-booking (fire-and-forget — don't block the response)
     syncOrderToTransdirect(orderId).catch(err =>

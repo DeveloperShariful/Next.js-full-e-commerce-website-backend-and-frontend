@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function updateOrderCustomerDetails(formData: FormData) {
   try {
@@ -52,6 +53,13 @@ export async function updateOrderCustomerDetails(formData: FormData) {
             content: "Customer details and shipping address updated manually by admin.",
             isSystem: true
         }
+    });
+
+    await logActivity({
+      action: 'ORDER_CUSTOMER_UPDATED',
+      entityType: 'Order',
+      entityId: orderId,
+      details: { name, email },
     });
 
     revalidatePath(`/admin/orders/${orderId}`);

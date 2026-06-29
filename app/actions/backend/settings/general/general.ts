@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-logger";
 
 // Helper to extract symbol from code (e.g., USD -> $)
 // আমরা এখানে Intl ব্যবহার করছি যাতে তোমার helper ফাইলের লজিকের সাথে মিল থাকে
@@ -127,6 +128,13 @@ export async function updateGeneralSettings(formData: FormData) {
         taxSettings: taxSettings as any,
         generalConfig: generalConfig as any,
       }
+    });
+
+    await logActivity({
+      action: 'SETTINGS_UPDATED',
+      entityType: 'Settings',
+      entityId: 'general',
+      details: { storeName, storeEmail, currency: currencyCode },
     });
 
     revalidatePath("/admin/settings/general");

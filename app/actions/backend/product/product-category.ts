@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity-logger";
 
 // ==========================================
 // TYPES
@@ -249,19 +250,16 @@ export async function createCategory(
       },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "CATEGORY_CREATED",
-        entityType: "Category",
-        entityId: category.id,
-        details: {
-          name: category.name,
-          slug: category.slug,
-          parentId: category.parentId ?? null,
-          isActive: category.isActive,
-          menuOrder: category.menuOrder,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "CATEGORY_CREATED",
+      entityType: "Category",
+      entityId: category.id,
+      details: {
+        name: category.name,
+        slug: category.slug,
+        parentId: category.parentId ?? null,
+        isActive: category.isActive,
+        menuOrder: category.menuOrder,
       },
     });
 
@@ -328,18 +326,15 @@ export async function updateCategory(
 
     const changes = buildChangeDelta(oldData, data);
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "CATEGORY_UPDATED",
-        entityType: "Category",
-        entityId: id,
-        details: {
-          categoryName: oldData.name,
-          newSlug: slug,
-          changedFields: Object.keys(changes),
-          changes,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "CATEGORY_UPDATED",
+      entityType: "Category",
+      entityId: id,
+      details: {
+        categoryName: oldData.name,
+        newSlug: slug,
+        changedFields: Object.keys(changes),
+        changes,
       },
     });
 
@@ -398,16 +393,13 @@ export async function deleteCategory(
       data: { deletedAt: new Date() },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "CATEGORY_SOFT_DELETED",
-        entityType: "Category",
-        entityId: id,
-        details: {
-          name: category.name,
-          slug: category.slug,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "CATEGORY_SOFT_DELETED",
+      entityType: "Category",
+      entityId: id,
+      details: {
+        name: category.name,
+        slug: category.slug,
       },
     });
 
@@ -445,16 +437,13 @@ export async function restoreCategory(
       data: { deletedAt: null },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "CATEGORY_RESTORED",
-        entityType: "Category",
-        entityId: id,
-        details: {
-          name: category.name,
-          slug: category.slug,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "CATEGORY_RESTORED",
+      entityType: "Category",
+      entityId: id,
+      details: {
+        name: category.name,
+        slug: category.slug,
       },
     });
 
@@ -497,17 +486,14 @@ export async function forceDeleteCategory(
   try {
     await db.category.delete({ where: { id } });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "CATEGORY_FORCE_DELETED",
-        entityType: "Category",
-        entityId: id,
-        details: {
-          name: category.name,
-          slug: category.slug,
-          permanent: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "CATEGORY_FORCE_DELETED",
+      entityType: "Category",
+      entityId: id,
+      details: {
+        name: category.name,
+        slug: category.slug,
+        permanent: true,
       },
     });
 

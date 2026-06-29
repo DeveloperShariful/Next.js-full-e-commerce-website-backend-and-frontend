@@ -5,8 +5,9 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma, Role } from "@prisma/client";
-import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/backend/product/product-utils"; 
+import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/backend/product/product-utils";
 import { auth } from "@/auth";
+import { logActivity } from "@/lib/activity-logger";
 
 // 🔥 GMC Sync Action
 import { syncProductToGoogle } from "@/app/actions/backend/marketing/gmc-product-sync.actions";
@@ -582,45 +583,44 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 productName: product.name
             };
 
-            if (type === "CREATE" || (diff && Object.keys(diff).length > 0)) {
-                await tx.activityLog.create({
-                    data: {
-                        userId: dbUser!.id,
-                        action: type === "CREATE" ? "CREATED_PRODUCT" : "UPDATED_PRODUCT",
-                        entityType: "Product",
-                        entityId: product.id,
-                        details: logDetails 
-                    }
-                });
-            }
-
-            return serializeData(product);
+            return { kind: "saved" as const, serialized: serializeData(product), shouldLog: type === "CREATE" || (diff && Object.keys(diff).length > 0), logAction: type === "CREATE" ? "CREATED_PRODUCT" : "UPDATED_PRODUCT", logEntityId: product.id, logDetails };
 
         }, { maxWait: 20000, timeout: 120000 });
 
-        if ("success" in savedProduct) {
+        if (!("kind" in savedProduct)) {
             return savedProduct;
         }
 
-        // গুগল মার্চেন্ট সেন্টার সিঙ্ক অ্যাক্টিভ করা
-        if (savedProduct && savedProduct.id) {
-            syncProductToGoogle(savedProduct.id).catch((err) => {
-                console.error("Background GMC Sync failed for Product ID:", savedProduct.id, err);
+        const { serialized: productData, shouldLog, logAction, logEntityId, logDetails: logDetailsOut } = savedProduct;
+
+        if (shouldLog) {
+            await logActivity({
+                action: logAction,
+                entityType: "Product",
+                entityId: logEntityId,
+                details: logDetailsOut,
             });
         }
 
-        if (savedProduct && savedProduct.id) {
-            revalidatePath(`/product/${savedProduct.slug}`);
+        // গুগল মার্চেন্ট সেন্টার সিঙ্ক অ্যাক্টিভ করা
+        if (productData && productData.id) {
+            syncProductToGoogle(productData.id).catch((err) => {
+                console.error("Background GMC Sync failed for Product ID:", productData.id, err);
+            });
+        }
+
+        if (productData && productData.id) {
+            revalidatePath(`/product/${productData.slug}`);
 
             try {
                 const connectedCategories = await db.category.findMany({
-                    where: { products: { some: { id: savedProduct.id } } },
+                    where: { products: { some: { id: productData.id } } },
                     select: { slug: true }
                 });
 
                 connectedCategories.forEach((cat) => {
                     if (cat.slug) {
-                        revalidatePath(`/${cat.slug}`); 
+                        revalidatePath(`/${cat.slug}`);
                     }
                 });
             } catch (e) {
@@ -629,7 +629,7 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         }
 
         revalidatePath("/admin/products");
-        return { success: true, productId: savedProduct.id };
+        return { success: true, productId: productData?.id };
 
     } catch (error: unknown) {
         console.error("[SAVE_PRODUCT_ERROR]", error);

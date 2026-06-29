@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity-logger";
 
 // ==========================================
 // TYPES
@@ -203,17 +204,14 @@ export async function createTag(
       },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_CREATED",
-        entityType: "Tag",
-        entityId: tag.id,
-        details: {
-          name: tag.name,
-          slug: tag.slug,
-          color: tag.color ?? null,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "TAG_CREATED",
+      entityType: "Tag",
+      entityId: tag.id,
+      details: {
+        name: tag.name,
+        slug: tag.slug,
+        color: tag.color ?? null,
       },
     });
 
@@ -277,18 +275,15 @@ export async function updateTag(
 
     const changes = buildChangeDelta(oldData, data);
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_UPDATED",
-        entityType: "Tag",
-        entityId: id,
-        details: {
-          tagName: oldData.name,
-          newSlug: slug,
-          changedFields: Object.keys(changes),
-          changes,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "TAG_UPDATED",
+      entityType: "Tag",
+      entityId: id,
+      details: {
+        tagName: oldData.name,
+        newSlug: slug,
+        changedFields: Object.keys(changes),
+        changes,
       },
     });
 
@@ -337,16 +332,13 @@ export async function deleteTag(
       data: { deletedAt: new Date() },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_SOFT_DELETED",
-        entityType: "Tag",
-        entityId: id,
-        details: {
-          name: tag.name,
-          slug: tag.slug,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "TAG_SOFT_DELETED",
+      entityType: "Tag",
+      entityId: id,
+      details: {
+        name: tag.name,
+        slug: tag.slug,
       },
     });
 
@@ -384,16 +376,13 @@ export async function restoreTag(
       data: { deletedAt: null },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_RESTORED",
-        entityType: "Tag",
-        entityId: id,
-        details: {
-          name: tag.name,
-          slug: tag.slug,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "TAG_RESTORED",
+      entityType: "Tag",
+      entityId: id,
+      details: {
+        name: tag.name,
+        slug: tag.slug,
       },
     });
 
@@ -436,17 +425,14 @@ export async function forceDeleteTag(
   try {
     await db.tag.delete({ where: { id } });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_FORCE_DELETED",
-        entityType: "Tag",
-        entityId: id,
-        details: {
-          name: tag.name,
-          slug: tag.slug,
-          permanent: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "TAG_FORCE_DELETED",
+      entityType: "Tag",
+      entityId: id,
+      details: {
+        name: tag.name,
+        slug: tag.slug,
+        permanent: true,
       },
     });
 
@@ -483,14 +469,11 @@ export async function bulkDeleteTags(
       data: { deletedAt: new Date() },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_BULK_SOFT_DELETED",
-        entityType: "Tag",
-        entityId: ids[0],
-        details: { tagIds: ids, totalCount: ids.length } as unknown as Prisma.InputJsonValue,
-      },
+    await logActivity({
+      action: "TAG_BULK_SOFT_DELETED",
+      entityType: "Tag",
+      entityId: ids[0],
+      details: { tagIds: ids, totalCount: ids.length },
     });
 
     revalidatePath("/admin/tags");
@@ -518,14 +501,11 @@ export async function bulkRestoreTags(
       data: { deletedAt: null },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_BULK_RESTORED",
-        entityType: "Tag",
-        entityId: ids[0],
-        details: { tagIds: ids, totalCount: ids.length } as unknown as Prisma.InputJsonValue,
-      },
+    await logActivity({
+      action: "TAG_BULK_RESTORED",
+      entityType: "Tag",
+      entityId: ids[0],
+      details: { tagIds: ids, totalCount: ids.length },
     });
 
     revalidatePath("/admin/tags");
@@ -558,14 +538,11 @@ export async function bulkForceDeleteTags(
   try {
     await db.tag.deleteMany({ where: { id: { in: ids } } });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_BULK_FORCE_DELETED",
-        entityType: "Tag",
-        entityId: ids[0],
-        details: { tagIds: ids, totalCount: ids.length, permanent: true } as unknown as Prisma.InputJsonValue,
-      },
+    await logActivity({
+      action: "TAG_BULK_FORCE_DELETED",
+      entityType: "Tag",
+      entityId: ids[0],
+      details: { tagIds: ids, totalCount: ids.length, permanent: true },
     });
 
     revalidatePath("/admin/tags");

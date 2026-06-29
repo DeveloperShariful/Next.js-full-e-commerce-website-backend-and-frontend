@@ -3,7 +3,7 @@
 import { db } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { logActivity } from "@/lib/activity-logger";
 
 async function checkAdminAccess(): Promise<string | null> {
   const session = await auth();
@@ -73,14 +73,10 @@ export async function importTagsCsv(
   }
 
   if (created > 0) {
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "TAG_BULK_IMPORTED",
-        entityType: "Tag",
-        entityId: userId,
-        details: { created, skipped, errors: errors.slice(0, 5) } as unknown as Prisma.InputJsonValue,
-      },
+    await logActivity({
+      action: "TAG_BULK_IMPORTED",
+      entityType: "Tag",
+      details: { created, skipped, errors: errors.slice(0, 5) },
     });
     revalidatePath("/admin/tags");
   }
@@ -131,14 +127,10 @@ export async function importBrandsCsv(
   }
 
   if (created > 0) {
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "BRAND_BULK_IMPORTED",
-        entityType: "Brand",
-        entityId: userId,
-        details: { created, skipped, errors: errors.slice(0, 5) } as unknown as Prisma.InputJsonValue,
-      },
+    await logActivity({
+      action: "BRAND_BULK_IMPORTED",
+      entityType: "Brand",
+      details: { created, skipped, errors: errors.slice(0, 5) },
     });
     revalidatePath("/admin/brands");
   }
@@ -189,14 +181,10 @@ export async function importAttributesCsv(
   }
 
   if (created > 0) {
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "ATTRIBUTE_BULK_IMPORTED",
-        entityType: "Attribute",
-        entityId: userId,
-        details: { created, skipped, errors: errors.slice(0, 5) } as unknown as Prisma.InputJsonValue,
-      },
+    await logActivity({
+      action: "ATTRIBUTE_BULK_IMPORTED",
+      entityType: "Attribute",
+      details: { created, skipped, errors: errors.slice(0, 5) },
     });
     revalidatePath("/admin/attributes");
   }

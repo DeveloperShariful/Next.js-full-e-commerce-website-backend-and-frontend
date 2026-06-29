@@ -10,7 +10,7 @@ import { db } from "@/lib/prisma";
 import Papa from "papaparse";
 import { OrderStatus, PaymentStatus, FulfillmentStatus, DiscountType, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/auth";
+import { logActivity } from "@/lib/activity-logger";
 
 // ============================================================
 // SECTION 1: UTILITY HELPERS
@@ -319,12 +319,6 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
     if (parseErrors.length > 0) {
       console.warn("CSV parse warnings:", parseErrors);
     }
-
-    const session = await auth();
-    const dbUser  = session?.user?.email
-      ? await db.user.findUnique({ where: { email: session.user.email } })
-      : null;
-    const adminUserId = dbUser?.id ?? null;
 
     // ── একবারে সব existing order numbers load করা (loop এ N+1 এড়ানো) ──
     const allOrderNums = data
@@ -683,18 +677,15 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
     }
 
     // ── Activity Log ──
-    if (adminUserId && result.successCount > 0) {
-      await db.activityLog.create({
-        data: {
-          userId:     adminUserId,
-          action:     "BULK_IMPORT_ORDERS",
-          entityType: "Order",
-          details: {
-            success:  result.successCount,
-            skipped:  result.skipCount,
-            failed:   result.errorCount,
-            source:   "woocommerce_csv_v15",
-          },
+    if (result.successCount > 0) {
+      await logActivity({
+        action: "BULK_IMPORT_ORDERS",
+        entityType: "Order",
+        details: {
+          success: result.successCount,
+          skipped: result.skipCount,
+          failed:  result.errorCount,
+          source:  "woocommerce_csv_v15",
         },
       });
     }

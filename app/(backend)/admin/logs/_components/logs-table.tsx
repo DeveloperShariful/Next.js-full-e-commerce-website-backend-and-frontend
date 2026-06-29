@@ -22,7 +22,7 @@ export const LogsTable = ({ logs }: LogsTableProps) => {
   const [bulkAction, setBulkAction] = useState<string>("");
 
   // Modal State for JSON Details
-  const [selectedLogData, setSelectedLogData] = useState<any | null>(null);
+  const [selectedLogData, setSelectedLogData] = useState<ActivityLogType | null>(null);
 
   const toggleSelect = (id: string) => {
     if (selectedIds.includes(id)) setSelectedIds(prev => prev.filter(cid => cid !== id));

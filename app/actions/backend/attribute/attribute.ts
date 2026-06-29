@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
+import { logActivity } from "@/lib/activity-logger";
 
 export type AttributeState = {
   success: boolean;
@@ -141,14 +142,11 @@ export async function createAttribute(formData: FormData): Promise<AttributeStat
       data: { name, slug: finalSlug, type, values }
     });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "ATTRIBUTE_CREATED",
-        entityType: "Attribute",
-        entityId: attr.id,
-        details: { name, slug: finalSlug, type, valuesCount: values.length } as unknown as Prisma.InputJsonValue,
-      }
+    await logActivity({
+      action: "ATTRIBUTE_CREATED",
+      entityType: "Attribute",
+      entityId: attr.id,
+      details: { name, slug: finalSlug, type, valuesCount: values.length },
     });
 
     revalidatePath("/admin/attributes");
@@ -204,14 +202,11 @@ export async function updateAttribute(formData: FormData): Promise<AttributeStat
       data: { name, slug: finalSlug, type, values }
     });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "ATTRIBUTE_UPDATED",
-        entityType: "Attribute",
-        entityId: id,
-        details: { changes, attributeName: name } as unknown as Prisma.InputJsonValue,
-      }
+    await logActivity({
+      action: "ATTRIBUTE_UPDATED",
+      entityType: "Attribute",
+      entityId: id,
+      details: { changes, attributeName: name },
     });
 
     revalidatePath("/admin/attributes");
@@ -241,14 +236,11 @@ export async function deleteAttribute(id: string) {
       data: { deletedAt: new Date() }
     });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "ATTRIBUTE_SOFT_DELETED",
-        entityType: "Attribute",
-        entityId: id,
-        details: { attributeName: attr.name } as unknown as Prisma.InputJsonValue,
-      }
+    await logActivity({
+      action: "ATTRIBUTE_SOFT_DELETED",
+      entityType: "Attribute",
+      entityId: id,
+      details: { attributeName: attr.name },
     });
 
     revalidatePath("/admin/attributes");
@@ -275,14 +267,11 @@ export async function restoreAttribute(id: string) {
       data: { deletedAt: null }
     });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "ATTRIBUTE_RESTORED",
-        entityType: "Attribute",
-        entityId: id,
-        details: { attributeName: attr.name } as unknown as Prisma.InputJsonValue,
-      }
+    await logActivity({
+      action: "ATTRIBUTE_RESTORED",
+      entityType: "Attribute",
+      entityId: id,
+      details: { attributeName: attr.name },
     });
 
     revalidatePath("/admin/attributes");
@@ -306,14 +295,11 @@ export async function forceDeleteAttribute(id: string) {
 
     await db.attribute.delete({ where: { id } });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "ATTRIBUTE_FORCE_DELETED",
-        entityType: "Attribute",
-        entityId: id,
-        details: { attributeName: attr.name } as unknown as Prisma.InputJsonValue,
-      }
+    await logActivity({
+      action: "ATTRIBUTE_FORCE_DELETED",
+      entityType: "Attribute",
+      entityId: id,
+      details: { attributeName: attr.name },
     });
 
     revalidatePath("/admin/attributes");

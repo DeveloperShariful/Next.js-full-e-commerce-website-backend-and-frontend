@@ -6,7 +6,8 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from "@prisma/client";
 // 🔥 FIX: Import centralized email utility
-import { restockInventory, updateAnalytics, sendOrderEmail } from "./order-utils"; 
+import { restockInventory, updateAnalytics, sendOrderEmail } from "./order-utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function updateOrderStatus(formData: FormData) {
   try {
@@ -74,6 +75,15 @@ export async function updateOrderStatus(formData: FormData) {
       });
     }
     
+    if (changes.length > 0) {
+      await logActivity({
+        action: "ORDER_STATUS_UPDATED",
+        entityType: "Order",
+        entityId: orderId,
+        details: { changes },
+      });
+    }
+
     revalidatePath(`/admin/orders/${orderId}`);
     return { success: true, message: "Order updated & notifications sent!" };
 

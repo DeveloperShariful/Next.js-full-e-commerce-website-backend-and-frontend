@@ -5,47 +5,62 @@ import { headers } from "next/headers";
 import { Prisma } from "@prisma/client";
 
 // ==========================================
-// 1. SAFE DATA SERIALIZATION (Robust)
+// 1. SAFE DATA SERIALIZATION
 // ==========================================
-const serializePrismaData = (data: any): any => {
+const serializePrismaData = (data: unknown): unknown => {
   if (data === null || data === undefined) return data;
-  if (typeof data === "object" && "toNumber" in data) { return data.toNumber(); }
-  if (typeof data === "bigint") { return data.toString(); }
-  if (data instanceof Date) { return data.toISOString();}
-  if (Array.isArray(data)) { return data.map((item) => serializePrismaData(item));}
-  if (typeof data === "object") {
-    const newObj: Record<string, any> = {};
-    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'apikey', 'creditcard', 'cvv'];
 
-    for (const key in data) {
+  // Prisma Decimal
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "toNumber" in data &&
+    typeof (data as { toNumber: unknown }).toNumber === "function"
+  ) {
+    return (data as { toNumber: () => number }).toNumber();
+  }
+
+  if (typeof data === "bigint") return data.toString();
+  if (data instanceof Date) return data.toISOString();
+  if (Array.isArray(data)) return data.map((item) => serializePrismaData(item));
+
+  if (typeof data === "object" && data !== null) {
+    const newObj: Record<string, unknown> = {};
+    const sensitiveKeys = ["password", "token", "secret", "key", "apikey", "creditcard", "cvv"];
+
+    for (const key in data as Record<string, unknown>) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
-        if (sensitiveKeys.some(s => key.toLowerCase().includes(s.toLowerCase()))) {
-          newObj[key] = '***MASKED***';
+        if (sensitiveKeys.some((s) => key.toLowerCase().includes(s.toLowerCase()))) {
+          newObj[key] = "***MASKED***";
         } else {
-          newObj[key] = serializePrismaData(data[key]);
+          newObj[key] = serializePrismaData((data as Record<string, unknown>)[key]);
         }
       }
     }
     return newObj;
   }
+
   return data;
 };
 
 // ==========================================
-// 2. DIFFING ALGORITHM (Restored)
+// 2. DIFFING ALGORITHM
 // ==========================================
-
-function calculateDiff(oldData: any, newData: any) {
+function calculateDiff(oldData: unknown, newData: unknown) {
   if (!oldData || !newData) return null;
-  
-  const diff: Record<string, { from: any; to: any }> = {};
-  const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
-  const ignoredKeys = ['updatedAt', 'createdAt', 'lastLogin', 'version'];
+  if (typeof oldData !== "object" || typeof newData !== "object") return null;
 
-  allKeys.forEach(key => {
+  const diff: Record<string, { from: unknown; to: unknown }> = {};
+  const allKeys = new Set([
+    ...Object.keys(oldData as object),
+    ...Object.keys(newData as object),
+  ]);
+  const ignoredKeys = ["updatedAt", "createdAt", "lastLogin", "version"];
+
+  allKeys.forEach((key) => {
     if (ignoredKeys.includes(key)) return;
-    const oldVal = serializePrismaData(oldData[key]);
-    const newVal = serializePrismaData(newData[key]);
+    const oldVal = serializePrismaData((oldData as Record<string, unknown>)[key]);
+    const newVal = serializePrismaData((newData as Record<string, unknown>)[key]);
 
     if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
       diff[key] = { from: oldVal ?? null, to: newVal ?? null };
@@ -60,91 +75,110 @@ function calculateDiff(oldData: any, newData: any) {
 // ==========================================
 
 interface AuditParams {
-  userId?: string | null; 
+  userId?: string | null;
   action: string;
   entity: string;
   entityId: string;
-  oldData?: any;
-  newData?: any;
-  meta?: any;
+  oldData?: unknown;
+  newData?: unknown;
+  meta?: unknown;
 }
 
 export const auditService = {
-  async log({ userId, action, entity, entityId, oldData, newData, meta }: AuditParams) {
+  async log({ userId, action, entity, entityId, oldData, newData }: AuditParams) {
     const safeOldData = serializePrismaData(oldData);
     const safeNewData = serializePrismaData(newData);
-    const finalUserId = (userId && userId !== "system") ? userId : null;
+    const finalUserId = userId && userId !== "system" ? userId : null;
+
     const getRequestInfo = async () => {
-        try {
-            const headerList = await headers();
-            return {
-                ip: headerList.get("x-forwarded-for") || "unknown",
-                userAgent: headerList.get("user-agent") || "system"
-            };
-        } catch (e) {
-            return { ip: "unknown", userAgent: "system" };
-        }
+      try {
+        const headerList = await headers();
+        return {
+          ip: headerList.get("x-forwarded-for") || "unknown",
+          userAgent: headerList.get("user-agent") || "system",
+        };
+      } catch {
+        return { ip: "unknown", userAgent: "system" };
+      }
     };
 
     const { ip, userAgent } = await getRequestInfo();
 
     try {
-      // Try to create log
       await db.auditLog.create({
         data: {
           userId: finalUserId,
-          action: action,
+          action,
           tableName: entity,
           recordId: entityId,
-          oldValues: safeOldData ?? Prisma.JsonNull,
-          newValues: safeNewData ?? Prisma.JsonNull,
+          oldValues: (safeOldData ?? Prisma.JsonNull) as unknown as Prisma.InputJsonValue,
+          newValues: (safeNewData ?? Prisma.JsonNull) as unknown as Prisma.InputJsonValue,
           ipAddress: ip,
-          userAgent: userAgent,
-        }
+          userAgent,
+        },
       });
-    } catch (error: any) {
-      if (error.code === 'P2003' || error.message?.includes("Foreign key constraint violated")) {
+    } catch (error: unknown) {
+      const isPrismaFKError =
+        error instanceof Error &&
+        (("code" in error && (error as { code?: string }).code === "P2003") ||
+          error.message?.includes("Foreign key constraint violated"));
+
+      if (isPrismaFKError) {
         try {
-            await db.auditLog.create({
-                data: {
-                  userId: null, 
-                  action: action,
-                  tableName: entity,
-                  recordId: entityId,
-                  oldValues: safeOldData ?? Prisma.JsonNull,
-                  newValues: safeNewData ?? Prisma.JsonNull,
-                  ipAddress: ip,
-                  userAgent: userAgent,
-                }
-            });
+          await db.auditLog.create({
+            data: {
+              userId: null,
+              action,
+              tableName: entity,
+              recordId: entityId,
+              oldValues: (safeOldData ?? Prisma.JsonNull) as unknown as Prisma.InputJsonValue,
+              newValues: (safeNewData ?? Prisma.JsonNull) as unknown as Prisma.InputJsonValue,
+              ipAddress: ip,
+              userAgent,
+            },
+          });
         } catch (retryError) {
-            console.error("❌ AUDIT FATAL:", retryError);
+          console.error("❌ AUDIT FATAL:", retryError);
         }
       } else {
-        console.error("❌ AUDIT ERROR:", error.message);
+        console.error("❌ AUDIT ERROR:", error instanceof Error ? error.message : String(error));
       }
     }
   },
 
-  async systemLog(level: "INFO" | "WARN" | "ERROR" | "CRITICAL", source: string, message: string, context?: any) {
+  async systemLog(
+    level: "INFO" | "WARN" | "ERROR" | "CRITICAL",
+    source: string,
+    message: string,
+    context?: unknown
+  ) {
     try {
-      let safeContext = context;
+      let safeContext: unknown = context;
+
       if (context instanceof Error) {
         safeContext = {
-            name: context.name,
-            message: context.message,
-            stack: process.env.NODE_ENV === 'development' ? context.stack : undefined,
-            cause: (context as any).cause
+          name: context.name,
+          message: context.message,
+          stack: process.env.NODE_ENV === "development" ? context.stack : undefined,
+          cause: context.cause,
         };
-      } else if (typeof context === 'object' && context?.error instanceof Error) {
-         safeContext = {
-            ...context,
-            error: {
-                message: context.error.message,
-                stack: process.env.NODE_ENV === 'development' ? context.error.stack : undefined
-            }
-         };
+      } else if (
+        typeof context === "object" &&
+        context !== null &&
+        "error" in context &&
+        (context as { error: unknown }).error instanceof Error
+      ) {
+        const contextObj = context as Record<string, unknown>;
+        const err = contextObj.error as Error;
+        safeContext = {
+          ...contextObj,
+          error: {
+            message: err.message,
+            stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+          },
+        };
       }
+
       safeContext = serializePrismaData(safeContext);
 
       await db.systemLog.create({
@@ -152,11 +186,11 @@ export const auditService = {
           level,
           source,
           message,
-          context: safeContext ?? Prisma.JsonNull
-        }
+          context: (safeContext ?? Prisma.JsonNull) as unknown as Prisma.InputJsonValue,
+        },
       });
     } catch (e) {
       console.error("SYSTEM_LOG_FAILED", e);
     }
-  }
+  },
 };

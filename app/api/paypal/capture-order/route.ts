@@ -5,6 +5,7 @@ import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { logActivity } from '@/lib/activity-logger';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -103,6 +104,13 @@ export async function POST(request: Request) {
           where: { id: wcOrderId },
           data: { status: OrderStatus.FAILED, paymentStatus: PaymentStatus.UNPAID },
         });
+        logActivity({
+          action: 'CHECKOUT_PAYMENT_FAILED',
+          entityType: 'Order',
+          entityId: wcOrderId,
+          details: { gateway: 'paypal', reason: isDeclined ? 'INSTRUMENT_DECLINED' : 'CAPTURE_FAILED' },
+          userId: order.userId ?? undefined,
+        }).catch(() => {});
         return NextResponse.json({
           success: false,
           status: 'FAILED',
@@ -217,6 +225,17 @@ export async function POST(request: Request) {
         }
       }
     });
+
+    // Activity log — fire-and-forget, never blocks the response
+    if (isFullSuccess) {
+      logActivity({
+        action: 'CHECKOUT_ORDER_PLACED',
+        entityType: 'Order',
+        entityId: wcOrderId,
+        details: { gateway: 'paypal', amount: capturedAmount, transactionId },
+        userId: order.userId ?? undefined,
+      }).catch(() => {});
+    }
 
     // ── 8. Post-payment side-effects (fire-and-forget) ────────
     if (successResponse && finalOrderStatus === OrderStatus.PROCESSING) {

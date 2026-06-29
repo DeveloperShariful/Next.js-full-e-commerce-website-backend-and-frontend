@@ -5,6 +5,7 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { sendOrderEmail } from "./order-utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function addOrderNote(formData: FormData) {
   try {
@@ -28,6 +29,13 @@ export async function addOrderNote(formData: FormData) {
     if (notify) {
       await sendOrderEmail(orderId, "ORDER_NOTE");
     }
+
+    await logActivity({
+      action: "ORDER_NOTE_ADDED",
+      entityType: "Order",
+      entityId: orderId,
+      details: { notify },
+    });
 
     revalidatePath(`/admin/orders/${orderId}`);
     return { success: true, message: "Note added successfully" };

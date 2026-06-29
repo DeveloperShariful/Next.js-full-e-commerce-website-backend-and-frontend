@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ShipmentQueryParams, GetShipmentsResponse } from "@/app/(backend)/admin/shipments/types";
 import { OrderStatus } from "@prisma/client";
+import { logActivity } from "@/lib/activity-logger";
 
 // --- 1. GET SHIPMENTS WITH PAGINATION, SEARCH & COUNTS ---
 export async function getShipments(params: ShipmentQueryParams): Promise<GetShipmentsResponse> {
@@ -109,6 +110,13 @@ export async function updateTracking(formData: FormData) {
     await db.shipment.update({
       where: { id },
       data: { courier, trackingNumber, trackingUrl, numberOfParcels },
+    });
+
+    await logActivity({
+      action: 'SHIPMENT_TRACKING_UPDATED',
+      entityType: 'Shipment',
+      entityId: id,
+      details: { courier, trackingNumber },
     });
 
     revalidatePath("/admin/shipments");
@@ -265,6 +273,12 @@ export async function bulkUpdateShipments(ids: string[], action: string) {
         data: { status: OrderStatus.DELIVERED },
       });
     }
+
+    await logActivity({
+      action: 'SHIPMENT_BULK_UPDATED',
+      entityType: 'Shipment',
+      details: { count: ids.length, action },
+    });
 
     revalidatePath("/admin/shipments");
     return { success: true, message: "Bulk action applied successfully." };

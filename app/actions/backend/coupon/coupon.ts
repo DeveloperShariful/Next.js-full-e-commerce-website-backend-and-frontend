@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { DiscountType, Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity-logger";
 
 // ==========================================
 // TYPES
@@ -287,26 +288,23 @@ export async function saveCoupon(
         data: updateData as unknown as Prisma.DiscountUpdateInput,
       });
 
-      await db.activityLog.create({
-        data: {
-          userId: user.id,
-          action: "COUPON_UPDATED",
-          entityType: "Discount",
-          entityId: id,
-          details: {
-            code: data.code,
-            changes: {
-              ...(oldCoupon.code !== data.code
-                ? { code: { old: oldCoupon.code, new: data.code } }
-                : {}),
-              ...(Number(oldCoupon.value) !== data.value
-                ? { value: { old: Number(oldCoupon.value), new: data.value } }
-                : {}),
-              ...(oldCoupon.isActive !== data.isActive
-                ? { isActive: { old: oldCoupon.isActive, new: data.isActive } }
-                : {}),
-            },
-          } as unknown as Prisma.InputJsonValue,
+      await logActivity({
+        action: "COUPON_UPDATED",
+        entityType: "Discount",
+        entityId: id,
+        details: {
+          code: data.code,
+          changes: {
+            ...(oldCoupon.code !== data.code
+              ? { code: { old: oldCoupon.code, new: data.code } }
+              : {}),
+            ...(Number(oldCoupon.value) !== data.value
+              ? { value: { old: Number(oldCoupon.value), new: data.value } }
+              : {}),
+            ...(oldCoupon.isActive !== data.isActive
+              ? { isActive: { old: oldCoupon.isActive, new: data.isActive } }
+              : {}),
+          },
         },
       });
     } else {
@@ -339,20 +337,17 @@ export async function saveCoupon(
         data: createData as unknown as Prisma.DiscountCreateInput,
       });
 
-      await db.activityLog.create({
-        data: {
-          userId: user.id,
-          action: "COUPON_CREATED",
-          entityType: "Discount",
-          entityId: coupon.id,
-          details: {
-            code: coupon.code,
-            type: coupon.type,
-            value: Number(coupon.value),
-            isActive: coupon.isActive,
-            hasExpiry: !!coupon.endDate,
-            hasUsageLimit: !!coupon.usageLimit,
-          } as unknown as Prisma.InputJsonValue,
+      await logActivity({
+        action: "COUPON_CREATED",
+        entityType: "Discount",
+        entityId: coupon.id,
+        details: {
+          code: coupon.code,
+          type: coupon.type,
+          value: Number(coupon.value),
+          isActive: coupon.isActive,
+          hasExpiry: !!coupon.endDate,
+          hasUsageLimit: !!coupon.usageLimit,
         },
       });
     }
@@ -393,16 +388,13 @@ export async function deleteCoupons(
       data: { deletedAt: new Date() },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "COUPON_BULK_SOFT_DELETED",
-        entityType: "Discount",
-        entityId: ids[0],
-        details: {
-          count: ids.length,
-          codes: coupons.map((c) => c.code),
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "COUPON_BULK_SOFT_DELETED",
+      entityType: "Discount",
+      entityId: ids[0],
+      details: {
+        count: ids.length,
+        codes: coupons.map((c) => c.code),
       },
     });
 
@@ -435,16 +427,13 @@ export async function restoreCoupons(
       data: { deletedAt: null },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "COUPON_BULK_RESTORED",
-        entityType: "Discount",
-        entityId: ids[0],
-        details: {
-          count: ids.length,
-          ids,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "COUPON_BULK_RESTORED",
+      entityType: "Discount",
+      entityId: ids[0],
+      details: {
+        count: ids.length,
+        ids,
       },
     });
 
@@ -479,17 +468,14 @@ export async function hardDeleteCoupons(
 
     await db.discount.deleteMany({ where: { id: { in: ids } } });
 
-    await db.activityLog.create({
-      data: {
-        userId: user.id,
-        action: "COUPON_BULK_FORCE_DELETED",
-        entityType: "Discount",
-        entityId: ids[0],
-        details: {
-          count: ids.length,
-          codes: coupons.map((c) => c.code),
-          permanent: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "COUPON_BULK_FORCE_DELETED",
+      entityType: "Discount",
+      entityId: ids[0],
+      details: {
+        count: ids.length,
+        codes: coupons.map((c) => c.code),
+        permanent: true,
       },
     });
 

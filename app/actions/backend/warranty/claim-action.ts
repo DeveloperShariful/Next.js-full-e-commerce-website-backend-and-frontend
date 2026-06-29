@@ -6,6 +6,7 @@ import { db } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { ClaimStatus } from '@prisma/client';
 import { sendNotification } from '@/app/api/email/send-notification';
+import { logActivity } from '@/lib/activity-logger';
 
 export async function updateClaimStatus(formData: FormData) {
   const id = formData.get('id') as string;
@@ -40,6 +41,13 @@ export async function updateClaimStatus(formData: FormData) {
         });
     }
 
+    await logActivity({
+      action: 'WARRANTY_STATUS_UPDATED',
+      entityType: 'WarrantyClaim',
+      entityId: id,
+      details: { status, claimName: updatedClaim.name, orderNumber: updatedClaim.orderNumber },
+    });
+
     revalidatePath(`/admin/warranty-claims`);
   } catch (error) {
     console.error('Update failed:', error);
@@ -71,6 +79,12 @@ export async function bulkUpdateClaimStatus(ids: string[], status: ClaimStatus) 
         }
     }
 
+    await logActivity({
+      action: 'WARRANTY_BULK_STATUS_UPDATED',
+      entityType: 'WarrantyClaim',
+      details: { count: ids.length, status },
+    });
+
     revalidatePath(`/admin/warranty-claims`);
     return { success: true };
   } catch (error) {
@@ -83,6 +97,13 @@ export async function deleteClaimPermanently(formData: FormData) {
   if (!id) return;
   try {
     await db.warrantyClaim.delete({ where: { id } });
+
+    await logActivity({
+      action: 'WARRANTY_DELETED',
+      entityType: 'WarrantyClaim',
+      entityId: id,
+    });
+
     revalidatePath(`/admin/warranty-claims`);
   } catch (error) {
     console.error('Delete failed:', error);
@@ -93,6 +114,13 @@ export async function bulkDeleteClaimsPermanently(ids: string[]) {
   if (!ids.length) return { success: false };
   try {
     await db.warrantyClaim.deleteMany({ where: { id: { in: ids } } });
+
+    await logActivity({
+      action: 'WARRANTY_BULK_DELETED',
+      entityType: 'WarrantyClaim',
+      details: { count: ids.length },
+    });
+
     revalidatePath(`/admin/warranty-claims`);
     return { success: true };
   } catch (error) {

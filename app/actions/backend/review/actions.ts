@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { Prisma, ReviewStatus } from "@prisma/client";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity-logger";
 
 // ==========================================
 // TYPES
@@ -329,27 +330,24 @@ export async function updateFullReview(
       await recalculateProductRating(oldReview.productId);
     }
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_UPDATED",
-        entityType: "Review",
-        entityId: id,
-        details: {
-          productId: oldReview.productId,
-          changes: {
-            ...(oldReview.status !== data.status
-              ? { status: { old: oldReview.status, new: data.status } }
-              : {}),
-            ...(oldReview.rating !== data.rating
-              ? { rating: { old: oldReview.rating, new: data.rating } }
-              : {}),
-            ...(oldReview.content !== data.content
-              ? { contentEdited: true }
-              : {}),
-          },
-          productRatingRecalculated: statusChanged || ratingChanged,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "REVIEW_UPDATED",
+      entityType: "Review",
+      entityId: id,
+      details: {
+        productId: oldReview.productId,
+        changes: {
+          ...(oldReview.status !== data.status
+            ? { status: { old: oldReview.status, new: data.status } }
+            : {}),
+          ...(oldReview.rating !== data.rating
+            ? { rating: { old: oldReview.rating, new: data.rating } }
+            : {}),
+          ...(oldReview.content !== data.content
+            ? { contentEdited: true }
+            : {}),
+        },
+        productRatingRecalculated: statusChanged || ratingChanged,
       },
     });
 
@@ -392,17 +390,14 @@ export async function submitReply(
       data: { reply: processedReply },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: processedReply ? "REVIEW_REPLY_ADDED" : "REVIEW_REPLY_REMOVED",
-        entityType: "Review",
-        entityId: id,
-        details: {
-          productId: review.productId,
-          hadPreviousReply: !!review.reply,
-          replyAdded: !!processedReply,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: processedReply ? "REVIEW_REPLY_ADDED" : "REVIEW_REPLY_REMOVED",
+      entityType: "Review",
+      entityId: id,
+      details: {
+        productId: review.productId,
+        hadPreviousReply: !!review.reply,
+        replyAdded: !!processedReply,
       },
     });
 
@@ -447,19 +442,16 @@ export async function updateReviewStatus(
 
     await recalculateProductRating(review.productId);
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_STATUS_CHANGED",
-        entityType: "Review",
-        entityId: id,
-        details: {
-          productId: review.productId,
-          oldStatus: review.status,
-          newStatus: status,
-          rating: review.rating,
-          productRatingRecalculated: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "REVIEW_STATUS_CHANGED",
+      entityType: "Review",
+      entityId: id,
+      details: {
+        productId: review.productId,
+        oldStatus: review.status,
+        newStatus: status,
+        rating: review.rating,
+        productRatingRecalculated: true,
       },
     });
 
@@ -508,19 +500,16 @@ export async function bulkUpdateReviewStatus(
       affectedProductIds.map((pid) => recalculateProductRating(pid))
     );
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_BULK_STATUS_CHANGED",
-        entityType: "Review",
-        entityId: ids[0],
-        details: {
-          reviewIds: ids,
-          totalCount: ids.length,
-          newStatus: status,
-          affectedProducts: affectedProductIds,
-          productRatingsRecalculated: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "REVIEW_BULK_STATUS_CHANGED",
+      entityType: "Review",
+      entityId: ids[0],
+      details: {
+        reviewIds: ids,
+        totalCount: ids.length,
+        newStatus: status,
+        affectedProducts: affectedProductIds,
+        productRatingsRecalculated: true,
       },
     });
 
@@ -552,14 +541,11 @@ export async function bulkRestoreReviews(
       data: { status: ReviewStatus.PENDING, deletedAt: null },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_BULK_RESTORED",
-        entityType: "Review",
-        entityId: ids[0],
-        details: { reviewIds: ids, totalCount: ids.length } as unknown as Prisma.InputJsonValue,
-      },
+    await logActivity({
+      action: "REVIEW_BULK_RESTORED",
+      entityType: "Review",
+      entityId: ids[0],
+      details: { reviewIds: ids, totalCount: ids.length },
     });
 
     revalidatePath("/admin/reviews");
@@ -593,18 +579,15 @@ export async function bulkForceDeleteReviews(
 
     await Promise.all(affectedProductIds.map((pid) => recalculateProductRating(pid)));
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_BULK_FORCE_DELETED",
-        entityType: "Review",
-        entityId: ids[0],
-        details: {
-          reviewIds: ids,
-          totalCount: ids.length,
-          affectedProducts: affectedProductIds,
-          permanent: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "REVIEW_BULK_FORCE_DELETED",
+      entityType: "Review",
+      entityId: ids[0],
+      details: {
+        reviewIds: ids,
+        totalCount: ids.length,
+        affectedProducts: affectedProductIds,
+        permanent: true,
       },
     });
 
@@ -641,18 +624,15 @@ export async function deleteReview(
 
     await recalculateProductRating(review.productId);
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_SOFT_DELETED",
-        entityType: "Review",
-        entityId: id,
-        details: {
-          productId: review.productId,
-          previousStatus: review.status,
-          rating: review.rating,
-          productRatingRecalculated: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "REVIEW_SOFT_DELETED",
+      entityType: "Review",
+      entityId: id,
+      details: {
+        productId: review.productId,
+        previousStatus: review.status,
+        rating: review.rating,
+        productRatingRecalculated: true,
       },
     });
 
@@ -690,16 +670,13 @@ export async function restoreReview(
       data: { status: ReviewStatus.PENDING, deletedAt: null },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_RESTORED",
-        entityType: "Review",
-        entityId: id,
-        details: {
-          productId: review.productId,
-          restoredToStatus: ReviewStatus.PENDING,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "REVIEW_RESTORED",
+      entityType: "Review",
+      entityId: id,
+      details: {
+        productId: review.productId,
+        restoredToStatus: ReviewStatus.PENDING,
       },
     });
 
@@ -733,19 +710,16 @@ export async function forceDeleteReview(
 
     await recalculateProductRating(review.productId);
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "REVIEW_FORCE_DELETED",
-        entityType: "Review",
-        entityId: id,
-        details: {
-          productId: review.productId,
-          previousStatus: review.status,
-          rating: review.rating,
-          permanent: true,
-          productRatingRecalculated: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "REVIEW_FORCE_DELETED",
+      entityType: "Review",
+      entityId: id,
+      details: {
+        productId: review.productId,
+        previousStatus: review.status,
+        rating: review.rating,
+        permanent: true,
+        productRatingRecalculated: true,
       },
     });
 

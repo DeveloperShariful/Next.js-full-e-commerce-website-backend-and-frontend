@@ -5,6 +5,7 @@
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function getUniqueMetaKeys() {
   try {
@@ -71,6 +72,13 @@ export async function updateOrderMetadata(orderId: string, metaKey: string, meta
       data: { orderId, content: `Custom field '${metaKey}' updated.`, isSystem: true }
     });
 
+    await logActivity({
+      action: 'ORDER_META_UPDATED',
+      entityType: 'Order',
+      entityId: orderId,
+      details: { metaKey },
+    });
+
     revalidatePath(`/admin/orders/${orderId}`);
     return { success: true, message: "Custom field updated successfully." };
 
@@ -106,6 +114,13 @@ export async function deleteOrderMetadata(orderId: string, metaKey: string) {
 
     await db.orderNote.create({
         data: { orderId, content: `Custom field '${metaKey}' deleted.`, isSystem: true }
+    });
+
+    await logActivity({
+      action: 'ORDER_META_DELETED',
+      entityType: 'Order',
+      entityId: orderId,
+      details: { metaKey },
     });
 
     revalidatePath(`/admin/orders/${orderId}`);

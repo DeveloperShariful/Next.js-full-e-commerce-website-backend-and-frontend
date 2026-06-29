@@ -5,6 +5,7 @@ import { db } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
+import { logActivity } from "@/lib/activity-logger";
 
 export interface CartActionResponse {
   success: boolean;
@@ -416,19 +417,29 @@ export async function applyCouponAction(code: string): Promise<CartActionRespons
     const discount = await db.discount.findFirst({ where: { code: normalizedCode } });
 
     if (!discount || !discount.isActive || discount.deletedAt) {
+      logActivity({ action: "CHECKOUT_COUPON_INVALID", details: { code: normalizedCode, reason: "invalid_or_inactive" } }).catch(() => {});
       return { success: false, error: "Invalid or expired coupon code." };
     }
 
     const now = new Date();
-    if (discount.startDate > now) return { success: false, error: "This coupon is not active yet." };
-    if (discount.endDate && discount.endDate < now) return { success: false, error: "This coupon has expired." };
+    if (discount.startDate > now) {
+      logActivity({ action: "CHECKOUT_COUPON_INVALID", details: { code: normalizedCode, reason: "not_yet_active" } }).catch(() => {});
+      return { success: false, error: "This coupon is not active yet." };
+    }
+    if (discount.endDate && discount.endDate < now) {
+      logActivity({ action: "CHECKOUT_COUPON_INVALID", details: { code: normalizedCode, reason: "expired" } }).catch(() => {});
+      return { success: false, error: "This coupon has expired." };
+    }
     if (discount.usageLimit && discount.usedCount >= discount.usageLimit) {
+      logActivity({ action: "CHECKOUT_COUPON_INVALID", details: { code: normalizedCode, reason: "usage_limit_reached" } }).catch(() => {});
       return { success: false, error: "This coupon's usage limit has been reached." };
     }
     if (discount.minSpend && subtotal < Number(discount.minSpend)) {
+      logActivity({ action: "CHECKOUT_COUPON_INVALID", details: { code: normalizedCode, reason: "below_min_spend" } }).catch(() => {});
       return { success: false, error: `Minimum spend of $${discount.minSpend} required for this coupon.` };
     }
     if (discount.maxSpend && subtotal > Number(discount.maxSpend)) {
+      logActivity({ action: "CHECKOUT_COUPON_INVALID", details: { code: normalizedCode, reason: "above_max_spend" } }).catch(() => {});
       return { success: false, error: "Maximum spend limit exceeded for this coupon." };
     }
 
@@ -442,6 +453,13 @@ export async function applyCouponAction(code: string): Promise<CartActionRespons
 
     const newCoupon = { code: discount.code, amount: discountAmount };
     await db.cart.update({ where: { id: cart.id }, data: { appliedCoupons: [newCoupon] } });
+
+    logActivity({
+      action: "CHECKOUT_COUPON_APPLIED",
+      entityType: "Discount",
+      entityId: discount.id,
+      details: { code: discount.code, amount: discountAmount },
+    }).catch(() => {});
 
     return { success: true, items, appliedCoupons: [newCoupon] };
   } catch (error) {

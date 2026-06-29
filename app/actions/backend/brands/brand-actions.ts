@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { logActivity } from "@/lib/activity-logger";
 
 // ==========================================
 // TYPES
@@ -215,18 +216,15 @@ export async function createBrand(
       },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "BRAND_CREATED",
-        entityType: "Brand",
-        entityId: brand.id,
-        details: {
-          name: brand.name,
-          slug: brand.slug,
-          website: brand.website ?? null,
-          countryOfOrigin: brand.countryOfOrigin ?? null,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "BRAND_CREATED",
+      entityType: "Brand",
+      entityId: brand.id,
+      details: {
+        name: brand.name,
+        slug: brand.slug,
+        website: brand.website ?? null,
+        countryOfOrigin: brand.countryOfOrigin ?? null,
       },
     });
 
@@ -296,18 +294,15 @@ export async function updateBrand(
 
     const changes = buildChangeDelta(oldData, data);
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "BRAND_UPDATED",
-        entityType: "Brand",
-        entityId: id,
-        details: {
-          brandName: oldData.name,
-          newSlug: slug,
-          changedFields: Object.keys(changes),
-          changes,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "BRAND_UPDATED",
+      entityType: "Brand",
+      entityId: id,
+      details: {
+        brandName: oldData.name,
+        newSlug: slug,
+        changedFields: Object.keys(changes),
+        changes,
       },
     });
 
@@ -356,16 +351,13 @@ export async function deleteBrand(
       data: { deletedAt: new Date() },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "BRAND_SOFT_DELETED",
-        entityType: "Brand",
-        entityId: id,
-        details: {
-          name: brand.name,
-          slug: brand.slug,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "BRAND_SOFT_DELETED",
+      entityType: "Brand",
+      entityId: id,
+      details: {
+        name: brand.name,
+        slug: brand.slug,
       },
     });
 
@@ -403,16 +395,13 @@ export async function restoreBrand(
       data: { deletedAt: null },
     });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "BRAND_RESTORED",
-        entityType: "Brand",
-        entityId: id,
-        details: {
-          name: brand.name,
-          slug: brand.slug,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "BRAND_RESTORED",
+      entityType: "Brand",
+      entityId: id,
+      details: {
+        name: brand.name,
+        slug: brand.slug,
       },
     });
 
@@ -455,17 +444,14 @@ export async function forceDeleteBrand(
   try {
     await db.brand.delete({ where: { id } });
 
-    await db.activityLog.create({
-      data: {
-        userId,
-        action: "BRAND_FORCE_DELETED",
-        entityType: "Brand",
-        entityId: id,
-        details: {
-          name: brand.name,
-          slug: brand.slug,
-          permanent: true,
-        } as unknown as Prisma.InputJsonValue,
+    await logActivity({
+      action: "BRAND_FORCE_DELETED",
+      entityType: "Brand",
+      entityId: id,
+      details: {
+        name: brand.name,
+        slug: brand.slug,
+        permanent: true,
       },
     });
 

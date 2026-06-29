@@ -5,7 +5,8 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ReturnStatus } from "@prisma/client";
-import { restockInventory, sendOrderEmail } from "./order-utils"; // আপনার তৈরি করা ইউটিলিটি
+import { restockInventory, sendOrderEmail } from "./order-utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function updateReturnRequest(formData: FormData) {
   try {
@@ -47,6 +48,13 @@ export async function updateReturnRequest(formData: FormData) {
         content: `Return Request #${returnId.slice(-4)} marked as ${status}. ${doRestock ? "(Inventory Restocked)" : ""}`,
         isSystem: true
       }
+    });
+
+    await logActivity({
+      action: "ORDER_RETURN_UPDATED",
+      entityType: "Order",
+      entityId: returnReq.orderId,
+      details: { returnId, status, adminNote: adminNote || null },
     });
 
     revalidatePath(`/admin/orders/${returnReq.orderId}`);

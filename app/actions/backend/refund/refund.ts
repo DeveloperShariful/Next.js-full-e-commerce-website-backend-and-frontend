@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { RefundQueryParams, GetRefundsResponse } from "@/app/(backend)/admin/refunds/types";
 import { PaymentStatus } from "@prisma/client";
+import { logActivity } from "@/lib/activity-logger";
 
 // --- 1. GET REFUNDS WITH PAGINATION, SEARCH, COUNTS & STATS ---
 export async function getRefunds(params: RefundQueryParams): Promise<GetRefundsResponse> {
@@ -129,6 +130,13 @@ export async function updateRefundStatus(id: string, status: string) {
       });
     }
 
+    await logActivity({
+      action: 'REFUND_STATUS_UPDATED',
+      entityType: 'Order',
+      entityId: refund.orderId,
+      details: { refundId: id, status, amount: Number(refund.amount) },
+    });
+
     revalidatePath("/admin/refunds");
     return { success: true, message: `Refund marked as ${status}.` };
   } catch (error) {
@@ -177,6 +185,12 @@ export async function bulkUpdateRefunds(ids: string[], action: string) {
       });
     }
 
+    await logActivity({
+      action: 'REFUND_BULK_UPDATED',
+      entityType: 'Order',
+      details: { count: ids.length, action },
+    });
+
     revalidatePath("/admin/refunds");
     return { success: true, message: "Bulk action applied successfully." };
   } catch (error) {
@@ -189,6 +203,13 @@ export async function bulkUpdateRefunds(ids: string[], action: string) {
 export async function deleteRefund(id: string) {
   try {
     await db.refund.delete({ where: { id } });
+
+    await logActivity({
+      action: 'REFUND_DELETED',
+      entityType: 'Order',
+      entityId: id,
+    });
+
     revalidatePath("/admin/refunds");
     return { success: true, message: "Record deleted permanently." };
   } catch (error) {

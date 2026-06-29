@@ -5,19 +5,10 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ProductStatus } from "@prisma/client";
-import { auth } from "@/auth"; 
-
-async function getDbUserId() {
-    const session = await auth();
-    if (!session?.user?.email) return null;
-    const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
-    return dbUser?.id;
-}
+import { logActivity } from "@/lib/activity-logger";
 
 export async function deleteProduct(id: string) {
     try {
-        const userId = await getDbUserId();
-
         const hasOrders = await db.orderItem.findFirst({
             where: { productId: id }
         });
@@ -31,17 +22,12 @@ export async function deleteProduct(id: string) {
                 }
             });
             
-            if (userId) {
-                await db.activityLog.create({
-                    data: {
-                        userId,
-                        action: "ARCHIVED_PRODUCT_SAFE",
-                        entityType: "Product",
-                        entityId: id,
-                        details: { reason: "Has sales history, soft deleted instead." }
-                    }
-                });
-            }
+            await logActivity({
+                action: "ARCHIVED_PRODUCT_SAFE",
+                entityType: "Product",
+                entityId: id,
+                details: { reason: "Has sales history, soft deleted instead." },
+            });
             revalidatePath("/admin/products");
             return { success: true, message: "Product archived (Has sales history)" };
 
@@ -61,17 +47,12 @@ export async function deleteProduct(id: string) {
                 await tx.product.delete({ where: { id } });
             });
 
-            if (userId) {
-                await db.activityLog.create({
-                    data: {
-                        userId,
-                        action: "DELETED_PRODUCT_PERMANENT",
-                        entityType: "Product",
-                        entityId: id,
-                        details: { reason: "No sales history, permanently deleted." }
-                    }
-                });
-            }
+            await logActivity({
+                action: "DELETED_PRODUCT_PERMANENT",
+                entityType: "Product",
+                entityId: id,
+                details: { reason: "No sales history, permanently deleted." },
+            });
             
             revalidatePath("/admin/products");
             return { success: true, message: "Product permanently deleted" };
@@ -86,7 +67,6 @@ export async function deleteProduct(id: string) {
 export async function bulkProductAction(formData: FormData) {
     const ids = JSON.parse(formData.get("ids") as string);
     const action = formData.get("action") as string;
-    const userId = await getDbUserId();
 
     if (!ids.length) return { success: false, message: "No items selected" };
 
@@ -142,18 +122,13 @@ export async function bulkProductAction(formData: FormData) {
                 if (unsoldProductIds.length > 0) msg += `${unsoldProductIds.length} deleted permanently. `;
                 if (soldProductIds.length > 0) msg += `${soldProductIds.length} archived (has orders).`;
                 
-                if (userId) {
-                    await db.activityLog.create({
-                        data: {
-                            userId,
-                            action: "BULK_SMART_DELETE",
-                            details: { 
-                                deleted: unsoldProductIds.length, 
-                                archived: soldProductIds.length 
-                            }
-                        }
-                    });
-                }
+                await logActivity({
+                    action: "BULK_SMART_DELETE",
+                    details: {
+                        deleted: unsoldProductIds.length,
+                        archived: soldProductIds.length,
+                    },
+                });
 
                 revalidatePath("/admin/products");
                 return { success: true, message: msg || "Action completed" };
@@ -183,16 +158,11 @@ export async function bulkProductAction(formData: FormData) {
                 return { success: false, message: `Unknown action: ${action}` };
         }
         
-        if (userId) {
-            await db.activityLog.create({
-                data: {
-                    userId,
-                    action: `BULK_${action.toUpperCase()}`,
-                    entityType: "Product",
-                    details: { count: ids.length, affectedIds: ids }
-                }
-            });
-        }
+        await logActivity({
+            action: `BULK_${action.toUpperCase()}`,
+            entityType: "Product",
+            details: { count: ids.length, affectedIds: ids },
+        });
 
         revalidatePath("/admin/products");
         return { success: true, message: "Bulk action applied" };
@@ -204,23 +174,16 @@ export async function bulkProductAction(formData: FormData) {
 
 export async function moveToTrash(id: string) {
     try {
-        const userId = await getDbUserId();
-        
         await db.product.update({
             where: { id },
             data: { status: ProductStatus.ARCHIVED, deletedAt: new Date() }
         });
 
-        if (userId) {
-            await db.activityLog.create({
-                data: {
-                    userId,
-                    action: "MOVED_TO_TRASH",
-                    entityType: "Product",
-                    entityId: id
-                }
-            });
-        }
+        await logActivity({
+            action: "MOVED_TO_TRASH",
+            entityType: "Product",
+            entityId: id,
+        });
 
         revalidatePath("/admin/products");
         return { success: true };

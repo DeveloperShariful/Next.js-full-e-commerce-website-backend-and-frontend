@@ -5,7 +5,8 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@/auth"; 
+import { auth } from "@/auth";
+import { logActivity } from "@/lib/activity-logger";
 
 // --- SCHEMAS ---
 const SupplierSchema = z.object({
@@ -79,36 +80,22 @@ export async function adjustStock(id: string, adjustment: number, reason: string
       return { success: false, message: "Unauthorized: User not found" };
     }
 
-    // 🚀 Get Actual DB User ID
-    const dbUser = await db.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true }
-    });
-
-    if (!dbUser) {
-       return { success: false, message: "Unauthorized: DB User not found" };
-    }
-
     const level = await db.inventoryLevel.findUnique({ where: { id } });
     if (!level) return { success: false, message: "Inventory record not found" };
 
     const newQty = level.quantity + adjustment;
     if (newQty < 0) return { success: false, message: "Stock cannot be negative" };
 
-    await db.$transaction([
-      db.inventoryLevel.update({
-        where: { id },
-        data: { quantity: newQty }
-      }),
-      db.activityLog.create({
-        data: {
-          action: `Stock Adjusted (${adjustment > 0 ? '+' : ''}${adjustment})`,
-          entityId: id,
-          details: { reason, old: level.quantity, new: newQty },
-          userId: dbUser.id 
-        }
-      })
-    ]);
+    await db.inventoryLevel.update({
+      where: { id },
+      data: { quantity: newQty }
+    });
+
+    await logActivity({
+      action: `Stock Adjusted (${adjustment > 0 ? '+' : ''}${adjustment})`,
+      entityId: id,
+      details: { reason, old: level.quantity, new: newQty },
+    });
 
     revalidatePath("/admin/inventory");
     return { success: true, message: "Stock updated successfully" };

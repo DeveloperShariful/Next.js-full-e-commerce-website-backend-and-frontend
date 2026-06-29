@@ -25,11 +25,11 @@ async function getAuthUser() {
 
 // Internal helper — no auth needed, called from background tasks
 async function _doCleanupOldLogs() {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const fifteenDaysAgo = new Date();
+  fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
   const result = await db.activityLog.deleteMany({
-    where: { createdAt: { lt: thirtyDaysAgo } },
+    where: { createdAt: { lt: fifteenDaysAgo } },
   });
   return { success: true, count: result.count };
 }

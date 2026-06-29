@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { sendOrderEmail } from "./order-utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function addTrackingInfo(formData: FormData) {
   try {
@@ -73,6 +74,13 @@ export async function addTrackingInfo(formData: FormData) {
 
     // 4. Notify customer about shipment
     await sendOrderEmail(orderId, "ORDER_SHIPPED");
+
+    await logActivity({
+      action: "ORDER_FULFILLED",
+      entityType: "Order",
+      entityId: orderId,
+      details: { courier: courier || "Standard Courier", trackingNumber },
+    });
 
     revalidatePath(`/admin/orders/${orderId}`);
     return { success: true, message: "Tracking added successfully" };

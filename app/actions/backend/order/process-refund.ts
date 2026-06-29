@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import Stripe from "stripe";
 import { decrypt } from "@/app/actions/backend/settings/payments/crypto";
 import { restockInventory, sendOrderEmail } from "./order-utils";
+import { logActivity } from "@/lib/activity-logger";
 
 export async function processRefund(formData: FormData) {
   try {
@@ -216,6 +217,19 @@ export async function processRefund(formData: FormData) {
 
         // Notify customer + admin about the refund
         await sendOrderEmail(orderId, "PAYMENT_REFUNDED");
+
+        await logActivity({
+          action: "ORDER_REFUNDED",
+          entityType: "Order",
+          entityId: orderId,
+          details: {
+            amount,
+            currency: order.currency,
+            gateway: order.paymentGateway,
+            reason,
+            refundId: gatewayRefundId,
+          },
+        });
 
         revalidatePath(`/admin/orders/${orderId}`);
         return { success: true, message: "Refund processed successfully" };

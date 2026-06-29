@@ -18,6 +18,7 @@ import {
   bulkRestoreReviews,
   bulkForceDeleteReviews,
 } from "@/app/actions/backend/review/actions";
+import { importReviewsFromCSV, exportReviewsToCSV } from "@/app/actions/backend/review/import-export";
 
 import ReviewHeader from "./header";
 import ReviewList from "./review-list";
@@ -36,6 +37,7 @@ export default function ReviewView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationData>({ totalItems: 0, totalPages: 1, currentPage: 1, limit: 20 });
   const [counts, setCounts] = useState({ all: 0, pending: 0, approved: 0, rejected: 0, trash: 0 });
+  const [isImporting, setIsImporting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -146,12 +148,46 @@ export default function ReviewView() {
     return res.success;
   };
 
+  // --- IMPORT / EXPORT ---
+  const handleImport = async (csvText: string) => {
+    setIsImporting(true);
+    const toastId = toast.loading("Importing reviews...");
+    const res = await importReviewsFromCSV(csvText);
+    if (res.success) {
+      toast.success(res.message ?? "Import সম্পন্ন", { id: toastId, duration: 6000 });
+      fetchData();
+    } else {
+      toast.error(res.message ?? "Import failed", { id: toastId });
+    }
+    setIsImporting(false);
+  };
+
+  const handleExport = async () => {
+    const toastId = toast.loading("Exporting reviews...");
+    try {
+      const csv = await exportReviewsToCSV();
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reviews-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export সম্পন্ন", { id: toastId });
+    } catch {
+      toast.error("Export failed", { id: toastId });
+    }
+  };
+
   return (
     <div className="font-sans text-[#3c434a] max-w-full">
       
-      <ReviewHeader 
+      <ReviewHeader
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        onImport={handleImport}
+        onExport={handleExport}
+        isImporting={isImporting}
       />
 
       <div className="mt-4">

@@ -84,7 +84,7 @@ export const sidebarConfig: SidebarGroup[] = [
     title: "Marketing",
     items: [ {
         name: "Integrations",
-        href: "/admin/marketing",
+        href: "/admin/marketing/merchant-center",
         icon: Plug,
         submenu: [
          { name: "Klaviyo",        href: "/admin/marketing/klaviyo",         icon: Network,   roles: [Role.SUPER_ADMIN, Role.ADMIN] },

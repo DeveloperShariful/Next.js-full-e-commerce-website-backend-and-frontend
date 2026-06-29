@@ -1,6 +1,6 @@
 // File: app/(backend)/admin/reviews/types.ts
 
-export type ReviewStatus = "PENDING" | "APPROVED" | "SPAM" | "TRASH";
+export type ReviewStatus = "PENDING" | "APPROVED" | "SPAM" | "REJECTED" | "TRASH";
 
 export interface ReviewData {
   id: string;

@@ -48,7 +48,7 @@ const updateReviewSchema = z.object({
   title: z.string().optional().nullable(),
   content: z.string().min(1, "Review content cannot be empty"),
   rating: z.number().int().min(1).max(5),
-  status: z.enum(["PENDING", "APPROVED", "SPAM", "TRASH"]),
+  status: z.enum(["PENDING", "APPROVED", "SPAM", "REJECTED", "TRASH"]),
 });
 
 // ==========================================
@@ -282,7 +282,7 @@ export async function updateFullReview(
     title: string | null;
     content: string;
     rating: number;
-    status: "PENDING" | "APPROVED" | "SPAM" | "TRASH";
+    status: "PENDING" | "APPROVED" | "SPAM" | "REJECTED" | "TRASH";
   }
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const userId = await getDbUserId();
@@ -480,7 +480,7 @@ export async function updateReviewStatus(
 
 export async function bulkUpdateReviewStatus(
   ids: string[],
-  status: "PENDING" | "APPROVED" | "SPAM" | "TRASH"
+  status: "PENDING" | "APPROVED" | "SPAM" | "REJECTED" | "TRASH"
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const userId = await getDbUserId();
   if (!userId) return { success: false, error: "Unauthorized access." };

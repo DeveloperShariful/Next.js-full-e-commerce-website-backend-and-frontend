@@ -314,6 +314,7 @@ enum ReviewStatus {
   PENDING
   APPROVED
   SPAM
+  REJECTED
   TRASH
 }
 

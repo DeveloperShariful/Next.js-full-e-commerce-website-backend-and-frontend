@@ -176,7 +176,7 @@ export default function ReviewEditForm({ initialData }: ReviewEditFormProps) {
               <p className="text-[13px] text-[#3c434a] font-semibold mb-1 flex items-center gap-1.5">
                 <span className="text-[#8c8f94]">📌</span> Status: 
                 <span className="font-bold ml-1">
-                  {formData.status === "APPROVED" ? "Approved" : formData.status === "PENDING" ? "Pending" : "Spam"}
+                  {formData.status === "APPROVED" ? "Approved" : formData.status === "PENDING" ? "Pending" : formData.status === "REJECTED" ? "Rejected" : formData.status === "TRASH" ? "Trash" : "Spam"}
                 </span>
               </p>
               <div className="flex flex-col gap-1.5 pl-5">
@@ -191,6 +191,10 @@ export default function ReviewEditForm({ initialData }: ReviewEditFormProps) {
                 <label className="flex items-center gap-2 text-[13px] text-[#3c434a] cursor-pointer">
                   <input type="radio" name="status" value="SPAM" checked={formData.status === "SPAM"} onChange={(e) => setFormData({...formData, status: e.target.value as "PENDING" | "APPROVED" | "SPAM" | "REJECTED" | "TRASH"})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
                   Spam
+                </label>
+                <label className="flex items-center gap-2 text-[13px] text-[#3c434a] cursor-pointer">
+                  <input type="radio" name="status" value="REJECTED" checked={formData.status === "REJECTED"} onChange={(e) => setFormData({...formData, status: e.target.value as "PENDING" | "APPROVED" | "SPAM" | "REJECTED" | "TRASH"})} className="w-3.5 h-3.5 text-[#2271b1] border-[#8c8f94] focus:ring-[#2271b1]" />
+                  Rejected
                 </label>
               </div>
             </div>

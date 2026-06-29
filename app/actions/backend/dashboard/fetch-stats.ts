@@ -9,21 +9,23 @@ import { DashboardPulse, StatusBreakdown } from "./types";
 // Helper to fetch single range stats
 async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: Date, prevEndDate: Date): Promise<DashboardPulse> {
   
-  // 1. REVENUE (Strictly PAID orders only)
+  // 1. REVENUE (Strictly PAID orders only, excluding trashed)
   const currentPaid = await db.order.aggregate({
-    where: { 
-      createdAt: { gte: startDate, lte: endDate }, 
+    where: {
+      createdAt: { gte: startDate, lte: endDate },
       paymentStatus: "PAID",
-      status: { not: OrderStatus.CANCELLED } 
+      status: { not: OrderStatus.CANCELLED },
+      deletedAt: null,
     },
     _sum: { total: true }
   });
 
   const prevPaid = await db.order.aggregate({
-    where: { 
-      createdAt: { gte: prevStartDate, lte: prevEndDate }, 
+    where: {
+      createdAt: { gte: prevStartDate, lte: prevEndDate },
       paymentStatus: "PAID",
-      status: { not: OrderStatus.CANCELLED } 
+      status: { not: OrderStatus.CANCELLED },
+      deletedAt: null,
     },
     _sum: { total: true }
   });
@@ -32,19 +34,21 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
   const currentRevenue = Number(currentPaid._sum.total || 0);
   const prevRevenue = Number(prevPaid._sum.total || 0);
 
-  // 2. ORDER COUNTS (Total, Paid, Unpaid)
+  // 2. ORDER COUNTS (Total, Paid, Unpaid, excluding trashed)
   const currentOrders = await db.order.findMany({
-    where: { 
-      createdAt: { gte: startDate, lte: endDate }, 
-      status: { not: OrderStatus.CANCELLED } 
+    where: {
+      createdAt: { gte: startDate, lte: endDate },
+      status: { not: OrderStatus.CANCELLED },
+      deletedAt: null,
     },
     select: { id: true, paymentStatus: true, status: true }
   });
 
   const prevOrdersCount = await db.order.count({
-    where: { 
-      createdAt: { gte: prevStartDate, lte: prevEndDate }, 
-      status: { not: OrderStatus.CANCELLED } 
+    where: {
+      createdAt: { gte: prevStartDate, lte: prevEndDate },
+      status: { not: OrderStatus.CANCELLED },
+      deletedAt: null,
     }
   });
 
@@ -89,12 +93,14 @@ export async function getAllStats(
   todayStart: Date, todayEnd: Date,
   yesterdayStart: Date, yesterdayEnd: Date,
   weekStart: Date, monthStart: Date,
-  prevDayStart: Date, prevWeekStart: Date, prevMonthStart: Date
+  prevDayStart: Date, prevWeekStart: Date, prevMonthStart: Date,
+  thisMonthStart: Date, prevCalMonthStart: Date, prevCalMonthEnd: Date
 ) {
   return await Promise.all([
     getStatsForRange(todayStart, todayEnd, yesterdayStart, yesterdayEnd),
     getStatsForRange(yesterdayStart, yesterdayEnd, prevDayStart, yesterdayStart),
     getStatsForRange(weekStart, todayEnd, prevWeekStart, weekStart),
-    getStatsForRange(monthStart, todayEnd, prevMonthStart, monthStart)
+    getStatsForRange(monthStart, todayEnd, prevMonthStart, monthStart),
+    getStatsForRange(thisMonthStart, todayEnd, prevCalMonthStart, prevCalMonthEnd),
   ]);
 }

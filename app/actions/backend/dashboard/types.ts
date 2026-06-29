@@ -31,7 +31,8 @@ export interface DashboardStats {
 }
 
 export interface ActionAlerts {
-  unfulfilled: number;
+  totalProducts: number;
+  pendingReviews: number;
   returns: number;
   disputes: number;
   lowStock: number;

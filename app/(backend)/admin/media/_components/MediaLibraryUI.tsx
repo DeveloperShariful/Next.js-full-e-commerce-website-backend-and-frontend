@@ -2,87 +2,105 @@
 
 'use client';
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { upload } from '@vercel/blob/client';
-import { saveMediaRecord, bulkDeleteMedia } from '@/app/actions/backend/media/media-action';
-import { Media } from '@prisma/client'; // NEW: Imported original Prisma Type
+import { saveMediaRecord, bulkDeleteMedia, getAllMedia } from '@/app/actions/backend/media/media-action';
+import { Media } from '@prisma/client';
 import MediaToolbar from './MediaToolbar';
 import MediaGrid from './MediaGrid';
 import MediaModal from './MediaModal';
 
+type ViewMode = 'grid' | 'list';
+type SortBy = 'date' | 'name' | 'size';
+
 type MediaLibraryUIProps = {
-  initialMedia: Media[]; // Strongly typed array
+  initialMedia: Media[];
 };
 
 export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
   const [mediaList, setMediaList] = useState<Media[]>(initialMedia);
   const [showUploader, setShowUploader] = useState(false);
-  
-  // Filters & Search
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('ALL'); 
-  const [sourceFilter, setSourceFilter] = useState('ALL');
 
-  // Bulk Select Mode
+  // Filters, Search, View, Sort
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [sourceFilter, setSourceFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+
+  // Bulk Select
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
-  // Upload State
+  // Upload
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Modal State
+  // Modal
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  // 1. COUNTS
-  const typeCounts = useMemo(() => ({
-    ALL: mediaList.length,
-    IMAGE: mediaList.filter(m => m.type === 'IMAGE').length,
-    VIDEO: mediaList.filter(m => m.type === 'VIDEO').length,
-    DOCUMENT: mediaList.filter(m => m.type === 'DOCUMENT').length,
-  }), [mediaList]);
-
-  const sourceCounts = useMemo(() => ({
-    ALL: mediaList.length,
-    GENERAL: mediaList.filter(m => m.source === 'GENERAL').length,
-    PRODUCT: mediaList.filter(m => m.source === 'PRODUCT').length,
-    CATEGORY: mediaList.filter(m => m.source === 'CATEGORY').length,
-    BRAND: mediaList.filter(m => m.source === 'BRAND').length,
-    AFFILIATE: mediaList.filter(m => m.source === 'AFFILIATE').length,
-    WARRANTY: mediaList.filter(m => m.source === 'WARRANTY').length,
-    USER: mediaList.filter(m => m.source === 'USER').length,
-    STORE: mediaList.filter(m => m.source === 'STORE').length,
-    REVIEW: mediaList.filter(m => m.source === 'REVIEW').length,
-  }), [mediaList]);
-
-  // 2. PAGINATION STATE
+  // Pagination
   const [perPage, setPerPage] = useState(50);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // 3. FILTER LOGIC
+  // ── Counts (single pass — O(n) instead of 9 passes) ──
+  const { typeCounts, sourceCounts } = useMemo(() => {
+    const tc: Record<string, number> = { ALL: 0, IMAGE: 0, VIDEO: 0, DOCUMENT: 0 };
+    const sc: Record<string, number> = { ALL: 0, GENERAL: 0, PRODUCT: 0, CATEGORY: 0, BRAND: 0, AFFILIATE: 0, WARRANTY: 0, USER: 0, STORE: 0, REVIEW: 0 };
+    for (const m of mediaList) {
+      tc.ALL++;
+      if (m.type in tc) tc[m.type] = (tc[m.type] ?? 0) + 1;
+      sc.ALL++;
+      if (m.source in sc) sc[m.source] = (sc[m.source] ?? 0) + 1;
+    }
+    return { typeCounts: tc, sourceCounts: sc };
+  }, [mediaList]);
+
+  // ── Total storage size ──
+  const totalBytes = useMemo(() => mediaList.reduce((sum, m) => sum + (m.size || 0), 0), [mediaList]);
+  const totalStorageLabel = totalBytes > 1024 * 1024 * 1024
+    ? `${(totalBytes / (1024 ** 3)).toFixed(2)} GB`
+    : totalBytes > 1024 * 1024
+    ? `${(totalBytes / (1024 ** 2)).toFixed(1)} MB`
+    : `${(totalBytes / 1024).toFixed(0)} KB`;
+
+  // ── Filter + Sort ──
   const filteredMedia = useMemo(() => {
+    const q = searchQuery.toLowerCase();
     return mediaList.filter(item => {
-      const matchSearch = item.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (item.originalName && item.originalName.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchSearch = !q || item.filename.toLowerCase().includes(q) || (item.originalName?.toLowerCase().includes(q) ?? false);
       const matchType = typeFilter === 'ALL' || item.type === typeFilter;
       const matchSource = sourceFilter === 'ALL' || item.source === sourceFilter;
       return matchSearch && matchType && matchSource;
     });
   }, [mediaList, searchQuery, typeFilter, sourceFilter]);
 
-  // 4. PAGINATED SLICE
-  const totalPages = Math.max(1, Math.ceil(filteredMedia.length / perPage));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedMedia = filteredMedia.slice((safePage - 1) * perPage, safePage * perPage);
-  const fromItem = filteredMedia.length === 0 ? 0 : (safePage - 1) * perPage + 1;
-  const toItem = Math.min(safePage * perPage, filteredMedia.length);
+  const sortedMedia = useMemo(() => {
+    const sorted = [...filteredMedia];
+    if (sortBy === 'name') sorted.sort((a, b) => a.filename.localeCompare(b.filename));
+    else if (sortBy === 'size') sorted.sort((a, b) => b.size - a.size);
+    else sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return sorted;
+  }, [filteredMedia, sortBy]);
 
-  // Reset to page 1 when filters/search change
+  // ── Pagination ──
+  const totalPages = Math.max(1, Math.ceil(sortedMedia.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedMedia = sortedMedia.slice((safePage - 1) * perPage, safePage * perPage);
+  const fromItem = sortedMedia.length === 0 ? 0 : (safePage - 1) * perPage + 1;
+  const toItem = Math.min(safePage * perPage, sortedMedia.length);
+
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => { setter(v); setCurrentPage(1); };
 
-  // 2. UPLOAD LOGIC
+  // ── Refresh after sync (replaces window.location.reload) ──
+  const refreshMedia = useCallback(async () => {
+    const fresh = await getAllMedia();
+    setMediaList(fresh);
+  }, []);
+
+  // ── Upload ──
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -90,7 +108,7 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
     setIsUploading(true);
     setUploadProgress(0);
 
-    let uploadedFiles: Media[] = [];
+    const uploadedFiles: Media[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
@@ -98,8 +116,8 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
           access: 'public',
           handleUploadUrl: '/api/upload',
           onUploadProgress: (progressEvent: { loaded: number; total: number }) => {
-            const percentage = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-            setUploadProgress(percentage);
+            const total = progressEvent.total || 1;
+            setUploadProgress(Math.round((progressEvent.loaded / total) * 100));
           },
         });
 
@@ -115,8 +133,9 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
         if (dbResult.success && dbResult.media) {
           uploadedFiles.push(dbResult.media);
         }
-      } catch (error) {
-        alert(`Failed to upload ${file.name}`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Failed to upload ${file.name}: ${msg}`);
       }
     }
 
@@ -129,37 +148,35 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // 3. BULK DELETE LOGIC
+  // ── Bulk Delete ──
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     if (!confirm(`Are you sure you want to permanently delete ${selectedIds.length} items from your site?\nThis cannot be undone.`)) return;
 
     setIsDeletingBulk(true);
-    
-    const itemsToDelete = mediaList
-      .filter(m => selectedIds.includes(m.id))
-      .map(m => ({ id: m.id, pathname: m.pathname }));
+    const res = await bulkDeleteMedia(selectedIds);
 
-    const res = await bulkDeleteMedia(itemsToDelete);
-    
     if (res.success) {
       setMediaList(prev => prev.filter(m => !selectedIds.includes(m.id)));
-      setSelectedIds([]); 
-      setIsBulkMode(false); 
+      setSelectedIds([]);
+      setIsBulkMode(false);
     } else {
       alert(res.message);
     }
-    
+
     setIsDeletingBulk(false);
   };
 
   return (
     <div className="font-sans text-[#2c3338] w-full pb-20">
-      
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 px-2 md:px-0 pt-4">
         <h1 className="text-2xl font-normal text-[#1d2327]">Media Library</h1>
-        <button 
+        <span className="text-[13px] text-[#646970] hidden md:block">
+          {mediaList.length} files · {totalStorageLabel} used
+        </span>
+        <button
           onClick={() => setShowUploader(!showUploader)}
           className="border border-[#2271b1] text-[#2271b1] bg-[#f6f7f7] hover:bg-[#f0f0f1] px-3 py-1 rounded-sm text-sm transition-colors w-max"
         >
@@ -170,11 +187,11 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
       {/* Slide-down Uploader */}
       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${showUploader ? 'max-h-[500px] mb-6 opacity-100' : 'max-h-0 opacity-0'}`}>
         <div className="border-2 border-dashed border-[#c3c4c7] bg-white rounded-sm p-8 md:p-14 text-center relative mx-2 md:mx-0">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            multiple 
-            accept="image/jpeg, image/png, image/webp, image/svg+xml, video/mp4, video/quicktime, application/pdf" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            multiple
+            accept="image/jpeg, image/png, image/webp, image/svg+xml, video/mp4, video/quicktime, application/pdf"
             onChange={handleFileSelect}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             disabled={isUploading}
@@ -191,14 +208,14 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
             <div className="w-full max-w-md mx-auto z-20 relative">
               <p className="text-[#2c3338] font-bold mb-2 text-sm">Uploading... {uploadProgress}%</p>
               <div className="w-full bg-[#f0f0f1] rounded-full h-4 shadow-inner overflow-hidden border border-gray-200">
-                <div className="bg-[#2271b1] h-full transition-all duration-200" style={{ width: `${uploadProgress}%` }}></div>
+                <div className="bg-[#2271b1] h-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Shared Toolbar */}
+      {/* Toolbar */}
       <MediaToolbar
         searchQuery={searchQuery}
         setSearchQuery={handleFilterChange(setSearchQuery)}
@@ -214,14 +231,19 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
         isDeletingBulk={isDeletingBulk}
         typeCounts={typeCounts}
         sourceCounts={sourceCounts}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        onSyncComplete={refreshMedia}
       />
 
       {/* Per-page + counter row */}
       <div className="flex items-center justify-between px-2 md:px-0 mb-3 text-[13px] text-[#50575e]">
         <span>
-          {filteredMedia.length === 0
+          {sortedMedia.length === 0
             ? 'No items found'
-            : `Showing ${fromItem}–${toItem} of ${filteredMedia.length} items`}
+            : `Showing ${fromItem}–${toItem} of ${sortedMedia.length} items`}
         </span>
         <div className="flex items-center gap-2">
           <span>Show:</span>
@@ -237,16 +259,17 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
         </div>
       </div>
 
-      {/* Shared Grid */}
+      {/* Grid / List */}
       <MediaGrid
         filteredMedia={paginatedMedia}
         isBulkMode={isBulkMode}
         selectedIds={selectedIds}
         setSelectedIds={setSelectedIds}
         setSelectedIndex={setSelectedIndex}
+        viewMode={viewMode}
       />
 
-      {/* Pagination controls */}
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-1 mt-6 flex-wrap">
           <button
@@ -288,14 +311,13 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
         </div>
       )}
 
-      {/* Details Modal Popup */}
+      {/* Details Modal */}
       <MediaModal
-        filteredMedia={filteredMedia}
+        filteredMedia={sortedMedia}
         selectedIndex={selectedIndex}
         setSelectedIndex={setSelectedIndex}
         setMediaList={setMediaList}
       />
-
     </div>
   );
 }

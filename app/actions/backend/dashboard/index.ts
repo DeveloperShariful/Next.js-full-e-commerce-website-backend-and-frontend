@@ -2,7 +2,7 @@
 
 "use server";
 
-import { startOfDay, endOfDay, subDays } from "date-fns";
+import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { getAllStats } from "./fetch-stats";
 import { getActionAlerts } from "./fetch-alerts";
 import { getGraphData, getRecentData, getStoreSettings } from "./fetch-misc";
@@ -22,6 +22,11 @@ export async function getDashboardOverview() {
     const weekStart = startOfDay(subDays(now, 7));
     const monthStart = startOfDay(subDays(now, 30));
 
+    // This Month (calendar month: 1st of current month → now)
+    const thisMonthStart = startOfMonth(now);
+    const prevCalMonthStart = startOfMonth(subMonths(now, 1));
+    const prevCalMonthEnd = endOfMonth(subMonths(now, 1));
+
     // Comparison Ranges
     const prevDayStart = startOfDay(subDays(now, 2));
     const prevWeekStart = startOfDay(subDays(now, 14));
@@ -29,13 +34,13 @@ export async function getDashboardOverview() {
 
     // 2. Execute All Queries in Parallel
     const [
-      [todayStats, yesterdayStats, weekStats, monthStats],
+      [todayStats, yesterdayStats, weekStats, monthStats, thisMonthStats],
       alerts,
       graphData,
       { recentOrders, recentActivities },
       currencySymbol
     ] = await Promise.all([
-      getAllStats(todayStart, todayEnd, yesterdayStart, yesterdayEnd, weekStart, monthStart, prevDayStart, prevWeekStart, prevMonthStart),
+      getAllStats(todayStart, todayEnd, yesterdayStart, yesterdayEnd, weekStart, monthStart, prevDayStart, prevWeekStart, prevMonthStart, thisMonthStart, prevCalMonthStart, prevCalMonthEnd),
       getActionAlerts(),
       getGraphData(now),
       getRecentData(),
@@ -48,7 +53,8 @@ export async function getDashboardOverview() {
         today: todayStats,
         yesterday: yesterdayStats,
         week: weekStats,
-        month: monthStats
+        month: monthStats,
+        this_month: thisMonthStats,
       },
       alerts,
       graphData,

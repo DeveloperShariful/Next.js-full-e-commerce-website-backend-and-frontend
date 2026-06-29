@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { upload } from '@vercel/blob/client';
 import { getAllMedia, saveMediaRecord } from '@/app/actions/backend/media/media-action';
@@ -34,6 +34,7 @@ type Props = {
 };
 
 export default function MediaPickerModal({ open, onClose, onSelect, multiple = false, title, source }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [mediaList, setMediaList] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -46,6 +47,9 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const PAGE_SIZE = 40;
+
+  // SSR safety: only render portal after mount
+  useEffect(() => { setMounted(true); }, []);
 
   const loadMedia = useCallback(async () => {
     setLoading(true);
@@ -65,29 +69,28 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     }
   }, [open, loadMedia]);
 
-  // Reset pagination when search or type filter changes
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [search, typeFilter]);
 
-  if (!open) return null;
-
-  const filtered = mediaList.filter(m => {
-    const matchSearch =
-      m.filename.toLowerCase().includes(search.toLowerCase()) ||
-      (m.originalName?.toLowerCase().includes(search.toLowerCase()) ?? false);
-    const matchType = typeFilter === 'ALL' || m.type === typeFilter;
-    return matchSearch && matchType;
-  });
+  // Memoized filter — avoids O(n) pass on every render
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return mediaList.filter(m => {
+      const matchSearch = !q
+        || m.filename.toLowerCase().includes(q)
+        || (m.originalName?.toLowerCase().includes(q) ?? false);
+      const matchType = typeFilter === 'ALL' || m.type === typeFilter;
+      return matchSearch && matchType;
+    });
+  }, [mediaList, search, typeFilter]);
 
   const visibleItems = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
 
   const toggleSelect = (id: string) => {
     if (multiple) {
-      setSelectedIds(prev =>
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-      );
+      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     } else {
       setSelectedIds([id]);
     }
@@ -113,10 +116,12 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
           access: 'public',
           handleUploadUrl: '/api/upload',
           onUploadProgress: (p: { loaded: number; total: number }) => {
-            setUploadProgress(Math.round((p.loaded / p.total) * 100));
+            const total = p.total || 1;
+            setUploadProgress(Math.round((p.loaded / total) * 100));
           },
         });
-        await saveMediaRecord({
+
+        const dbResult = await saveMediaRecord({
           url: blob.url,
           pathname: blob.pathname,
           filename: file.name,
@@ -124,8 +129,14 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
           size: file.size,
           source: source ?? MediaSource.GENERAL,
         });
-      } catch {
-        alert(`Failed to upload ${file.name}`);
+
+        if (!dbResult.success) {
+          console.error('Failed to save media record for', file.name, dbResult.message);
+          alert(`File uploaded but failed to save to library: ${file.name}`);
+        }
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Failed to upload ${file.name}: ${msg}`);
       }
     }
 
@@ -135,6 +146,8 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     if (fileInputRef.current) fileInputRef.current.value = '';
     loadMedia();
   };
+
+  if (!open || !mounted) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4">
@@ -152,7 +165,6 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-[#c3c4c7] bg-white shrink-0">
-          {/* Search */}
           <div className="relative">
             <IoSearchOutline size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8c8f94]" />
             <input
@@ -164,7 +176,6 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
             />
           </div>
 
-          {/* Type filter */}
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
@@ -177,20 +188,15 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
           </select>
 
           <span className="text-[12px] text-[#646970]">
-            {visibleCount < filtered.length
-              ? `${visibleCount} of ${filtered.length} files`
-              : `${filtered.length} files`}
+            {visibleCount < filtered.length ? `${visibleCount} of ${filtered.length} files` : `${filtered.length} files`}
           </span>
 
           <div className="flex-1" />
 
-          {/* Upload toggle */}
           <button
             onClick={() => setShowUploader(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-[5px] text-[13px] border rounded-[3px] cursor-pointer transition-colors ${
-              showUploader
-                ? 'bg-[#135e96] border-[#135e96] text-white'
-                : 'bg-[#2271b1] border-[#2271b1] text-white hover:bg-[#135e96]'
+              showUploader ? 'bg-[#135e96] border-[#135e96] text-white' : 'bg-[#2271b1] border-[#2271b1] text-white hover:bg-[#135e96]'
             }`}
           >
             <IoCloudUploadOutline size={14} />
@@ -198,7 +204,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
           </button>
         </div>
 
-        {/* Upload panel (slide down) */}
+        {/* Upload panel */}
         {showUploader && (
           <div className="px-4 py-3 border-b border-[#c3c4c7] bg-[#f6f7f7] shrink-0">
             <div className="border-2 border-dashed border-[#c3c4c7] bg-white rounded-sm p-6 text-center relative">
@@ -215,10 +221,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                 <div className="max-w-xs mx-auto">
                   <p className="text-[13px] font-semibold text-[#2c3338] mb-2">Uploading... {uploadProgress}%</p>
                   <div className="w-full bg-[#f0f0f1] rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-[#2271b1] h-full transition-all duration-200"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
+                    <div className="bg-[#2271b1] h-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
                   </div>
                 </div>
               ) : (
@@ -260,7 +263,6 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                       isSelected ? 'outline outline-[3px] outline-[#2271b1] z-10' : ''
                     }`}
                   >
-                    {/* Thumbnail */}
                     <div className="w-full h-full bg-[#f0f0f1] flex items-center justify-center">
                       {file.type === 'IMAGE' ? (
                         <Image
@@ -269,19 +271,14 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                           fill
                           className="object-cover"
                           sizes="120px"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : file.type === 'VIDEO' ? (
                         <div className="relative w-full h-full bg-[#1d2327]">
-                          <video
-                            src={`${file.url}#t=1`}
-                            className="w-full h-full object-cover"
-                            preload="metadata"
-                            muted
-                            playsInline
-                          />
+                          <video src={`${file.url}#t=1`} className="w-full h-full object-cover" preload="metadata" muted playsInline />
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="bg-black/50 rounded-full p-1.5">
-                              <svg className="w-4 h-4 text-white fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                              <svg className="w-4 h-4 text-white fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                             </div>
                           </div>
                           <div className="absolute bottom-1 left-1 bg-black/60 rounded-sm px-1 py-0.5 pointer-events-none">
@@ -293,19 +290,16 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                       )}
                     </div>
 
-                    {/* Hover overlay */}
                     <div className={`absolute inset-0 transition-colors ${
                       isSelected ? 'bg-[#2271b1]/20' : 'bg-black/0 group-hover:bg-black/10'
                     }`} />
 
-                    {/* Checkmark */}
                     {isSelected && (
                       <div className="absolute top-1 left-1 w-5 h-5 bg-[#2271b1] rounded-sm flex items-center justify-center shadow">
                         <IoCheckmarkOutline className="text-white text-sm font-bold" />
                       </div>
                     )}
 
-                    {/* Filename on hover */}
                     <div className="absolute bottom-0 inset-x-0 bg-[#1d2327]/80 text-white text-[9px] px-1.5 py-[3px] truncate opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                       {file.filename}
                     </div>
@@ -315,7 +309,6 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
             </div>
           )}
 
-          {/* Load More */}
           {hasMore && (
             <div className="flex justify-center pt-4 pb-1">
               <button
@@ -331,9 +324,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-2.5 border-t border-[#c3c4c7] bg-[#f6f7f7] shrink-0">
           <span className="text-[13px] text-[#646970]">
-            {selectedIds.length > 0
-              ? `${selectedIds.length} file${selectedIds.length > 1 ? 's' : ''} selected`
-              : 'No files selected'}
+            {selectedIds.length > 0 ? `${selectedIds.length} file${selectedIds.length > 1 ? 's' : ''} selected` : 'No files selected'}
           </span>
           <div className="flex gap-2">
             <button
@@ -353,6 +344,6 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

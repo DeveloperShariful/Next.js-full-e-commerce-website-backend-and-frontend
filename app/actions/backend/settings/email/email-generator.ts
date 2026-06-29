@@ -21,6 +21,7 @@ interface EmailOrder {
   taxTotal: number;
   refundedAmount: number;
   discountTotal: number;
+  couponCode?: string | null;
   shippingMethod: string | null;
   shippingTrackingNumber: string | null;
   paymentMethod: string | null;
@@ -203,7 +204,10 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
       if (order.discountTotal > 0) {
         totalsHtml += `
         <tr>
-          <td colspan="2" class="ttd" style="padding: 11px 16px; color: #555; font-size: 14px;">Discount:</td>
+          <td colspan="2" class="ttd" style="padding: 11px 16px; color: #555; font-size: 14px;">
+            Discount:
+            ${order.couponCode ? `<span style="display: inline-block; margin-left: 6px; padding: 2px 7px; background: #fff3cd; color: #856404; border: 1px solid #ffc107; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px;">${order.couponCode}</span>` : ''}
+          </td>
           <td class="ttd" style="padding: 11px 16px; text-align: right; color: #d9534f; font-size: 14px; white-space: nowrap;">-${formatMoney(order.discountTotal)}</td>
         </tr>`;
       }

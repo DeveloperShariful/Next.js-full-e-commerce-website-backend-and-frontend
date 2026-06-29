@@ -41,6 +41,12 @@ export default async function RevenueAnalyticsPage(props: RevenuePageProps) {
     { title: "Total sales", value: data.summary.totalSales, prev: data.previousSummary.totalSales, isCurrency: true },
   ];
 
+  const rateCards = [
+    { title: "Cart abandonment rate", value: data.summary.cartAbandonmentRate, prev: data.previousSummary.cartAbandonmentRate, isNegative: true },
+    { title: "Refund rate", value: data.summary.refundRate, prev: data.previousSummary.refundRate, isNegative: true },
+    { title: "Repeat purchase rate", value: data.summary.repeatPurchaseRate, prev: data.previousSummary.repeatPurchaseRate, isNegative: false },
+  ];
+
   // Formatting dates for the Chart Legend
   const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime() 
       ? format(dates.current.from, "MMM d, yyyy")
@@ -101,7 +107,35 @@ export default async function RevenueAnalyticsPage(props: RevenuePageProps) {
         })}
       </div>
 
-      {/* 🔥 The Fully Upgraded WooCommerce Chart */}
+      {/* Rate Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-[#c3c4c7] bg-white shadow-sm mb-6 rounded-sm">
+        {rateCards.map((card, index) => {
+          const percentChange = calculatePercentageChange(card.value, card.prev);
+          const isPositiveChange = card.isNegative ? percentChange <= 0 : percentChange >= 0;
+          return (
+            <div
+              key={card.title}
+              className={`p-4 border-[#f0f0f1] ${index < rateCards.length - 1 ? "border-r" : ""}`}
+            >
+              <h3 className="text-[13px] text-[#50575e] mb-2">{card.title}</h3>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[20px] font-normal text-[#1d2327]">{card.value}%</span>
+                {isComparing && (
+                  <span
+                    className={`text-[12px] font-medium px-1.5 py-0.5 rounded-[3px] ${
+                      isPositiveChange ? "bg-[#e5f5fa] text-[#008a20]" : "bg-[#fbeaea] text-[#d63638]"
+                    }`}
+                  >
+                    {percentChange >= 0 ? "" : "-"}{Math.abs(percentChange)}%
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* The Fully Upgraded WooCommerce Chart */}
       <div className="border border-[#c3c4c7] shadow-sm rounded-sm mb-8 overflow-hidden">
          <AnalyticsChart 
             currentPeriod={data.chartData} 

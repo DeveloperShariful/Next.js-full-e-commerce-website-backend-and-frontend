@@ -100,6 +100,8 @@ interface Product {
   length?: number;
   width?: number;
   height?: number;
+  videoUrl?: string | null;
+  videoThumbnail?: string | null;
 }
 
 // --- Helper Functions ---
@@ -118,6 +120,7 @@ const SIZE_ORDER = ['110', '120', '130', '140', '150', '160', 'XS', 'S', 'M', 'L
 export default function ProductClient({ product }: { product: Product }) {
   // --- State Management ---
   const [mainImage, setMainImage] = useState<string | undefined>(product.image?.sourceUrl);
+  const [showVideo, setShowVideo] = useState(!!product.videoUrl);
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [currentVariation, setCurrentVariation] = useState<Variation | null>(null);
   
@@ -253,26 +256,68 @@ export default function ProductClient({ product }: { product: Product }) {
         
         {/* Gallery Container */}
         <div className="flex flex-col gap-4 relative md:sticky md:top-[100px]">
-          {mainImage && (
-            <Image 
-                src={mainImage} 
-                alt={product.name} 
-                width={1000} 
-                height={1000} 
-                className="w-full h-auto rounded-xl border border-[#eaeaea] max-h-[55vh] object-contain" 
-            />
+
+          {/* Main display — video or image */}
+          {showVideo && product.videoUrl ? (
+            <div className="w-full rounded-xl overflow-hidden border border-[#eaeaea] bg-black">
+              <video
+                key={product.videoUrl}
+                src={product.videoUrl}
+                poster={product.videoThumbnail || undefined}
+                autoPlay
+                loop
+                playsInline
+                controls
+                className="w-full h-auto"
+                style={{ maxHeight: '55vh' }}
+              />
+            </div>
+          ) : (
+            mainImage && (
+              <Image
+                src={mainImage}
+                alt={product.name}
+                width={1000}
+                height={1000}
+                className="w-full h-auto rounded-xl border border-[#eaeaea] max-h-[55vh] object-contain"
+              />
+            )
           )}
-          {allImages.length > 1 && (
+
+          {/* Thumbnail strip — video thumb first, then images */}
+          {(product.videoUrl || allImages.length > 1) && (
             <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-thin scrollbar-track-gray-100 scrollbar-thumb-gray-400 hover:scrollbar-thumb-gray-600">
+
+              {/* Video thumbnail */}
+              {product.videoUrl && (
+                <div
+                  onClick={() => setShowVideo(true)}
+                  className={`relative h-[90px] w-[90px] md:h-[150px] md:w-[150px] flex-shrink-0 rounded-md border-2 cursor-pointer overflow-hidden bg-black transition-colors duration-200 ${showVideo ? 'border-[#070707]' : 'border-[#c0c0c0] hover:border-[#0070f3]'}`}
+                >
+                  {product.videoThumbnail ? (
+                    <Image src={product.videoThumbnail} fill alt="Video thumbnail" className="object-cover" sizes="150px" />
+                  ) : (
+                    <div className="w-full h-full bg-[#1d2327]" />
+                  )}
+                  {/* Play icon overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/50 rounded-full p-2">
+                      <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Image thumbnails */}
               {allImages.map((img, index) => (
-                <Image 
-                    key={index} 
-                    src={img.sourceUrl} 
-                    width={800} 
-                    height={800} 
-                    alt={`${product.name} thumbnail ${index + 1}`}
-                    className={`h-[90px] w-[90px] md:h-[150px] md:w-[150px] object-cover rounded-md border-2 cursor-pointer transition-colors duration-200 flex-shrink-0 flex-basis-[calc(25%-0.75rem)] hover:border-[#0070f3] ${mainImage === img.sourceUrl ? 'border-[#070707]' : 'border-[#c0c0c0]'}`}
-                    onClick={() => setMainImage(img.sourceUrl)} 
+                <Image
+                  key={index}
+                  src={img.sourceUrl}
+                  width={800}
+                  height={800}
+                  alt={`${product.name} thumbnail ${index + 1}`}
+                  className={`h-[90px] w-[90px] md:h-[150px] md:w-[150px] object-cover rounded-md border-2 cursor-pointer transition-colors duration-200 flex-shrink-0 hover:border-[#0070f3] ${!showVideo && mainImage === img.sourceUrl ? 'border-[#070707]' : 'border-[#c0c0c0]'}`}
+                  onClick={() => { setShowVideo(false); setMainImage(img.sourceUrl); }}
                 />
               ))}
             </div>

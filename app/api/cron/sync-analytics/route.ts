@@ -8,19 +8,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
+import { SUCCESS_STATUSES } from "@/app/actions/backend/analytics/shared.utils";
 
 export const dynamic = "force-dynamic";
-
-// ── সফল order statuses (analytics এ গণনা করা হবে) ──
-const SUCCESS_STATUSES: OrderStatus[] = [
-  "PROCESSING",
-  "PACKED",
-  "SHIPPED",
-  "DELIVERED",
-  "READY_FOR_PICKUP",
-  "PARTIALLY_PAID",
-  "COMPLETED" as any, // WC imported orders এর জন্য fallback
-];
 
 // ── Refund করা হয়েছে এমন statuses (totalRefunds এ যাবে) ──
 const REFUNDED_STATUSES: OrderStatus[] = ["REFUNDED"];
@@ -445,13 +435,13 @@ export async function GET(request: Request) {
     console.log("🎉 Sync Complete:", summary);
     return NextResponse.json(summary);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
     console.error("❌ Analytics Sync Error:", error);
     return NextResponse.json(
       {
         success:  false,
-        error:    error?.message ?? "Internal Server Error",
+        error:    error instanceof Error ? error.message : "Internal Server Error",
         duration: `${duration}ms`,
       },
       { status: 500 }

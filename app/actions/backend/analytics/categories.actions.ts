@@ -35,22 +35,31 @@ export async function getCategoriesAnalyticsData(
   previousRange: DateRange
 ): Promise<CategoriesAnalyticsResponse> {
 
-  // ১. Fetch Chart Data & Summaries from Analytics lookup table
-  const currentDataRaw = await db.analytics.findMany({
-    where: { date: { gte: currentRange.from, lte: currentRange.to } },
-    orderBy: { date: "asc" },
-  });
-
-  const previousDataRaw = await db.analytics.findMany({
-    where: { date: { gte: previousRange.from, lte: previousRange.to } },
-    orderBy: { date: "asc" },
-  });
+  const [currentDataRaw, previousDataRaw, categoryGroups] = await Promise.all([
+    db.analytics.findMany({
+      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      orderBy: { date: "asc" },
+    }),
+    db.analytics.findMany({
+      where: { date: { gte: previousRange.from, lte: previousRange.to } },
+      orderBy: { date: "asc" },
+    }),
+    db.productAnalytics.groupBy({
+      by: ["categoryId"],
+      where: {
+        date: { gte: currentRange.from, lte: currentRange.to },
+        categoryId: { not: null },
+      },
+      _sum: { itemsSold: true, netSales: true },
+      orderBy: { _sum: { itemsSold: "desc" } },
+    }),
+  ]);
 
   const chartData = currentDataRaw.map(serializeAnalyticsData);
   const previousChartData = previousDataRaw.map(serializeAnalyticsData);
 
-  const buildSummary = (data: SerializedAnalytics[]) => {
-    return data.reduce(
+  const buildSummary = (data: SerializedAnalytics[]) =>
+    data.reduce(
       (acc, curr) => {
         acc.itemsSold += curr.productsSold;
         acc.netSales += curr.netSales;
@@ -59,61 +68,76 @@ export async function getCategoriesAnalyticsData(
       },
       { itemsSold: 0, netSales: 0, orders: 0 }
     );
-  };
 
   const summary = buildSummary(chartData);
   const previousSummary = buildSummary(previousChartData);
 
-  // ২. Table Data from ProductAnalytics grouped by Category
-  const categoryGroups = await db.productAnalytics.groupBy({
-    by: ["categoryId"],
+  // Fetch all category details in ONE query (N+1 fix)
+  const categoryIds = categoryGroups
+    .map((g) => g.categoryId)
+    .filter((id): id is string => id !== null);
+
+  const [categories, orderCountGroups] = await Promise.all([
+    db.category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true, name: true, _count: { select: { products: true } } },
+    }),
+    db.orderItem.groupBy({
+      by: ["productId"],
+      where: {
+        product: { categories: { some: { id: { in: categoryIds } } } },
+        order: { orderDate: { gte: currentRange.from, lte: currentRange.to } },
+      },
+      _count: { id: true },
+    }),
+  ]);
+
+  // Build a category → product set from ProductAnalytics categoryId field
+  // (orderCountGroups gives us item-level counts per productId, not per categoryId)
+  // We use the productAnalytics categoryId to link back
+  const productAnalyticsRows = await db.productAnalytics.findMany({
     where: {
       date: { gte: currentRange.from, lte: currentRange.to },
-      categoryId: { not: null }, // Null ক্যাটাগরি ইগনোর করা
+      categoryId: { in: categoryIds },
     },
-    _sum: {
-      itemsSold: true,
-      netSales: true,
-    },
-    orderBy: {
-      _sum: { itemsSold: "desc" },
-    }
+    select: { productId: true, categoryId: true },
+    distinct: ["productId", "categoryId"],
   });
 
-  // ৩. Fetch additional Category details (Name, Products count, Orders count)
-  const tableData: CategoryTableRow[] = await Promise.all(
-    categoryGroups.map(async (group) => {
-      if (!group.categoryId) return null;
+  const productToCategory = new Map<string, string>();
+  productAnalyticsRows.forEach((r) => {
+    if (r.productId && r.categoryId) productToCategory.set(r.productId, r.categoryId);
+  });
 
-      const category = await db.category.findUnique({
-        where: { id: group.categoryId },
-        select: { name: true, _count: { select: { products: true } } }
-      });
+  const categoryOrderCount = new Map<string, number>();
+  orderCountGroups.forEach((g) => {
+    if (!g.productId) return;
+    const catId = productToCategory.get(g.productId);
+    if (!catId) return;
+    categoryOrderCount.set(catId, (categoryOrderCount.get(catId) ?? 0) + g._count.id);
+  });
 
-      // Approximate Orders Count per Category
-      const ordersCount = await db.orderItem.count({
-        where: {
-          product: { categories: { some: { id: group.categoryId } } },
-          order: { orderDate: { gte: currentRange.from, lte: currentRange.to } }
-        }
-      });
+  const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
+  const tableData: CategoryTableRow[] = categoryGroups
+    .filter((g): g is typeof g & { categoryId: string } => g.categoryId !== null)
+    .map((group) => {
+      const category = categoryMap.get(group.categoryId);
       return {
         id: group.categoryId,
-        name: category?.name || "Unknown Category",
-        itemsSold: group._sum.itemsSold || 0,
-        netSales: Number(group._sum.netSales) || 0,
-        productsCount: category?._count.products || 0,
-        ordersCount: ordersCount,
+        name: category?.name ?? "Unknown Category",
+        itemsSold: group._sum.itemsSold ?? 0,
+        netSales: Number(group._sum.netSales) ?? 0,
+        productsCount: category?._count.products ?? 0,
+        ordersCount: categoryOrderCount.get(group.categoryId) ?? 0,
       };
-    })
-  ).then(res => res.filter((item): item is CategoryTableRow => item !== null));
+    });
 
   return {
     summary,
     previousSummary,
     chartData,
     previousChartData,
-    tableData
+    tableData,
   };
 }

@@ -3,9 +3,8 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { DateRange } from "./shared.utils";
+import { DateRange, SUCCESS_STATUSES } from "./shared.utils";
 
-// স্ট্রিক্ট টাইপস (No any)
 export interface TopProductData {
   id: string;
   name: string;
@@ -20,93 +19,94 @@ export interface TopCategoryData {
   netSales: number;
 }
 
+export interface TopChannelData {
+  source: string;
+  orders: number;
+  netSales: number;
+}
+
 export interface LeaderboardsResponse {
   topProducts: TopProductData[];
   topCategories: TopCategoryData[];
+  topChannels: TopChannelData[];
 }
 
 export async function getLeaderboardsData(
   currentRange: DateRange
 ): Promise<LeaderboardsResponse> {
-  
-  // ১. Top Products Query (Grouping by productId)
-  const productGroups = await db.productAnalytics.groupBy({
-    by: ["productId"],
-    where: {
-      date: {
-        gte: currentRange.from,
-        lte: currentRange.to,
+
+  const [productGroups, categoryGroups, channelGroups] = await Promise.all([
+    db.productAnalytics.groupBy({
+      by: ["productId"],
+      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      _sum: { itemsSold: true, netSales: true },
+      orderBy: { _sum: { itemsSold: "desc" } },
+      take: 5,
+    }),
+    db.productAnalytics.groupBy({
+      by: ["categoryId"],
+      where: {
+        date: { gte: currentRange.from, lte: currentRange.to },
+        categoryId: { not: null },
       },
-    },
-    _sum: {
-      itemsSold: true,
-      netSales: true,
-    },
-    orderBy: {
-      _sum: { itemsSold: "desc" },
-    },
-    take: 5, // Top 5 Products
-  });
-
-  // Product ID দিয়ে অরিজিনাল প্রোডাক্টের নাম ফেচ করা
-  const topProducts: TopProductData[] = await Promise.all(
-    productGroups.map(async (group) => {
-      const product = await db.product.findUnique({
-        where: { id: group.productId },
-        select: { name: true },
-      });
-
-      return {
-        id: group.productId,
-        name: product?.name || "Unknown Product",
-        itemsSold: group._sum.itemsSold || 0,
-        netSales: Number(group._sum.netSales) || 0,
-      };
-    })
-  );
-
-  // ২. Top Categories Query (Grouping by categoryId)
-  // (স্কিমা অনুযায়ী ProductAnalytics এ categoryId রাখা আছে)
-  const categoryGroups = await db.productAnalytics.groupBy({
-    by: ["categoryId"],
-    where: {
-      date: {
-        gte: currentRange.from,
-        lte: currentRange.to,
+      _sum: { itemsSold: true, netSales: true },
+      orderBy: { _sum: { itemsSold: "desc" } },
+      take: 5,
+    }),
+    db.order.groupBy({
+      by: ["utmSource"],
+      where: {
+        orderDate: { gte: currentRange.from, lte: currentRange.to },
+        status: { in: SUCCESS_STATUSES },
       },
-      categoryId: { not: null }, // Null ক্যাটাগরি ইগনোর করা
-    },
-    _sum: {
-      itemsSold: true,
-      netSales: true,
-    },
-    orderBy: {
-      _sum: { itemsSold: "desc" },
-    },
-    take: 5, // Top 5 Categories
-  });
+      _count: { id: true },
+      _sum: { netAmount: true },
+      orderBy: { _count: { id: "desc" } },
+      take: 5,
+    }),
+  ]);
 
-  // Category ID দিয়ে অরিজিনাল ক্যাটাগরির নাম ফেচ করা
-  const topCategories: TopCategoryData[] = await Promise.all(
-    categoryGroups.map(async (group) => {
-      if (!group.categoryId) return null;
-      
-      const category = await db.category.findUnique({
-        where: { id: group.categoryId },
-        select: { name: true },
-      });
+  // Fetch all product names in ONE query (N+1 fix)
+  const productIds = productGroups.map((g) => g.productId);
+  const categoryIds = categoryGroups
+    .map((g) => g.categoryId)
+    .filter((id): id is string => id !== null);
 
-      return {
-        id: group.categoryId,
-        name: category?.name || "Unknown Category",
-        itemsSold: group._sum.itemsSold || 0,
-        netSales: Number(group._sum.netSales) || 0,
-      };
-    })
-  ).then(res => res.filter((item): item is TopCategoryData => item !== null));
+  const [products, categories] = await Promise.all([
+    db.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true },
+    }),
+    db.category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true, name: true },
+    }),
+  ]);
 
-  return {
-    topProducts,
-    topCategories,
-  };
+  const productNameMap = new Map(products.map((p) => [p.id, p.name]));
+  const categoryNameMap = new Map(categories.map((c) => [c.id, c.name]));
+
+  const topProducts: TopProductData[] = productGroups.map((group) => ({
+    id: group.productId,
+    name: productNameMap.get(group.productId) ?? "Unknown Product",
+    itemsSold: group._sum.itemsSold ?? 0,
+    netSales: Number(group._sum.netSales) ?? 0,
+  }));
+
+  const topCategories: TopCategoryData[] = categoryGroups
+    .filter((g): g is typeof g & { categoryId: string } => g.categoryId !== null)
+    .map((group) => ({
+      id: group.categoryId,
+      name: categoryNameMap.get(group.categoryId) ?? "Unknown Category",
+      itemsSold: group._sum.itemsSold ?? 0,
+      netSales: Number(group._sum.netSales) ?? 0,
+    }));
+
+  const topChannels: TopChannelData[] = channelGroups.map((group) => ({
+    source: group.utmSource ?? "Organic / Direct",
+    orders: group._count.id,
+    netSales: Number(group._sum.netAmount) ?? 0,
+  }));
+
+  return { topProducts, topCategories, topChannels };
 }

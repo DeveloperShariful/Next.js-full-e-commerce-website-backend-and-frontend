@@ -67,6 +67,8 @@ export async function getProductBySlugAction(slug: string) {
       height: product.height ? Number(product.height.toString()) : undefined,
       averageRating: product.rating ? Number(product.rating.toString()) : 0,
       reviewCount: product.reviewCount || 0,
+      videoUrl: product.videoUrl || null,
+      videoThumbnail: product.videoThumbnail || null,
       
       // Attributes
       attributes: {

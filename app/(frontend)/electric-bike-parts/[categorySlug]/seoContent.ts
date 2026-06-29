@@ -30,8 +30,6 @@ export const seoContentMap: Record<string, any> = {
     ]
   },
 
-  // ---------------- TYRES PAGE ----------------
-  // (আপনার আগের স্ক্রিনশটে স্লাগ 'tyre-tube' ছিল, তাই আমি দুটি নামই দিয়ে রাখলাম যাতে কাজ করে)
   'tyre': { ...tyreContent() },
   'tyre-tube': { ...tyreContent() },
 

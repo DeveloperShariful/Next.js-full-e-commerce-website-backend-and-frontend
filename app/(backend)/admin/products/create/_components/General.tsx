@@ -8,6 +8,8 @@ import { getTaxClasses, getConfigOptions } from "@/app/actions/backend/product/p
 import { X, ChevronDown, Check, Plus, Info } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { ProductFormData } from "../types";
+import MediaPickerModal, { PickedMedia } from "@/app/(backend)/admin/media/_components/MediaPickerModal";
+import { MediaSource } from "@prisma/client";
 
 // Helper Component for Searchable Select
 const CreatableSelect = ({ 
@@ -113,6 +115,8 @@ export default function General() {
     const [ageGroupOptions, setAgeGroupOptions] = useState<string[]>([]);
     const [showSchedule, setShowSchedule] = useState(!!data.saleStart);
     const [amountInput, setAmountInput] = useState("");
+    const [openVideoModal, setOpenVideoModal] = useState(false);
+    const [openThumbModal, setOpenThumbModal] = useState(false);
     
     const { symbol, tax } = useGlobalStore(); 
     const currency = symbol || "$";
@@ -312,26 +316,87 @@ export default function General() {
 
             {/* Video Settings */}
             <h3 className="text-[14px] font-semibold text-[#1d2327] mt-6 mb-3">Product Video</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                <label className="md:text-left text-[13px] text-[#3c434a]">Video URL</label>
+
+            {/* Video file */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start mb-4">
+                <label className="md:text-left text-[13px] text-[#3c434a] pt-1">Video</label>
                 <div className="md:col-span-3">
-                    <input 
-                        type="text" 
-                        {...register("videoUrl")}
-                        className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
-                        placeholder="e.g. YouTube or Vimeo link"
-                    />
+                    {data.videoUrl ? (
+                        <div className="space-y-2">
+                            <video
+                                key={data.videoUrl}
+                                src={data.videoUrl}
+                                controls
+                                className="w-full max-w-md rounded-[3px] border border-[#c3c4c7] bg-black"
+                                style={{ maxHeight: 220 }}
+                            />
+                            <div className="flex items-center gap-2">
+                                <span className="truncate text-[12px] text-[#646970] flex-1">
+                                    {data.videoUrl.split("/").pop()?.split("?")[0] || data.videoUrl}
+                                </span>
+                                <button type="button" onClick={() => setOpenVideoModal(true)} className="text-[12px] text-[#2271b1] hover:text-[#135e96] shrink-0 whitespace-nowrap">
+                                    Change
+                                </button>
+                                <button type="button" onClick={() => setValue("videoUrl", "", { shouldDirty: true })} className="text-[#646970] hover:text-[#d63638] shrink-0">
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setOpenVideoModal(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 border border-dashed border-[#8c8f94] rounded-[3px] text-[13px] text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] transition-colors"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Select from Media Library
+                        </button>
+                    )}
                 </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#f0f0f1] pb-4">
-                <label className="md:text-left text-[13px] text-[#3c434a]">Thumbnail URL</label>
+
+            {/* Video thumbnail */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start border-b border-[#f0f0f1] pb-4">
+                <label className="md:text-left text-[13px] text-[#3c434a] pt-1">Thumbnail</label>
                 <div className="md:col-span-3">
-                    <input 
-                        type="text" 
-                        {...register("videoThumbnail")}
-                        className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
-                        placeholder="Image URL for video cover"
-                    />
+                    {data.videoThumbnail ? (
+                        <div className="relative w-32 h-20 group">
+                            <img
+                                src={data.videoThumbnail}
+                                alt="Video thumbnail"
+                                className="w-full h-full object-cover rounded-[3px] border border-[#c3c4c7]"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-[3px] flex items-center justify-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenThumbModal(true)}
+                                    className="text-white text-[11px] bg-black/60 rounded px-1.5 py-0.5 hover:bg-black/80"
+                                >
+                                    Change
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setValue("videoThumbnail", "", { shouldDirty: true })}
+                                    className="text-white bg-black/60 rounded p-0.5 hover:bg-black/80"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setOpenThumbModal(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 border border-dashed border-[#8c8f94] rounded-[3px] text-[13px] text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] transition-colors"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V8a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Select from Media Library
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -438,6 +503,32 @@ export default function General() {
                     </div>
                 </div>
             )}
+
+            {/* Video media picker modal */}
+            <MediaPickerModal
+                open={openVideoModal}
+                onClose={() => setOpenVideoModal(false)}
+                onSelect={(items: PickedMedia[]) => {
+                    if (!items.length) return;
+                    setValue("videoUrl", items[0].url, { shouldDirty: true });
+                    setOpenVideoModal(false);
+                }}
+                title="Select Video"
+                source={MediaSource.PRODUCT}
+            />
+
+            {/* Thumbnail media picker modal */}
+            <MediaPickerModal
+                open={openThumbModal}
+                onClose={() => setOpenThumbModal(false)}
+                onSelect={(items: PickedMedia[]) => {
+                    if (!items.length) return;
+                    setValue("videoThumbnail", items[0].url, { shouldDirty: true });
+                    setOpenThumbModal(false);
+                }}
+                title="Select Thumbnail Image"
+                source={MediaSource.PRODUCT}
+            />
         </div>
     );
 }

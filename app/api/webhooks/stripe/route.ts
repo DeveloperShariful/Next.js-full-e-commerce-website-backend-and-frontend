@@ -96,6 +96,14 @@ export async function POST(request: Request) {
                   console.error('[Stripe Webhook] Backup TransDirect resync failed:', err)
               );
           }
+          // Mark abandoned checkout as recovered (non-blocking)
+          const alreadyEmail = order.guestEmail || order.user?.email;
+          if (alreadyEmail) {
+            db.abandonedCheckout.updateMany({
+              where: { email: alreadyEmail, isRecovered: false },
+              data: { isRecovered: true, recoveredAt: new Date() },
+            }).catch(() => {});
+          }
           await db.paymentWebhookLog.update({ where: { eventId: event.id }, data: { processed: true } });
           return NextResponse.json({ received: true, message: "Already processed by frontend" });
       }
@@ -165,6 +173,13 @@ export async function POST(request: Request) {
       // so capture-order never ran these. If webhook fires again, order is now
       // PROCESSING and we return early at the top → these never run twice.
       const rescueEmail = order.guestEmail || order.user?.email;
+      // Mark abandoned checkout as recovered (non-blocking)
+      if (rescueEmail) {
+        db.abandonedCheckout.updateMany({
+          where: { email: rescueEmail, isRecovered: false },
+          data: { isRecovered: true, recoveredAt: new Date() },
+        }).catch(() => {});
+      }
       if (rescueEmail) {
         sendNotification({ trigger: 'ORDER_PROCESSING', recipient: rescueEmail, orderId })
           .catch(err => console.error('[Stripe Webhook] Customer email failed:', err));

@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { DateRange, SerializedAnalytics, serializeAnalyticsData } from "./shared.utils";
+import { DateRange, SerializedAnalytics, serializeAnalyticsData, SUCCESS_STATUSES } from "./shared.utils";
 
 export interface OrderTableRow {
   id: string;
@@ -13,6 +13,7 @@ export interface OrderTableRow {
   customerName: string;
   customerType: "New" | "Returning" | "Guest";
   productsInfo: { name: string; link: string }[];
+  totalProducts: number;
   itemsSold: number;
   couponUsed: string | null;
   netSales: number;
@@ -75,26 +76,26 @@ export async function getOrdersAnalyticsData(
   const previousSummary = buildSummary(previousChartData);
 
   // ২. Table Data from actual Order table (only Success orders for Analytics)
-  const SUCCESS_STATUSES = ["PROCESSING", "PACKED", "SHIPPED", "DELIVERED", "READY_FOR_PICKUP", "PARTIALLY_PAID"];
-
   const ordersRaw = await db.order.findMany({
     where: {
       orderDate: { gte: currentRange.from, lte: currentRange.to },
-      status: { in: SUCCESS_STATUSES as any }
+      status: { in: SUCCESS_STATUSES },
     },
     include: {
       user: { select: { name: true } },
       items: { select: { quantity: true, productName: true, productId: true } },
     },
-    orderBy: { orderDate: 'desc' },
-    take: 50 // Limit for performance, typically WooCommerce has pagination here
+    orderBy: { orderDate: "desc" },
+    take: 200,
   });
 
   const tableData: OrderTableRow[] = ordersRaw.map((order) => {
-    const customerName = order.user?.name || (order.billingAddress as any)?.firstName || "Guest";
+    const billing = order.billingAddress as Record<string, string> | null;
+    const customerName = order.user?.name || billing?.firstName || "Guest";
     const customerType = order.user ? (order.isFirstOrder ? "New" : "Returning") : "Guest";
     const itemsSold = order.items.reduce((acc, item) => acc + item.quantity, 0);
-    
+    const totalProducts = order.items.length;
+
     return {
       id: order.id,
       orderDate: order.orderDate.toISOString(),
@@ -102,14 +103,15 @@ export async function getOrdersAnalyticsData(
       status: order.status,
       customerName,
       customerType,
-      productsInfo: order.items.slice(0, 2).map(i => ({ 
-          name: i.productName, 
-          link: i.productId ? `/admin/products/${i.productId}` : "#" 
+      productsInfo: order.items.slice(0, 2).map((i) => ({
+        name: i.productName,
+        link: i.productId ? `/admin/products/${i.productId}` : "#",
       })),
+      totalProducts,
       itemsSold,
       couponUsed: order.couponCode || null,
       netSales: Number(order.netAmount) || 0,
-      attribution: order.utmSource ? `Campaign: ${order.utmSource}` : "Organic"
+      attribution: order.utmSource ? `Campaign: ${order.utmSource}` : "Organic",
     };
   });
 

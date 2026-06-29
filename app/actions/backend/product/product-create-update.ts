@@ -263,35 +263,82 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             const normalizeAttributes = (attrs: { name: string; values?: string[] }[]) => attrs?.map(a => ({ n: a.name, v: [...(a.values || [])].sort() })).sort((a, b) => a.n.localeCompare(b.n)) || [];
             
             // 🚀 Scalars changed লজিকে নতুন গুগল মার্চেন্ট সেন্টারের ৫টি কলাম ফিক্স করা হয়েছে (ডেল্টা সিস্টেম অক্ষুণ্ণ রাখতে)
-            const scalarsChanged = !oldProductData || 
+            const scalarsChanged = !oldProductData ||
+                // Core
                 oldProductData.name !== data.name ||
                 oldProductData.slug !== finalSlug ||
                 Number(oldProductData.price) !== data.price ||
                 Number(oldProductData.salePrice || 0) !== (data.salePrice || 0) ||
+                Number(oldProductData.costPerItem || 0) !== (data.costPerItem || 0) ||
+                oldProductData.sku !== (data.sku || null) ||
+                oldProductData.barcode !== (data.barcode || null) ||
                 oldProductData.description !== data.description ||
                 oldProductData.shortDescription !== data.shortDescription ||
                 oldProductData.status !== data.status ||
                 oldProductData.productType !== data.productType ||
-                oldProductData.trackQuantity !== data.trackQuantity ||
                 oldProductData.isFeatured !== data.isFeatured ||
-                oldProductData.brandId !== (data.brandId || null) ||
+                oldProductData.featuredImage !== (data.featuredImage || null) ||
+                oldProductData.featuredMediaId !== (data.featuredMediaId || null) ||
+                oldProductData.videoUrl !== (data.videoUrl || null) ||
+                oldProductData.videoThumbnail !== (data.videoThumbnail || null) ||
+                // Pricing / sale dates
+                (oldProductData.saleStart?.toISOString().split('T')[0] || null) !== (data.saleStart || null) ||
+                (oldProductData.saleEnd?.toISOString().split('T')[0] || null) !== (data.saleEnd || null) ||
+                // Tax / shipping
+                oldProductData.taxStatus !== data.taxStatus ||
                 oldProductData.taxRateId !== (data.taxRateId || null) ||
                 oldProductData.shippingClassId !== (data.shippingClassId || null) ||
+                oldProductData.brandId !== (data.brandId || null) ||
+                // Dimensions / weight
                 Number(oldProductData.weight || 0) !== (data.weight || 0) ||
                 Number(oldProductData.length || 0) !== (data.length || 0) ||
                 Number(oldProductData.width || 0) !== (data.width || 0) ||
                 Number(oldProductData.height || 0) !== (data.height || 0) ||
+                // Inventory behaviour
+                oldProductData.trackQuantity !== data.trackQuantity ||
+                oldProductData.lowStockThreshold !== (data.lowStockThreshold ?? 2) ||
+                oldProductData.backorderStatus !== data.backorderStatus ||
+                oldProductData.soldIndividually !== (data.soldIndividually ?? false) ||
+                // Virtual / downloadable
+                oldProductData.isVirtual !== (data.isVirtual ?? false) ||
+                oldProductData.isDownloadable !== (data.isDownloadable ?? false) ||
+                (oldProductData.downloadLimit ?? -1) !== (data.downloadLimit ?? -1) ||
+                (oldProductData.downloadExpiry ?? -1) !== (data.downloadExpiry ?? -1) ||
+                // Pre-order
                 oldProductData.isPreOrder !== data.isPreOrder ||
                 (oldProductData.preOrderReleaseDate?.toISOString().split('T')[0] || null) !== (data.preOrderReleaseDate || null) ||
                 oldProductData.preOrderLimit !== (data.preOrderLimit || null) ||
                 oldProductData.preOrderMessage !== (data.preOrderMessage || null) ||
-                oldProductData.featuredImage !== (data.featuredImage || null) ||
+                // Shipping / logistics
+                oldProductData.mpn !== (data.mpn || null) ||
+                oldProductData.hsCode !== (data.hsCode || null) ||
+                oldProductData.countryOfManufacture !== (data.countryOfManufacture || null) ||
+                oldProductData.isDangerousGood !== (data.isDangerousGood ?? false) ||
+                // SEO
+                oldProductData.metaTitle !== (data.metaTitle || null) ||
+                oldProductData.metaDesc !== (data.metaDesc || null) ||
+                oldProductData.seoCanonicalUrl !== (data.seoCanonicalUrl || null) ||
+                // Misc
+                oldProductData.purchaseNote !== (data.purchaseNote || null) ||
+                oldProductData.menuOrder !== (data.menuOrder ?? 0) ||
+                oldProductData.enableReviews !== (data.enableReviews ?? true) ||
+                oldProductData.gender !== (data.gender || null) ||
+                oldProductData.ageGroup !== (data.ageGroup || null) ||
                 // 👇 গুগল মার্চেন্ট সেন্টার কোর কলাম কম্প্যারিসন
                 oldProductData.condition !== data.condition ||
                 oldProductData.googleProductCategory !== (data.googleProductCategory || null) ||
                 oldProductData.googleTitle !== (data.googleTitle || null) ||
                 oldProductData.googleDescription !== (data.googleDescription || null) ||
-                oldProductData.googleIsBundle !== data.googleIsBundle;
+                oldProductData.googleIsBundle !== data.googleIsBundle ||
+                // Facebook / Meta Catalog
+                oldProductData.facebookSyncMode !== (data.facebookSyncMode || null) ||
+                oldProductData.facebookDescription !== (data.facebookDescription || null) ||
+                (oldProductData.facebookImageType || "PRODUCT_IMAGE") !== (data.facebookImageType || "PRODUCT_IMAGE") ||
+                Number(oldProductData.facebookPrice || 0) !== (data.facebookPrice ?? 0) ||
+                oldProductData.size !== (data.size || null) ||
+                oldProductData.color !== (data.color || null) ||
+                oldProductData.material !== (data.material || null) ||
+                oldProductData.pattern !== (data.pattern || null);
 
             const categoriesChanged = !oldProductData || !arraysHaveSameContent(
                 oldProductData.categories.map(c => c.id),
@@ -341,7 +388,15 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 metafieldsObj
             );
 
-            const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged || metafieldsChanged;
+            const seoSchemaChanged = !oldProductData || !isDeepEqual(
+                oldProductData.seoSchema,
+                data.seoSchema || null
+            );
+
+            const upsellsChanged = !oldProductData || !arraysHaveSameContent(oldProductData.upsellIds || [], data.upsells || []);
+            const crossSellsChanged = !oldProductData || !arraysHaveSameContent(oldProductData.crossSellIds || [], data.crossSells || []);
+
+            const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged || metafieldsChanged || seoSchemaChanged || upsellsChanged || crossSellsChanged;
 
             if (type === "UPDATE" && !anyChanges) {
                 return { success: true, message: "No changes detected.", productId: data.id };

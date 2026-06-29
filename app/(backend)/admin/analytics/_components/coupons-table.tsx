@@ -63,22 +63,28 @@ export default function CouponsTable({ data }: CouponsTableProps) {
                      <input type="checkbox" className="border-[#8c8f94] rounded-[2px]" />
                   </td>
                   <td className="py-3 px-4">
-                     {/* Assuming the coupons page is under /admin/marketing/coupons */}
-                     <Link href={`/admin/marketing/coupons?search=${row.code}`} className="text-[#2271b1] font-medium hover:text-[#135e96] hover:underline">
-                        {row.code}
-                     </Link>
+                     <div className="flex items-center gap-2">
+                       <Link href={`/admin/marketing/coupons?search=${row.code}`} className="text-[#2271b1] font-medium hover:text-[#135e96] hover:underline">
+                          {row.code}
+                       </Link>
+                       {!row.isLocal && (
+                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-[3px] bg-[#f0f6fc] text-[#50575e] border border-[#c3c4c7] whitespace-nowrap">
+                           WC Import
+                         </span>
+                       )}
+                     </div>
                   </td>
                   <td className="py-3 px-4 text-right text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer">
                      <Link href={`/admin/orders?query=${row.code}`}>{formatNumber(row.orders)}</Link>
                   </td>
                   <td className="py-3 px-4 text-right font-medium">{formatCurrency(row.amount)}</td>
                   <td className="py-3 px-4 text-[#646970]">
-                     {row.created ? format(parseISO(row.created), "MMMM d, yyyy") : "N/A"}
+                     {row.created ? format(parseISO(row.created), "MMMM d, yyyy") : <span className="text-[#a7aaad]">—</span>}
                   </td>
                   <td className="py-3 px-4 text-[#646970]">
-                     {row.expires ? format(parseISO(row.expires), "MMMM d, yyyy") : "N/A"}
+                     {row.expires ? format(parseISO(row.expires), "MMMM d, yyyy") : <span className="text-[#a7aaad]">—</span>}
                   </td>
-                  <td className="py-3 px-4">{row.type}</td>
+                  <td className="py-3 px-4 text-[#646970]">{row.type}</td>
                 </tr>
               ))
             )}

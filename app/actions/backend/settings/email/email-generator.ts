@@ -123,6 +123,11 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
           customer_phone: metaStr("customer_phone", "Not Provided"),
           message: metaStr("message", "No message content"),
       };
+  } else if (template.triggerEvent === 'ABANDONED_CHECKOUT') {
+      variables = {
+          customer_name: metaStr('customer_name', 'Valued Customer'),
+          checkout_url: metaStr('checkout_url', `${appUrl}/checkout`),
+      };
   } else if (order) {
       const currency = order.currency || "$";
       const formatMoney = (amount: number) => {
@@ -361,6 +366,136 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
     actionButton = `
       <div style="text-align: center; margin: 32px 0;">
         <a href="${appUrl}/shop" class="btn" style="background-color: ${baseColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: 700; border-radius: 6px; display: inline-block; font-size: 16px;">Shop Now</a>
+      </div>
+    `;
+  }
+
+  if (template.triggerEvent === 'ABANDONED_CHECKOUT') {
+    const checkoutUrl = metaStr('checkout_url', `${appUrl}/checkout`);
+    const currency    = metaStr('currency', 'AUD');
+    const subtotal    = metaStr('subtotal', '0');
+    const sym         = currency === 'AUD' ? 'A$' : '$';
+    const subtotalNum = parseFloat(subtotal);
+
+    type CartItemMeta = {
+      name: string;
+      price: string | number;
+      quantity: number;
+      image?: string | null;
+      slug?: string;
+      attributes?: Array<{ label: string; value: string }>;
+    };
+    const cartItems = Array.isArray(metadata?.items)
+      ? (metadata!.items as CartItemMeta[])
+      : [];
+
+    const itemRows = cartItems.map(item => {
+      const rawPrice   = typeof item.price === 'number' ? item.price : parseFloat(String(item.price).replace(/[^0-9.]/g, ''));
+      const unitPrice  = isNaN(rawPrice) ? '' : `${sym}${rawPrice.toFixed(2)}`;
+      const lineTotal  = isNaN(rawPrice) ? '' : `${sym}${(rawPrice * item.quantity).toFixed(2)}`;
+      const attrText   = item.attributes?.length
+        ? item.attributes.map(a => `${a.label}: ${a.value}`).join(' · ')
+        : '';
+
+      return `
+      <tr style="border-bottom: 1px solid #f0f0f0;">
+        <td style="padding: 14px 12px; vertical-align: middle;">
+          <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+            <tr>
+              ${item.image ? `
+              <td style="padding-right:14px; vertical-align:middle; width:84px;">
+                <a href="${appUrl}/product/${item.slug || ''}" style="display:block; border-radius:8px; overflow:hidden; line-height:0;">
+                  <img src="${item.image}" alt="${item.name}" width="80" height="80"
+                    style="display:block;width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #eee;">
+                </a>
+              </td>` : ''}
+              <td style="vertical-align:middle;">
+                <a href="${appUrl}/product/${item.slug || ''}"
+                   style="font-size:14px;font-weight:700;color:#1a1a1a;text-decoration:none;line-height:1.4;display:block;">
+                  ${item.name}
+                </a>
+                ${attrText ? `<div style="font-size:12px;color:#999;margin-top:4px;">${attrText}</div>` : ''}
+                <div style="font-size:12px;color:#777;margin-top:5px;">
+                  Qty: <strong>${item.quantity}</strong>
+                  ${unitPrice ? ` &nbsp;·&nbsp; ${unitPrice} each` : ''}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td style="padding:14px 12px;text-align:right;vertical-align:middle;font-size:15px;font-weight:700;color:#1a1a1a;white-space:nowrap;min-width:70px;">
+          ${lineTotal}
+        </td>
+      </tr>`;
+    }).join('');
+
+    actionButton = `
+      <h2 style="color:${baseColor};font-size:19px;margin:28px 0 14px 0;text-align:center;font-weight:700;">
+        Your Saved Cart Items
+      </h2>
+
+      <table border="0" cellpadding="0" cellspacing="0" width="100%"
+             style="border:1px solid #e8e8e8;border-radius:10px;overflow:hidden;border-collapse:collapse;">
+        <thead>
+          <tr style="background-color:#f7f7f7;border-bottom:1px solid #e8e8e8;">
+            <th style="text-align:left;padding:10px 12px;font-size:11px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Product</th>
+            <th style="text-align:right;padding:10px 12px;font-size:11px;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows || '<tr><td colspan="2" style="padding:20px;text-align:center;color:#bbb;">No items found</td></tr>'}
+        </tbody>
+        <tfoot>
+          <tr style="background-color:#fafafa;border-top:2px solid #e8e8e8;">
+            <td style="padding:13px 12px;font-size:14px;color:#555;font-weight:600;">Cart Subtotal</td>
+            <td style="padding:13px 12px;text-align:right;font-size:20px;font-weight:800;color:${baseColor};white-space:nowrap;">
+              ${!isNaN(subtotalNum) ? `${sym}${subtotalNum.toFixed(2)}` : `${sym}${subtotal}`}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <p style="font-size:11px;color:#bbb;text-align:right;margin:4px 0 24px 0;">
+        *Shipping &amp; taxes calculated at checkout
+      </p>
+
+      <div style="text-align:center;margin:28px 0 20px 0;">
+        <a href="${checkoutUrl}"
+           style="background-color:${baseColor};color:#ffffff;padding:16px 40px;text-decoration:none;
+                  font-weight:700;border-radius:8px;display:inline-block;font-size:17px;letter-spacing:0.3px;">
+          Complete My Order &rarr;
+        </a>
+        <p style="margin:12px 0 0 0;font-size:12px;color:#bbb;">
+          Your cart is saved and ready. Click above to finish your purchase.
+        </p>
+      </div>
+
+      <table border="0" cellpadding="0" cellspacing="0" width="100%"
+             style="margin:20px 0;border-top:1px solid #f0f0f0;padding-top:20px;">
+        <tr>
+          <td style="text-align:center;padding:8px;vertical-align:top;width:33%;">
+            <div style="font-size:24px;margin-bottom:5px;">&#128274;</div>
+            <div style="font-size:12px;font-weight:700;color:#333;">Secure Checkout</div>
+            <div style="font-size:11px;color:#aaa;margin-top:2px;">SSL encrypted</div>
+          </td>
+          <td style="text-align:center;padding:8px;vertical-align:top;width:34%;">
+            <div style="font-size:24px;margin-bottom:5px;">&#128666;</div>
+            <div style="font-size:12px;font-weight:700;color:#333;">Fast Delivery</div>
+            <div style="font-size:11px;color:#aaa;margin-top:2px;">Australia-wide</div>
+          </td>
+          <td style="text-align:center;padding:8px;vertical-align:top;width:33%;">
+            <div style="font-size:24px;margin-bottom:5px;">&#11088;</div>
+            <div style="font-size:12px;font-weight:700;color:#333;">Top Rated</div>
+            <div style="font-size:11px;color:#aaa;margin-top:2px;">500+ happy families</div>
+          </td>
+        </tr>
+      </table>
+
+      <div style="background-color:#fff8e6;border:1px solid #ffe082;border-radius:8px;padding:13px 16px;text-align:center;">
+        <p style="margin:0;font-size:13px;color:#856404;">
+          &#9201; <strong>Stock is limited!</strong> We cannot guarantee availability.
+          Complete your order now to avoid disappointment.
+        </p>
       </div>
     `;
   }

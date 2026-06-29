@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { upload } from '@vercel/blob/client';
 import { getAllMedia, saveMediaRecord } from '@/app/actions/backend/media/media-action';
 import { Media, MediaSource } from '@prisma/client';
@@ -55,6 +56,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
 
   useEffect(() => {
     if (open) {
+      setMediaList([]);
       loadMedia();
       setSelectedIds([]);
       setSearch('');
@@ -134,7 +136,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     loadMedia();
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white w-full max-w-5xl max-h-[90vh] flex flex-col rounded-sm shadow-2xl">
 
@@ -350,6 +352,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -120,7 +120,7 @@ export default function AnalyticsChart({
                className="w-[14px] h-[14px] rounded-sm text-[#007cba] focus:ring-0 border-gray-400 cursor-pointer" 
                style={{ accentColor: currentColor }} // Custom checkbox color
              />
-             <span>Last year ({currentDateLabel})</span>
+             <span>{currentDateLabel}</span>
              <span className="font-semibold text-[#1d2327] ml-1">{customFormatter(currentTotal)}</span>
            </label>
 
@@ -133,7 +133,7 @@ export default function AnalyticsChart({
                  className="w-[14px] h-[14px] rounded-sm text-[#11a0d2] focus:ring-0 border-gray-400 cursor-pointer"
                  style={{ accentColor: previousColor }}
                />
-               <span>Previous year ({previousDateLabel})</span>
+               <span>{previousDateLabel}</span>
                <span className="font-semibold text-[#1d2327] ml-1">{customFormatter(previousTotal)}</span>
              </label>
            )}

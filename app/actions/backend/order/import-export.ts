@@ -8,7 +8,7 @@
 
 import { db } from "@/lib/prisma";
 import Papa from "papaparse";
-import { OrderStatus, PaymentStatus, FulfillmentStatus } from "@prisma/client";
+import { OrderStatus, PaymentStatus, FulfillmentStatus, DiscountType, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 
@@ -16,27 +16,80 @@ import { auth } from "@/auth";
 // SECTION 1: UTILITY HELPERS
 // ============================================================
 
-/** যেকোনো value থেকে safe float বের করা */
-const safeFloat = (val: any): number => {
+const safeFloat = (val: unknown): number => {
   if (val === null || val === undefined || val === "") return 0;
   const clean = String(val).replace(/[^\d.-]/g, "");
   const num = parseFloat(clean);
   return isNaN(num) ? 0 : num;
 };
 
-/** যেকোনো value থেকে safe int বের করা */
-const safeInt = (val: any): number => {
+const safeInt = (val: unknown): number => {
   if (val === null || val === undefined || val === "") return 0;
   const num = parseInt(String(val), 10);
   return isNaN(num) ? 0 : num;
 };
 
-/** খালি string কে null এ convert করা (DB এ empty string না রাখা) */
-const nullIfEmpty = (val: any): string | null => {
+const nullIfEmpty = (val: unknown): string | null => {
   if (val === null || val === undefined) return null;
   const s = String(val).trim();
   return s === "" ? null : s;
 };
+
+// ============================================================
+// SECTION 1B: COUPON TYPE INFERENCE
+// ============================================================
+
+interface CouponUsage {
+  discountTotal: number;
+  subtotal: number;
+}
+
+function inferCouponType(
+  code: string,
+  usages: CouponUsage[]
+): { type: DiscountType; value: number } {
+  // 1. Explicit % in code name (e.g. "5%freeship")
+  const explicitPct = code.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (explicitPct) {
+    return { type: "PERCENTAGE", value: parseFloat(explicitPct[1]) };
+  }
+
+  // 2. Ratio-based inference across all orders using this coupon
+  const ratios = usages
+    .filter((u) => u.subtotal > 0.01)
+    .map((u) => (u.discountTotal / u.subtotal) * 100);
+
+  if (ratios.length > 0) {
+    const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+    const maxDev = Math.max(...ratios.map((r) => Math.abs(r - avg)));
+    // Consistent ratio within 2% deviation AND a sensible percentage (1–100)
+    if (maxDev < 2 && avg >= 1 && avg <= 100) {
+      const rounded = Math.round(avg * 2) / 2; // nearest 0.5
+      if (Math.abs(avg - rounded) < 1.5) {
+        return { type: "PERCENTAGE", value: parseFloat(rounded.toFixed(1)) };
+      }
+    }
+  }
+
+  // 3. Trailing number in code name matches computed ratio (e.g. gobike5 → 5%)
+  const trailing = code.match(/(\d+)$/);
+  if (trailing) {
+    const n = parseInt(trailing[1]);
+    if (n >= 1 && n <= 99 && ratios.length > 0) {
+      const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+      if (Math.abs(avg - n) < 4) {
+        return { type: "PERCENTAGE", value: n };
+      }
+    }
+  }
+
+  // 4. Default: FIXED_AMOUNT — use average discount across orders
+  const avgAmount =
+    usages.length > 0
+      ? usages.reduce((a, u) => a + u.discountTotal, 0) / usages.length
+      : 0;
+  return { type: "FIXED_AMOUNT", value: parseFloat(avgAmount.toFixed(2)) };
+}
 
 // ============================================================
 // SECTION 2: STATUS MAPPERS
@@ -139,19 +192,20 @@ const parseAddress = (
 // ============================================================
 
 /**
- * v15 plugin product format:
- * "Product Name [SKU: ABC] [Cat: Bikes] {Dims: L:10,W:5,H:3,Wt:2} [Attr: Color: Red, Size: XL] (x2) - 99.99 [Img: https://...]"
+ * v15 plugin product format (updated):
+ * "Product Name [SKU: ABC] [Type: variable] [Cat: Bikes] {Dims: L:10,W:5,H:3,Wt:2} [Attr: Color: Red, Size: XL] (x2) - 99.99 [Img: https://...]"
  */
 interface ParsedItem {
-  name:       string;
-  sku:        string | null;
-  quantity:   number;
-  unitPrice:  number;
-  lineTotal:  number;
-  image:      string | null;
-  category:   string | null;
-  dims:       string | null;
-  attributes: Record<string, string>; // { Color: "Red", Size: "XL" }
+  name:        string;
+  sku:         string | null;
+  productType: string; // "simple" | "variable" | "grouped" | "external" — from [Type:] or inferred
+  quantity:    number;
+  unitPrice:   number;
+  lineTotal:   number;
+  image:       string | null;
+  category:    string | null;
+  dims:        string | null;
+  attributes:  Record<string, string>; // { Color: "Red", Size: "XL" }
 }
 
 const parseProducts = (productString: string): ParsedItem[] => {
@@ -159,23 +213,21 @@ const parseProducts = (productString: string): ParsedItem[] => {
 
   return productString.split(" || ").map((itemStr): ParsedItem | null => {
     try {
-      // Name: [SKU:...] আসার আগের অংশ
-      const namePart    = itemStr.split("[")[0].trim();
+      const namePart   = itemStr.split("[")[0].trim();
 
-      const skuMatch    = itemStr.match(/\[SKU:\s*(.*?)\]/);
-      const catMatch    = itemStr.match(/\[Cat:\s*(.*?)\]/);
-      const dimsMatch   = itemStr.match(/\{Dims:\s*(.*?)\}/);
-      const attrMatch   = itemStr.match(/\[Attr:\s*(.*?)\]/);
-      const qtyMatch    = itemStr.match(/\(x(\d+)\)/);
-      // price: "(x2) - 99.99" or "(x2) - $99.99" format (plugin exports with $ sign)
-      const priceMatch  = itemStr.match(/\(x\d+\)\s*-\s*\$?([\d.]+)/);
-      const imgMatch    = itemStr.match(/\[Img:\s*(https?:\/\/[^\]]+)\]/);
+      const skuMatch   = itemStr.match(/\[SKU:\s*(.*?)\]/);
+      const typeMatch  = itemStr.match(/\[Type:\s*(.*?)\]/i);
+      const catMatch   = itemStr.match(/\[Cat:\s*(.*?)\]/);
+      const dimsMatch  = itemStr.match(/\{Dims:\s*(.*?)\}/);
+      const attrMatch  = itemStr.match(/\[Attr:\s*(.*?)\]/);
+      const qtyMatch   = itemStr.match(/\(x(\d+)\)/);
+      const priceMatch = itemStr.match(/\(x\d+\)\s*-\s*\$?([\d.]+)/);
+      const imgMatch   = itemStr.match(/\[Img:\s*(https?:\/\/[^\]]+)\]/);
 
-      const quantity   = qtyMatch   ? parseInt(qtyMatch[1], 10)     : 1;
-      const lineTotal  = priceMatch ? parseFloat(priceMatch[1])     : 0;
-      const unitPrice  = quantity > 0 ? lineTotal / quantity        : 0;
+      const quantity  = qtyMatch   ? parseInt(qtyMatch[1], 10) : 1;
+      const lineTotal = priceMatch ? parseFloat(priceMatch[1]) : 0;
+      const unitPrice = quantity > 0 ? lineTotal / quantity    : 0;
 
-      // Attributes parse: "Color: Red, Size: XL" → { Color: "Red", Size: "XL" }
       const attributes: Record<string, string> = {};
       if (attrMatch) {
         attrMatch[1].split(",").forEach((pair) => {
@@ -186,15 +238,20 @@ const parseProducts = (productString: string): ParsedItem[] => {
         });
       }
 
+      // productType: use [Type:] if present, otherwise infer from attributes
+      const productType = typeMatch?.[1]?.trim().toLowerCase()
+        || (Object.keys(attributes).length > 0 ? "variable" : "simple");
+
       return {
-        name:       namePart || "Imported Item",
-        sku:        nullIfEmpty(skuMatch?.[1]),
+        name:        namePart || "Imported Item",
+        sku:         nullIfEmpty(skuMatch?.[1]),
+        productType,
         quantity,
-        unitPrice:  parseFloat(unitPrice.toFixed(2)),
-        lineTotal:  parseFloat(lineTotal.toFixed(2)),
-        image:      nullIfEmpty(imgMatch?.[1]),
-        category:   nullIfEmpty(catMatch?.[1]),
-        dims:       nullIfEmpty(dimsMatch?.[1]),
+        unitPrice:   parseFloat(unitPrice.toFixed(2)),
+        lineTotal:   parseFloat(lineTotal.toFixed(2)),
+        image:       nullIfEmpty(imgMatch?.[1]),
+        category:    nullIfEmpty(catMatch?.[1]),
+        dims:        nullIfEmpty(dimsMatch?.[1]),
         attributes,
       };
     } catch {
@@ -270,7 +327,7 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
     const adminUserId = dbUser?.id ?? null;
 
     // ── একবারে সব existing order numbers load করা (loop এ N+1 এড়ানো) ──
-    const allOrderNums = (data as any[])
+    const allOrderNums = data
       .map((r) => String(r["Order ID"] || "").trim())
       .filter(Boolean);
 
@@ -282,7 +339,7 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
 
     // ── Customer lookup cache (loop এ N+1 এড়ানো) ──
     const allEmails = [...new Set(
-      (data as any[]).map((r) => String(r["Email"] || "").trim().toLowerCase()).filter(Boolean)
+      data.map((r) => String(r["Email"] || "").trim().toLowerCase()).filter(Boolean)
     )];
     const existingUsers = await db.user.findMany({
       where:  { email: { in: allEmails } },
@@ -290,8 +347,48 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
     });
     const userEmailMap = new Map(existingUsers.map((u) => [u.email.toLowerCase(), u.id]));
 
+    // ── Coupon accumulator (type inference এর জন্য) ──
+    const couponUsageMap = new Map<string, CouponUsage[]>();
+
+    // ── SKU → Product/Variant lookup (analytics product linking) ──
+    // Pre-scan all rows first to collect unique SKUs, then batch query once
+    const allRawSkus: string[] = [];
+    for (const row of data) {
+      const productColScan = row["Product Details (Name | SKU | Type | Cat | Dims | Image | Attrs)"]
+        || row["Product Details (Name | SKU | Cat | Dims | Image | Attrs)"]
+        || row["Product Details (Name | SKU | Cat | Dims | Image)"]
+        || row["Product Details"]
+        || "";
+      if (productColScan) {
+        parseProducts(productColScan).forEach((item) => { if (item.sku) allRawSkus.push(item.sku); });
+      }
+    }
+    const uniqueSkus = [...new Set(allRawSkus)];
+
+    const [skuProducts, skuVariants] = uniqueSkus.length > 0
+      ? await Promise.all([
+          db.product.findMany({
+            where:  { sku: { in: uniqueSkus }, deletedAt: null },
+            select: { id: true, sku: true },
+          }),
+          db.productVariant.findMany({
+            where:  { sku: { in: uniqueSkus } },
+            select: { id: true, sku: true, productId: true },
+          }),
+        ])
+      : ([ [], [] ] as const);
+
+    const skuToProductId = new Map<string, string>();
+    skuProducts.forEach((p) => { if (p.sku) skuToProductId.set(p.sku, p.id); });
+
+    // First variant match per SKU wins (variant SKU is more specific than product SKU)
+    const skuToVariant = new Map<string, { variantId: string; productId: string }>();
+    skuVariants.forEach((v) => {
+      if (v.sku && !skuToVariant.has(v.sku)) skuToVariant.set(v.sku, { variantId: v.id, productId: v.productId });
+    });
+
     // ── Process each row ──
-    for (const row of data as any[]) {
+    for (const row of data) {
       const orderNum = String(row["Order ID"] || "").trim();
       if (!orderNum) continue;
 
@@ -359,6 +456,12 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
         // ── 5. Coupon ──
         const coupon = parseCoupon(row["Coupons"] || "");
 
+        // Accumulate coupon usage for type inference (after loop)
+        if (coupon.code && coupon.amount > 0) {
+          if (!couponUsageMap.has(coupon.code)) couponUsageMap.set(coupon.code, []);
+          couponUsageMap.get(coupon.code)!.push({ discountTotal: coupon.amount, subtotal });
+        }
+
         // ── 6. Shipping ──
         const shippingMethod = nullIfEmpty(row["Shipping Method"]) ?? "Standard";
 
@@ -400,7 +503,9 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
         const userAgent    = nullIfEmpty(row["Customer User Agent"]);
 
         // ── 12. Products parse ──
-        const productCol = row["Product Details (Name | SKU | Cat | Dims | Image | Attrs)"]
+        // Supports both old header (without Type) and new header (with Type)
+        const productCol = row["Product Details (Name | SKU | Type | Cat | Dims | Image | Attrs)"]
+          || row["Product Details (Name | SKU | Cat | Dims | Image | Attrs)"]
           || row["Product Details (Name | SKU | Cat | Dims | Image)"]
           || row["Product Details"]
           || "";
@@ -459,8 +564,8 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
             couponCode:        coupon.code,
 
             // Addresses
-            billingAddress:    billingAddress  as any,
-            shippingAddress:   shippingAddress as any,
+            billingAddress:    billingAddress  as unknown as Prisma.InputJsonValue,
+            shippingAddress:   shippingAddress as unknown as Prisma.InputJsonValue,
 
             // Shipping
             shippingMethod:    shippingMethod,
@@ -505,19 +610,29 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
 
             // Related Records
             items: {
-              create: parsedItems.map((item) => ({
-                productName: item.name,
-                sku:         item.sku,
-                price:       item.unitPrice,
-                quantity:    item.quantity,
-                total:       item.lineTotal,
-                image:       item.image,
-                metadata: Object.keys(item.attributes).length > 0
-                  ? { attributes: item.attributes, category: item.category, dims: item.dims }
-                  : item.category || item.dims
-                    ? { category: item.category, dims: item.dims }
-                    : undefined,
-              })),
+              create: parsedItems.map((item) => {
+                // Resolve productId/variantId from local catalog by SKU
+                const variantMatch      = item.sku ? skuToVariant.get(item.sku)   : undefined;
+                const productIdFromSku  = item.sku ? skuToProductId.get(item.sku) : undefined;
+                const resolvedProductId = variantMatch?.productId ?? productIdFromSku;
+                const resolvedVariantId = variantMatch?.variantId;
+                return {
+                  productName: item.name,
+                  sku:         item.sku,
+                  price:       item.unitPrice,
+                  quantity:    item.quantity,
+                  total:       item.lineTotal,
+                  image:       item.image,
+                  ...(resolvedProductId ? { productId: resolvedProductId } : {}),
+                  ...(resolvedVariantId ? { variantId: resolvedVariantId } : {}),
+                  metadata: {
+                    productType: item.productType,
+                    ...(item.category                              ? { category: item.category }       : {}),
+                    ...(item.dims                                  ? { dims: item.dims }                : {}),
+                    ...(Object.keys(item.attributes).length > 0   ? { attributes: item.attributes }    : {}),
+                  } as unknown as Prisma.InputJsonValue,
+                };
+              }),
             },
 
             orderNotes: {
@@ -534,10 +649,36 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
         existingSet.add(orderNum);
         result.successCount++;
 
-      } catch (err: any) {
-        console.error(`Order #${orderNum} import failed:`, err?.message ?? err);
-        result.errors.push(`Order #${orderNum}: ${err?.message ?? "Unknown error"}`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : "Unknown error";
+        console.error(`Order #${orderNum} import failed:`, errMsg);
+        result.errors.push(`Order #${orderNum}: ${errMsg}`);
         result.errorCount++;
+      }
+    }
+
+    // ── Coupon Upsert (type inference + save to Discount table) ──
+    if (couponUsageMap.size > 0) {
+      for (const [code, usages] of couponUsageMap) {
+        try {
+          const { type, value } = inferCouponType(code, usages);
+          await db.discount.upsert({
+            where: { code },
+            // Already exists: increment usedCount only (don't overwrite admin's settings)
+            update: { usedCount: { increment: usages.length } },
+            // New coupon: create with inferred type — isActive:false (historical, not live)
+            create: {
+              code,
+              type,
+              value:        new Prisma.Decimal(value),
+              usedCount:    usages.length,
+              description:  "Imported from WooCommerce",
+              isActive:     false,
+            },
+          });
+        } catch {
+          // Non-critical: coupon upsert failure doesn't break the import
+        }
       }
     }
 
@@ -564,9 +705,9 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
     result.message = `✅ Imported: ${result.successCount} | ⏭️ Skipped: ${result.skipCount} | ❌ Failed: ${result.errorCount}`;
     return result;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("CSV Import Critical Error:", error);
-    result.error = `Critical failure: ${error?.message ?? "Unknown"}`;
+    result.error = `Critical failure: ${error instanceof Error ? error.message : "Unknown"}`;
     return result;
   }
 }
@@ -585,7 +726,7 @@ export interface ExportFilters {
 
 export async function exportOrdersCSV(filters?: ExportFilters): Promise<{ success: boolean; csv?: string; error?: string }> {
   try {
-    const whereCondition: any = {
+    const whereCondition: Prisma.OrderWhereInput = {
       deletedAt: null,
       ...(filters?.status && filters.status !== "all" ? { status: filters.status as OrderStatus } : {}),
       ...(filters?.startDate || filters?.endDate ? {
@@ -615,11 +756,11 @@ export async function exportOrdersCSV(filters?: ExportFilters): Promise<{ succes
       take:    10000,
     });
 
-    const csvRows: Record<string, any>[] = [];
+    const csvRows: Record<string, unknown>[] = [];
 
     for (const order of orders) {
-      const billing:  any = order.billingAddress  ?? {};
-      const shipping: any = order.shippingAddress ?? {};
+      const billing  = (order.billingAddress  ?? {}) as Record<string, string>;
+      const shipping = (order.shippingAddress ?? {}) as Record<string, string>;
 
       const billingFull  = [billing.address1,  billing.city,  billing.state,  billing.postcode,  billing.country].filter(Boolean).join(", ");
       const shippingFull = [shipping.address1, shipping.city, shipping.state, shipping.postcode, shipping.country].filter(Boolean).join(", ");
@@ -631,13 +772,15 @@ export async function exportOrdersCSV(filters?: ExportFilters): Promise<{ succes
       let productStr = "No Items";
       if (order.items.length > 0) {
         productStr = order.items.map((item) => {
-          const meta: any = item.metadata ?? {};
+          const meta = (item.metadata ?? {}) as Record<string, unknown>;
           let str = item.productName;
           if (item.sku)          str += ` [SKU: ${item.sku}]`;
+          if (meta.productType)  str += ` [Type: ${meta.productType}]`;
           if (meta.category)     str += ` [Cat: ${meta.category}]`;
           if (meta.dims)         str += ` {Dims: ${meta.dims}}`;
-          if (meta.attributes && Object.keys(meta.attributes).length > 0) {
-            const attrStr = Object.entries(meta.attributes).map(([k, v]) => `${k}: ${v}`).join(", ");
+          const attrs = meta.attributes as Record<string, unknown> | undefined;
+          if (attrs && Object.keys(attrs).length > 0) {
+            const attrStr = Object.entries(attrs).map(([k, v]) => `${k}: ${v}`).join(", ");
             str += ` [Attr: ${attrStr}]`;
           }
           str += ` (x${item.quantity}) - ${item.total}`;
@@ -669,7 +812,7 @@ export async function exportOrdersCSV(filters?: ExportFilters): Promise<{ succes
         "Transaction ID":    order.paymentId ?? "",
         "Coupons":           couponStr,
         // ── Products ──
-        "Product Details (Name | SKU | Cat | Dims | Image | Attrs)": productStr,
+        "Product Details (Name | SKU | Type | Cat | Dims | Image | Attrs)": productStr,
         // ── Shipping ──
         "Shipping Method":   order.shippingMethod   ?? "",
         "Shipping Total":    Number(order.shippingTotal).toFixed(2),
@@ -709,8 +852,8 @@ export async function exportOrdersCSV(filters?: ExportFilters): Promise<{ succes
     const csvString = Papa.unparse(csvRows);
     return { success: true, csv: csvString };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Export Error:", error);
-    return { success: false, error: `Export failed: ${error?.message ?? "Unknown"}` };
+    return { success: false, error: `Export failed: ${error instanceof Error ? error.message : "Unknown"}` };
   }
 }

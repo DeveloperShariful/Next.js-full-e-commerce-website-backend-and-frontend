@@ -215,6 +215,26 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
     []
   );
 
+  // Abandoned checkout capture — fire-and-forget when a valid email is entered.
+  const debouncedCaptureAbandoned = useCallback(
+    debounce((email: string, items: typeof cartItems, sub: number) => {
+      fetch('/api/abandoned-checkout/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, cartItems: items, subtotal: sub }),
+      }).catch(() => {});
+    }, 2000),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  useEffect(() => {
+    const email = customerInfo.email;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (cartItems.length === 0) return;
+    debouncedCaptureAbandoned(email, cartItems, totals?.subtotal ?? 0);
+  }, [customerInfo.email, cartItems, totals?.subtotal, debouncedCaptureAbandoned]);
+
   // ✅ NEW: Create ONE shared PI when totals first arrive.
   // Update (debounced) whenever total changes due to shipping/coupon.
   // ExpressCheckouts + StripePaymentGateway both use this same PI.

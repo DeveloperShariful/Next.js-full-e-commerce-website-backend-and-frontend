@@ -445,7 +445,19 @@ const DEFAULT_TEMPLATES = [
         recipientType: 'customer',
         subject: 'Partial Payment Received for Order #{order_number}',
         content: '<p>Hi {customer_name},</p><p>We have received a partial payment for your order <strong>#{order_number}</strong>. Your total order value is <strong>{total_amount}</strong>.</p><p>Please arrange the remaining balance at your earliest convenience to avoid any delays in processing your order. If you have any questions, please reply to this email.</p>'
-    }
+    },
+
+    // =======================================================================
+    // --- ABANDONED CHECKOUT ---
+    // =======================================================================
+    {
+        slug: 'abandoned_checkout',
+        name: 'Abandoned Checkout Recovery',
+        triggerEvent: 'ABANDONED_CHECKOUT',
+        recipientType: 'customer',
+        subject: 'You left something behind, {customer_name}! 🛒',
+        content: '<p>Hi {customer_name},</p><p>We noticed you were checking out some amazing kids\' e-bikes on <strong>GoBike Australia</strong> but didn\'t quite finish your order.</p><p>Don\'t worry — we\'ve saved your cart! Your items are still waiting for you. Stock is limited, so grab yours before it\'s gone!</p><p>If you had any trouble during checkout or need help with payment, simply reply to this email and our friendly team will get back to you within 24 hours.</p><p>Happy Riding! 🚴</p>',
+    },
 ];
 
 export async function getEmailTemplates() {

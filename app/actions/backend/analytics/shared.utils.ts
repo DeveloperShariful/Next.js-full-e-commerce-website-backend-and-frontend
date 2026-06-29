@@ -1,6 +1,17 @@
 //File: app/actions/backend/analytics/shared.utils.ts
 
-import { Analytics } from "@prisma/client";
+import { Analytics, OrderStatus } from "@prisma/client";
+
+// Single source of truth for all analytics files — must match sync-analytics/route.ts
+export const SUCCESS_STATUSES: OrderStatus[] = [
+  "PROCESSING",
+  "PACKED",
+  "SHIPPED",
+  "DELIVERED",
+  "COMPLETED",
+  "READY_FOR_PICKUP",
+  "PARTIALLY_PAID",
+];
 
 export interface DateRange {
   from: Date;

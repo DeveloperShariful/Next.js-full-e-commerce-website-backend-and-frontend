@@ -88,7 +88,7 @@ export default function OrdersTable({ data }: OrdersTableProps) {
                               {p.name}
                            </Link>
                         ))}
-                        {row.itemsSold > 2 && <span className="text-[#646970] text-[11px]">+ {row.itemsSold - 2} more</span>}
+                        {row.totalProducts > 2 && <span className="text-[#646970] text-[11px]">+ {row.totalProducts - 2} more</span>}
                      </div>
                   </td>
                   

@@ -24,7 +24,43 @@ export default function OverviewLeaderboards({ data }: OverviewLeaderboardsProps
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
+        {/* Top Channels Table */}
+        <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-sm lg:col-span-2">
+          <h3 className="text-[14px] font-semibold text-[#1d2327] p-4 border-b border-[#c3c4c7]">
+            Revenue by channel
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13px] text-[#2c3338]">
+              <thead>
+                <tr className="border-b border-[#c3c4c7] bg-[#f8f9f9]">
+                  <th className="font-semibold py-2.5 px-4">Source / Channel</th>
+                  <th className="font-semibold py-2.5 px-4 text-right">Orders</th>
+                  <th className="font-semibold py-2.5 px-4 text-right">Net sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.topChannels.length > 0 ? (
+                  data.topChannels.map((channel, index) => (
+                    <tr
+                      key={channel.source}
+                      className={index !== data.topChannels.length - 1 ? "border-b border-[#f0f0f1]" : ""}
+                    >
+                      <td className="py-3 px-4 font-medium">{channel.source}</td>
+                      <td className="py-3 px-4 text-right">{formatNumber(channel.orders)}</td>
+                      <td className="py-3 px-4 text-right">{formatCurrency(channel.netSales)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-[#646970]">No channel data found for this period</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Top Categories Table */}
         <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-sm">
           <h3 className="text-[14px] font-semibold text-[#1d2327] p-4 border-b border-[#c3c4c7]">

@@ -26,6 +26,9 @@ export interface RevenueAnalyticsResponse {
     taxes: number;
     shipping: number;
     totalSales: number;
+    cartAbandonmentRate: number;
+    refundRate: number;
+    repeatPurchaseRate: number;
   };
   previousSummary: {
     grossSales: number;
@@ -35,49 +38,17 @@ export interface RevenueAnalyticsResponse {
     taxes: number;
     shipping: number;
     totalSales: number;
+    cartAbandonmentRate: number;
+    refundRate: number;
+    repeatPurchaseRate: number;
   };
   chartData: SerializedAnalytics[];
   previousChartData: SerializedAnalytics[];
   tableData: RevenueTableRow[];
 }
 
-export async function getRevenueAnalyticsData(
-  currentRange: DateRange,
-  previousRange: DateRange
-): Promise<RevenueAnalyticsResponse> {
-
-  // ১. Fetch Current Period Data
-  const currentDataRaw = await db.analytics.findMany({
-    where: { date: { gte: currentRange.from, lte: currentRange.to } },
-    orderBy: { date: "desc" }, // Descending for the table (latest first)
-  });
-
-  // ২. Fetch Previous Period Data (For comparison)
-  const previousDataRaw = await db.analytics.findMany({
-    where: { date: { gte: previousRange.from, lte: previousRange.to } },
-    orderBy: { date: "desc" },
-  });
-
-  const chartData = currentDataRaw.map(serializeAnalyticsData);
-  const previousChartData = previousDataRaw.map(serializeAnalyticsData);
-
-  // ৩. Calculate Current Summary
-  const summary = chartData.reduce(
-    (acc, curr) => {
-      acc.grossSales += curr.grossSales;
-      acc.returns += curr.totalRefunds;
-      acc.coupons += curr.totalDiscounts;
-      acc.netSales += curr.netSales;
-      acc.taxes += curr.totalTax;
-      acc.shipping += curr.totalShipping;
-      acc.totalSales += curr.netSales + curr.totalTax + curr.totalShipping; // total = net + tax + shipping
-      return acc;
-    },
-    { grossSales: 0, returns: 0, coupons: 0, netSales: 0, taxes: 0, shipping: 0, totalSales: 0 }
-  );
-
-  // ৪. Calculate Previous Summary
-  const previousSummary = previousChartData.reduce(
+function buildSummary(data: SerializedAnalytics[]) {
+  const base = data.reduce(
     (acc, curr) => {
       acc.grossSales += curr.grossSales;
       acc.returns += curr.totalRefunds;
@@ -86,13 +57,66 @@ export async function getRevenueAnalyticsData(
       acc.taxes += curr.totalTax;
       acc.shipping += curr.totalShipping;
       acc.totalSales += curr.netSales + curr.totalTax + curr.totalShipping;
+      acc.totalOrders += curr.totalOrders;
+      acc.abandonedCheckouts += curr.abandonedCheckouts;
+      acc.newCustomers += curr.newCustomers;
+      acc.returningCustomers += curr.returningCustomers;
       return acc;
     },
-    { grossSales: 0, returns: 0, coupons: 0, netSales: 0, taxes: 0, shipping: 0, totalSales: 0 }
+    {
+      grossSales: 0, returns: 0, coupons: 0, netSales: 0,
+      taxes: 0, shipping: 0, totalSales: 0,
+      totalOrders: 0, abandonedCheckouts: 0,
+      newCustomers: 0, returningCustomers: 0,
+    }
   );
 
-  // ৫. Generate Table Data (Day by Day Breakdown)
-  const tableData: RevenueTableRow[] = chartData.map(day => ({
+  const totalAttempts = base.abandonedCheckouts + base.totalOrders;
+  const totalCustomers = base.newCustomers + base.returningCustomers;
+
+  return {
+    grossSales: base.grossSales,
+    returns: base.returns,
+    coupons: base.coupons,
+    netSales: base.netSales,
+    taxes: base.taxes,
+    shipping: base.shipping,
+    totalSales: base.totalSales,
+    cartAbandonmentRate: totalAttempts > 0
+      ? parseFloat(((base.abandonedCheckouts / totalAttempts) * 100).toFixed(1))
+      : 0,
+    refundRate: base.totalOrders > 0
+      ? parseFloat(((base.returns / base.totalOrders) * 100).toFixed(1))
+      : 0,
+    repeatPurchaseRate: totalCustomers > 0
+      ? parseFloat(((base.returningCustomers / totalCustomers) * 100).toFixed(1))
+      : 0,
+  };
+}
+
+export async function getRevenueAnalyticsData(
+  currentRange: DateRange,
+  previousRange: DateRange
+): Promise<RevenueAnalyticsResponse> {
+
+  const [currentDataRaw, previousDataRaw] = await Promise.all([
+    db.analytics.findMany({
+      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      orderBy: { date: "desc" },
+    }),
+    db.analytics.findMany({
+      where: { date: { gte: previousRange.from, lte: previousRange.to } },
+      orderBy: { date: "desc" },
+    }),
+  ]);
+
+  const chartDataDesc = currentDataRaw.map(serializeAnalyticsData);
+  const previousChartDataDesc = previousDataRaw.map(serializeAnalyticsData);
+
+  const summary = buildSummary(chartDataDesc);
+  const previousSummary = buildSummary(previousChartDataDesc);
+
+  const tableData: RevenueTableRow[] = chartDataDesc.map((day) => ({
     date: day.date,
     orders: day.totalOrders,
     grossSales: day.grossSales,
@@ -101,14 +125,15 @@ export async function getRevenueAnalyticsData(
     netSales: day.netSales,
     taxes: day.totalTax,
     shipping: day.totalShipping,
-    totalSales: day.netSales + day.totalTax + day.totalShipping
+    totalSales: day.netSales + day.totalTax + day.totalShipping,
   }));
 
   return {
     summary,
     previousSummary,
-    chartData: chartData.reverse(), // Reversing back to ASC for the chart
-    previousChartData: previousChartData.reverse(),
-    tableData
+    // Spread into new arrays so we don't mutate the sorted originals
+    chartData: [...chartDataDesc].reverse(),
+    previousChartData: [...previousChartDataDesc].reverse(),
+    tableData,
   };
 }

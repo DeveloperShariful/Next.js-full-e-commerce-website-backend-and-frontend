@@ -83,7 +83,7 @@ export default async function ElectricBikePartsCategoryPage({
   const seoData = seoContentMap[categorySlug];
   // ডাটাবেজ থেকে ক্যাটাগরির নাম বের করা
   const currentCategory = categories.find(c => c.slug === categorySlug);
-  const categoryName = currentCategory?.name || seoData?.h1 || categorySlug;
+  const categoryName = seoData?.h1 || currentCategory?.name || categorySlug;
   const categoryImage = currentCategory?.image ?? null;
 
   // ★★★ JSON-LD SCHEMA INJECTION ★★★
@@ -168,25 +168,33 @@ export default async function ElectricBikePartsCategoryPage({
           <Breadcrumbs pageTitle={categoryName} />
           
           <div className="flex flex-col md:flex-row items-center gap-8 mt-6">
-            <div className={`flex-1 text-center md:text-left ${categoryImage ? '' : 'mx-auto md:text-center'}`}>
+            <div className={`flex-1 text-center md:text-left ${!categoryImage ? 'md:mx-auto md:text-center' : ''}`}>
               <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-6 tracking-tight">
                 {categoryName}
               </h1>
-              {seoData?.topIntro && (
+              {seoData?.topIntro ? (
                 <div
                   className="text-lg text-gray-600 leading-relaxed max-w-3xl"
                   dangerouslySetInnerHTML={{ __html: seoData.topIntro }}
                 />
+              ) : (
+                currentCategory?.description && (
+                  <div
+                    className="text-lg text-gray-600 leading-relaxed max-w-3xl prose prose-p:mb-4"
+                    dangerouslySetInnerHTML={{ __html: currentCategory.description }}
+                  />
+                )
               )}
             </div>
             {categoryImage && (
-              <div className="flex-shrink-0 w-full md:w-[280px] lg:w-[340px]">
+              <div className="flex-1 w-full max-w-[500px] relative rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-gray-50 aspect-[4/3] md:aspect-auto md:h-[300px]">
                 <Image
                   src={categoryImage}
                   alt={categoryName}
-                  width={340}
-                  height={260}
-                  className="w-full h-auto object-cover rounded-xl shadow-md"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 500px"
+                  priority
                 />
               </div>
             )}

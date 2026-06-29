@@ -11,7 +11,7 @@ export interface ProductTableRow {
   sku: string | null;
   itemsSold: number;
   netSales: number;
-  ordersCount: number; // We approximate orders per product
+  ordersCount: number;
   categoryName: string;
   categoryId: string | null;
   variationsSold: number;
@@ -35,16 +35,22 @@ export async function getProductsAnalyticsData(
   previousRange: DateRange
 ): Promise<ProductsAnalyticsResponse> {
 
-  // ১. Chart & Summary Data (from global Analytics table)
-  const currentDataRaw = await db.analytics.findMany({
-    where: { date: { gte: currentRange.from, lte: currentRange.to } },
-    orderBy: { date: "asc" },
-  });
-
-  const previousDataRaw = await db.analytics.findMany({
-    where: { date: { gte: previousRange.from, lte: previousRange.to } },
-    orderBy: { date: "asc" },
-  });
+  const [currentDataRaw, previousDataRaw, productGroups] = await Promise.all([
+    db.analytics.findMany({
+      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      orderBy: { date: "asc" },
+    }),
+    db.analytics.findMany({
+      where: { date: { gte: previousRange.from, lte: previousRange.to } },
+      orderBy: { date: "asc" },
+    }),
+    db.productAnalytics.groupBy({
+      by: ["productId"],
+      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      _sum: { itemsSold: true, netSales: true },
+      orderBy: { _sum: { itemsSold: "desc" } },
+    }),
+  ]);
 
   const chartData = currentDataRaw.map(serializeAnalyticsData);
   const previousChartData = previousDataRaw.map(serializeAnalyticsData);
@@ -59,56 +65,60 @@ export async function getProductsAnalyticsData(
     { itemsSold: 0, netSales: 0, orders: 0 }
   );
 
-  // ২. Table Data (from ProductAnalytics grouped by Product)
-  const productGroups = await db.productAnalytics.groupBy({
-    by: ["productId"],
-    where: {
-      date: { gte: currentRange.from, lte: currentRange.to },
-    },
-    _sum: {
-      itemsSold: true,
-      netSales: true,
-    },
-    orderBy: {
-      _sum: { itemsSold: "desc" },
-    }
-  });
+  // Fetch all product details in ONE query (N+1 fix)
+  const productIds = productGroups.map((g) => g.productId);
 
-  // ৩. Fetch additional product details (SKU, Stock, Status, Category)
-  const tableData: ProductTableRow[] = await Promise.all(
-    productGroups.map(async (group) => {
-      const product = await db.product.findUnique({
-        where: { id: group.productId },
-        include: { categories: { take: 1 } }
-      });
+  const [products, orderCountGroups] = await Promise.all([
+    db.product.findMany({
+      where: { id: { in: productIds } },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        status: true,
+        stock: true,
+        trackQuantity: true,
+        categories: { select: { id: true, name: true }, take: 1 },
+      },
+    }),
+    db.orderItem.groupBy({
+      by: ["productId"],
+      where: {
+        productId: { in: productIds },
+        order: { orderDate: { gte: currentRange.from, lte: currentRange.to } },
+      },
+      _count: { id: true },
+    }),
+  ]);
 
-      return {
-        id: group.productId,
-        name: product?.name || "Unknown Product",
-        sku: product?.sku || "N/A",
-        itemsSold: group._sum.itemsSold || 0,
-        netSales: Number(group._sum.netSales) || 0,
-        // Since we don't track exact distinct orders per product directly in ProductAnalytics yet, 
-        // we fallback to itemsSold or a separate query. For performance, we approximate or query OrderItem
-        ordersCount: await db.orderItem.count({
-            where: { 
-                productId: group.productId,
-                order: { orderDate: { gte: currentRange.from, lte: currentRange.to } }
-            }
-        }),
-        categoryId: product?.categories?.[0]?.id || null,
-        categoryName: product?.categories?.[0]?.name || "N/A",
-        variationsSold: 0, // Simplified for now
-        status: product?.status || "N/A",
-        stock: product?.trackQuantity ? product?.stock : "N/A",
-      };
-    })
+  const productMap = new Map(products.map((p) => [p.id, p]));
+  const orderCountMap = new Map(
+    orderCountGroups
+      .filter((g): g is typeof g & { productId: string } => g.productId !== null)
+      .map((g) => [g.productId, g._count.id])
   );
+
+  const tableData: ProductTableRow[] = productGroups.map((group) => {
+    const product = productMap.get(group.productId);
+    return {
+      id: group.productId,
+      name: product?.name ?? "Unknown Product",
+      sku: product?.sku ?? null,
+      itemsSold: group._sum.itemsSold ?? 0,
+      netSales: Number(group._sum.netSales) ?? 0,
+      ordersCount: orderCountMap.get(group.productId) ?? 0,
+      categoryId: product?.categories?.[0]?.id ?? null,
+      categoryName: product?.categories?.[0]?.name ?? "N/A",
+      variationsSold: 0,
+      status: product?.status ?? "N/A",
+      stock: product?.trackQuantity ? (product?.stock ?? 0) : "N/A",
+    };
+  });
 
   return {
     summary,
     chartData,
     previousChartData,
-    tableData
+    tableData,
   };
 }

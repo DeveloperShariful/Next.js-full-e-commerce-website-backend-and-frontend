@@ -1,9 +1,11 @@
-// app/actions/storefront/affiliates/_services/dashboard-service.ts
+﻿// app/actions/storefront/affiliates/_services/dashboard-service.ts
 
 "use server";
 
 import { db } from "@/lib/prisma";
-import { format, eachDayOfInterval, subDays, startOfDay, endOfDay, isBefore, isAfter } from "date-fns";
+import { eachDayOfInterval, subDays, startOfDay, endOfDay, isBefore, isAfter } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 import { unstable_cache } from "next/cache";
 import { AnnouncementType, CommissionType } from "@prisma/client";
 import { serializePrismaData } from "@/lib/format-data";
@@ -320,6 +322,7 @@ export async function getActiveRules() {
 // ==========================================
 
 export async function getPerformanceChart(affiliateId: string) {
+  const timezone = await getStoreTimezone();
   return await unstable_cache(async () => {
       const end = endOfDay(new Date());
       const start = startOfDay(subDays(end, 29));
@@ -330,26 +333,26 @@ export async function getPerformanceChart(affiliateId: string) {
           createdAt: { gte: start, lte: end },
           status: { in: ["APPROVED", "PAID"] }
         },
-        select: { createdAt: true, commissionAmount: true } 
+        select: { createdAt: true, commissionAmount: true }
       });
 
       const days = eachDayOfInterval({ start, end });
-      
+
       return days.map(day => {
-        const dateKey = format(day, "yyyy-MM-dd");
-        const dayTransactions = rawReferrals.filter(r => format(r.createdAt, "yyyy-MM-dd") === dateKey);
-        const dailyEarnings = dayTransactions.reduce((sum, item) => 
+        const dateKey = formatTz(day, timezone, "yyyy-MM-dd");
+        const dayTransactions = rawReferrals.filter(r => formatTz(r.createdAt, timezone, "yyyy-MM-dd") === dateKey);
+        const dailyEarnings = dayTransactions.reduce((sum, item) =>
           sum + item.commissionAmount.toNumber(), 0
         );
 
         return {
-          date: format(day, "yyyy-MM-dd"),
-          displayDate: format(day, "MMM dd"),
+          date: formatTz(day, timezone, "yyyy-MM-dd"),
+          displayDate: formatTz(day, timezone, "MMM dd"),
           earnings: dailyEarnings,
         };
       });
     },
-    [`affiliate-chart-${affiliateId}`],
+    [`affiliate-chart-${affiliateId}-${timezone}`],
     { revalidate: 3600 }
   )();
 }

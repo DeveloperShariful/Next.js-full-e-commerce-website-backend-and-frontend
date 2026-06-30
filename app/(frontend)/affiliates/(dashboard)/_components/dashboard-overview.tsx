@@ -8,7 +8,7 @@ import {
   Ticket, ChevronRight, Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import Link from "next/link";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -115,7 +115,7 @@ function KpiCard({ label, value, sub, icon: Icon, color, todayBadge, trend, tren
 // ── Earnings Chart ────────────────────────────────────────────────────────────
 
 function EarningsChart({ data, view, setView }: { data: any[]; view: "area" | "bar"; setView: (v: "area" | "bar") => void }) {
-  const { symbol, formatPrice } = useGlobalStore();
+  const { symbol, formatPrice, timezone } = useGlobalStore();
   const currency = symbol || "$";
 
   if (!data || data.length === 0) {
@@ -165,7 +165,7 @@ function EarningsChart({ data, view, setView }: { data: any[]; view: "area" | "b
               <Tooltip
                 contentStyle={{ borderRadius: 8, border: "1px solid #e0e0e0", fontSize: 12 }}
                 formatter={(v: unknown) => [formatPrice(n(v)), "Earnings"]}
-                labelFormatter={l => format(new Date(l), "MMM d, yyyy")}
+                labelFormatter={l => formatTz(new Date(l), timezone, "MMM d, yyyy")}
               />
               <Area type="monotone" dataKey="earnings" stroke="#2271b1" strokeWidth={2.5}
                 fill="url(#earn)" animationDuration={1000} />
@@ -374,7 +374,7 @@ function ConversionFunnel({ clicks, referrals, approved }: { clicks: number; ref
 // ── Recent Referrals ──────────────────────────────────────────────────────────
 
 function ReferralItem({ r }: { r: any }) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
 
   const statusStyle: Record<string, string> = {
     PAID:     "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/20",
@@ -403,7 +403,7 @@ function ReferralItem({ r }: { r: any }) {
           </span>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-[#8c8f94]">{format(new Date(r.date), "MMM d, h:mm a")}</span>
+          <span className="text-[10px] text-[#8c8f94]">{formatTz(new Date(r.date), timezone, "MMM d, h:mm a")}</span>
           {r.orderAmount > 0 && (
             <span className="text-[10px] text-[#8c8f94]">· Order: {formatPrice(r.orderAmount)}</span>
           )}
@@ -463,7 +463,7 @@ function RulesCard({ rules }: { rules: any[] }) {
 // ── Active Contests ───────────────────────────────────────────────────────────
 
 function ContestsCard({ contests }: { contests: any[] }) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   if (!contests || contests.length === 0) return null;
 
   const getPrize = (prizes: unknown) => {
@@ -488,7 +488,7 @@ function ContestsCard({ contests }: { contests: any[] }) {
               {c.endDate && (
                 <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded flex items-center gap-1">
                   <Clock className="w-2.5 h-2.5" />
-                  {format(new Date(c.endDate), "MMM d")}
+                  {formatTz(new Date(c.endDate), timezone, "MMM d")}
                 </span>
               )}
             </div>

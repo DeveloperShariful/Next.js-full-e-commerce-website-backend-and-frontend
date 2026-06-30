@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Wallet } from "lucide-react";
 import WalletAdjustForm from "./_components/WalletAdjustForm";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function UserWalletPage({
 }) {
   const { userId } = await params;
   const wallet = await getWalletByUserId(userId);
+  const timezone = await getStoreTimezone();
 
   if (!wallet) notFound();
 
@@ -112,8 +114,8 @@ export default async function UserWalletPage({
                             {isCredit ? "+" : "-"}A${Number(tx.amount).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-right text-[#8c8f94] text-[12px]">
-                            {format(new Date(tx.createdAt), "dd/MM/yyyy")}
-                            <div className="text-[11px]">{format(new Date(tx.createdAt), "hh:mm a")}</div>
+                            {formatTz(new Date(tx.createdAt), timezone, "dd/MM/yyyy")}
+                            <div className="text-[11px]">{formatTz(new Date(tx.createdAt), timezone, "hh:mm a")}</div>
                           </td>
                         </tr>
                       );

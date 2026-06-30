@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { Wallet, Ticket, FileText, ArrowDownLeft, ArrowUpRight, Copy, Check } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ interface Props {
 }
 
 export default function WalletView({ data }: Props) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   const [giftCode, setGiftCode] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -138,8 +138,8 @@ export default function WalletView({ data }: Props) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-[#50575e] text-[12px]">
-                        <div>{format(new Date(tx.createdAt), "Y/m/d")}</div>
-                        <div className="text-[11px] text-[#8c8f94] font-mono">{format(new Date(tx.createdAt), "g:i a")}</div>
+                        <div>{formatTz(new Date(tx.createdAt), timezone, "yyyy/M/d")}</div>
+                        <div className="text-[11px] text-[#8c8f94] font-mono">{formatTz(new Date(tx.createdAt), timezone, "h:mm a")}</div>
                       </td>
                     </tr>
                   );

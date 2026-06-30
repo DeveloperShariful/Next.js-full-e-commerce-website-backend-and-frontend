@@ -1,6 +1,6 @@
 // app/actions/backend/settings/email/email-generator.ts
 
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 
 interface EmailOrderItem {
   productName: string;
@@ -55,6 +55,7 @@ interface EmailGeneratorProps {
   config: EmailConfig;
   template: EmailTemplate;
   metadata?: Record<string, unknown>;
+  timezone?: string;
 }
 
 const getReadablePaymentMethod = (method: string | null) => {
@@ -85,7 +86,7 @@ const safeReplace = (text: string, variables: Record<string, string | number | n
     return result;
 };
 
-export const generateEmailHtml = ({ order, config, template, metadata }: EmailGeneratorProps) => {
+export const generateEmailHtml = ({ order, config, template, metadata, timezone = "UTC" }: EmailGeneratorProps) => {
   const baseColor = config.baseColor || "#2271b1";
   const bgColor = config.backgroundColor || "#f0f0f1";
   const bodyColor = config.bodyBackgroundColor || "#ffffff";
@@ -143,7 +144,7 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
           payment_method: getReadablePaymentMethod(order.paymentMethod),
           tracking_number: order.shippingTrackingNumber || "N/A",
           courier: order.shippingMethod || "Standard Shipping",
-          order_date: format(new Date(order.createdAt), "MMMM do, yyyy"),
+          order_date: formatTz(new Date(order.createdAt), timezone, "MMMM do, yyyy"),
           shipping_address: `${shipping.address1 || ''} ${shipping.city || ''}`,
           billing_address: `${billing.address1 || ''} ${billing.city || ''}`
       };
@@ -570,7 +571,7 @@ export const generateEmailHtml = ({ order, config, template, metadata }: EmailGe
                                   ? template.triggerEvent?.includes("ADMIN")
                                     ? `<a href="${appUrl}/admin/orders/${order?.id || ''}" style="color: #ffffff; text-decoration: underline;">Order #${variables.order_number}</a>`
                                     : `<a href="${appUrl}/orders" style="color: #ffffff; text-decoration: underline;">Order #${variables.order_number}</a>`
-                                  : format(new Date(), "MMMM do, yyyy")}
+                                  : formatTz(new Date(), timezone, "MMMM do, yyyy")}
                             </p>
                         </td>
                     </tr>

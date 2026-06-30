@@ -1,10 +1,11 @@
-// Location: app/(backend)/admin/analytics/page.tsx
+﻿// Location: app/(backend)/admin/analytics/page.tsx
 
 import React from "react";
 import { getOverviewData } from "@/app/actions/backend/analytics/overview.actions";
 import { getLeaderboardsData } from "@/app/actions/backend/analytics/leaderboards.actions";
 import { parseDateRange } from "@/app/actions/backend/analytics/shared.utils";
-import { format } from "date-fns"; // 🔥 NEW: Imported for formatting dates
+import { formatTz } from "@/lib/store-time";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 import SummaryCards from "./_components/summary-cards";
 import AnalyticsChart from "./_components/analytics-chart";
@@ -30,19 +31,20 @@ export default async function AnalyticsOverviewPage(props: PageProps) {
   const dates = parseDateRange(period, compare, customFrom, customTo);
   const isComparing = compare !== "none";
 
-  const [overviewData, leaderboardsData] = await Promise.all([
+  const [overviewData, leaderboardsData, timezone] = await Promise.all([
     getOverviewData(dates.current, dates.previous),
-    getLeaderboardsData(dates.current)
+    getLeaderboardsData(dates.current),
+    getStoreTimezone(),
   ]);
 
-  // 🔥 NEW: Formatting dates for the Chart Legend
-  const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime() 
-      ? format(dates.current.from, "MMM d, yyyy")
-      : `${format(dates.current.from, "MMM d")} - ${format(dates.current.to, "d, yyyy")}`;
-      
-  const previousDateLabel = dates.previous.from.getTime() === dates.previous.to.getTime() 
-      ? format(dates.previous.from, "MMM d, yyyy")
-      : `${format(dates.previous.from, "MMM d")} - ${format(dates.previous.to, "d, yyyy")}`;
+  // Formatting dates for the Chart Legend
+  const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime()
+      ? formatTz(dates.current.from, timezone, "MMM d, yyyy")
+      : `${formatTz(dates.current.from, timezone, "MMM d")} - ${formatTz(dates.current.to, timezone, "d, yyyy")}`;
+
+  const previousDateLabel = dates.previous.from.getTime() === dates.previous.to.getTime()
+      ? formatTz(dates.previous.from, timezone, "MMM d, yyyy")
+      : `${formatTz(dates.previous.from, timezone, "MMM d")} - ${formatTz(dates.previous.to, timezone, "d, yyyy")}`;
 
   return (
     <div className="w-full">

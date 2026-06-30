@@ -1,9 +1,10 @@
 // File Location: app/admin/orders/[orderId]/page.tsx
 
-import { getOrderDetails } from "@/app/actions/backend/order/get-orders"; 
+import { getOrderDetails } from "@/app/actions/backend/order/get-orders";
 import { db } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 // --- WOOCOMMERCE STYLE META BOX COMPONENTS ---
 import { OrderDetailsMeta } from "./_components/order-details-meta";
@@ -34,6 +35,7 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
 
   // ✅ Serialize and Cast to Strict Type
   const order: OrderDetailsType = JSON.parse(JSON.stringify(rawOrder));
+  const timezone = await getStoreTimezone();
 
   // ২. Customer History Calculation
   let customerHistory: CustomerHistoryType = { totalOrders: 0, totalRevenue: 0, avgValue: 0 };
@@ -86,12 +88,12 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
 
         {/* === LEFT COLUMN === */}
         <div className="w-full lg:w-[70%] xl:w-[82%] space-y-5">
-          <OrderDetailsMeta order={order} />
+          <OrderDetailsMeta order={order} timezone={timezone} />
           <OrderIssuesMeta order={order} />
-          <OrderItemsMeta order={order} />
-          <OrderShipmentsMeta shipments={order.shipments} />
-          <OrderRefundsMeta refunds={order.refunds} />
-          <OrderTransactionsMeta transactions={order.transactions} />
+          <OrderItemsMeta order={order} timezone={timezone} />
+          <OrderShipmentsMeta shipments={order.shipments} timezone={timezone} />
+          <OrderRefundsMeta refunds={order.refunds} timezone={timezone} />
+          <OrderTransactionsMeta transactions={order.transactions} timezone={timezone} />
           <CustomerHistoryMeta history={customerHistory} />
           <CustomFieldsMeta order={order} />
           <DownloadablePermissionsMeta order={order} />
@@ -104,7 +106,7 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
               <OrderSidebarActions order={order} />
             </div>
             <TransdirectSidebar order={order} />
-            <OrderSidebarNotes order={order} />
+            <OrderSidebarNotes order={order} timezone={timezone} />
             <SecuritySidebar order={order} />
             <AffiliateSidebar order={order} />
         </div>

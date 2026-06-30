@@ -81,6 +81,21 @@ export async function sendNotification({
         finalRecipient = uniqueEmails.join(", ");
     }
 
+    // Duplicate check — same order + same template already queued/sent? skip
+    if (orderId && template.slug) {
+      const already = await db.notificationQueue.findFirst({
+        where: {
+          orderId,
+          templateSlug: template.slug,
+          status: { not: 'FAILED' },
+        },
+        select: { id: true },
+      });
+      if (already) {
+        return { success: true };
+      }
+    }
+
     // ডাটাবেসে কিউ (Queue) তৈরি
     await db.notificationQueue.create({
       data: {

@@ -175,7 +175,22 @@ export async function resyncOrderToTransdirect(orderId: string) {
       return { success: false, error: errMsg };
     }
 
-    const resyncBookingIdInt = responseData.id ? parseInt(String(responseData.id), 10) : null;
+    if (!responseData.id) {
+      const rawResponse = JSON.stringify(responseData).substring(0, 500);
+      console.error(`❌ [TransDirect Resync] HTTP 200 but no booking ID. Response: ${rawResponse}`);
+      const errMsg = `TransDirect returned HTTP 200 but no booking ID. Raw: ${rawResponse}`;
+      await db.order.update({
+        where: { id: orderId },
+        data: { transdirectOrderStatus: "failed", transdirectError: errMsg }
+      });
+      await db.orderNote.create({
+        data: { orderId: order.id, content: `❌ Resync failed: No booking ID returned. Please try again.`, isSystem: true }
+      });
+      revalidatePath(`/admin/orders/${orderId}`);
+      return { success: false, error: errMsg };
+    }
+
+    const resyncBookingIdInt = parseInt(String(responseData.id), 10);
     await db.order.update({
       where: { id: orderId },
       data: {
@@ -364,8 +379,24 @@ export async function syncOrderToTransdirect(orderId: string) {
       return { success: false, error: errMsg };
     }
 
+    // Guard: 200 OK but no booking ID — TransDirect duplicate or API change
+    if (!responseData.id) {
+      const rawResponse = JSON.stringify(responseData).substring(0, 500);
+      console.error(`❌ [TransDirect] HTTP 200 but no booking ID. Response: ${rawResponse}`);
+      const errMsg = `TransDirect returned HTTP 200 but no booking ID. Raw: ${rawResponse}`;
+      await db.order.update({
+        where: { id: orderId },
+        data: { transdirectOrderStatus: "failed", transdirectError: errMsg }
+      });
+      await db.orderNote.create({
+        data: { orderId: order.id, content: `❌ TransDirect sync failed: No booking ID returned. Use "Recalculate & Send" to retry.`, isSystem: true }
+      });
+      revalidatePath(`/admin/orders/${orderId}`);
+      return { success: false, error: errMsg };
+    }
+
     // ✅ Success — save booking ID and clear error
-    const bookingIdInt = responseData.id ? parseInt(String(responseData.id), 10) : null;
+    const bookingIdInt = parseInt(String(responseData.id), 10);
     await db.order.update({
       where: { id: orderId },
       data: {

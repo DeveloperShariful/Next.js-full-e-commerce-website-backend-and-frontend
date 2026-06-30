@@ -1,9 +1,10 @@
-// app/(backend)/admin/subscriptions/page.tsx
+﻿// app/(backend)/admin/subscriptions/page.tsx
 
 import { getSubscriptionList } from "@/app/actions/backend/subscriptions/subscription-actions";
 import Link from "next/link";
 import { RefreshCw, Search, Users, Package } from "lucide-react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 import StatusSelect from "./_components/StatusSelect";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export default async function AdminSubscriptionsPage({
     search,
     status
   );
+  const timezone = await getStoreTimezone();
 
   const countFor = (s: string) =>
     statusCounts.find((c) => c.status === s)?._count._all || 0;
@@ -187,10 +189,10 @@ export default async function AdminSubscriptionsPage({
                     {Number(sub.plan.price).toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-[#50575e] whitespace-nowrap">
-                    {format(new Date(sub.nextBillingDate), "dd/MM/yyyy")}
+                    {formatTz(new Date(sub.nextBillingDate), timezone, "dd/MM/yyyy")}
                   </td>
                   <td className="px-4 py-3 text-[#50575e] whitespace-nowrap">
-                    {format(new Date(sub.currentPeriodEnd), "dd/MM/yyyy")}
+                    {formatTz(new Date(sub.currentPeriodEnd), timezone, "dd/MM/yyyy")}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-1.5">
@@ -232,3 +234,4 @@ export default async function AdminSubscriptionsPage({
     </div>
   );
 }
+

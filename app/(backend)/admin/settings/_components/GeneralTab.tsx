@@ -30,11 +30,12 @@ export interface GeneralSettingsData {
         youtube: string;
         linkedin: string;
     };
+    timezone: string;
     storeAddress: {
         address1: string;
         address2: string;
         city: string;
-        country: string; 
+        country: string;
         postcode: string;
     };
     generalConfig: {
@@ -69,6 +70,7 @@ export default function GeneralTab() {
   const [data, setData] = useState<GeneralSettingsData>({
     storeName: "", storeEmail: "", storePhone: "",
     weightUnit: "kg", dimensionUnit: "cm", maintenance: false,
+    timezone: "UTC",
     socialLinks: { facebook: "", instagram: "", twitter: "", youtube: "", linkedin: "" },
     storeAddress: { address1: "", address2: "", city: "", country: "AU", postcode: "" },
     generalConfig: { 
@@ -101,6 +103,7 @@ export default function GeneralTab() {
             weightUnit: s.weightUnit || "kg",
             dimensionUnit: s.dimensionUnit || "cm",
             maintenance: s.maintenance || false,
+            timezone: (s as any).timezone || "UTC",
             socialLinks: {
                 facebook: sl.facebook || "", instagram: sl.instagram || "",
                 twitter: sl.twitter || "", youtube: sl.youtube || "", linkedin: sl.linkedin || ""
@@ -136,9 +139,11 @@ export default function GeneralTab() {
     setData(prev => ({ ...prev, [name]: value }));
   };
 
-  const updateNestedData = (section: keyof GeneralSettingsData | 'maintenance', field: string, value: any) => {
+  const updateNestedData = (section: keyof GeneralSettingsData | 'maintenance' | 'timezone', field: string, value: any) => {
     if (section === 'maintenance') {
         setData(prev => ({ ...prev, maintenance: value }));
+    } else if (section === 'timezone') {
+        setData(prev => ({ ...prev, timezone: value }));
     } else {
         setData(prev => ({
             ...prev,
@@ -157,6 +162,7 @@ export default function GeneralTab() {
     formData.append("weightUnit", data.weightUnit);
     formData.append("dimensionUnit", data.dimensionUnit);
     formData.append("maintenance", String(data.maintenance));
+    formData.append("timezone", data.timezone);
 
     Object.keys(data.socialLinks).forEach(k => formData.append(`social_${k}`, (data.socialLinks as any)[k]));
     Object.keys(data.storeAddress).forEach(k => formData.append(`addr_${k}`, (data.storeAddress as any)[k]));

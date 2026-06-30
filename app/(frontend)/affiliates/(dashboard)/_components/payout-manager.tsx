@@ -4,7 +4,7 @@
 
 import { useState, useTransition } from "react";
 import { CreditCard, Clock, CheckCircle, AlertCircle, History, Building2, Wallet, Loader2, DollarSign, X, Check, ShoppingBag, ArrowRight } from "lucide-react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { PayoutMethod } from "@prisma/client";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -187,7 +187,7 @@ export default function PayoutManager({ data, userId }: ManagerProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // ✅ GLOBAL STORE USAGE
-  const { formatPrice, symbol } = useGlobalStore();
+  const { formatPrice, symbol, timezone } = useGlobalStore();
   const currency = symbol || "$";
 
   return (
@@ -286,8 +286,8 @@ export default function PayoutManager({ data, userId }: ManagerProps) {
                 history.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 text-gray-600 font-medium">
-                      {format(new Date(item.createdAt), "MMM d, yyyy")}
-                      <div className="text-[10px] text-gray-400 font-normal">{format(new Date(item.createdAt), "h:mm a")}</div>
+                      {formatTz(new Date(item.createdAt), timezone, "MMM d, yyyy")}
+                      <div className="text-[10px] text-gray-400 font-normal">{formatTz(new Date(item.createdAt), timezone, "h:mm a")}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-gray-700 capitalize">

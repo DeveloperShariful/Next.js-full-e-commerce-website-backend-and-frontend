@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Loader2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { updateFullReview } from "@/app/actions/backend/review/actions";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 // Types matching your database structure
 interface ReviewEditFormProps {
@@ -34,6 +35,7 @@ interface ReviewEditFormProps {
 
 export default function ReviewEditForm({ initialData }: ReviewEditFormProps) {
   const router = useRouter();
+  const { timezone } = useGlobalStore();
   const [isPending, startTransition] = useTransition();
   const [isDateEditOpen, setIsDateEditOpen] = useState(false);
 
@@ -205,7 +207,7 @@ export default function ReviewEditForm({ initialData }: ReviewEditFormProps) {
                   <span className="text-[#8c8f94] mt-0.5">📅</span>
                   <div className="flex-1">
                     <p className="mb-1">
-                      Submitted on: <span className="font-bold">{format(new Date(formData.createdAt), "MMM d, yyyy 'at' hh:mm a")}</span>
+                      Submitted on: <span className="font-bold">{formatTz(new Date(formData.createdAt), timezone, "MMM d, yyyy 'at' hh:mm a")}</span>
                     </p>
                     
                     {!isDateEditOpen ? (

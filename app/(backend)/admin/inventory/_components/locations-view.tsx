@@ -7,9 +7,11 @@ import { getLocations, upsertLocation, deleteLocation } from "@/app/actions/back
 import { LocationData } from "../types";
 import { Plus, Loader2, MapPin, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 export function LocationsView() {
+  const { timezone } = useGlobalStore();
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -182,7 +184,7 @@ export function LocationsView() {
                              </td>
 
                              <td className="p-2 align-top pt-[10px] text-[#50575e]">
-                               {format(new Date(loc.createdAt), "yyyy/MM/dd")}
+                               {formatTz(new Date(loc.createdAt), timezone, "yyyy/MM/dd")}
                              </td>
 
                           </tr>

@@ -1639,6 +1639,7 @@ model StoreSettings {
   socialLinks    Json?
   smtpConfig     Json?
   maintenance    Boolean @default(false)
+  timezone       String  @default("UTC")
 
   // 👇 Affiliate System JSON Configs (৫টি টেবিলের কাজ এখানে)
   affiliateConfig        Json?

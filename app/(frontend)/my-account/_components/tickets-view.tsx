@@ -4,7 +4,7 @@
 
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { HelpCircle, Plus, Send, X, Loader2, MessageSquare, ArrowLeft } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { createSupportTicketAction, sendTicketReplyAction } from "@/app/actions/frontend/my-account/ticket-service";
@@ -32,6 +32,7 @@ interface Props {
 }
 
 export default function TicketsView({ initialTickets }: Props) {
+  const { timezone } = useGlobalStore();
   const [tickets, setTickets] = useState<TicketData[]>(initialTickets);
   const [activeTicket, setActiveTicket] = useState<TicketData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -133,7 +134,7 @@ export default function TicketsView({ initialTickets }: Props) {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-[#50575e]">
-                                        {format(new Date(ticket.createdAt), "Y/m/d g:i a")}
+                                        {formatTz(new Date(ticket.createdAt), timezone, "yyyy/M/d h:mm a")}
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         <button onClick={() => setActiveTicket(ticket)} className="text-[#2271b1] hover:underline text-[12px] flex items-center gap-1 ml-auto">
@@ -170,7 +171,7 @@ export default function TicketsView({ initialTickets }: Props) {
                                 {msg.message}
                             </div>
                             <span className="text-[10px] text-[#8c8f94] mt-1">
-                                {isMe ? "You" : "Staff"} • {format(new Date(msg.createdAt), "g:i a")}
+                                {isMe ? "You" : "Staff"} • {formatTz(new Date(msg.createdAt), timezone, "h:mm a")}
                             </span>
                         </div>
                     );

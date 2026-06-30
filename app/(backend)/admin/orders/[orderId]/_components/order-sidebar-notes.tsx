@@ -3,19 +3,20 @@
 "use client";
 
 import { useState } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { ChevronUp, ChevronDown, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
-import { addOrderNote } from "@/app/actions/backend/order/add-note"; 
+import { addOrderNote } from "@/app/actions/backend/order/add-note";
 
 // ✅ STRICT TYPES IMPORT
 import { OrderDetailsType, OrderNote } from "../types";
 
 interface OrderSidebarNotesProps {
   order: OrderDetailsType;
+  timezone?: string;
 }
 
-export const OrderSidebarNotes = ({ order }: OrderSidebarNotesProps) => {
+export const OrderSidebarNotes = ({ order, timezone = "UTC" }: OrderSidebarNotesProps) => {
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [noteType, setNoteType] = useState<string>("private");
@@ -60,7 +61,7 @@ export const OrderSidebarNotes = ({ order }: OrderSidebarNotesProps) => {
                         {order.orderNotes.map((note: OrderNote) => (
                             <li key={note.id} className="text-[13px]">
                                 <div className="text-[11px] text-[#646970] mb-0.5 flex items-center gap-1">
-                                    {format(new Date(note.createdAt), "MMMM d, yyyy 'at' h:mm a")}
+                                    {formatTz(new Date(note.createdAt), timezone, "MMMM d, yyyy 'at' h:mm a")}
                                     {note.isSystem && <span className="font-semibold text-[#2271b1]">(System)</span>}
                                     {note.notify && <span className="flex items-center gap-0.5 text-[#dba617] font-semibold" title="Emailed to customer"><Mail size={10}/></span>}
                                 </div>

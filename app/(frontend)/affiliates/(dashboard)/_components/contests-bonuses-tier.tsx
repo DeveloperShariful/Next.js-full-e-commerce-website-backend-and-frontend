@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { format, isValid } from "date-fns";
+import { isValid } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { getContestLeaderboard } from "@/app/actions/frontend/affiliate/_services/marketing-service";
 
 // ✅ Dialog/Modal Components (Internal)
@@ -31,13 +32,13 @@ export default function ContestsBonusesTierView({ tierData, contests, bonuses }:
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
 
   // Helper for Date Safety
   const formatDateSafely = (dateString: any, formatStr: string) => {
       if (!dateString) return "TBD";
       const date = new Date(dateString);
-      return isValid(date) ? format(date, formatStr) : "Invalid Date";
+      return isValid(date) ? formatTz(date, timezone, formatStr) : "Invalid Date";
   };
 
   // ✅ Handle Opening Leaderboard

@@ -5,7 +5,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { format, formatDistanceToNow, isToday } from "date-fns";
+import { isToday, formatDistanceToNow } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { toast } from "sonner"; 
 import { Eye, Check, Loader2, Trash2, RefreshCcw, AlertTriangle, Truck } from "lucide-react";
 import { bulkUpdateOrderStatus, deleteOrder, restoreOrder } from "@/app/actions/backend/order/bulk-update";
@@ -53,9 +54,10 @@ interface SerializedOrder {
 interface OrderListTableProps {
   orders: SerializedOrder[];
   isTrashView?: boolean;
+  timezone?: string;
 }
 
-export const OrderListTable = ({ orders, isTrashView = false }: OrderListTableProps) => {
+export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }: OrderListTableProps) => {
   const router = useRouter();
   const { formatPrice } = useGlobalStore(); 
   
@@ -254,9 +256,9 @@ export const OrderListTable = ({ orders, isTrashView = false }: OrderListTablePr
                             const customerName = order.user?.name || order.shippingAddress?.firstName || "Guest";
                             
                             const orderDate = new Date(order.createdAt);
-                            const displayDate = isToday(orderDate) 
-                                ? `${formatDistanceToNow(orderDate)} ago` 
-                                : format(orderDate, "MMM d, yyyy");
+                            const displayDate = isToday(orderDate)
+                                ? `${formatDistanceToNow(orderDate)} ago`
+                                : formatTz(orderDate, timezone, "MMM d, yyyy");
 
                             let originText = 'Direct';
                             if (order.affiliate) {

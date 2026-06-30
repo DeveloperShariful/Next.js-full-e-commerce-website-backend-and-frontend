@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { 
     Edit2, Loader2, ExternalLink, MapPin, 
     CreditCard, DollarSign, Package, AlertCircle, Link as LinkIcon 
@@ -22,11 +22,12 @@ import { OrderDetailsType, AddressJson, OrderUser, OrderStatus } from "../types"
 
 interface OrderDetailsMetaProps {
   order: OrderDetailsType;
+  timezone?: string;
 }
 
 type LocationSuggestion = { city: string; state: string; postcode: string | number };
 
-export const OrderDetailsMeta = ({ order }: OrderDetailsMetaProps) => {
+export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaProps) => {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   
@@ -51,7 +52,7 @@ export const OrderDetailsMeta = ({ order }: OrderDetailsMetaProps) => {
   let paidDateStr: string | null = null;
   if (order.paymentStatus === 'PAID') {
       const paidDateObj = successTx?.createdAt || order.capturedAt || order.updatedAt || order.createdAt;
-      const formatted = format(new Date(paidDateObj), "MMM d, yyyy '@' h:mm a");
+      const formatted = formatTz(new Date(paidDateObj), timezone, "MMM d, yyyy '@' h:mm a");
       paidDateStr = formatted.replace('AM', 'am').replace('PM', 'pm');
   }
 
@@ -59,9 +60,9 @@ export const OrderDetailsMeta = ({ order }: OrderDetailsMetaProps) => {
   // DATE PROCESSING
   // ==========================================
   const orderDate = new Date(order.createdAt);
-  const dateStr = format(orderDate, "yyyy-MM-dd");
-  const hourStr = format(orderDate, "HH");
-  const minuteStr = format(orderDate, "mm");
+  const dateStr = formatTz(orderDate, timezone, "yyyy-MM-dd");
+  const hourStr = formatTz(orderDate, timezone, "HH");
+  const minuteStr = formatTz(orderDate, timezone, "mm");
 
   // ==========================================
   // STRICT FORM STATES

@@ -1,10 +1,11 @@
-// File Location: app/admin/orders/page.tsx
+﻿// File Location: app/admin/orders/page.tsx
 
 import { db } from "@/lib/prisma"; // 🔥 Prisma Client Imported
-import { getOrders } from "@/app/actions/backend/order/get-orders"; 
+import { getOrders } from "@/app/actions/backend/order/get-orders";
 import { OrderListTable } from "./_components/order-list-table";
 import { OrdersHeader } from "./_components/header";
-import { PaginationControls } from "./_components/pagination-controls"; 
+import { PaginationControls } from "./_components/pagination-controls";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 interface OrdersPageProps {
   searchParams: Promise<{
@@ -46,6 +47,7 @@ export default async function OrdersPage(props: OrdersPageProps) {
   );
 
   const serializedOrders = JSON.parse(JSON.stringify(orders || []));
+  const timezone = await getStoreTimezone();
 
   return (
     <div className=" max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans">
@@ -53,9 +55,10 @@ export default async function OrdersPage(props: OrdersPageProps) {
       {/* 🔥 Passing the dynamic gateways array down to the header */}
       <OrdersHeader counts={meta?.counts || {}} gateways={dbGateways} />
       
-      <OrderListTable 
-        orders={serializedOrders} 
-        isTrashView={status === 'trash'} 
+      <OrderListTable
+        orders={serializedOrders}
+        isTrashView={status === 'trash'}
+        timezone={timezone}
       />
 
       {meta && meta.total > 0 && (

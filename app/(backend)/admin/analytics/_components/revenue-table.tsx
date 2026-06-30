@@ -4,7 +4,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { formatCurrency, formatNumber } from "@/app/actions/backend/analytics/shared.utils";
 import { RevenueTableRow } from "@/app/actions/backend/analytics/revenue.actions";
 
@@ -13,6 +14,7 @@ interface RevenueTableProps {
 }
 
 export default function RevenueTable({ data }: RevenueTableProps) {
+  const { timezone } = useGlobalStore();
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-sm overflow-hidden mt-6">
       
@@ -54,7 +56,7 @@ export default function RevenueTable({ data }: RevenueTableProps) {
               data.map((row, index) => {
                 const rowDate = new Date(row.date);
                 // WooCommerce typically strips time and format as "December 31, 2025"
-                const formattedDate = format(rowDate, "MMMM d, yyyy");
+                const formattedDate = formatTz(rowDate, timezone, "MMMM d, yyyy");
 
                 return (
                   <tr key={index} className="hover:bg-[#f6f7f7] transition-colors">
@@ -63,7 +65,7 @@ export default function RevenueTable({ data }: RevenueTableProps) {
                     {/* Orders count links to the orders page filtered by this date */}
                     <td className="py-3 px-4 text-right">
                        <Link 
-                          href={`/admin/orders?startDate=${format(rowDate, "yyyy-MM-dd")}&endDate=${format(rowDate, "yyyy-MM-dd")}`} 
+                          href={`/admin/orders?startDate=${formatTz(rowDate, timezone, "yyyy-MM-dd")}&endDate=${formatTz(rowDate, timezone, "yyyy-MM-dd")}`} 
                           className="text-[#2271b1] hover:text-[#135e96] hover:underline"
                        >
                           {formatNumber(row.orders)}

@@ -74,6 +74,12 @@ export async function updateGeneralSettings(formData: FormData) {
         shippingCountries = shipRaw ? JSON.parse(shipRaw) : [];
     } catch (e) { console.error("JSON Parse Error", e); }
 
+    // ✅ 5. NEW FIELDS (Schema Compliance)
+    const weightUnit = formData.get("weightUnit") as string || "kg";
+    const dimensionUnit = formData.get("dimensionUnit") as string || "cm";
+    const maintenance = formData.get("maintenance") === "true";
+    const timezone = formData.get("timezone") as string || "UTC";
+
     const generalConfig = {
       sellingLocation: formData.get("conf_selling_location"),
       sellingCountries: sellingCountries,
@@ -84,13 +90,9 @@ export async function updateGeneralSettings(formData: FormData) {
       calcCouponsSequentially: formData.get("calc_coupons_seq") === "true",
       enableReviews: formData.get("enable_reviews") === "true",
       enableGuestCheckout: formData.get("enable_guest_checkout") === "true",
-      currencyOptions: currencyOptions 
+      currencyOptions: currencyOptions,
+      timezone: timezone,
     };
-
-    // ✅ 5. NEW FIELDS (Schema Compliance)
-    const weightUnit = formData.get("weightUnit") as string || "kg";
-    const dimensionUnit = formData.get("dimensionUnit") as string || "cm";
-    const maintenance = formData.get("maintenance") === "true";
 
     const socialLinks = {
         facebook: formData.get("social_facebook"),
@@ -105,11 +107,12 @@ export async function updateGeneralSettings(formData: FormData) {
       where: { id: "settings" },
       update: {
         storeName, storeEmail, storePhone,
-        currency: currencyCode, 
-        currencySymbol, // Symbol saved here
-        weightUnit, 
+        currency: currencyCode,
+        currencySymbol,
+        weightUnit,
         dimensionUnit,
         maintenance,
+        timezone,
         socialLinks: socialLinks as any,
         storeAddress: storeAddress as any,
         taxSettings: taxSettings as any,
@@ -118,11 +121,12 @@ export async function updateGeneralSettings(formData: FormData) {
       create: {
         id: "settings",
         storeName, storeEmail, storePhone,
-        currency: currencyCode, 
+        currency: currencyCode,
         currencySymbol,
-        weightUnit, 
+        weightUnit,
         dimensionUnit,
         maintenance,
+        timezone,
         socialLinks: socialLinks as any,
         storeAddress: storeAddress as any,
         taxSettings: taxSettings as any,

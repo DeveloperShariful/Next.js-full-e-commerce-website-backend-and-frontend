@@ -3,7 +3,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { CreditCard, Pause, Play, Trash2, Calendar, Loader2 } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { pauseSubscriptionAction, cancelSubscriptionAction } from "@/app/actions/frontend/my-account/subscription-service";
@@ -27,7 +27,7 @@ interface Props {
 }
 
 export default function SubscriptionsView({ initialSubscriptions }: Props) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   const [isPending, startTransition] = useTransition();
 
   const handlePause = (id: string) => {
@@ -89,7 +89,7 @@ export default function SubscriptionsView({ initialSubscriptions }: Props) {
                   
                   <div className="text-[12px] text-[#50575e] mt-1 flex flex-wrap items-center gap-3">
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" /> Next Billing: {format(new Date(sub.nextBillingDate), "Y/m/d")}
+                      <Calendar className="w-3.5 h-3.5" /> Next Billing: {formatTz(new Date(sub.nextBillingDate), timezone, "yyyy/M/d")}
                     </span>
                   </div>
                 </div>

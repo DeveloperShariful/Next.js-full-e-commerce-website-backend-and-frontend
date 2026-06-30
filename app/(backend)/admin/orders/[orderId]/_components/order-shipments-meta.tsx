@@ -4,14 +4,15 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Package, ExternalLink, FileText, Tag } from "lucide-react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { OrderShipment } from "../types";
 
 interface OrderShipentsMetaProps {
   shipments: OrderShipment[];
+  timezone?: string;
 }
 
-export const OrderShipmentsMeta = ({ shipments }: OrderShipentsMetaProps) => {
+export const OrderShipmentsMeta = ({ shipments, timezone = "UTC" }: OrderShipentsMetaProps) => {
   const [isOpen, setIsOpen] = useState(true);
 
   return (
@@ -55,7 +56,7 @@ export const OrderShipmentsMeta = ({ shipments }: OrderShipentsMetaProps) => {
                       ) : null}
                     </span>
                     <span className="text-[12px] text-[#646970]">
-                      {format(new Date(shipment.shippedDate), "dd MMM yyyy")}
+                      {formatTz(new Date(shipment.shippedDate), timezone, "dd MMM yyyy")}
                     </span>
                   </div>
 
@@ -107,7 +108,7 @@ export const OrderShipmentsMeta = ({ shipments }: OrderShipentsMetaProps) => {
                       <div>
                         <span className="text-[#646970] block text-[12px] mb-0.5">Delivered</span>
                         <span className="text-[#5b841b] font-medium">
-                          {format(new Date(shipment.deliveredDate), "dd MMM yyyy")}
+                          {formatTz(new Date(shipment.deliveredDate), timezone, "dd MMM yyyy")}
                         </span>
                       </div>
                     )}

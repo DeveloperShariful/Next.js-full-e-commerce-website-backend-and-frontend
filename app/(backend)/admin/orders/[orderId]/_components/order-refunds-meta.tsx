@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, RefreshCcw } from "lucide-react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { OrderRefund } from "../types";
 
 interface OrderRefundsMetaProps {
   refunds: OrderRefund[];
+  timezone?: string;
 }
 
 const refundStatusBadge: Record<string, { bg: string; text: string; label: string }> = {
@@ -17,7 +18,7 @@ const refundStatusBadge: Record<string, { bg: string; text: string; label: strin
   PROCESSING: { bg: "bg-[#e9f0f8]", text: "text-[#2271b1]",  label: "Processing" },
 };
 
-export const OrderRefundsMeta = ({ refunds }: OrderRefundsMetaProps) => {
+export const OrderRefundsMeta = ({ refunds, timezone = "UTC" }: OrderRefundsMetaProps) => {
   const [isOpen, setIsOpen] = useState(true);
   const { formatPrice } = useGlobalStore();
 
@@ -81,7 +82,7 @@ export const OrderRefundsMeta = ({ refunds }: OrderRefundsMetaProps) => {
                       <div>
                         <span className="text-[#646970] block text-[12px] mb-0.5">Date</span>
                         <span className="text-[#1d2327]">
-                          {format(new Date(refund.createdAt), "dd MMM yyyy, HH:mm")}
+                          {formatTz(new Date(refund.createdAt), timezone, "dd MMM yyyy, HH:mm")}
                         </span>
                       </div>
 

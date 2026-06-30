@@ -3,7 +3,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { Edit2, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { searchCustomers } from "@/app/actions/backend/order/create_order/search-resources";
@@ -17,6 +18,7 @@ interface CreateDetailsMetaProps {
 }
 
 export const CreateDetailsMeta = ({ orderData, setOrderData }: CreateDetailsMetaProps) => {
+  const { timezone } = useGlobalStore();
   const [editBilling, setEditBilling] = useState(true); 
   const [editShipping, setEditShipping] = useState(true);
 
@@ -138,7 +140,7 @@ export const CreateDetailsMeta = ({ orderData, setOrderData }: CreateDetailsMeta
                 <div className="space-y-1 text-[13px] text-[#3c434a]">
                     <label className="block mb-1 text-[#646970]">Date created:</label>
                     <div className="flex items-center gap-1">
-                        <input type="text" readOnly value={format(orderData.createdAt, "yyyy-MM-dd")} className="w-[100px] h-[28px] px-2 border border-[#8c8f94] bg-[#f6f7f7] rounded-[3px] text-center text-[#646970]" />
+                        <input type="text" readOnly value={formatTz(orderData.createdAt, timezone, "yyyy-MM-dd")} className="w-[100px] h-[28px] px-2 border border-[#8c8f94] bg-[#f6f7f7] rounded-[3px] text-center text-[#646970]" />
                     </div>
                 </div>
 

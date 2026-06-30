@@ -1,8 +1,9 @@
-//app/admin/orders/print-batch/page.tsx
+﻿//app/admin/orders/print-batch/page.tsx
 
 import { db } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 import { PrintButton } from "@/app/(backend)/admin/orders/[orderId]/invoice/_components/print-button"; // ✅ Absolute Path
 
 interface PrintItem {
@@ -87,6 +88,7 @@ export default async function PrintBatchPage(props: PrintBatchPageProps) {
   const orders = serializeData(rawOrders) as PrintOrder[];
   const settings = serializeData(rawSettings) as PrintSettings | null;
   const storeAddr: Record<string, string> = settings?.storeAddress || {};
+  const timezone = await getStoreTimezone();
 
   return (
     <div className="min-h-screen bg-slate-100 p-8 flex flex-col items-center print:bg-white print:p-0">
@@ -139,7 +141,7 @@ export default async function PrintBatchPage(props: PrintBatchPageProps) {
                             <div className="space-y-1 text-sm">
                                 <div className="flex justify-end gap-4">
                                     <span className="text-slate-500">Date:</span>
-                                    <span className="font-medium">{format(new Date(order.createdAt), "dd MMM, yyyy")}</span>
+                                    <span className="font-medium">{formatTz(new Date(order.createdAt), timezone, "dd MMM, yyyy")}</span>
                                 </div>
                                 <div className="flex justify-end gap-4">
                                     <span className="text-slate-500">Payment:</span>

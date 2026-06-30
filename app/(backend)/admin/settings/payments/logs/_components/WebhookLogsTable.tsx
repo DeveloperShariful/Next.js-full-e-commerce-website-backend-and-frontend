@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { format } from "date-fns"
+import { formatTz } from "@/lib/store-time"
+import { useGlobalStore } from "@/app/providers/global-store-provider"
 import { toast } from "sonner"
 import { Loader2, FileJson, CheckCircle, XCircle, Clock, RefreshCw } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -22,6 +23,7 @@ const PROVIDER_BADGE: Record<string, string> = {
 
 export function WebhookLogsTable({ initialLogs }: Props) {
   const router = useRouter()
+  const { timezone } = useGlobalStore()
   const [logs, setLogs] = useState<WebhookLogItem[]>(initialLogs)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [viewLog, setViewLog] = useState<WebhookLogItem | null>(null)
@@ -254,7 +256,7 @@ export function WebhookLogsTable({ initialLogs }: Props) {
 
                   {/* Date */}
                   <td className="py-3 px-3 align-top whitespace-nowrap text-[12px]">
-                    {format(new Date(log.createdAt), "dd MMM yyyy, h:mm a")}
+                    {formatTz(new Date(log.createdAt), timezone, "dd MMM yyyy, h:mm a")}
                   </td>
                 </tr>
               )
@@ -272,7 +274,7 @@ export function WebhookLogsTable({ initialLogs }: Props) {
               {viewLog?.provider?.toUpperCase()} — {viewLog?.eventType}
             </DialogTitle>
             <div className="text-[11px] text-[#50575e] font-mono mt-1">
-              {viewLog?.eventId} · {viewLog && format(new Date(viewLog.createdAt), "PPpp")}
+              {viewLog?.eventId} · {viewLog && formatTz(new Date(viewLog.createdAt), timezone, "dd MMM yyyy, h:mm a")}
             </div>
             {viewLog?.processingError && (
               <div className="mt-2 px-3 py-2 bg-red-50 border border-red-200 rounded text-[12px] text-red-700">

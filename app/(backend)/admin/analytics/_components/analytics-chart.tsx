@@ -15,7 +15,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { SerializedAnalytics, formatCurrency, formatNumber } from "@/app/actions/backend/analytics/shared.utils";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface AnalyticsChartProps {
   currentPeriod: SerializedAnalytics[];
@@ -48,6 +50,8 @@ export default function AnalyticsChart({
   previousDateLabel
 }: AnalyticsChartProps) {
   
+  const { timezone } = useGlobalStore();
+
   // States for interactive controls
   const [interval, setInterval] = useState<IntervalType>("day");
   const [chartType, setChartType] = useState<ChartType>("line");
@@ -60,7 +64,7 @@ export default function AnalyticsChart({
       return currentPeriod.map((currentDay, index) => {
         const prevDay = previousPeriod[index];
         return {
-          dateLabel: format(parseISO(currentDay.date), "MMM d"),
+          dateLabel: formatTz(parseISO(currentDay.date), timezone, "MMM d"),
           currentValue: Number(currentDay[metricKey]) || 0,
           previousValue: isComparing && prevDay ? Number(prevDay[metricKey]) || 0 : 0,
         };
@@ -72,7 +76,7 @@ export default function AnalyticsChart({
     
     currentPeriod.forEach((currentDay, index) => {
       const prevDay = previousPeriod[index];
-      const monthLabel = format(parseISO(currentDay.date), "MMM yyyy");
+      const monthLabel = formatTz(parseISO(currentDay.date), timezone, "MMM yyyy");
       
       if (!groupedMap[monthLabel]) {
         groupedMap[monthLabel] = { currentValue: 0, previousValue: 0 };

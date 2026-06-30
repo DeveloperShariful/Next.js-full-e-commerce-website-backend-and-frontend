@@ -2,7 +2,7 @@
 
 "use client";
 
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { ArrowUpRight, ArrowDownLeft, FileText, Download, RefreshCcw } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
@@ -22,7 +22,7 @@ interface Props {
 }
 
 export default function TransactionLedger({ transactions }: Props) {
-  const { formatPrice, symbol } = useGlobalStore();
+  const { formatPrice, symbol, timezone } = useGlobalStore();
 
   // ✅ FIXED: Updated to match WalletTransaction Types
   const getTypeConfig = (type: string) => {
@@ -129,8 +129,8 @@ export default function TransactionLedger({ transactions }: Props) {
 
                       {/* Date Column */}
                       <td className="px-4 py-3 text-right text-[#50575e]">
-                        <div className="text-[12px] font-medium text-[#1d2327]">{format(new Date(item.createdAt), "MMM d, yyyy")}</div>
-                        <div className="text-[11px] text-[#8c8f94] font-mono">{format(new Date(item.createdAt), "h:mm a")}</div>
+                        <div className="text-[12px] font-medium text-[#1d2327]">{formatTz(new Date(item.createdAt), timezone, "MMM d, yyyy")}</div>
+                        <div className="text-[11px] text-[#8c8f94] font-mono">{formatTz(new Date(item.createdAt), timezone, "h:mm a")}</div>
                       </td>
                     </tr>
                   );

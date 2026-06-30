@@ -10,7 +10,7 @@ import {
   CreditCard, ScrollText
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { PayoutQueueItem } from "@/app/actions/backend/affiliate/types";
@@ -135,7 +135,7 @@ function PayoutsTab({
   const [isPending, startTransition] = useTransition();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "COMPLETED" | "REJECTED">("ALL");
-  const { formatPrice, currency } = useGlobalStore();
+  const { formatPrice, currency, timezone } = useGlobalStore();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -327,7 +327,7 @@ function PayoutsTab({
                           {item.status}
                         </span>
                         <div className="text-[10px] text-[#8c8f94] mt-0.5">
-                          {format(new Date(item.requestedAt), "MMM d, h:mm a")}
+                          {formatTz(new Date(item.requestedAt), timezone, "MMM d, h:mm a")}
                         </div>
                       </td>
 
@@ -416,7 +416,7 @@ function LedgerTab({
   totalPages: number;
   currentPage: number;
 }) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
   const pathname = usePathname();
@@ -471,7 +471,7 @@ function LedgerTab({
       i.amount,
       i.balanceBefore,
       i.balanceAfter,
-      format(new Date(i.createdAt), "yyyy-MM-dd HH:mm"),
+      formatTz(new Date(i.createdAt), timezone, "yyyy-MM-dd HH:mm"),
     ].join(","));
     const blob = new Blob([headers.join(",") + "\n" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -589,10 +589,10 @@ function LedgerTab({
                       {/* Date */}
                       <td className="px-3 py-3 text-right">
                         <div className="text-[12px] font-medium text-[#1d2327]">
-                          {format(new Date(item.createdAt), "yyyy/MM/dd")}
+                          {formatTz(new Date(item.createdAt), timezone, "yyyy/MM/dd")}
                         </div>
                         <div className="text-[11px] text-[#8c8f94] font-mono">
-                          {format(new Date(item.createdAt), "h:mm a")}
+                          {formatTz(new Date(item.createdAt), timezone, "h:mm a")}
                         </div>
                       </td>
                     </tr>

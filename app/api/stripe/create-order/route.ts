@@ -33,14 +33,19 @@ const MAX_ORDER_NUMBER_RETRIES = 5;
 // ORDER NUMBER GENERATOR
 // ============================================================================
 async function generateNextOrderNumber(): Promise<string> {
-  const lastOrder = await db.order.findFirst({
+  const recentOrders = await db.order.findMany({
     orderBy: { createdAt: 'desc' },
     select: { orderNumber: true },
+    take: 20,
   });
-  if (!lastOrder?.orderNumber) return '1000';
-  const numericPart = lastOrder.orderNumber.replace(/[^0-9]/g, '');
-  if (!numericPart) return '1000';
-  return String(parseInt(numericPart, 10) + 1);
+  let maxNumber = 999;
+  for (const order of recentOrders) {
+    if (order.orderNumber) {
+      const num = parseInt(order.orderNumber.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(num) && num < 9_000_000 && num > maxNumber) maxNumber = num;
+    }
+  }
+  return String(maxNumber + 1);
 }
 
 // ============================================================================

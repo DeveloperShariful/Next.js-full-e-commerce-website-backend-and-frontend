@@ -3,6 +3,8 @@
 import { getCountryStateOptions } from "@/app/actions/backend/settings/general/location-helpers";
 import { GeneralSettingsData } from "../GeneralTab";
 
+const TIMEZONES = Intl.supportedValuesOf("timeZone");
+
 interface Props {
     data: GeneralSettingsData;
     updateNestedData: (section: keyof GeneralSettingsData | 'maintenance', field: string, value: any) => void;
@@ -88,11 +90,29 @@ export default function Store_Address({ data, updateNestedData }: Props) {
                             <label className="cursor-pointer">Postcode / ZIP</label>
                         </th>
                         <td className={tdResponsiveClass}>
-                            <input 
-                                value={data.storeAddress.postcode} 
-                                onChange={(e) => updateNestedData('storeAddress', 'postcode', e.target.value)} 
+                            <input
+                                value={data.storeAddress.postcode}
+                                onChange={(e) => updateNestedData('storeAddress', 'postcode', e.target.value)}
                                 className={wpInputClass}
                             />
+                        </td>
+                    </tr>
+
+                    <tr className={trResponsiveClass}>
+                        <th scope="row" className={thResponsiveClass}>
+                            <label className="cursor-pointer">Timezone</label>
+                            <p className="text-[12px] text-[#646970] font-normal mt-1">All dates & times in admin will use this timezone.</p>
+                        </th>
+                        <td className={tdResponsiveClass}>
+                            <select
+                                value={data.timezone}
+                                onChange={(e) => updateNestedData('timezone', 'timezone', e.target.value)}
+                                className={wpInputClass}
+                            >
+                                {TIMEZONES.map((tz) => (
+                                    <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+                                ))}
+                            </select>
                         </td>
                     </tr>
 

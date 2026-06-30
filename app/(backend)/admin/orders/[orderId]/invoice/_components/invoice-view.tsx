@@ -2,7 +2,7 @@
 
 "use client";
 
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { InvoiceActions } from "./invoice-actions";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
@@ -41,21 +41,17 @@ interface InvoiceSettings {
 interface InvoiceViewProps {
     order: InvoiceOrder;
     settings: InvoiceSettings | null;
+    timezone?: string;
 }
 
-export const InvoiceView = ({ order, settings }: InvoiceViewProps) => {
+export const InvoiceView = ({ order, settings, timezone = "UTC" }: InvoiceViewProps) => {
     const { formatPrice, dateFormat } = useGlobalStore();
-    
+
     const billing = order.billingAddress || {};
     const storeAddr = settings?.storeAddress || {};
 
-    // Fallback format if global context isn't ready immediately
     const formatDate = (dateString: string) => {
-        try {
-            return format(new Date(dateString), dateFormat || "dd MMM, yyyy");
-        } catch (e) {
-            return dateString;
-        }
+        return formatTz(new Date(dateString), timezone, dateFormat || "dd MMM, yyyy");
     };
 
     return (

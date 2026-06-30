@@ -7,9 +7,11 @@ import { getSuppliers, upsertSupplier, deleteSupplier } from "@/app/actions/back
 import { SupplierData } from "../types";
 import { Plus, Loader2, Users, MapPin, Mail, Phone, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 export function SuppliersView() {
+  const { timezone } = useGlobalStore();
   const [suppliers, setSuppliers] = useState<SupplierData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -172,7 +174,7 @@ export function SuppliersView() {
 
                              {/* Created At */}
                              <td className="p-2 align-top pt-[10px] text-[#50575e]">
-                               {format(new Date(sup.createdAt), "yyyy/MM/dd")}
+                               {formatTz(new Date(sup.createdAt), timezone, "yyyy/MM/dd")}
                              </td>
 
                           </tr>

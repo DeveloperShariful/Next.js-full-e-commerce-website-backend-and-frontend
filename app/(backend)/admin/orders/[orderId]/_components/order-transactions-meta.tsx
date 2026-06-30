@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, CreditCard } from "lucide-react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { OrderTransaction } from "../types";
 
 interface OrderTransactionsMetaProps {
   transactions: OrderTransaction[];
+  timezone?: string;
 }
 
 const txStatusBadge: Record<string, { bg: string; text: string }> = {
@@ -29,7 +30,7 @@ const txTypeLabel: Record<string, string> = {
   VOID:           "Void",
 };
 
-export const OrderTransactionsMeta = ({ transactions }: OrderTransactionsMetaProps) => {
+export const OrderTransactionsMeta = ({ transactions, timezone = "UTC" }: OrderTransactionsMetaProps) => {
   const [isOpen, setIsOpen] = useState(true);
   const { formatPrice } = useGlobalStore();
 
@@ -80,7 +81,7 @@ export const OrderTransactionsMeta = ({ transactions }: OrderTransactionsMetaPro
                     return (
                       <tr key={tx.id} className="border-b border-[#e2e4e7] last:border-0 hover:bg-[#f6f7f7] transition-colors">
                         <td className="py-2 pr-3 text-[#646970] whitespace-nowrap">
-                          {format(new Date(tx.createdAt), "dd MMM yyyy")}
+                          {formatTz(new Date(tx.createdAt), timezone, "dd MMM yyyy")}
                         </td>
                         <td className="py-2 pr-3 font-medium text-[#1d2327] capitalize">
                           {tx.gateway}

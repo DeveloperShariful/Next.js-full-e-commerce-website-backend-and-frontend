@@ -4,7 +4,8 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { format } from "date-fns"
+import { formatTz } from "@/lib/store-time"
+import { useGlobalStore } from "@/app/providers/global-store-provider"
 import { toast } from "sonner"
 import { Loader2, Eye, FileJson } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -30,6 +31,7 @@ interface Props {
 
 export const PaymentLogsTable = ({ initialLogs }: Props) => {
   const router = useRouter()
+  const { timezone } = useGlobalStore()
   const [logs, setLogs] = useState<LogItem[]>(initialLogs)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [selectedLog, setSelectedLog] = useState<LogItem | null>(null)
@@ -171,7 +173,7 @@ export const PaymentLogsTable = ({ initialLogs }: Props) => {
                 
                 <td className="py-3 px-3 align-top text-[#50575e] break-words">{log.message}</td>
                 <td className="py-3 px-3 align-top">{log.user}</td>
-                <td className="py-3 px-3 align-top whitespace-nowrap">{format(new Date(log.createdAt), "MMM d, yyyy h:mm a")}</td>
+                <td className="py-3 px-3 align-top whitespace-nowrap">{formatTz(new Date(log.createdAt), timezone, "MMM d, yyyy h:mm a")}</td>
               </tr>
             ))}
           </tbody>
@@ -197,7 +199,7 @@ export const PaymentLogsTable = ({ initialLogs }: Props) => {
                 <DialogTitle className="flex items-center gap-2 text-lg font-normal text-[#1d2327]">
                     <FileJson className="h-5 w-5 text-[#2271b1]" /> Log Details
                 </DialogTitle>
-                <div className="text-[12px] text-[#50575e] font-mono mt-1">ID: {selectedLog?.id} | Date: {selectedLog && format(new Date(selectedLog.createdAt), "PPpp")}</div>
+                <div className="text-[12px] text-[#50575e] font-mono mt-1">ID: {selectedLog?.id} | Date: {selectedLog && formatTz(new Date(selectedLog.createdAt), timezone, "dd MMM yyyy, h:mm a")}</div>
             </DialogHeader>
             
             <div className="flex-1 overflow-hidden p-6 bg-white">

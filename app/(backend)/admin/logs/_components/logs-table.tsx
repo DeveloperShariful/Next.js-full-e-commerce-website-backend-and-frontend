@@ -4,7 +4,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { toast } from "sonner";
 import { Loader2, X, Eye } from "lucide-react";
 import { deleteLog, deleteBulkLogs } from "@/app/actions/backend/all-activity-log/all-activity-log";
@@ -16,6 +17,7 @@ interface LogsTableProps {
 
 export const LogsTable = ({ logs }: LogsTableProps) => {
   const router = useRouter();
+  const { timezone } = useGlobalStore();
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -173,9 +175,9 @@ export const LogsTable = ({ logs }: LogsTableProps) => {
                                 </td>
 
                                 <td className="py-3 px-3 align-top text-[#3c434a]">
-                                    {format(new Date(log.createdAt), "MMM d, yyyy")}
+                                    {formatTz(new Date(log.createdAt), timezone, "MMM d, yyyy")}
                                     <br/>
-                                    <span className="text-[11px] text-[#646970]">{format(new Date(log.createdAt), "h:mm a")}</span>
+                                    <span className="text-[11px] text-[#646970]">{formatTz(new Date(log.createdAt), timezone, "h:mm a")}</span>
                                 </td>
                             </tr>
                         ))

@@ -3,7 +3,8 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import {
   Search, Filter, Eye, AlertTriangle, Terminal, Shield,
   FileJson, X, ChevronLeft, ChevronRight, Trash2, Loader2,
@@ -39,14 +40,8 @@ interface Props {
 type LogTab = "overview" | "audit" | "system";
 
 // =========================================
-// HELPERS
-// =========================================
-function fmtDate(d: Date | string) {
-  return format(new Date(d), "dd MMM yyyy, HH:mm:ss");
-}
-function fmtShort(d: Date | string) {
-  return format(new Date(d), "dd MMM, HH:mm");
-}
+// HELPERS — moved inside component so they can access timezone
+
 
 const ACTION_COLORS: Record<string, string> = {
   CREATE:       "bg-[#edfaef] text-[#00a32a] border-[#00a32a]/30",
@@ -72,7 +67,7 @@ function levelStyle(l: string) {
   return LEVEL_COLORS[l] ?? { bg: "bg-[#f6f7f7] text-[#50575e] border-[#c3c4c7]", icon: Info };
 }
 
-function exportToCSV(rows: AuditLogRecord[], filename: string) {
+function exportToCSV(rows: AuditLogRecord[], filename: string, timezone: string) {
   if (rows.length === 0) { toast.error("No rows selected to export"); return; }
   const headers = ["ID", "Actor", "Role", "Action", "Entity", "Record ID", "IP Address", "Date"];
   const lines = rows.map((r) => [
@@ -83,7 +78,7 @@ function exportToCSV(rows: AuditLogRecord[], filename: string) {
     r.tableName,
     r.recordId,
     r.ipAddress ?? "—",
-    fmtDate(r.createdAt),
+    formatTz(new Date(r.createdAt), timezone, "dd MMM yyyy, HH:mm:ss"),
   ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
   const csv = [headers.join(","), ...lines].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
@@ -244,11 +239,12 @@ function DiffView({ oldValues, newValues }: {
 // DETAIL MODAL
 // =========================================
 function DetailModal({
-  log, type, onClose,
+  log, type, onClose, timezone,
 }: {
   log: AuditLogRecord | SystemLogRecord;
   type: "audit" | "system";
   onClose: () => void;
+  timezone: string;
 }) {
   const [modalTab, setModalTab] = useState<"diff" | "raw">(type === "audit" ? "diff" : "raw");
 
@@ -275,7 +271,7 @@ function DetailModal({
 
         {/* Meta row */}
         <div className="px-5 py-2.5 bg-[#f6f7f7] border-b border-[#c3c4c7] flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[#50575e] shrink-0">
-          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDate(log.createdAt)}</span>
+          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatTz(new Date(log.createdAt), timezone, "dd MMM yyyy, HH:mm:ss")}</span>
           {auditLog && (
             <>
               <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{auditLog.action}</span>
@@ -563,6 +559,10 @@ export default function LogViewer({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isNavigating, startNavigation] = useTransition();
+  const { timezone } = useGlobalStore();
+
+  const fmtDate = (d: Date | string) => formatTz(new Date(d), timezone, "dd MMM yyyy, HH:mm:ss");
+  const fmtShort = (d: Date | string) => formatTz(new Date(d), timezone, "dd MMM, HH:mm");
 
   const activeTab = (currentTab || "overview") as LogTab;
 
@@ -775,7 +775,7 @@ export default function LogViewer({
           {selectedIds.size > 0 && (
             <>
               <button
-                onClick={() => exportToCSV(auditData.logs.filter((l) => selectedIds.has(l.id)), "audit-logs.csv")}
+                onClick={() => exportToCSV(auditData.logs.filter((l) => selectedIds.has(l.id)), "audit-logs.csv", timezone)}
                 className="flex items-center gap-1 px-2.5 py-1.5 border border-[#2271b1] text-[#2271b1] text-[11px] font-bold hover:bg-[#f0f6fb] transition-colors shrink-0"
               >
                 <Download className="w-3 h-3" />
@@ -1224,6 +1224,7 @@ export default function LogViewer({
           log={selectedLog.log}
           type={selectedLog.type}
           onClose={() => setSelectedLog(null)}
+          timezone={timezone}
         />
       )}
     </div>

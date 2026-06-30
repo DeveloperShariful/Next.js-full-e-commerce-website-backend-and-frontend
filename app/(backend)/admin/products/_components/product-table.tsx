@@ -12,6 +12,7 @@ import { bulkProductAction, moveToTrash, deleteProduct } from "@/app/actions/bac
 import { duplicateProduct } from "@/app/actions/backend/product/product-duplicate"; 
 import { toast } from "sonner";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { formatTz } from "@/lib/store-time";
 import { PaginationControls } from "./pagination-controls"; 
 
 export interface ProductRow {
@@ -64,7 +65,7 @@ export default function ProductTable({
   const [isPending, startTransition] = useTransition();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkAction, setBulkAction] = useState("");
@@ -173,7 +174,7 @@ export default function ProductTable({
       });
   };
 
-  const formatDate = (date: Date | string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
+  const formatDate = (date: Date | string) => formatTz(new Date(date), timezone, "dd MMM yyyy");
 
   const renderStars = (isFeatured: boolean) => {
     return (

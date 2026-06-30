@@ -6,9 +6,11 @@ import { useState, useEffect, useCallback } from "react";
 import { getStockTransfers } from "@/app/actions/backend/inventory/location-actions";
 import { StockTransferData } from "../types";
 import { Loader2, ArrowRightLeft, ArrowRight } from "lucide-react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 export function TransfersView() {
+  const { timezone } = useGlobalStore();
   const [transfers, setTransfers] = useState<StockTransferData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -129,7 +131,7 @@ export function TransfersView() {
 
                              {/* Created At */}
                              <td className="p-2 align-top pt-[10px] text-[#50575e]">
-                               {format(new Date(transfer.createdAt), "MMM d, yyyy 'at' hh:mm a")}
+                               {formatTz(new Date(transfer.createdAt), timezone, "MMM d, yyyy 'at' hh:mm a")}
                              </td>
 
                           </tr>

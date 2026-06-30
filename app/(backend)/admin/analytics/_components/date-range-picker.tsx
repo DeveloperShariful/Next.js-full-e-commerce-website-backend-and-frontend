@@ -6,7 +6,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { DayPicker, DateRange } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 const PRESETS = [
   { label: "Today", value: "today" },
@@ -22,6 +23,7 @@ const PRESETS = [
 ];
 
 export default function DateRangePicker() {
+  const { timezone } = useGlobalStore();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -70,11 +72,11 @@ export default function DateRangePicker() {
     params.set("compare", comparePeriod);
     
     if (selectedPeriod === "custom" && dateRange?.from) {
-      params.set("from", format(dateRange.from, "yyyy-MM-dd"));
+      params.set("from", formatTz(dateRange.from, timezone, "yyyy-MM-dd"));
       if (dateRange.to) {
-        params.set("to", format(dateRange.to, "yyyy-MM-dd"));
+        params.set("to", formatTz(dateRange.to, timezone, "yyyy-MM-dd"));
       } else {
-        params.set("to", format(dateRange.from, "yyyy-MM-dd"));
+        params.set("to", formatTz(dateRange.from, timezone, "yyyy-MM-dd"));
       }
     } else {
       params.delete("from");
@@ -88,8 +90,8 @@ export default function DateRangePicker() {
   let currentPresetLabel = PRESETS.find(p => p.value === selectedPeriod)?.label;
   if (selectedPeriod === "custom" && dateRange?.from) {
     currentPresetLabel = dateRange.to 
-      ? `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`
-      : format(dateRange.from, "MMM d, yyyy");
+      ? `${formatTz(dateRange.from, timezone, "MMM d, yyyy")} - ${formatTz(dateRange.to, timezone, "MMM d, yyyy")}`
+      : formatTz(dateRange.from, timezone, "MMM d, yyyy");
   }
 
   const compareText = comparePeriod === "previous_year" 

@@ -4,7 +4,9 @@
 
 import React from "react";
 import Link from "next/link";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { formatCurrency, formatNumber } from "@/app/actions/backend/analytics/shared.utils";
 import { CouponTableRow } from "@/app/actions/backend/analytics/coupons.actions";
 
@@ -13,6 +15,7 @@ interface CouponsTableProps {
 }
 
 export default function CouponsTable({ data }: CouponsTableProps) {
+  const { timezone } = useGlobalStore();
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-sm overflow-hidden mt-6">
       
@@ -79,10 +82,10 @@ export default function CouponsTable({ data }: CouponsTableProps) {
                   </td>
                   <td className="py-3 px-4 text-right font-medium">{formatCurrency(row.amount)}</td>
                   <td className="py-3 px-4 text-[#646970]">
-                     {row.created ? format(parseISO(row.created), "MMMM d, yyyy") : <span className="text-[#a7aaad]">—</span>}
+                     {row.created ? formatTz(parseISO(row.created), timezone, "MMMM d, yyyy") : <span className="text-[#a7aaad]">—</span>}
                   </td>
                   <td className="py-3 px-4 text-[#646970]">
-                     {row.expires ? format(parseISO(row.expires), "MMMM d, yyyy") : <span className="text-[#a7aaad]">—</span>}
+                     {row.expires ? formatTz(parseISO(row.expires), timezone, "MMMM d, yyyy") : <span className="text-[#a7aaad]">—</span>}
                   </td>
                   <td className="py-3 px-4 text-[#646970]">{row.type}</td>
                 </tr>

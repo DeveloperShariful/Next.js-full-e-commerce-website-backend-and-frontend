@@ -6,7 +6,8 @@ import React, { useState } from "react";
 import { ReviewData } from "../types";
 import { MessageSquare, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 interface RowProps {
   reviews: ReviewData[];
@@ -25,6 +26,7 @@ export default function ReviewRow({
   reviews, handleStatusChange, handleDelete, handleRestore, handleForceDelete, handleReplySubmit, selectedIds, handleSelectOne, currentFilter
 }: RowProps) {
   
+  const { timezone } = useGlobalStore();
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
@@ -205,7 +207,7 @@ export default function ReviewRow({
               </td>
 
               <td className="p-2 align-top pt-3 text-[12px] text-[#50575e]">
-                 {format(new Date(review.createdAt), "yyyy/MM/dd 'at' h:mm a")}
+                 {formatTz(new Date(review.createdAt), timezone, "yyyy/MM/dd 'at' h:mm a")}
               </td>
 
             </tr>

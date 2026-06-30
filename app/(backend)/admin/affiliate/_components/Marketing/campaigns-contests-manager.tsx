@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { format, isAfter, isBefore } from "date-fns";
+import { isAfter, isBefore } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import {
   Megaphone, Trophy, Plus, Trash2, Edit, Calendar,
   MousePointer, Percent, TrendingUp, Users, Medal,
@@ -114,7 +115,7 @@ export default function CampaignsContestsManager({ campaignsData, contestsData }
 
 function CampaignsTab({ data, totalEntries }: { data: CampaignItem[]; totalEntries: number }) {
   const [isPending, startTransition] = useTransition();
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
 
   const handleDelete = (id: string) => {
     if (!confirm("Delete this campaign?")) return;
@@ -164,7 +165,7 @@ function CampaignsTab({ data, totalEntries }: { data: CampaignItem[]; totalEntri
                     {item.createdAt && (
                       <div className="text-[11px] text-[#50575e] flex items-center gap-1 mt-0.5">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(item.createdAt), "MMM d, yyyy")}
+                        {formatTz(new Date(item.createdAt), timezone, "MMM d, yyyy")}
                       </div>
                     )}
                   </td>
@@ -242,7 +243,7 @@ function CampaignsTab({ data, totalEntries }: { data: CampaignItem[]; totalEntri
 // ── Contests Tab ──────────────────────────────────────────────────────────────
 
 function ContestsTab({ initialContests }: { initialContests: AffiliateContestData[] }) {
-  const { symbol } = useGlobalStore();
+  const { symbol, timezone } = useGlobalStore();
   const currency = symbol || " ";
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AffiliateContestData | null>(null);
@@ -318,7 +319,7 @@ function ContestsTab({ initialContests }: { initialContests: AffiliateContestDat
                       <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#50575e]">
                         <span className="flex items-center gap-1 bg-[#f0f0f1] px-1.5 py-0.5 rounded border border-[#c3c4c7]">
                           <Calendar className="w-3 h-3" />
-                          {format(new Date(contest.startDate), "MMM d")} – {format(new Date(contest.endDate), "MMM d, yyyy")}
+                          {formatTz(new Date(contest.startDate), timezone, "MMM d")} – {formatTz(new Date(contest.endDate), timezone, "MMM d, yyyy")}
                         </span>
                         <span className="flex items-center gap-1 bg-[#f0f0f1] px-1.5 py-0.5 rounded border border-[#c3c4c7]">
                           {contest.criteria === "sales_amount"

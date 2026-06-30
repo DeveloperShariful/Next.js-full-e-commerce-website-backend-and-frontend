@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { ShoppingBag, Eye, X, Loader2, RefreshCcw, CheckCircle, Package, ArrowUpRight } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { createReturnRequestAction } from "@/app/actions/frontend/my-account/order-service";
@@ -38,7 +38,7 @@ interface Props {
 }
 
 export default function OrdersView({ initialOrders }: Props) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -112,7 +112,7 @@ export default function OrdersView({ initialOrders }: Props) {
                       #{order.orderNumber}
                     </td>
                     <td className="px-4 py-3 text-[#50575e]">
-                      {format(new Date(order.orderDate), "MMM dd, yyyy")}
+                      {formatTz(new Date(order.orderDate), timezone, "MMM dd, yyyy")}
                     </td>
                     <td className="px-4 py-3">
                       <span className={cn("px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase border", 

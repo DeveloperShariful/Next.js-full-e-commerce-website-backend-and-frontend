@@ -5,7 +5,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { deleteCoupons, restoreCoupons, hardDeleteCoupons } from "@/app/actions/backend/coupon/coupon";
@@ -21,7 +21,7 @@ interface CouponsTableProps {
 
 export const CouponsTable = ({ coupons, isTrashMode }: CouponsTableProps) => {
   const router = useRouter();
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -238,7 +238,7 @@ export const CouponsTable = ({ coupons, isTrashMode }: CouponsTableProps) => {
                                 </td>
 
                                 <td className="py-3 px-3 align-top text-[#646970]">
-                                    {coupon.endDate ? format(new Date(coupon.endDate), "MMM d, yyyy") : "—"}
+                                    {coupon.endDate ? formatTz(new Date(coupon.endDate), timezone, "MMM d, yyyy") : "—"}
                                 </td>
                             </tr>
                         ))

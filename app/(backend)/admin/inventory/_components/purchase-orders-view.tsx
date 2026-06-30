@@ -7,11 +7,11 @@ import { getPurchaseOrders, createPurchaseOrder } from "@/app/actions/backend/in
 import { PurchaseOrderData } from "../types";
 import { Plus, Loader2, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 export function PurchaseOrdersView() {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   const [pos, setPos] = useState<PurchaseOrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -130,7 +130,7 @@ export function PurchaseOrdersView() {
 
                              {/* Created At */}
                              <td className="p-2 align-top pt-[10px] text-[#50575e]">
-                               {format(new Date(order.createdAt), "MMM d, yyyy")}
+                               {formatTz(new Date(order.createdAt), timezone, "MMM d, yyyy")}
                              </td>
 
                           </tr>

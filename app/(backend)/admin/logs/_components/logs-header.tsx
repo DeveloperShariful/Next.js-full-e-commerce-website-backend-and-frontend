@@ -7,7 +7,8 @@ import { useState, useTransition } from "react";
 import { CalendarIcon, ShieldAlert, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ interface LogsHeaderProps {
 }
 
 export const LogsHeader = ({ filterOptions, totalItems, currentPage, totalPages }: LogsHeaderProps) => {
+  const { timezone } = useGlobalStore();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -156,9 +158,9 @@ export const LogsHeader = ({ filterOptions, totalItems, currentPage, totalPages 
                         <CalendarIcon className="mr-2 h-3.5 w-3.5 text-[#8c8f94]" />
                         {date?.from ? (
                             date.to ? (
-                                <span className="truncate text-[#32373c]">{format(date.from, "MMM d, y")} - {format(date.to, "MMM d, y")}</span>
+                                <span className="truncate text-[#32373c]">{formatTz(date.from, timezone, "MMM d, y")} - {formatTz(date.to, timezone, "MMM d, y")}</span>
                             ) : (
-                                <span className="text-[#32373c]">{format(date.from, "MMM d, y")}</span>
+                                <span className="text-[#32373c]">{formatTz(date.from, timezone, "MMM d, y")}</span>
                             )
                         ) : (
                             <span>Filter by date</span>

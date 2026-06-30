@@ -6,9 +6,11 @@ import { useState, useEffect, useCallback } from "react";
 import { getStockHistory } from "@/app/actions/backend/inventory/stock-actions";
 import { StockHistoryData } from "../types";
 import { Loader2, History, TrendingUp, TrendingDown } from "lucide-react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 
 export function HistoryView() {
+  const { timezone } = useGlobalStore();
   const [history, setHistory] = useState<StockHistoryData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,7 +64,7 @@ export function HistoryView() {
                           <tr key={log.id} className={`hover:bg-[#f0f6fc] transition-colors ${isEven ? 'bg-[#f9f9f9]' : 'bg-white'}`}>
                              
                              <td className="p-2 align-top pt-[10px] text-[#50575e]">
-                               {format(new Date(log.createdAt), "MMM d, yyyy 'at' hh:mm a")}
+                               {formatTz(new Date(log.createdAt), timezone, "MMM d, yyyy 'at' hh:mm a")}
                              </td>
                              
                              <td className="p-2 align-top pt-[10px]">

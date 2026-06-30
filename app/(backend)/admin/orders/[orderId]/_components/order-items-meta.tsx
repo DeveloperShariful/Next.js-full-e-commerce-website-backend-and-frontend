@@ -3,7 +3,7 @@
 "use client";
 
 import { useState } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { Truck, Package, HelpCircle, AlertCircle, DollarSign, RotateCcw, Tag, Printer } from "lucide-react"; // ✅ Added Printer
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { RefundModal } from "./refund-modal"; 
@@ -13,9 +13,10 @@ import { OrderDetailsType, OrderItem, OrderTransaction } from "../types";
 
 interface OrderItemsMetaProps {
   order: OrderDetailsType;
+  timezone?: string;
 }
 
-export const OrderItemsMeta = ({ order }: OrderItemsMetaProps) => {
+export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps) => {
   const { formatPrice } = useGlobalStore();
   const [isRefundOpen, setIsRefundOpen] = useState<boolean>(false);
 
@@ -34,8 +35,7 @@ export const OrderItemsMeta = ({ order }: OrderItemsMetaProps) => {
   let paidDateStr: string | null = null;
   if (order.paymentStatus === 'PAID') {
       const paidDateObj = successTx?.createdAt || order.capturedAt || order.updatedAt || order.createdAt;
-      const formatted = format(new Date(paidDateObj), "MMM d, yyyy");
-      paidDateStr = formatted;
+      paidDateStr = formatTz(new Date(paidDateObj), timezone, "MMM d, yyyy");
   }
 
   return (

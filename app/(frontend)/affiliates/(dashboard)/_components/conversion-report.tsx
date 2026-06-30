@@ -3,7 +3,8 @@
 "use client";
 
 import { useState } from "react";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { Search, ShoppingBag, TrendingUp, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 
 interface Order {
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function ConversionReport({ conversions, currency }: Props) {
+  const { timezone } = useGlobalStore();
   const [searchTerm, setSearchTerm] = useState("");
 
   const filtered = conversions.filter(c => 
@@ -89,8 +91,8 @@ export default function ConversionReport({ conversions, currency }: Props) {
                 filtered.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 text-gray-600">
-                      {format(new Date(item.createdAt), "MMM d, yyyy")}
-                      <div className="text-[10px] text-gray-400">{format(new Date(item.createdAt), "h:mm a")}</div>
+                      {formatTz(new Date(item.createdAt), timezone, "MMM d, yyyy")}
+                      <div className="text-[10px] text-gray-400">{formatTz(new Date(item.createdAt), timezone, "h:mm a")}</div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-mono font-bold text-gray-900">#{item.order.orderNumber}</span>

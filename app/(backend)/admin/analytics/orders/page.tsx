@@ -1,10 +1,11 @@
-//File Location: app/(backend)/admin/analytics/orders/page.tsx
+﻿//File Location: app/(backend)/admin/analytics/orders/page.tsx
 
 import React from "react";
 import { parseDateRange } from "@/app/actions/backend/analytics/shared.utils";
 import { getOrdersAnalyticsData } from "@/app/actions/backend/analytics/orders.actions";
 import { calculatePercentageChange, formatCurrency, formatNumber } from "@/app/actions/backend/analytics/shared.utils";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 // Components
 import DateRangePicker from "../_components/date-range-picker";
@@ -31,16 +32,19 @@ export default async function OrdersAnalyticsPage(props: OrdersPageProps) {
   const isComparing = compare !== "none";
 
   // Fetch data specifically for Orders Tab
-  const data = await getOrdersAnalyticsData(dates.current, dates.previous);
+  const [data, timezone] = await Promise.all([
+    getOrdersAnalyticsData(dates.current, dates.previous),
+    getStoreTimezone(),
+  ]);
 
   // Formatting dates for the Chart Legend
-  const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime() 
-      ? format(dates.current.from, "MMM d, yyyy")
-      : `${format(dates.current.from, "MMM d")} - ${format(dates.current.to, "d, yyyy")}`;
-      
-  const previousDateLabel = dates.previous.from.getTime() === dates.previous.to.getTime() 
-      ? format(dates.previous.from, "MMM d, yyyy")
-      : `${format(dates.previous.from, "MMM d")} - ${format(dates.previous.to, "d, yyyy")}`;
+  const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime()
+      ? formatTz(dates.current.from, timezone, "MMM d, yyyy")
+      : `${formatTz(dates.current.from, timezone, "MMM d")} - ${formatTz(dates.current.to, timezone, "d, yyyy")}`;
+
+  const previousDateLabel = dates.previous.from.getTime() === dates.previous.to.getTime()
+      ? formatTz(dates.previous.from, timezone, "MMM d, yyyy")
+      : `${formatTz(dates.previous.from, timezone, "MMM d")} - ${formatTz(dates.previous.to, timezone, "d, yyyy")}`;
 
   return (
     <div className="w-full">

@@ -10,7 +10,7 @@ import {
   GitMerge, Play
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import {
@@ -44,7 +44,7 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
 const STATUSES = ["ALL", "PENDING", "APPROVED", "REJECTED", "PAID"];
 
 export default function ReferralsManager({ data, currentPage }: Props) {
-  const { formatPrice } = useGlobalStore();
+  const { formatPrice, timezone } = useGlobalStore();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -303,7 +303,7 @@ export default function ReferralsManager({ data, currentPage }: Props) {
                     {/* Available At */}
                     <td className="px-3 py-2">
                       <div className={cn("text-[11px]", ready ? "text-green-700 font-medium" : "text-[#50575e]")}>
-                        {ref.availableAt ? format(new Date(ref.availableAt), "dd MMM yyyy") : "Now"}
+                        {ref.availableAt ? formatTz(new Date(ref.availableAt), timezone, "dd MMM yyyy") : "Now"}
                       </div>
                       {ref.status === "PENDING" && (
                         <div className={cn("text-[10px]", ready ? "text-green-600" : "text-yellow-600")}>

@@ -4,7 +4,9 @@
 
 import React from "react";
 import Link from "next/link";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { formatCurrency, formatNumber } from "@/app/actions/backend/analytics/shared.utils";
 import { OrderTableRow } from "@/app/actions/backend/analytics/orders.actions";
 
@@ -13,7 +15,8 @@ interface OrdersTableProps {
 }
 
 export default function OrdersTable({ data }: OrdersTableProps) {
-  
+  const { timezone } = useGlobalStore();
+
   // Status Dots logic mimicking WooCommerce
   const getStatusDot = (status: string) => {
     const s = status.toUpperCase();
@@ -63,7 +66,7 @@ export default function OrdersTable({ data }: OrdersTableProps) {
             ) : (
               data.map((row) => (
                 <tr key={row.id} className="hover:bg-[#f6f7f7] transition-colors align-top">
-                  <td className="py-3 px-4 text-[#3c434a]">{format(parseISO(row.orderDate), "MMMM d, yyyy")}</td>
+                  <td className="py-3 px-4 text-[#3c434a]">{formatTz(parseISO(row.orderDate), timezone, "MMMM d, yyyy")}</td>
                   
                   <td className="py-3 px-4">
                      <Link href={`/admin/orders/${row.id}`} className="text-[#2271b1] hover:text-[#135e96] hover:underline font-medium">

@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { format, isFuture } from "date-fns";
+import { isFuture } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import {
   upsertAnnouncementAction,
   deleteAnnouncementAction,
@@ -91,6 +93,7 @@ function getFilteredItems(items: AnnouncementWithTargets[], filter: StatusFilter
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AnnouncementManager({ initialData }: Props) {
+  const { timezone } = useGlobalStore();
   const [items, setItems]         = useState<AnnouncementWithTargets[]>(initialData);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AnnouncementWithTargets | null>(null);
@@ -265,14 +268,14 @@ export default function AnnouncementManager({ initialData }: Props) {
                     <td className="px-3 py-2.5 hidden lg:table-cell">
                       <span className="flex items-center gap-1 text-[12px] text-[#50575e]">
                         <Calendar className="w-3 h-3" />
-                        {format(new Date(item.startsAt), "MMM d, yyyy")}
+                        {formatTz(new Date(item.startsAt), timezone, "MMM d, yyyy")}
                       </span>
                     </td>
 
                     {/* Expires */}
                     <td className="px-3 py-2.5 hidden lg:table-cell text-[12px] text-[#50575e]">
                       {item.expiresAt
-                        ? <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{format(new Date(item.expiresAt), "MMM d, yyyy")}</span>
+                        ? <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatTz(new Date(item.expiresAt), timezone, "MMM d, yyyy")}</span>
                         : "—"}
                     </td>
 

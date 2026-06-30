@@ -3,6 +3,7 @@
 import { db } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { InvoiceView } from "./_components/invoice-view";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 const serializeData = (data: unknown) => {
   return JSON.parse(JSON.stringify(data, (key, value) => {
@@ -27,6 +28,7 @@ export default async function InvoicePage(props: { params: Promise<{ orderId: st
 
   const order = serializeData(rawOrder);
   const settings = serializeData(rawSettings);
+  const timezone = await getStoreTimezone();
 
-  return <InvoiceView order={order} settings={settings} />;
+  return <InvoiceView order={order} settings={settings} timezone={timezone} />;
 }

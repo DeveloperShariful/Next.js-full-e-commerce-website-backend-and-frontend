@@ -8,7 +8,8 @@ import { useState, useTransition, useEffect } from "react";
 import { OrderImportExportButtons } from "./import-export-buttons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { DateRange } from "react-day-picker";
 import { CalendarIcon, Loader2 } from "lucide-react"; // 🔥 Loader2 Imported
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ interface OrdersHeaderProps {
 }
 
 export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
+  const { timezone } = useGlobalStore();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -79,8 +81,8 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
     let startDate, endDate;
     if (date?.from) {
         // 🔥 FIXED: Formatting locally to match server-side UTC boundaries perfectly
-        startDate = format(date.from, "yyyy-MM-dd");
-        endDate = date.to ? format(date.to, "yyyy-MM-dd") : startDate;
+        startDate = formatTz(date.from, timezone, "yyyy-MM-dd");
+        endDate = date.to ? formatTz(date.to, timezone, "yyyy-MM-dd") : startDate;
     }
     
     updateFilters({ 
@@ -189,10 +191,10 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
                     {date?.from ? (
                         date.to ? (
                             <>
-                                {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                                {formatTz(date.from, timezone, "LLL dd, y")} - {formatTz(date.to, timezone, "LLL dd, y")}
                             </>
                         ) : (
-                            format(date.from, "LLL dd, y")
+                            formatTz(date.from, timezone, "LLL dd, y")
                         )
                     ) : (
                         <span>All dates</span>

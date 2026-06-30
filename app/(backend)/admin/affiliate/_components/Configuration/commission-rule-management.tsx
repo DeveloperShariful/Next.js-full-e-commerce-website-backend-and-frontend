@@ -8,7 +8,7 @@ import {
   Ban, CheckCircle, X, Loader2, Save, Percent, Tag
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
 import { useForm } from "react-hook-form";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { deleteRuleAction, upsertRuleAction } from "@/app/actions/backend/affiliate/_services/commition-rule-service";
@@ -127,7 +127,7 @@ export default function CommissionRuleManagement({ initialRules, categories }: R
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AffiliateCommissionRule | null>(null);
   const [isDeleting, startDelete]     = useTransition();
-  const { symbol } = useGlobalStore();
+  const { symbol, timezone } = useGlobalStore();
 
   const handleCreate = () => { setEditingRule(null); setIsModalOpen(true); };
   const handleEdit   = (rule: AffiliateCommissionRule) => { setEditingRule(rule); setIsModalOpen(true); };
@@ -227,7 +227,7 @@ export default function CommissionRuleManagement({ initialRules, categories }: R
                       {rule.endDate ? (
                         <span className="flex items-center justify-center gap-1 text-[11px] text-[#d63638]">
                           <CalendarClock className="w-3 h-3" />
-                          {format(new Date(rule.endDate), "MMM d, yyyy")}
+                          {formatTz(new Date(rule.endDate), timezone, "MMM d, yyyy")}
                         </span>
                       ) : (
                         <span className="text-[11px] text-[#8c8f94]">No end</span>

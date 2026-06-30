@@ -8,7 +8,8 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { format } from "date-fns";
+import { formatTz } from "@/lib/store-time";
+import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { ChevronLeft, ChevronRight, RefreshCw, Trash2, Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { deleteEmailLogs, cleanupOldLogs } from "@/app/actions/backend/settings/email/delete-logs";
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, refreshData }: Props) => {
+  const { timezone } = useGlobalStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -150,7 +152,7 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, refreshD
                             />
                         </TableCell>
                         <TableCell className="text-xs text-slate-500 whitespace-nowrap">
-                            {format(new Date(log.createdAt), "MMM d, h:mm a")}
+                            {formatTz(new Date(log.createdAt), timezone, "MMM d, h:mm a")}
                         </TableCell>
                         
                         {/* Read Status (Based on openedAt) */}

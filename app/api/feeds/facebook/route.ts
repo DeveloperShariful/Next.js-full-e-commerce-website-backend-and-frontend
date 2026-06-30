@@ -3,7 +3,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://gobike.au";
+// Strip trailing slash to prevent /// in constructed URLs
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://gobike.au").replace(/\/+$/, "");
 
 // ============================================================================
 // HELPERS
@@ -29,7 +30,6 @@ function stripHtmlTags(html: string): string {
 
 function formatUrl(url: string | null | undefined): string {
   if (!url) return "";
-  // Replace any localhost or staging origin with the real production SITE_URL
   return url.replace(/^https?:\/\/(localhost:\d+|[^/]*sharifulbuilds\.com)/, SITE_URL);
 }
 
@@ -38,15 +38,18 @@ function isSeoTemplate(s: string): boolean {
   return /%[a-z_]+%/i.test(s);
 }
 
-// Extract numeric taxonomy ID from combined format "1026 - Sporting Goods > ..."
-// Returns just the path (after " - ") for Facebook catalog which prefers text paths
+// Extract text path from combined format "1026 - Sporting Goods > ..."
 function parseTaxonomyPath(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
   const trimmed = raw.trim();
-  // "1026 - Sporting Goods > Outdoor Recreation > ..." → "Sporting Goods > ..."
   const match = trimmed.match(/^\d+\s*-\s*(.+)$/);
   if (match) return match[1].trim();
   return trimmed || undefined;
+}
+
+// Clamp stock to 0 minimum — never send negative quantity to Facebook
+function safeStock(n: number): number {
+  return Math.max(0, n ?? 0);
 }
 
 // ============================================================================
@@ -58,6 +61,8 @@ export async function GET() {
       where: {
         status: "ACTIVE",
         deletedAt: null,
+        // Exclude digital/downloadable — Facebook Shop only supports physical goods
+        productType: { notIn: ["DOWNLOADABLE", "VIRTUAL"] },
         OR: [
           { facebookSyncMode: null },
           { facebookSyncMode: "SYNC_AND_SHOW" },
@@ -98,6 +103,8 @@ export async function GET() {
         pattern: true,
         brand: { select: { name: true } },
         categories: { select: { id: true, name: true, googleCategoryName: true } },
+        // Additional product images for g:additional_image_link
+        images: { orderBy: { position: "asc" }, select: { url: true }, take: 10 },
         variants: {
           where: { deletedAt: null },
           select: {
@@ -129,31 +136,36 @@ export async function GET() {
     products.forEach((product) => {
       const availabilityStatus = (product.trackQuantity === false || product.stock > 0) ? "in stock" : "out of stock";
 
-      // Use googleTitle as shopping title override if set and not an SEO template string
       const finalTitle =
         (product.googleTitle && product.googleTitle.trim() !== "" && !isSeoTemplate(product.googleTitle))
           ? product.googleTitle
           : product.name;
 
-      // Facebook description > product description
       const finalDescription =
         (product.facebookDescription && product.facebookDescription.trim() !== "")
           ? product.facebookDescription
           : (product.description || product.shortDescription || product.name);
 
-      // Facebook price override (if explicitly set)
       const finalPrice = product.facebookPrice ? Number(product.facebookPrice) : Number(product.price);
 
-      // Google Product Category — prefer category-level mapping, then product-level
-      // Use path only (strip numeric ID prefix) since Facebook prefers text paths
       const rawCategory =
         product.categories.find(c => c.googleCategoryName)?.googleCategoryName ||
         product.googleProductCategory;
       const categoryName = parseTaxonomyPath(rawCategory);
 
+      // product_type: store's own category path (first category name)
+      const productTypePath = product.categories.length > 0
+        ? product.categories.map(c => c.name).join(" > ")
+        : undefined;
+
       const brandName = product.brand?.name || "GoBike";
 
-      // Extract Google-specific metafields
+      // Additional images (skip featured image, take up to 10 extras)
+      const extraImages = (product.images || [])
+        .map(img => img.url)
+        .filter(url => url && url !== product.featuredImage)
+        .slice(0, 10);
+
       let google_size_system = "";
       let google_size_type = "";
       let google_multipack = "";
@@ -169,7 +181,6 @@ export async function GET() {
         google_multipack = typeof meta.google_multipack === "string" ? meta.google_multipack : "";
       }
 
-      // Facebook direct fields (size, color, material, pattern columns)
       const feedSize     = product.size     || "";
       const feedColor    = product.color    || "";
       const feedMaterial = product.material || "";
@@ -183,14 +194,24 @@ export async function GET() {
           const variantId = `${product.id}_${variant.id}`;
           const variantTitle = `${finalTitle} - ${variant.name}`;
           const variantAvailability = (variant.trackQuantity === false || variant.stock > 0) ? "in stock" : "out of stock";
+          const variantStock = safeStock(variant.stock);
 
           const variantImage = variant.images && variant.images.length > 0
             ? variant.images[0].url
             : product.featuredImage;
 
+          // Additional images for this variant (other variant images + product extra images)
+          const varExtraImages = [
+            ...(variant.images || []).slice(1).map(i => i.url),
+            ...extraImages,
+          ].filter(Boolean).slice(0, 10);
+
           const varAttrs = variant.attributes as Record<string, string> || {};
           const varColor = varAttrs.Color || varAttrs.color || varAttrs.Colour || varAttrs.colour || feedColor;
           const varSize  = varAttrs.Size  || varAttrs.size  || feedSize;
+
+          const hasGtin = !!(variant.barcode || product.barcode);
+          const hasMpn  = !!(variant.sku || product.mpn);
 
           xml += `
     <item>
@@ -198,12 +219,12 @@ export async function GET() {
       <g:item_group_id>${escapeXml(product.id)}</g:item_group_id>
       <g:title>${escapeXml(variantTitle)}</g:title>
       <g:description>${escapeXml(stripHtmlTags(finalDescription))}</g:description>
-      <g:link>${escapeXml(formatUrl(`${SITE_URL}/product/${product.slug}`))}</g:link>
+      <g:link>${escapeXml(`${SITE_URL}/product/${product.slug}`)}</g:link>
       <g:image_link>${escapeXml(formatUrl(variantImage))}</g:image_link>
       <g:brand>${escapeXml(brandName)}</g:brand>
       <g:condition>${escapeXml(product.condition.toLowerCase())}</g:condition>
       <g:availability>${escapeXml(variantAvailability)}</g:availability>
-      <g:quantity>${variant.stock}</g:quantity>
+      <g:quantity>${variantStock}</g:quantity>
       <g:price>${Number(variant.price).toFixed(2)} AUD</g:price>
           `;
 
@@ -220,6 +241,16 @@ export async function GET() {
           } else if (product.barcode) {
             xml += `      <g:gtin>${escapeXml(product.barcode)}</g:gtin>\n`;
           }
+          // Required by Facebook when product has no GTIN and no MPN
+          if (!hasGtin && !hasMpn) {
+            xml += `      <g:identifier_exists>no</g:identifier_exists>\n`;
+          }
+          if (varExtraImages.length > 0) {
+            varExtraImages.forEach(url => {
+              xml += `      <g:additional_image_link>${escapeXml(formatUrl(url))}</g:additional_image_link>\n`;
+            });
+          }
+          if (productTypePath) xml += `      <g:product_type>${escapeXml(productTypePath)}</g:product_type>\n`;
           if (varColor)    xml += `      <g:color>${escapeXml(varColor)}</g:color>\n`;
           if (varSize)     xml += `      <g:size>${escapeXml(varSize)}</g:size>\n`;
           if (google_size_system) xml += `      <g:size_system>${escapeXml(google_size_system.toUpperCase())}</g:size_system>\n`;
@@ -243,20 +274,24 @@ export async function GET() {
         });
       }
       // ======================================================================
-      // SIMPLE / VIRTUAL / BUNDLE products → one <item>
+      // SIMPLE / BUNDLE products → one <item>
       // ======================================================================
       else {
+        const simpleStock = safeStock(product.stock);
+        const hasGtin = !!product.barcode;
+        const hasMpn  = !!product.mpn;
+
         xml += `
     <item>
       <g:id>${escapeXml(product.id)}</g:id>
       <g:title>${escapeXml(finalTitle)}</g:title>
       <g:description>${escapeXml(stripHtmlTags(finalDescription))}</g:description>
-      <g:link>${escapeXml(formatUrl(`${SITE_URL}/product/${product.slug}`))}</g:link>
+      <g:link>${escapeXml(`${SITE_URL}/product/${product.slug}`)}</g:link>
       <g:image_link>${escapeXml(formatUrl(product.featuredImage))}</g:image_link>
       <g:brand>${escapeXml(brandName)}</g:brand>
       <g:condition>${escapeXml(product.condition.toLowerCase())}</g:condition>
       <g:availability>${escapeXml(availabilityStatus)}</g:availability>
-      <g:quantity>${product.stock}</g:quantity>
+      <g:quantity>${simpleStock}</g:quantity>
       <g:price>${finalPrice.toFixed(2)} AUD</g:price>
         `;
 
@@ -265,6 +300,16 @@ export async function GET() {
         }
         if (product.mpn)     xml += `      <g:mpn>${escapeXml(product.mpn)}</g:mpn>\n`;
         if (product.barcode) xml += `      <g:gtin>${escapeXml(product.barcode)}</g:gtin>\n`;
+        // Required by Facebook when product has no GTIN and no MPN
+        if (!hasGtin && !hasMpn) {
+          xml += `      <g:identifier_exists>no</g:identifier_exists>\n`;
+        }
+        if (extraImages.length > 0) {
+          extraImages.forEach(url => {
+            xml += `      <g:additional_image_link>${escapeXml(formatUrl(url))}</g:additional_image_link>\n`;
+          });
+        }
+        if (productTypePath) xml += `      <g:product_type>${escapeXml(productTypePath)}</g:product_type>\n`;
         if (product.gender)   xml += `      <g:gender>${escapeXml(product.gender.toLowerCase())}</g:gender>\n`;
         if (product.ageGroup) xml += `      <g:age_group>${escapeXml(product.ageGroup.toLowerCase())}</g:age_group>\n`;
         if (feedSize)     xml += `      <g:size>${escapeXml(feedSize)}</g:size>\n`;

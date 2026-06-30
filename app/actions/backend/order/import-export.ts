@@ -395,7 +395,15 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
       try {
         // ── 1. Basic fields ──
         const rawDate    = row["Date"] || row["Order Date"] || "";
-        const orderDate  = rawDate ? new Date(rawDate) : new Date();
+        
+        // সিডনির টাইম ঠিক রাখতে Space কে T দিয়ে রিপ্লেস করে +10:00 যোগ করা হলো
+        let orderDate = new Date();
+        if (rawDate) {
+           const formattedDate = rawDate.replace(" ", "T");
+           // +10:00 দেওয়ার ফলে সার্ভার (UTC) এটাকে সিডনি টাইম হিসেবেই ডাটাবেসে সেভ করবে
+           orderDate = new Date(`${formattedDate}+10:00`); 
+        }
+
         const wcStatus   = row["Status"] || "pending";
         const orderStatus      = mapOrderStatus(wcStatus);
         const transactionId    = nullIfEmpty(row["Transaction ID"]);
@@ -521,7 +529,7 @@ export async function importOrdersCSV(csvString: string): Promise<ImportResult> 
             orderNumber:       orderNum,
             orderDate:         orderDate,
             createdAt:         orderDate,  // WC original date preserve
-            updatedAt:         new Date(),
+            updatedAt:         orderDate,  // 👈 ফিক্সড: ইমপোর্টের টাইমের বদলে অরিজিনাল টাইম সেভ হবে
 
             // Customer
             userId:            orderUserId,

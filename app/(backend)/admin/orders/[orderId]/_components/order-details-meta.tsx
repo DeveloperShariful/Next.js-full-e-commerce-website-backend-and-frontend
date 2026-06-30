@@ -51,7 +51,8 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
 
   let paidDateStr: string | null = null;
   if (order.paymentStatus === 'PAID') {
-      const paidDateObj = successTx?.createdAt || order.capturedAt || order.updatedAt || order.createdAt;
+      // 👈 ফিক্সড: order.updatedAt সরিয়ে দেওয়া হয়েছে। এখন ট্রানজেকশন না থাকলে আসল অর্ডারের টাইমটাই দেখাবে।
+      const paidDateObj = successTx?.createdAt || order.capturedAt || order.createdAt;
       const formatted = formatTz(new Date(paidDateObj), timezone, "MMM d, yyyy '@' h:mm a");
       paidDateStr = formatted.replace('AM', 'am').replace('PM', 'pm');
   }

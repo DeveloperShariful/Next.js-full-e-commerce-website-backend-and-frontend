@@ -1,4 +1,4 @@
-//File Location: app/actions/admin/order/bulk-update.ts
+﻿//File Location: app/actions/admin/order/bulk-update.ts
 
 "use server";
 
@@ -186,6 +186,9 @@ export async function deleteOrder(orderId: string, force: boolean = false) {
 
     if (force) {
       // 🔴 Permanent Delete (ইতিমধ্যে ট্র্যাশে পাঠানো হয়েছে, তাই নতুন করে অ্যানালিটিক্স মাইনাস হবে না)
+      // Referral.orderId is non-nullable but schema has onDelete: SetNull — DB rejects that.
+      // Must delete referrals manually first to avoid FK constraint error.
+      await db.referral.deleteMany({ where: { orderId } });
       await db.order.delete({ where: { id: orderId } });
 
       await logActivity({

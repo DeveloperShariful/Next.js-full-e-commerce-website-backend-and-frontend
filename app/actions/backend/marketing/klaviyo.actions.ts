@@ -98,7 +98,7 @@ export async function saveKlaviyoSettings(data: KlaviyoSettings) {
       },
     });
 
-    revalidateTag("marketing-config");
+    revalidateTag("marketing-config", "default");
     revalidatePath("/admin/marketing/klaviyo");
     return { success: true, message: "Klaviyo integration configured successfully!" };
   } catch (error: unknown) {

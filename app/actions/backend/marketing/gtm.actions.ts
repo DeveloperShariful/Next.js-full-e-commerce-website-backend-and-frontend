@@ -159,7 +159,7 @@ export async function saveGtmContainerId(containerId: string) {
       }
     });
 
-    revalidateTag("marketing-config");
+    revalidateTag("marketing-config", "default");
     revalidatePath("/admin/marketing/gtm");
     return { success: true, message: "Google Tag Manager ID connected successfully!" };
   } catch (error: any) {

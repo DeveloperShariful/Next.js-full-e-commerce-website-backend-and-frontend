@@ -101,7 +101,7 @@ export async function updateFbSettings(data: FbSettingsData) {
       },
     });
 
-    revalidateTag("marketing-config");
+    revalidateTag("marketing-config", "default");
     revalidatePath("/admin/marketing/facebook");
     return { success: true, message: "Facebook settings saved successfully!" };
   } catch (error: unknown) {

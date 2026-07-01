@@ -8,7 +8,7 @@ import { auditService } from "@/lib/audit-service"
 import { security } from "@/lib/security"
 import { Prisma, PaymentMode, PaymentProvider } from "@prisma/client"
 import { PaymentGatewayUI, StripeSettingsSchema, PaypalSettingsSchema, OfflineSettingsSchema } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
-import { decrypt } from "@/app/actions/backend/settings/payments/crypto"
+import { decrypt, safeDecrypt } from "@/app/actions/backend/settings/payments/crypto"
 
 // 1. Fetch All Gateways with Type-Safe JSON Parsing & Webhook Decryption
 export async function getAllPaymentGateways(): Promise<{ success: boolean; data?: PaymentGatewayUI[]; error?: string }> {
@@ -23,7 +23,7 @@ export async function getAllPaymentGateways(): Promise<{ success: boolean; data?
     const mainStripeIsConnected = mainStripe?.isConnected || false;
     const mainStripeMode = mainStripe?.mode || PaymentMode.TEST;
     const mainStripeWebhookUrl = mainStripe?.webhookUrl || null;
-    const mainStripeWebhookSecret = mainStripe?.encryptedWebhook ? decrypt(mainStripe.encryptedWebhook) : null;
+    const mainStripeWebhookSecret = mainStripe?.encryptedWebhook ? safeDecrypt(mainStripe.encryptedWebhook) : null;
 
     const parsedGateways: PaymentGatewayUI[] = gateways.map((g) => {
       let parsedSettings: PaymentGatewayUI["settings"] = null;
@@ -44,7 +44,7 @@ export async function getAllPaymentGateways(): Promise<{ success: boolean; data?
       let finalIsConnected = g.isConnected;
       let finalMode = g.mode;
       let finalWebhookUrl = g.webhookUrl;
-      let finalWebhookSecret = g.encryptedWebhook ? decrypt(g.encryptedWebhook) : null;
+      let finalWebhookSecret = g.encryptedWebhook ? safeDecrypt(g.encryptedWebhook) : null;
 
       const isStripeSubMethod = g.provider === "STRIPE" && g.identifier !== "stripe";
 

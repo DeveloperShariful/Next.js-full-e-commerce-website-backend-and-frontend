@@ -40,3 +40,12 @@ export function decrypt(text: string): string {
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
 }
+
+// Returns null if decryption fails (e.g. key rotation) — caller should treat as "secret lost, re-enter"
+export function safeDecrypt(text: string): string | null {
+  try {
+    return decrypt(text);
+  } catch {
+    return null;
+  }
+}

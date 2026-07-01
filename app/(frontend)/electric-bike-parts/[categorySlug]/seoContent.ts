@@ -31,7 +31,7 @@ export const seoContentMap: Record<string, any> = {
   },
 
   'tyre': { ...tyreContent() },
-  'tyre-tube': { ...tyreContent() },
+  'tyre-and-tube': { ...tyreContent() },
 
   // ---------------- MOTORS PAGE ----------------
   'motors': {

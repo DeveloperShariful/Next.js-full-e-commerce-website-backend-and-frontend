@@ -100,7 +100,8 @@ export async function processRefund(formData: FormData) {
         const isSandbox = ppConfig.mode === "TEST";
         const clientId = ppConfig.publicKey;
         // ✅ NEW: Decrypt the secret key securely
-        const secret = decrypt(ppConfig.encryptedSecret);
+        const secret = safeDecrypt(ppConfig.encryptedSecret);
+        if (!secret) return { success: false, error: "PayPal secret key is invalid — please re-enter it in Admin → Settings → Payments." };
         const baseUrl = isSandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
 
         try {

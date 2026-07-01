@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
-import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { logActivity } from '@/lib/activity-logger';
@@ -15,7 +15,8 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 async function getPayPalCredentials() {
   const gateway = await db.paymentGateway.findUnique({ where: { identifier: 'paypal' } });
   if (!gateway) throw new Error('PayPal is not configured.');
-  const secret = decrypt(gateway.encryptedSecret!);
+  const secret = safeDecrypt(gateway.encryptedSecret!);
+  if (!secret) throw new Error('PayPal secret key is invalid — please re-enter it in Admin → Settings → Payments.');
   const apiUrl = gateway.mode === 'TEST'
     ? 'https://api-m.sandbox.paypal.com'
     : 'https://api-m.paypal.com';

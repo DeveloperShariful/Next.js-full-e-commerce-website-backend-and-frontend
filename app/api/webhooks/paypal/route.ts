@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
-import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
@@ -22,8 +22,9 @@ async function getPayPalConfig() {
     const gateway = await db.paymentGateway.findUnique({ where: { identifier: 'paypal' } });
     if (!gateway || !gateway.encryptedSecret) throw new Error("PayPal is not configured.");
     
-    const secret = decrypt(gateway.encryptedSecret);
-    const webhookId = gateway.encryptedWebhook ? decrypt(gateway.encryptedWebhook) : null;
+    const secret = safeDecrypt(gateway.encryptedSecret);
+    if (!secret) throw new Error('PayPal secret key is invalid — please re-enter it in Admin → Settings → Payments.');
+    const webhookId = gateway.encryptedWebhook ? safeDecrypt(gateway.encryptedWebhook) : null;
     const apiUrl = gateway.mode === 'TEST' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     
     return { clientId: gateway.publicKey!, secret, webhookId, apiUrl };

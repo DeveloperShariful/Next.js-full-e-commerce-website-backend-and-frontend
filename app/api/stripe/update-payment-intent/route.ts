@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
-import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 
 // ============================================================================
 // DYNAMIC STRIPE CREDENTIALS FROM DB
@@ -12,7 +12,8 @@ async function getStripeInstance() {
   if (!gateway || !gateway.encryptedSecret) {
     throw new Error('Stripe is not configured in the Admin Panel.');
   }
-  const secret = decrypt(gateway.encryptedSecret);
+  const secret = safeDecrypt(gateway.encryptedSecret);
+  if (!secret) throw new Error('Stripe secret key is invalid — please re-enter it in Admin → Settings → Payments.');
   return new Stripe(secret, { apiVersion: '2025-01-27.acacia' as any, typescript: true });
 }
 

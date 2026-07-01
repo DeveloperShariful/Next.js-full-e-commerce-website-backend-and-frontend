@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
 import { auth } from '@/auth';
-import { decrypt } from '@/app/actions/backend/settings/payments/crypto';
+import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { auditService } from '@/lib/audit-service';
 
 // ============================================================================
@@ -61,7 +61,8 @@ async function getPayPalCredentials() {
   if (!gateway || !gateway.isEnabled || !gateway.publicKey || !gateway.encryptedSecret) {
     throw new Error('PayPal is not configured or disabled in the admin panel.');
   }
-  const secret = decrypt(gateway.encryptedSecret);
+  const secret = safeDecrypt(gateway.encryptedSecret);
+  if (!secret) throw new Error('PayPal secret key is invalid — please re-enter it in Admin → Settings → Payments.');
   const apiUrl = gateway.mode === 'TEST'
     ? 'https://api-m.sandbox.paypal.com'
     : 'https://api-m.paypal.com';

@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import Stripe from 'stripe';
 import { db } from "@/lib/prisma";
 import { Prisma, OrderStatus, PaymentStatus } from "@prisma/client";
-import { decrypt } from "@/app/actions/backend/settings/payments/crypto";
+import { safeDecrypt } from "@/app/actions/backend/settings/payments/crypto";
 import { auditService } from "@/lib/audit-service";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -20,9 +20,10 @@ export const maxDuration = 60;
 async function getStripeConfig() {
   const gateway = await db.paymentGateway.findUnique({ where: { identifier: 'stripe' } });
   if (!gateway || !gateway.encryptedSecret) throw new Error('Stripe not configured in Admin Panel.');
-  const secret = decrypt(gateway.encryptedSecret);
+  const secret = safeDecrypt(gateway.encryptedSecret);
+  if (!secret) throw new Error('Stripe secret key is invalid — please re-enter it in Admin → Settings → Payments.');
   const webhookSecret = gateway.encryptedWebhook
-    ? decrypt(gateway.encryptedWebhook)
+    ? safeDecrypt(gateway.encryptedWebhook)
     : (process.env.STRIPE_WEBHOOK_SECRET ?? null);
   return {
     stripe: new Stripe(secret),

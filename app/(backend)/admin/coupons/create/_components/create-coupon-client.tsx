@@ -69,6 +69,7 @@ export default function CreateCouponClient({ affiliateEnabled }: CreateCouponCli
     payload.append("value", String(numericValue));
     payload.append("description", formData.description);
     payload.append("isActive", String(formData.isActive));
+    payload.append("allowFreeShipping", String(formData.allowFreeShipping));
     if (formData.endDate) payload.append("endDate", formData.endDate);
     if (formData.minSpend !== "") payload.append("minSpend", String(formData.minSpend));
     if (formData.usageLimit !== "") payload.append("usageLimit", String(formData.usageLimit));

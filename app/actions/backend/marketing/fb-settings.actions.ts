@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export interface FbSettingsData {
   fbEnabled: boolean;
@@ -101,6 +101,7 @@ export async function updateFbSettings(data: FbSettingsData) {
       },
     });
 
+    revalidateTag("marketing-config");
     revalidatePath("/admin/marketing/facebook");
     return { success: true, message: "Facebook settings saved successfully!" };
   } catch (error: unknown) {

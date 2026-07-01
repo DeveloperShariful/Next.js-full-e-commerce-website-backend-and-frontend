@@ -5,7 +5,7 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import Stripe from "stripe";
-import { decrypt } from "@/app/actions/backend/settings/payments/crypto";
+import { safeDecrypt } from "@/app/actions/backend/settings/payments/crypto";
 import { restockInventory, sendOrderEmail } from "./order-utils";
 import { logActivity } from "@/lib/activity-logger";
 
@@ -55,7 +55,8 @@ export async function processRefund(formData: FormData) {
         }
 
         // ✅ NEW: Decrypt the secret key securely
-        const secretKey = decrypt(stripeConfig.encryptedSecret);
+        const secretKey = safeDecrypt(stripeConfig.encryptedSecret);
+        if (!secretKey) return { success: false, error: "Stripe secret key is invalid — please re-enter it in Admin → Settings → Payments." };
         
         if (!secretKey) {
             return { success: false, error: "Failed to decrypt Stripe API key." };

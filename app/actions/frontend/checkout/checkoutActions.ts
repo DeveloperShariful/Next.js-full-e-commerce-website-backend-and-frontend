@@ -492,8 +492,22 @@ export async function getCheckoutDataAction(
           const maxWeight = rate.maxWeight ? Number(rate.maxWeight) : 999_999;
           const minPrice  = rate.minPrice  ? Number(rate.minPrice)  : 0;
 
-          if (rate.type === "FREE_SHIPPING" && subtotal - discountTotal >= minPrice) {
-            availableShippingRates.push({ id: rate.id, label: rate.name, cost: 0 });
+          if (rate.type === "FREE_SHIPPING") {
+            const freeReq = rate.freeShippingRequirement || "none";
+            const couponGrantsFreeShipping =
+              appliedCoupons.length > 0 &&
+              !!discountRecord &&
+              (discountRecord.type === "FREE_SHIPPING" ||
+                (discountRecord.ruleLogic as Record<string, unknown> | null)?.allowFreeShipping === true);
+            const meetsMinAmount = subtotal - discountTotal >= minPrice;
+            const show =
+              freeReq === "none"       ? true :
+              freeReq === "coupon"     ? couponGrantsFreeShipping :
+              freeReq === "min_amount" ? meetsMinAmount :
+              freeReq === "either"     ? (couponGrantsFreeShipping || meetsMinAmount) :
+              freeReq === "both"       ? (couponGrantsFreeShipping && meetsMinAmount) :
+              false;
+            if (show) availableShippingRates.push({ id: rate.id, label: rate.name, cost: 0 });
           } else if (rate.type === "FLAT_RATE" && totalWeight >= minWeight && totalWeight <= maxWeight) {
             availableShippingRates.push({ id: rate.id, label: rate.name, cost });
           } else if (rate.type === "LOCAL_PICKUP") {

@@ -260,6 +260,7 @@ export async function saveCoupon(
   }
 
   const data = validation.data;
+  const allowFreeShipping = formData.get("allowFreeShipping") === "true";
 
   try {
     if (isUpdate && id) {
@@ -281,6 +282,7 @@ export async function saveCoupon(
         isActive: data.isActive,
         affiliateId: data.affiliateId ?? null,
         affiliateCommissionRate: data.affiliateCommissionRate ?? null,
+        ruleLogic: { allowFreeShipping } as unknown as Prisma.InputJsonValue,
       };
 
       await db.discount.update({
@@ -330,6 +332,7 @@ export async function saveCoupon(
         isActive: data.isActive,
         affiliateId: data.affiliateId ?? null,
         affiliateCommissionRate: data.affiliateCommissionRate ?? null,
+        ruleLogic: { allowFreeShipping } as unknown as Prisma.InputJsonValue,
         createdBy: user.id,
       };
 

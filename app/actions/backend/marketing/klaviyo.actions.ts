@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 const KLAVIYO_REVISION = "2024-02-15";
 
@@ -98,6 +98,7 @@ export async function saveKlaviyoSettings(data: KlaviyoSettings) {
       },
     });
 
+    revalidateTag("marketing-config");
     revalidatePath("/admin/marketing/klaviyo");
     return { success: true, message: "Klaviyo integration configured successfully!" };
   } catch (error: unknown) {

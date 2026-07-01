@@ -4,7 +4,7 @@
 
 import { google } from "googleapis";
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 // ============================================================================
 // HELPER: GET AUTHENTICATED GTM CLIENT
@@ -159,6 +159,7 @@ export async function saveGtmContainerId(containerId: string) {
       }
     });
 
+    revalidateTag("marketing-config");
     revalidatePath("/admin/marketing/gtm");
     return { success: true, message: "Google Tag Manager ID connected successfully!" };
   } catch (error: any) {

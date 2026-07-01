@@ -253,7 +253,9 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }
                     ) : (
                         orders.map((order) => {
                             const isProcessingThis = loadingId === order.id;
-                            const customerName = order.user?.name || order.shippingAddress?.firstName || "Guest";
+                            const billingName = `${order.billingAddress?.firstName || ''} ${order.billingAddress?.lastName || ''}`.trim();
+                            const shippingName = `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.trim();
+                            const customerName = billingName || shippingName || order.user?.name || "Guest";
                             
                             const orderDate = new Date(order.createdAt);
                             const displayDate = isToday(orderDate)

@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { addShippingRate, deleteShippingRate, updateShippingRate } from "@/app/actions/backend/settings/shipping/local";
-import { ShippingZone, ShippingRate } from "./types"; 
+import { ShippingZone, ShippingRate } from "../types"; 
 import { TransdirectConfig, CarrierService } from "@prisma/client";
 import { X, HelpCircle } from "lucide-react";
 import { toast } from "sonner";

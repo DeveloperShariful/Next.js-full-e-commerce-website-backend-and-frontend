@@ -1,7 +1,7 @@
 // File: app/(backend)/admin/settings/_components/general/Store_Address.tsx
 
 import { getCountryStateOptions } from "@/app/actions/backend/settings/general/location-helpers";
-import { GeneralSettingsData } from "../GeneralTab";
+import { GeneralSettingsData } from "../_components/GeneralTab";
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 

@@ -9,7 +9,7 @@ import { getEmailTemplates } from "@/app/actions/backend/settings/email/email-te
 import { getEmailLogs } from "@/app/actions/backend/settings/email/email-logs";
 
 // সাব-কম্পোনেন্ট ইমপোর্ট (আগের email/ ফোল্ডারের ভেতরের রিলেটিভ পাথ বজায় রাখা হয়েছে)
-import { EmailSettingsView } from "./email/email-settings-view";
+import { EmailSettingsView } from "./email-settings-view";
 
 interface EmailPageData {
   config: EmailConfiguration | null;

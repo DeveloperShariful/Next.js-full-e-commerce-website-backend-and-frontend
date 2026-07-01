@@ -8,13 +8,13 @@ import { toast } from "sonner";
 import { Loader2, Save, Store, Globe, Share2 } from "lucide-react";
 
 // সাব-কম্পোনেন্ট ইমপোর্ট (আগের general/ ফোল্ডারের ভেতরের রিলেটিভ পাথ বজায় রাখা হয়েছে)
-import Store_Info from "./general/Store_Info";
-import Store_Address from "./general/Store_Address";
-import General_Options from "./general/General_Options";
-import Taxes_and_coupons from "./general/Taxes_and_coupons";
-import Currency_options from "./general/Currency_options";
-import Measurement_Maintenance from "./general/Measurement_Maintenance";
-import Social_Links from "./general/Social_Links";
+import Store_Info from "./Store_Info";
+import Store_Address from "./Store_Address";
+import General_Options from "./General_Options";
+import Taxes_and_coupons from "./Taxes_and_coupons";
+import Currency_options from "./Currency_options";
+import Measurement_Maintenance from "./Measurement_Maintenance";
+import Social_Links from "./Social_Links";
 
 export interface GeneralSettingsData {
     storeName: string;

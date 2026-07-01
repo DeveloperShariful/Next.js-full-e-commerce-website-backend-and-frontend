@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { getAllPaymentGateways } from "@/app/actions/backend/settings/payments/core-actions";
-import { Payment_Methods_List } from "../payments/_components/Payment_Methods_List";
+import { Payment_Methods_List } from "./Payment_Methods_List";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 export default function PaymentsTab() {

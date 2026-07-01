@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { getEmailTemplateById } from "@/app/actions/backend/settings/email/email-templates";
-import { TemplateEditPageClient } from "@/app/(backend)/admin/settings/_components/email/template-edit-page-client";
+import { TemplateEditPageClient } from "@/app/(backend)/admin/settings/email/_components/template-edit-page-client";
 
 interface Props {
   params: Promise<{ id: string }>;

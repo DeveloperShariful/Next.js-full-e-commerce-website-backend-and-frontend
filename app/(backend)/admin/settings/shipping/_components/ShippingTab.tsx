@@ -22,14 +22,14 @@ import { getTransdirectConfig } from "@/app/actions/backend/settings/shipping/tr
 import { getCarrierServices } from "@/app/actions/backend/settings/shipping/carriers";
 
 // সাব-কম্পোনেন্ট ইমপোর্ট (আগের shipping/ ফোল্ডারের ভেতরের রিলেটিভ পাথ বজায় রাখা হয়েছে)
-import Shipping_Zones from "./shipping/Shipping_Zones";
-import Shipping_Options from "./shipping/Shipping_Options";
-import Shipping_Classes from "./shipping/Shipping_Classes";
-import Packaging_List from "./shipping/Packaging_List";
-import Pickup_Locations from "./shipping/Pickup_Locations";
-import Origin_Address from "./shipping/Origin_Address";
-import Transdirect_Main from "./shipping/Transdirect_Main";
-import Carrier_Service_List from "./shipping/Carrier_Service_List";
+import Shipping_Zones from "./Shipping_Zones";
+import Shipping_Options from "./Shipping_Options";
+import Shipping_Classes from "./Shipping_Classes";
+import Packaging_List from "./Packaging_List";
+import Pickup_Locations from "./Pickup_Locations";
+import Origin_Address from "./Origin_Address";
+import Transdirect_Main from "./Transdirect_Main";
+import Carrier_Service_List from "./Carrier_Service_List";
 
 interface PageDataState {
     zones: (ShippingZone & { rates: any[] })[];

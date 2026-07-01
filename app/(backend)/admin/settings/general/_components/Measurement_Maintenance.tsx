@@ -1,7 +1,7 @@
 //app/(backend)/admin/settings/_components/general/Measurement_Maintenance.tsx
 
 import { Ruler, Scale, AlertTriangle } from "lucide-react";
-import { GeneralSettingsData } from "../GeneralTab";
+import { GeneralSettingsData } from "../_components/GeneralTab";
 
 interface Props {
     data: GeneralSettingsData;

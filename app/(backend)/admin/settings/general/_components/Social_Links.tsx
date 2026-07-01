@@ -1,7 +1,7 @@
 //app/(backend)/admin/settings/_components/general/Social_Links.tsx
 
 import { Facebook, Instagram, Twitter, Youtube, Linkedin } from "lucide-react";
-import { GeneralSettingsData } from "../GeneralTab";
+import { GeneralSettingsData } from "../_components/GeneralTab";
 
 interface Props {
     data: GeneralSettingsData;

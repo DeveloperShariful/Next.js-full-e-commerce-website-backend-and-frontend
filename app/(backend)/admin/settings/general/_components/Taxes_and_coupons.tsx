@@ -1,6 +1,6 @@
 // File: app/(backend)/admin/settings/_components/general/tax_and_coupons.tsx
 
-import { GeneralSettingsData } from "../GeneralTab";
+import { GeneralSettingsData } from "../_components/GeneralTab";
 
 interface Props {
     data: GeneralSettingsData;

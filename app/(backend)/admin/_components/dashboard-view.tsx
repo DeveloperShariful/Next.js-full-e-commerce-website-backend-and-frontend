@@ -9,14 +9,16 @@ import { Overview } from "./overview";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import { CalendarDays } from "lucide-react";
 import Link from "next/link";
+import { formatTz } from "@/lib/store-time";
 
 type DataRange = "today" | "yesterday" | "week" | "month" | "this_month";
 
 interface DashboardViewProps {
   data: any;
+  timezone: string;
 }
 
-export function DashboardView({ data }: DashboardViewProps) {
+export function DashboardView({ data, timezone }: DashboardViewProps) {
   const { storeName } = useGlobalStore();
   const [activeRange, setActiveRange] = useState<DataRange>("this_month");
 
@@ -100,7 +102,7 @@ export function DashboardView({ data }: DashboardViewProps) {
                 <li key={claim.id} className="p-3 hover:bg-[#f6f7f7] transition-colors flex justify-between items-start text-[13px]">
                   <div className="leading-relaxed pr-2">
                     <span className="text-[#8c8f94] block text-[11px] mb-0.5">
-                      {new Date(claim.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                      {formatTz(claim.createdAt, timezone, "d MMM")}
                     </span>
                     <Link href={`/admin/warranty-claims/${claim.id}`} className="text-[#2271b1] font-semibold hover:underline">
                       {claim.name}

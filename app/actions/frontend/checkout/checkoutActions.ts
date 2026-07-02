@@ -344,13 +344,14 @@ export async function getCheckoutDataAction(
               product: {
                 select: {
                   id: true, productCode: true, name: true, slug: true, price: true,
+                  salePrice: true, saleStart: true, saleEnd: true,
                   featuredImage: true, weight: true, length: true, width: true,
                   height: true, taxStatus: true,
                 },
               },
               variant: {
                 select: {
-                  id: true, name: true, price: true, image: true,
+                  id: true, name: true, price: true, salePrice: true, image: true,
                   weight: true, length: true, width: true, height: true,
                 },
               },
@@ -380,9 +381,32 @@ export async function getCheckoutDataAction(
     let subtotal = 0;
     let totalWeight = 0;
 
+    function getEffectivePrice(
+      price: number,
+      salePrice: number | null | undefined,
+      saleStart?: Date | null,
+      saleEnd?: Date | null
+    ): number {
+      if (!salePrice) return price;
+      const now = new Date();
+      if (saleStart && now < saleStart) return price;
+      if (saleEnd && now > saleEnd) return price;
+      return salePrice;
+    }
+
     const items: CartItemDTO[] = cart.items.map((item) => {
       const isVariant = item.variant !== null;
-      const rawPrice  = isVariant ? Number(item.variant!.price)  : Number(item.product.price);
+      const rawPrice = isVariant
+        ? getEffectivePrice(
+            Number(item.variant!.price),
+            item.variant!.salePrice ? Number(item.variant!.salePrice) : null
+          )
+        : getEffectivePrice(
+            Number(item.product.price),
+            item.product.salePrice ? Number(item.product.salePrice) : null,
+            item.product.saleStart,
+            item.product.saleEnd
+          );
       const rawWeight = isVariant ? Number(item.variant!.weight || 0) : Number(item.product.weight || 0);
       const rawLength = isVariant ? Number(item.variant!.length || 0) : Number(item.product.length || 0);
       const rawWidth  = isVariant ? Number(item.variant!.width  || 0) : Number(item.product.width  || 0);

@@ -38,7 +38,11 @@ export async function getProductBySlugAction(slug: string) {
     // --- Decimal & Data Formatting ---
     const regularPriceNum = product.price ? Number(product.price.toString()) : 0;
     const salePriceNum = product.salePrice ? Number(product.salePrice.toString()) : null;
-    const isOnSale = salePriceNum !== null && salePriceNum < regularPriceNum;
+    const now = new Date();
+    const isOnSale = salePriceNum !== null &&
+      salePriceNum < regularPriceNum &&
+      (!product.saleStart || now >= product.saleStart) &&
+      (!product.saleEnd || now <= product.saleEnd);
 
     const formatPrice = (amount: number) =>
       new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2 }).format(amount);

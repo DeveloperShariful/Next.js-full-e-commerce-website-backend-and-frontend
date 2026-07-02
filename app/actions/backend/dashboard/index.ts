@@ -3,34 +3,45 @@
 "use server";
 
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { getAllStats } from "./fetch-stats";
 import { getActionAlerts } from "./fetch-alerts";
 import { getGraphData, getRecentData, getStoreSettings } from "./fetch-misc";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 export async function getDashboardOverview() {
-  const now = new Date(); // Server Time
+  const [timezone, currencySymbol] = await Promise.all([
+    getStoreTimezone(),
+    getStoreSettings(),
+  ]);
+
+  // Convert server UTC time → store timezone
+  const nowUtc = new Date();
+  const now = toZonedTime(nowUtc, timezone);
+
+  const tz = (d: Date) => fromZonedTime(d, timezone); // zoned → UTC for DB queries
 
   try {
-    // 1. Setup Date Ranges
-    const todayStart = startOfDay(now);
-    // For testing future data (2026), extend end date. In production, use endOfDay(now)
-    const todayEnd = new Date(new Date().setFullYear(new Date().getFullYear() + 5)); 
-    
-    const yesterdayStart = startOfDay(subDays(now, 1));
-    const yesterdayEnd = endOfDay(subDays(now, 1));
-    
-    const weekStart = startOfDay(subDays(now, 7));
-    const monthStart = startOfDay(subDays(now, 30));
+    // 1. Setup Date Ranges (all in store timezone, converted to UTC for DB)
+    const todayStart    = tz(startOfDay(now));
+    // Keep 5-year window so orders created today (in any timezone offset) are included
+    const todayEnd      = new Date(nowUtc.getTime()); todayEnd.setFullYear(todayEnd.getFullYear() + 5);
+
+    const yesterdayStart = tz(startOfDay(subDays(now, 1)));
+    const yesterdayEnd   = tz(endOfDay(subDays(now, 1)));
+
+    const weekStart  = tz(startOfDay(subDays(now, 7)));
+    const monthStart = tz(startOfDay(subDays(now, 30)));
 
     // This Month (calendar month: 1st of current month → now)
-    const thisMonthStart = startOfMonth(now);
-    const prevCalMonthStart = startOfMonth(subMonths(now, 1));
-    const prevCalMonthEnd = endOfMonth(subMonths(now, 1));
+    const thisMonthStart    = tz(startOfMonth(now));
+    const prevCalMonthStart = tz(startOfMonth(subMonths(now, 1)));
+    const prevCalMonthEnd   = tz(endOfMonth(subMonths(now, 1)));
 
     // Comparison Ranges
-    const prevDayStart = startOfDay(subDays(now, 2));
-    const prevWeekStart = startOfDay(subDays(now, 14));
-    const prevMonthStart = startOfDay(subDays(now, 60));
+    const prevDayStart   = tz(startOfDay(subDays(now, 2)));
+    const prevWeekStart  = tz(startOfDay(subDays(now, 14)));
+    const prevMonthStart = tz(startOfDay(subDays(now, 60)));
 
     // 2. Execute All Queries in Parallel
     const [
@@ -38,13 +49,11 @@ export async function getDashboardOverview() {
       alerts,
       graphData,
       { recentOrders, recentActivities },
-      currencySymbol
     ] = await Promise.all([
       getAllStats(todayStart, todayEnd, yesterdayStart, yesterdayEnd, weekStart, monthStart, prevDayStart, prevWeekStart, prevMonthStart, thisMonthStart, prevCalMonthStart, prevCalMonthEnd),
       getActionAlerts(),
-      getGraphData(now),
+      getGraphData(nowUtc, timezone),
       getRecentData(),
-      getStoreSettings()
     ]);
 
     // 3. Return Combined Data
@@ -60,7 +69,8 @@ export async function getDashboardOverview() {
       graphData,
       recentOrders,
       recentActivities,
-      currencySymbol
+      currencySymbol,
+      timezone,
     };
 
   } catch (error) {

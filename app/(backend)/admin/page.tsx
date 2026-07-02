@@ -49,5 +49,5 @@ export default async function AdminDashboardPage() {
   const data = JSON.parse(JSON.stringify(mergedData));
 
   // Pass sanitized data to the client component
-  return <DashboardView data={data} />
+  return <DashboardView data={data} timezone={mergedData.timezone || "UTC"} />
 }

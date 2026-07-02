@@ -182,6 +182,19 @@ async function validateStockAndReserve(
 // ============================================================================
 // 3. CART ITEM FORMATTING
 // ============================================================================
+function getEffectivePrice(
+  price: number,
+  salePrice: number | null | undefined,
+  saleStart?: Date | null,
+  saleEnd?: Date | null
+): number {
+  if (!salePrice) return price;
+  const now = new Date();
+  if (saleStart && now < saleStart) return price;
+  if (saleEnd && now > saleEnd) return price;
+  return salePrice;
+}
+
 async function getFormattedCartItems(cartId: string) {
   // Fire-and-forget: expired reservation cleanup runs async, never blocks cart display
   db.inventoryReservation.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
@@ -210,7 +223,17 @@ async function getFormattedCartItems(cartId: string) {
 
   return cart.items.map((item) => {
     const isVariant = !!item.variant;
-    const priceNum  = isVariant ? Number(item.variant!.price) : Number(item.product.price);
+    const priceNum = isVariant
+      ? getEffectivePrice(
+          Number(item.variant!.price),
+          item.variant!.salePrice ? Number(item.variant!.salePrice) : null
+        )
+      : getEffectivePrice(
+          Number(item.product.price),
+          item.product.salePrice ? Number(item.product.salePrice) : null,
+          item.product.saleStart,
+          item.product.saleEnd
+        );
     const rawWeight = isVariant ? item.variant?.weight : item.product.weight;
 
     return {

@@ -5,11 +5,16 @@
 import { db } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { startOfYear, endOfYear } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
-export async function getGraphData(now: Date) {
+export async function getGraphData(nowUtc: Date, timezone: string) {
+  const nowZoned = toZonedTime(nowUtc, timezone);
+  const yearStart = fromZonedTime(startOfYear(nowZoned), timezone);
+  const yearEnd   = fromZonedTime(endOfYear(nowZoned), timezone);
+
   const yearOrders = await db.order.findMany({
     where: {
-      createdAt: { gte: startOfYear(now), lte: endOfYear(now) },
+      createdAt: { gte: yearStart, lte: yearEnd },
       status: { not: OrderStatus.CANCELLED }
     },
     select: { createdAt: true, total: true }
@@ -21,8 +26,8 @@ export async function getGraphData(now: Date) {
   }));
 
   yearOrders.forEach(order => {
-    const month = new Date(order.createdAt).getMonth();
-    // ✅ FIX: Convert Decimal to Number before adding
+    // Group by month in store timezone (not UTC)
+    const month = toZonedTime(order.createdAt, timezone).getMonth();
     graphData[month].total += Number(order.total);
   });
 

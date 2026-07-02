@@ -28,8 +28,11 @@ async function _fetchFeaturedBikes(): Promise<FeaturedBikesResponse> {
       // Prisma Decimal টাইপ থেকে Number এ কনভার্ট
       const regularPriceNum = product.price ? Number(product.price.toString()) : 0;
       const salePriceNum = product.salePrice ? Number(product.salePrice.toString()) : null;
-      
-      const isOnSale = salePriceNum !== null && salePriceNum < regularPriceNum;
+      const now = new Date();
+      const isOnSale = salePriceNum !== null &&
+        salePriceNum < regularPriceNum &&
+        (!product.saleStart || now >= product.saleStart) &&
+        (!product.saleEnd || now <= product.saleEnd);
       
       const formatPrice = (amount: number) => {
         return new Intl.NumberFormat("en-AU", {

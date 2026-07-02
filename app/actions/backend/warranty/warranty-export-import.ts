@@ -66,8 +66,16 @@ export async function importWarrantyClaimsCSV(csvString: string) {
 
     const validStatuses: ClaimStatus[] = ["PENDING", "APPROVED", "REJECTED", "TRASHED"];
 
+    // supports both export format ("Order Number") and raw format ("orderNumber")
+    const get = (row: Record<string, string>, ...keys: string[]) => {
+      for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null) return row[key];
+      }
+      return "";
+    };
+
     for (const row of data) {
-      const id = row["ID"]?.trim();
+      const id = get(row, "id", "ID")?.trim();
       if (!id) continue;
 
       const existing = await db.warrantyClaim.findUnique({ where: { id } });
@@ -77,30 +85,34 @@ export async function importWarrantyClaimsCSV(csvString: string) {
       }
 
       try {
-        const rawStatus = row["Status"]?.trim().toUpperCase();
+        const rawStatus = get(row, "status", "Status").trim().toUpperCase();
         const status: ClaimStatus = validStatuses.includes(rawStatus as ClaimStatus)
           ? (rawStatus as ClaimStatus)
           : "PENDING";
 
+        const orderDateStr = get(row, "orderDate", "Order Date").trim();
+        const createdAtStr = get(row, "createdAt", "Created At").trim();
+
         await db.warrantyClaim.create({
           data: {
             id,
-            name: row["Name"] || "Unknown",
-            email: row["Email"] || "",
-            phone: row["Phone"] || null,
-            orderNumber: row["Order Number"] || "",
-            orderDate: row["Order Date"] ? new Date(row["Order Date"]) : null,
-            shopPurchased: row["Shop Purchased"] || "",
-            description: row["Description"] || "",
+            name: get(row, "name", "Name") || "Unknown",
+            email: get(row, "email", "Email") || "",
+            phone: get(row, "phone", "Phone") || null,
+            orderNumber: get(row, "orderNumber", "Order Number") || "",
+            orderDate: orderDateStr ? new Date(orderDateStr) : null,
+            shopPurchased: get(row, "shopPurchased", "Shop Purchased") || "",
+            description: get(row, "description", "Description") || "",
             status,
-            replacementPart: row["Replacement Part"] || null,
-            trackingNumber: row["Tracking Number"] || null,
-            address: row["Address"] || null,
-            suburb: row["Suburb"] || null,
-            state: row["State"] || null,
-            postcode: row["Postcode"] || null,
-            country: row["Country"] || "AU",
-            mediaUrl: row["Media URL"] || null,
+            replacementPart: get(row, "replacementPart", "Replacement Part") || null,
+            trackingNumber: get(row, "trackingNumber", "Tracking Number") || null,
+            address: get(row, "address", "Address") || null,
+            suburb: get(row, "suburb", "Suburb") || null,
+            state: get(row, "state", "State") || null,
+            postcode: get(row, "postcode", "Postcode") || null,
+            country: get(row, "country", "Country") || "AU",
+            mediaUrl: get(row, "mediaUrl", "Media URL") || null,
+            createdAt: createdAtStr ? new Date(createdAtStr) : undefined,
           },
         });
         successCount++;

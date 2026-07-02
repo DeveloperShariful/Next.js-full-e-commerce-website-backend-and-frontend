@@ -188,7 +188,7 @@ const HeroSlider = () => {
             onClick={() => setCurrentSlide(index)}
             className={`h-2.5 rounded-full transition-all duration-500 ${currentSlide === index
               ? 'bg-red-500 w-8 shadow-[0_0_10px_rgba(239,68,68,0.8)]'
-              : 'bg-white/40 w-2.5 hover:bg-white/70'
+              : 'bg-white/60 w-2.5 hover:bg-white/80'
             }`}
             aria-label={`Go to slide ${index + 1}`}
           />
@@ -223,7 +223,7 @@ const TrustBadges = () => {
             <div className="flex items-start gap-4" key={index}>
               <div className="flex-shrink-0 w-8 h-8">{item.icon}</div>
               <div>
-                <h3 className="text-base font-bold text-[#1a1a1a] mb-1.5">{item.title}</h3>
+                <h2 className="text-base font-bold text-[#1a1a1a] mb-1.5">{item.title}</h2>
                 <p className="text-[15px] text-[#666] m-0 leading-[1.6]">{item.description}</p>
               </div>
             </div>

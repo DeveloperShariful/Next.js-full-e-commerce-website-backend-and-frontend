@@ -352,7 +352,7 @@ export default function ReviewForm({ productId, averageRating, reviewCount, revi
                                         <StarRatingDisplay rating={edge.rating} />
                                     </div>
                                 }
-                                <div className="text-[0.8rem] text-emerald-500 font-semibold inline-block mb-3">✓ Verified review</div>
+                                <div className="text-[0.8rem] text-emerald-700 font-semibold inline-block mb-3">✓ Verified review</div>
                                 <div className="text-[0.95rem] leading-[1.6] text-gray-600 mb-3" dangerouslySetInnerHTML={{ __html: edge.node.content }} />
                                 
                                 {edge.node.reviewMedia && edge.node.reviewMedia.length > 0 && (

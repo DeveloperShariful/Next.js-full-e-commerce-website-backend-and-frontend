@@ -660,6 +660,7 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
         className={`fixed top-0 left-0 w-[320px] h-[100dvh] bg-white z-[1001] transition-transform duration-300 ease-in-out flex flex-col px-4 pt-4 pb-3 shadow-[5px_0_15px_rgba(0,0,0,0.1)] ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
         role="dialog"
         aria-modal="true"
+        aria-label="Navigation menu"
       >
           {/* Mobile menu header: inline search + close */}
           <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[#f0f0f0]">

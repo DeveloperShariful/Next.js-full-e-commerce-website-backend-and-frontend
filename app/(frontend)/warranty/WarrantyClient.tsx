@@ -119,7 +119,7 @@ export default function WarrantyClient() {
         const file = files[i];
         const blob = await upload(file.name, file, {
           access: 'public',
-          handleUploadUrl: '/api/upload',
+          handleUploadUrl: '/api/upload-warranty',
           onUploadProgress: (p: { loaded: number; total: number }) => {
             const overall = Math.round(((i * 100) + (p.loaded / p.total) * 100) / totalFiles);
             setUploadProgress(overall);

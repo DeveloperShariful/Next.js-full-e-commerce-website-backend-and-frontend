@@ -47,6 +47,7 @@ export interface OrderItem {
     stock: number;
     name: string;
     featuredImage: string | null;
+    costPerItem: number | null;
   } | null;
 }
 

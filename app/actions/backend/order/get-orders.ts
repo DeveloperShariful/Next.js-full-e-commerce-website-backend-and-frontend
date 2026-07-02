@@ -170,13 +170,14 @@ export async function getOrderDetails(orderId: string) {
         subscription: true,
         items: {
             include: {
-                product: { 
-                  select: { 
-                    id: true, 
-                    stock: true, 
-                    name: true, 
-                    featuredImage: true 
-                  } 
+                product: {
+                  select: {
+                    id: true,
+                    stock: true,
+                    name: true,
+                    featuredImage: true,
+                    costPerItem: true
+                  }
                 }
             }
         },

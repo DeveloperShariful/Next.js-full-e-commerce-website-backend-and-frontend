@@ -17,6 +17,11 @@ interface Props {
 export const TemplateList = ({ templates, refreshData }: Props) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const saveScroll = () => {
+    sessionStorage.setItem("settings-email-scroll-y", String(window.scrollY));
+    sessionStorage.setItem("settings-email-return-url", window.location.href);
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     const res = await syncEmailTemplates();
@@ -90,6 +95,7 @@ export const TemplateList = ({ templates, refreshData }: Props) => {
                             <td className="px-[10px] py-[10px] text-right">
                                 <Link
                                     href={`/admin/settings/email/templates/${template.id}/edit`}
+                                    onClick={saveScroll}
                                     className="bg-transparent border border-[#c3c4c7] text-[#3c434a] hover:bg-[#f6f7f7] hover:border-[#8c8f94] rounded-[3px] px-[10px] py-[3px] text-[13px] cursor-pointer min-h-[30px] inline-flex items-center gap-1 no-underline"
                                 >
                                     <Edit size={14}/> Edit

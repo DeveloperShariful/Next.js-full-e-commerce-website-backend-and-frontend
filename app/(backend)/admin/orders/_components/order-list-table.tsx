@@ -67,6 +67,11 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [bulkAction, setBulkAction] = useState<string>("");
 
+  const saveScroll = () => {
+    sessionStorage.setItem("orders-scroll-y", String(window.scrollY));
+    sessionStorage.setItem("orders-return-url", window.location.href);
+  };
+
   const toggleSelect = (id: string) => {
     if (selectedOrders.includes(id)) setSelectedOrders(prev => prev.filter(oid => oid !== id));
     else setSelectedOrders(prev => [...prev, id]);
@@ -292,7 +297,7 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }
                                     </td>
                                     
                                     <td className="py-3 px-3 align-top min-w-[140px]">
-                                        <Link href={`/admin/orders/${order.id}`} className="font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline">
+                                        <Link href={`/admin/orders/${order.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline">
                                             #{order.orderNumber} {customerName}
                                         </Link>
                                         
@@ -360,9 +365,10 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }
                                                                 <Check size={16} strokeWidth={3}/>
                                                             </button>
                                                         )}
-                                                        <Link 
+                                                        <Link
                                                             title="View"
                                                             href={`/admin/orders/${order.id}`}
+                                                            onClick={saveScroll}
                                                             className="h-7 w-7 flex items-center justify-center border border-[#c3c4c7] bg-[#f6f7f7] text-[#a7aaad] rounded-[3px] hover:bg-white hover:text-[#2271b1] shadow-sm"
                                                         >
                                                             <Eye size={16}/>

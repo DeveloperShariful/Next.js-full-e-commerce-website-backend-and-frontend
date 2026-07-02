@@ -3,6 +3,7 @@
 import { db } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { BackButton } from '@/app/(backend)/admin/_components/back-button';
 import { updateClaimStatus } from '@/app/actions/backend/warranty/claim-action';
 import TransdirectClientBox from './TransdirectClientBox';
 import SubmitStatusButton from './SubmitStatusButton';
@@ -127,11 +128,11 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
   return (
     <div className="w-full pb-10">
       
+      <div className="mb-2">
+        <BackButton storageKey="warranty-return-url" fallbackUrl="/admin/warranty-claims" label="Back to claims" />
+      </div>
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-[23px] font-normal text-[#1d2327]">Edit Warranty Claim</h1>
-        <Link href="/admin/warranty-claims" className="border border-[#2271b1] text-[#2271b1] px-3 py-1 text-[13px] rounded hover:bg-[#2271b1] hover:text-white transition-colors">
-          ← Back to Claims
-        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

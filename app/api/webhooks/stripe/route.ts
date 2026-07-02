@@ -106,6 +106,17 @@ export async function POST(request: Request) {
               ? db.abandonedCheckout.updateMany({ where: { email: alreadyEmail, isRecovered: false }, data: { isRecovered: true, recoveredAt: new Date() } })
               : Promise.resolve(),
             db.paymentWebhookLog.update({ where: { eventId: event.id }, data: { processed: true } }),
+            sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId }),
+            alreadyEmail
+              ? sendNotification({ trigger: 'ORDER_PROCESSING', recipient: alreadyEmail, orderId })
+              : Promise.resolve(),
+            db.orderNote.create({
+              data: {
+                orderId,
+                content: `📧 [webhook backup] Stripe webhook email backup triggered — capture-order already processed payment. Email re-queued for customer: ${alreadyEmail || 'none'}, admin: ✓`,
+                isSystem: true,
+              }
+            }),
           ]);
           return NextResponse.json({ received: true, message: "Already processed by frontend" });
       }
@@ -230,6 +241,15 @@ export async function POST(request: Request) {
           ),
         );
       }
+      sideEffects.push(
+        db.orderNote.create({
+          data: {
+            orderId,
+            content: `🔔 [webhook rescue] Stripe webhook rescued this order — email queued (customer: ${rescueEmail || 'none'}, admin: ✓), TransDirect synced, affiliate triggered, analytics updated.`,
+            isSystem: true,
+          }
+        })
+      );
       await Promise.allSettled(sideEffects);
     }
 

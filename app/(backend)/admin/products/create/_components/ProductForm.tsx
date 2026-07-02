@@ -142,10 +142,10 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
         const result = await action(formData);
 
         if (result.success) {
-            localStorage.removeItem(STORAGE_KEY); 
+            localStorage.removeItem(STORAGE_KEY);
             toast.success(result.message || (isEdit ? "Updated successfully!" : "Product published!"), { id: toastId });
-            router.refresh(); 
-            router.push("/admin/products"); 
+            const returnUrl = sessionStorage.getItem("products-return-url") || "/admin/products";
+            router.push(returnUrl, { scroll: false });
         } else {
             toast.error(result.message || "Error saving product", { id: toastId });
         }

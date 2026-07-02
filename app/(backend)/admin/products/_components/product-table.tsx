@@ -71,6 +71,11 @@ export default function ProductTable({
   const [bulkAction, setBulkAction] = useState("");
   
   const [query, setQuery] = useState(searchParams.get("query") || "");
+
+  const saveScroll = () => {
+    sessionStorage.setItem("products-scroll-y", String(window.scrollY));
+    sessionStorage.setItem("products-return-url", window.location.href);
+  };
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get("category") || "");
   const [typeFilter, setTypeFilter] = useState(searchParams.get("type") || "");
   const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") || "");
@@ -372,8 +377,8 @@ export default function ProductTable({
                       <td className="p-2 pt-[14px]">
                          <div className="flex flex-col">
                            <div className="flex items-center gap-1.5">
-                             <Link href={`/admin/products/create?id=${product.id}`} className="font-semibold text-[#2271b1] hover:text-[#0a4b78] hover:underline">
-                                {product.name} 
+                             <Link href={`/admin/products/create?id=${product.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#0a4b78] hover:underline">
+                                {product.name}
                              </Link>
                              {product.status === 'DRAFT' && <span className="text-[#3c434a] font-bold text-[11px]">— Draft</span>}
                            </div>
@@ -390,7 +395,7 @@ export default function ProductTable({
                                   </>
                                ) : (
                                   <>
-                                     <Link href={`/admin/products/create?id=${product.id}`} className="text-[#2271b1] hover:underline">Edit</Link>
+                                     <Link href={`/admin/products/create?id=${product.id}`} onClick={saveScroll} className="text-[#2271b1] hover:underline">Edit</Link>
                                      <span className="text-[#c3c4c7]">|</span>
                                      <button className="text-[#2271b1] hover:underline">Quick Edit</button>
                                      <span className="text-[#c3c4c7]">|</span>

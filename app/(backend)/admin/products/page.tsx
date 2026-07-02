@@ -9,6 +9,7 @@ import ProductTable, { ProductRow } from './_components/product-table';
 import ProductLogViewer from './_components/ProductLogViewer';
 import ImportExportButtons from './_components/ImportExportButtons';
 import { serializeData } from "@/app/actions/backend/product/product-utils";
+import { ScrollRestorer } from "@/app/(backend)/admin/_components/back-button";
 
 interface ProductsPageProps {
   searchParams: Promise<{
@@ -135,8 +136,9 @@ export default async function ProductListPage(props: ProductsPageProps) {
       </div>
 
       {/* Main Table Component */}
+      <ScrollRestorer scrollKey="products-scroll-y" />
       <div className="w-full mt-4">
-        <ProductTable 
+        <ProductTable
           products={serializedProducts}
           categories={categories}
           brands={brands} 

@@ -160,7 +160,10 @@ export async function bulkUpdateOrderStatus(orderIds: string[], status: OrderSta
         await restockInventory(order.id);
       }
 
-      await sendOrderEmail(order.id, `ORDER_${status}`);
+      // COMPLETED status intentionally skipped — no customer email on completion
+      if (status !== "COMPLETED") {
+        await sendOrderEmail(order.id, `ORDER_${status}`);
+      }
     }
 
     await logActivity({

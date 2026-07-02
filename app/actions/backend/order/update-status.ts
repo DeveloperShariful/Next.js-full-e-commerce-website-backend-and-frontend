@@ -46,7 +46,8 @@ export async function updateOrderStatus(formData: FormData) {
     const emailPromises = [];
 
     // A. Order Status Changed? sendOrderEmail auto-notifies admin internally
-    if (status && status !== existingOrder.status) {
+    // COMPLETED status intentionally skipped — no customer email on completion
+    if (status && status !== existingOrder.status && status !== "COMPLETED") {
         emailPromises.push(sendOrderEmail(orderId, `ORDER_${status}`));
     }
 

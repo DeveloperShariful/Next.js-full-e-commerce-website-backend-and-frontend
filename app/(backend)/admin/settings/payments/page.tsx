@@ -5,12 +5,14 @@ export const dynamic = "force-dynamic"
 import { AlertTriangle } from "lucide-react"
 import { getAllPaymentGateways } from "@/app/actions/backend/settings/payments/core-actions"
 import { Payment_Methods_List } from "./_components/Payment_Methods_List"
+import { ScrollRestorer } from "@/app/(backend)/admin/_components/back-button"
 
 export default async function PaymentsPage() {
   const res = await getAllPaymentGateways()
 
   return (
     <div className="w-full font-sans text-[13px] text-[#3c434a]">
+      <ScrollRestorer scrollKey="settings-payments-scroll-y" />
       <div className="py-1 mb-4">
         <h1 className="text-xl font-bold text-slate-800">Payment Settings</h1>
         <p className="text-[#3c434a] m-0 text-[14px]">

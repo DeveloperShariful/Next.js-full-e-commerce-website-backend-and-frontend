@@ -21,6 +21,11 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [isResetting, setIsResetting] = useState(false)
 
+  const saveScroll = () => {
+    sessionStorage.setItem("settings-payments-scroll-y", String(window.scrollY));
+    sessionStorage.setItem("settings-payments-return-url", window.location.href);
+  };
+
   const handleToggle = async (id: string, currentStatus: boolean) => {
     setTogglingId(id)
     try {
@@ -127,12 +132,12 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
                 {/* Name Column */}
                 <td className="py-3 px-3 align-middle">
                   <div className="font-semibold text-[13px]">
-                    <Link href={`/admin/settings/payments/${method.identifier}`} className="text-[#2271b1] hover:text-[#0a4b78] hover:underline focus:shadow-none focus:outline-none">
+                    <Link href={`/admin/settings/payments/${method.identifier}`} onClick={saveScroll} className="text-[#2271b1] hover:text-[#0a4b78] hover:underline focus:shadow-none focus:outline-none">
                       {method.name}
                     </Link>
                   </div>
                   <div className="text-[12px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Link href={`/admin/settings/payments/${method.identifier}`} className="text-[#2271b1] hover:text-[#0a4b78]">Manage</Link>
+                    <Link href={`/admin/settings/payments/${method.identifier}`} onClick={saveScroll} className="text-[#2271b1] hover:text-[#0a4b78]">Manage</Link>
                   </div>
                 </td>
 
@@ -165,7 +170,7 @@ export const Payment_Methods_List = ({ initialMethods }: Props) => {
 
                 {/* Actions Column */}
                 <td className="py-3 px-3 text-right align-middle">
-                  <Link href={`/admin/settings/payments/${method.identifier}`}>
+                  <Link href={`/admin/settings/payments/${method.identifier}`} onClick={saveScroll}>
                     <Button variant="outline" size="sm" className="h-7 px-3 text-xs font-normal border-[#8c8f94] text-[#3c434a] hover:bg-[#f6f7f7]">
                       Manage
                     </Button>

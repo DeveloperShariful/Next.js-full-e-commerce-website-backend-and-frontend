@@ -25,6 +25,7 @@ import { AffiliateSidebar } from "./_components/affiliate-sidebar";
 
 // ✅ Import Strict Types
 import { OrderDetailsType, CustomerHistoryType } from "./types";
+import { BackButton } from "@/app/(backend)/admin/_components/back-button";
 
 export default async function OrderDetailsPage(props: { params: Promise<{ orderId: string }> }) {
   const params = await props.params;
@@ -67,6 +68,9 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
   return (
     <div className="max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
 
+      <div className="mb-2">
+        <BackButton storageKey="orders-return-url" fallbackUrl="/admin/orders" label="Back to orders" />
+      </div>
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-[23px] font-normal text-[#1d2327] m-0 leading-none">
             Edit order

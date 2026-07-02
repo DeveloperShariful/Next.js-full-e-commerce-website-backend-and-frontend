@@ -93,8 +93,9 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
                                     </div>
                                 </div>
                             </td>
-                            {/* Cost (WooCommerce specific field, defaults to $0.00 if not using COGS plugin) */}
-                            <td className="py-3 px-4 text-right text-[#a7aaad]">{formatPrice(0)}</td>
+                            <td className="py-3 px-4 text-right text-[#a7aaad]">
+                              {formatPrice(item.product?.costPerItem ? Number(item.product.costPerItem) : 0)}
+                            </td>
                             <td className="py-3 px-4 text-right text-[#3c434a]">{formatPrice(Number(item.price))}</td>
                             <td className="py-3 px-4 text-center text-[#3c434a]">× {item.quantity}</td>
                             <td className="py-3 px-4 text-right font-medium text-[#2c3338]">{formatPrice(Number(item.total))}</td>

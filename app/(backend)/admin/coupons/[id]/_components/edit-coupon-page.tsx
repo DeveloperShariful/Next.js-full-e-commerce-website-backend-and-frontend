@@ -4,8 +4,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { BackButton } from "@/app/(backend)/admin/_components/back-button";
 import { toast } from "sonner";
 
 import { saveCoupon, deleteCoupons, CouponData } from "@/app/actions/backend/coupon/coupon";
@@ -98,7 +97,7 @@ export default function EditCouponPage({ coupon, affiliateEnabled }: EditCouponP
         const res = await deleteCoupons([coupon.id]);
         if (res.success) {
           toast.success(res.message);
-          router.push("/admin/coupons");
+          router.push(sessionStorage.getItem("coupons-return-url") || "/admin/coupons", { scroll: false });
         } else {
           toast.error(res.error || "Failed to trash coupon.");
         }
@@ -111,14 +110,10 @@ export default function EditCouponPage({ coupon, affiliateEnabled }: EditCouponP
   return (
     <div className="max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
 
+      <div className="mb-2">
+        <BackButton storageKey="coupons-return-url" fallbackUrl="/admin/coupons" label="Back to coupons" />
+      </div>
       <div className="flex items-center gap-3 mb-4">
-        <Link
-          href="/admin/coupons"
-          className="border border-[#8c8f94] bg-white hover:bg-[#f6f7f7] text-[#3c434a] transition-colors p-1.5 rounded-[3px] shadow-sm"
-          title="Back to Coupons"
-        >
-          <ChevronLeft size={18} />
-        </Link>
         <h1 className="text-[23px] font-normal text-[#1d2327] m-0 leading-none">Edit coupon</h1>
         <span className="text-[13px] text-[#646970] font-mono bg-white border border-[#c3c4c7] px-2 py-0.5 rounded-[3px]">
           {coupon.code}

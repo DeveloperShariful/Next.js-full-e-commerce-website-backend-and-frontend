@@ -24,6 +24,11 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
   const [bulkAction, setBulkAction] = useState<BulkActionValue>('');
   const [isApplying, setIsApplying] = useState(false);
 
+  const saveScroll = () => {
+    sessionStorage.setItem("warranty-scroll-y", String(window.scrollY));
+    sessionStorage.setItem("warranty-return-url", window.location.href);
+  };
+
   const isTrashView = currentFilter === 'TRASHED';
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,7 +116,7 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
                   </td>
                   
                   <td className="p-3 sm:p-2 align-top whitespace-nowrap">
-                    <Link href={`/admin/warranty-claims/${claim.id}`} className="text-[#2271b1] font-bold text-[14px] hover:underline block mb-1">
+                    <Link href={`/admin/warranty-claims/${claim.id}`} onClick={saveScroll} className="text-[#2271b1] font-bold text-[14px] hover:underline block mb-1">
                       {claim.name}
                     </Link>
                     
@@ -124,11 +129,11 @@ export default function WarrantyTableClient({ claims, currentFilter, totalItems,
                         </>
                       ) : (
                         <>
-                          <Link href={`/admin/warranty-claims/${claim.id}`} className="text-[#2271b1] hover:underline">Edit</Link>
+                          <Link href={`/admin/warranty-claims/${claim.id}`} onClick={saveScroll} className="text-[#2271b1] hover:underline">Edit</Link>
                           <span className="text-gray-300">|</span>
                           <form action={updateClaimStatus}><input type="hidden" name="id" value={claim.id}/><input type="hidden" name="status" value="TRASHED"/><button type="submit" className="text-red-500 hover:underline cursor-pointer">Trash</button></form>
                           <span className="text-gray-300">|</span>
-                          <Link href={`/admin/warranty-claims/${claim.id}`} className="text-[#2271b1] hover:underline">View</Link>
+                          <Link href={`/admin/warranty-claims/${claim.id}`} onClick={saveScroll} className="text-[#2271b1] hover:underline">View</Link>
                         </>
                       )}
                     </div>

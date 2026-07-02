@@ -6,6 +6,7 @@ import { OrderListTable } from "./_components/order-list-table";
 import { OrdersHeader } from "./_components/header";
 import { PaginationControls } from "./_components/pagination-controls";
 import { getStoreTimezone } from "@/lib/get-store-timezone";
+import { ScrollRestorer } from "@/app/(backend)/admin/_components/back-button";
 
 interface OrdersPageProps {
   searchParams: Promise<{
@@ -55,6 +56,7 @@ export default async function OrdersPage(props: OrdersPageProps) {
       {/* 🔥 Passing the dynamic gateways array down to the header */}
       <OrdersHeader counts={meta?.counts || {}} gateways={dbGateways} />
       
+      <ScrollRestorer scrollKey="orders-scroll-y" />
       <OrderListTable
         orders={serializedOrders}
         isTrashView={status === 'trash'}

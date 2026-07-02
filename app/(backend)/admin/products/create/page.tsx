@@ -6,6 +6,7 @@ import { db } from "@/lib/prisma";
 import { ProductForm } from "./_components/ProductForm";
 import { ProductFormValues } from "./schema";
 import { notFound } from "next/navigation";
+import { BackButton } from "@/app/(backend)/admin/_components/back-button";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -273,5 +274,12 @@ export default async function CreateProductPage(props: PageProps) {
 
   const sanitizedInitialData = JSON.parse(JSON.stringify(initialData));
 
-  return <ProductForm initialData={sanitizedInitialData as ProductFormValues} isEdit={!!productId} />;
+  return (
+    <div>
+      <div className="mb-3">
+        <BackButton storageKey="products-return-url" fallbackUrl="/admin/products" label="Back to products" />
+      </div>
+      <ProductForm initialData={sanitizedInitialData as ProductFormValues} isEdit={!!productId} />
+    </div>
+  );
 }

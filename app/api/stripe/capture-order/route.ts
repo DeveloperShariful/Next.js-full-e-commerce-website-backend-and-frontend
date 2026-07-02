@@ -234,6 +234,14 @@ export async function POST(request: Request) {
       orderId,
     }).catch(err => console.error('[Stripe Capture] Admin email failed:', err));
 
+    db.orderNote.create({
+      data: {
+        orderId,
+        content: `📧 [capture-order] Email queued — customer: ${customerEmail || 'none'}, admin: ✓`,
+        isSystem: true,
+      }
+    }).catch(() => {});
+
     // Affiliate commission
     if (!process.env.INTERNAL_API_KEY) {
       console.error('[Stripe Capture] INTERNAL_API_KEY not set — affiliate commission skipped for order:', orderId);

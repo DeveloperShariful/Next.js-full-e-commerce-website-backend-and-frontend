@@ -4,8 +4,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { BackButton } from "@/app/(backend)/admin/_components/back-button";
 import { toast } from "sonner";
 
 import { saveCoupon } from "@/app/actions/backend/coupon/coupon";
@@ -82,7 +81,7 @@ export default function CreateCouponClient({ affiliateEnabled }: CreateCouponCli
         const res = await saveCoupon(payload);
         if (res.success) {
           toast.success(res.message);
-          router.push("/admin/coupons");
+          router.push(sessionStorage.getItem("coupons-return-url") || "/admin/coupons", { scroll: false });
         } else {
           toast.error(res.error || "Failed to save coupon.");
         }
@@ -95,14 +94,10 @@ export default function CreateCouponClient({ affiliateEnabled }: CreateCouponCli
   return (
     <div className="max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
 
+      <div className="mb-2">
+        <BackButton storageKey="coupons-return-url" fallbackUrl="/admin/coupons" label="Back to coupons" />
+      </div>
       <div className="flex items-center gap-3 mb-4">
-        <Link
-          href="/admin/coupons"
-          className="border border-[#8c8f94] bg-white hover:bg-[#f6f7f7] text-[#3c434a] transition-colors p-1.5 rounded-[3px] shadow-sm"
-          title="Back to Coupons"
-        >
-          <ChevronLeft size={18} />
-        </Link>
         <h1 className="text-[23px] font-normal text-[#1d2327] m-0 leading-none">Add new coupon</h1>
       </div>
 

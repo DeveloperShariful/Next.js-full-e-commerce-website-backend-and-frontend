@@ -3,8 +3,9 @@
 import { getCoupons } from "@/app/actions/backend/coupon/coupon";
 import { CouponsHeader } from "./_components/coupons-header";
 import { CouponsTable } from "./_components/coupons-table";
-import { PaginationControls } from "./_components/pagination-controls"; 
+import { PaginationControls } from "./_components/pagination-controls";
 import { CouponType, CouponCountsType } from "./types";
+import { ScrollRestorer } from "@/app/(backend)/admin/_components/back-button";
 
 interface CouponsPageProps {
   searchParams: Promise<{
@@ -34,8 +35,9 @@ export default async function CouponsPage(props: CouponsPageProps) {
   return (
     <div className="max-w-[100%] mx-auto min-h-screen bg-[#f0f0f1] text-[#3c434a] font-sans pb-20">
       
-      <CouponsHeader 
-        counts={typedCounts} 
+      <ScrollRestorer scrollKey="coupons-scroll-y" />
+      <CouponsHeader
+        counts={typedCounts}
         totalItems={meta?.total || 0}
         currentPage={page}
         totalPages={meta?.pages || 1}

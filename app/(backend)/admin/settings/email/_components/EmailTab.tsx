@@ -10,6 +10,7 @@ import { getEmailLogs } from "@/app/actions/backend/settings/email/email-logs";
 
 // সাব-কম্পোনেন্ট ইমপোর্ট (আগের email/ ফোল্ডারের ভেতরের রিলেটিভ পাথ বজায় রাখা হয়েছে)
 import { EmailSettingsView } from "./email-settings-view";
+import { ScrollRestorer } from "@/app/(backend)/admin/_components/back-button";
 
 interface EmailPageData {
   config: EmailConfiguration | null;
@@ -69,6 +70,7 @@ export default function EmailTab() {
 
   return (
     <div>
+      <ScrollRestorer scrollKey="settings-email-scroll-y" />
       <div className="mb-6 pb-4 border-b border-slate-100">
         <h2 className="text-xl font-bold text-slate-800">Email Settings & Notifications</h2>
         <p className="text-slate-500 text-xs mt-1">

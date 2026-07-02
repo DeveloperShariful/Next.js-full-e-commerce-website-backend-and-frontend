@@ -3,10 +3,10 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { PaymentGatewayUI } from "@/app/(backend)/admin/settings/payments/types-and-schemas"
-import { ArrowLeft, CreditCard, Sliders, Activity, Webhook, Palette, Briefcase, Info, type LucideIcon } from "lucide-react"
+import { CreditCard, Sliders, Activity, Webhook, Palette, Briefcase, Info, type LucideIcon } from "lucide-react"
+import { BackButton } from "@/app/(backend)/admin/_components/back-button"
 
 // Import Stripe Components
 import { Stripe_General_Form } from "./Stripe/Stripe_General_Form"
@@ -109,12 +109,7 @@ export const PaymentConfigUI = ({ method }: Props) => {
         
         {/* WordPress / WooCommerce Style Clean Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link 
-            href="/admin/settings?tab=payments" 
-            className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 rounded-full hover:bg-gray-200"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
+          <BackButton storageKey="settings-payments-return-url" fallbackUrl="/admin/settings/payments" label="Back to payments" />
           <h1 className="text-[23px] font-normal flex items-center gap-2 m-0">
             <span className={titleColor}>{method.name}</span> 
             <span className="text-gray-500 font-light hidden sm:inline">Configuration</span>

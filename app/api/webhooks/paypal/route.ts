@@ -126,7 +126,21 @@ export async function POST(request: Request) {
                         console.error('[PayPal Webhook] Backup TransDirect sync failed:', err);
                     }
                 }
-                await db.paymentWebhookLog.update({ where: { eventId: String(event.id) }, data: { processed: true } });
+                const alreadyEmail = order.guestEmail || order.user?.email;
+                await Promise.allSettled([
+                    db.paymentWebhookLog.update({ where: { eventId: String(event.id) }, data: { processed: true } }),
+                    sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId: wcOrderId }),
+                    alreadyEmail
+                        ? sendNotification({ trigger: 'ORDER_PROCESSING', recipient: alreadyEmail, orderId: wcOrderId })
+                        : Promise.resolve(),
+                    db.orderNote.create({
+                        data: {
+                            orderId: wcOrderId,
+                            content: `📧 [webhook backup] PayPal webhook email backup triggered — capture-order already processed payment. Email re-queued for customer: ${alreadyEmail || 'none'}, admin: ✓`,
+                            isSystem: true,
+                        }
+                    }),
+                ]);
                 return NextResponse.json({ message: "Already processed" }, { status: 200 });
             }
 
@@ -215,6 +229,15 @@ export async function POST(request: Request) {
                         ),
                     );
                 }
+                rescueSideEffects.push(
+                    db.orderNote.create({
+                        data: {
+                            orderId: wcOrderId,
+                            content: `🔔 [webhook rescue] PayPal webhook (CHECKOUT.ORDER.APPROVED) rescued — email queued (customer: ${rescueEmail || 'none'}, admin: ✓), TransDirect synced, affiliate triggered, analytics updated.`,
+                            isSystem: true,
+                        }
+                    })
+                );
                 await Promise.allSettled(rescueSideEffects);
             }
         }
@@ -310,6 +333,15 @@ export async function POST(request: Request) {
                             ),
                         );
                     }
+                    syncSideEffects.push(
+                        db.orderNote.create({
+                            data: {
+                                orderId: wcOrderId,
+                                content: `🔔 [webhook rescue] PayPal webhook (PAYMENT.CAPTURE.COMPLETED) rescued — email queued (customer: ${syncEmail || 'none'}, admin: ✓), TransDirect synced, affiliate triggered, analytics updated.`,
+                                isSystem: true,
+                            }
+                        })
+                    );
                     await Promise.allSettled(syncSideEffects);
                 }
             }

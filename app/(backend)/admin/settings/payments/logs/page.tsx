@@ -30,7 +30,7 @@ export default async function PaymentLogsPage({
       <div className="w-full mb-4">
         <div className="flex items-center gap-3 mb-1">
           <Link
-            href="/admin/settings?tab=payments"
+            href="/admin/settings/payments"
             className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 rounded-full hover:bg-gray-200"
           >
             <ArrowLeft className="h-5 w-5" />

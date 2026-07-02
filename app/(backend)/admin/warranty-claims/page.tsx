@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { db } from '@/lib/prisma';
 import FilterButtons from './_components/FilterButtons';
 import WarrantyTableClient from './_components/WarrantyTableClient';
+import { ScrollRestorer } from '@/app/(backend)/admin/_components/back-button';
+import WarrantyImportExport from './_components/WarrantyImportExport';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,11 +38,15 @@ export default async function WarrantyClaimsPage({ searchParams }: { searchParam
 
   return (
     <div className="max-w-full">
-      <div className="flex items-center gap-4 mb-6 px-4 sm:px-0">
-        <h1 className="text-[23px] font-normal text-[#1d2327]">Warranty Claims</h1>
-        <Link href="/warranty-claim" target="_blank" className="border border-[#2271b1] text-[#2271b1] px-2 py-1 text-[13px] rounded hover:bg-[#2271b1] hover:text-white transition-colors">Add New</Link>
+      <div className="flex items-center justify-between gap-4 mb-6 px-4 sm:px-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-[23px] font-normal text-[#1d2327]">Warranty Claims</h1>
+          <Link href="/warranty-claim" target="_blank" className="border border-[#2271b1] text-[#2271b1] px-2 py-1 text-[13px] rounded hover:bg-[#2271b1] hover:text-white transition-colors">Add New</Link>
+        </div>
+        <WarrantyImportExport />
       </div>
 
+      <ScrollRestorer scrollKey="warranty-scroll-y" />
       <div className="px-4 sm:px-0">
         <FilterButtons counts={counts} />
       </div>

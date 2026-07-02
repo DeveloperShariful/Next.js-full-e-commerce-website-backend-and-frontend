@@ -27,6 +27,11 @@ export const CouponsTable = ({ coupons, isTrashMode }: CouponsTableProps) => {
   const [isPending, startTransition] = useTransition();
   const [bulkAction, setBulkAction] = useState<string>("");
 
+  const saveScroll = () => {
+    sessionStorage.setItem("coupons-scroll-y", String(window.scrollY));
+    sessionStorage.setItem("coupons-return-url", window.location.href);
+  };
+
   const toggleSelect = (id: string) => {
     if (selectedIds.includes(id)) setSelectedIds(prev => prev.filter(cid => cid !== id));
     else setSelectedIds(prev => [...prev, id]);
@@ -187,7 +192,7 @@ export const CouponsTable = ({ coupons, isTrashMode }: CouponsTableProps) => {
                                             {coupon.code}
                                         </span>
                                     ) : (
-                                        <Link href={`/admin/coupons/${coupon.id}`} className="font-bold text-[#2271b1] hover:text-[#135e96] hover:underline font-mono">
+                                        <Link href={`/admin/coupons/${coupon.id}`} onClick={saveScroll} className="font-bold text-[#2271b1] hover:text-[#135e96] hover:underline font-mono">
                                             {coupon.code}
                                         </Link>
                                     )}
@@ -206,7 +211,7 @@ export const CouponsTable = ({ coupons, isTrashMode }: CouponsTableProps) => {
                                             </>
                                         ) : (
                                             <>
-                                                <Link href={`/admin/coupons/${coupon.id}`} className="text-[#2271b1] hover:underline">Edit</Link>
+                                                <Link href={`/admin/coupons/${coupon.id}`} onClick={saveScroll} className="text-[#2271b1] hover:underline">Edit</Link>
                                                 <span className="text-[#c3c4c7]">|</span>
                                                 <button onClick={() => handleSingleAction(coupon.id, 'trash')} className="text-[#d63638] hover:underline">Trash</button>
                                             </>

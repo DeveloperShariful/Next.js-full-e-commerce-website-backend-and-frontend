@@ -121,7 +121,10 @@ export function TemplateEditPageClient({ template }: Props) {
     setTimeout(() => setCopiedVar(null), 1500);
   };
 
-  const goBack = () => router.push("/admin/settings?tab=email&subtab=templates");
+  const goBack = () => {
+    const returnUrl = sessionStorage.getItem("settings-email-return-url") || "/admin/settings/email";
+    router.push(returnUrl, { scroll: false });
+  };
 
   return (
     <div

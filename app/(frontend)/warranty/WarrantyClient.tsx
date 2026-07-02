@@ -25,17 +25,23 @@ const SHOP_OPTIONS = [
     ],
   },
   {
-    group: 'VIC Retailers',
+    group: 'Victoria Retailers',
     options: [
       { value: 'Commuter Cycles', label: 'Commuter Cycles' },
       { value: 'Bikes Online VIC', label: 'Bikes Online VIC' },
     ],
   },
   {
-    group: 'QLD Retailers',
+    group: 'Queensland Retailers',
     options: [
       { value: 'Bikes Brisbane', label: 'Bikes Brisbane' },
       { value: 'Redland Bay Cycles', label: 'Redland Bay Cycles' },
+    ],
+  },
+  {
+    group: 'Western Retailers',
+    options: [
+      { value: 'Eazy Bikes', label: 'Eazy Bikes' },
     ],
   },
 ];
@@ -292,8 +298,8 @@ export default function WarrantyClient() {
                         )}
                       </div>
                       <div className="text-left">
-                        <p className="text-[13px] font-bold text-gray-800 leading-tight">{selectedShopOption?.label ?? 'Select store'}</p>
-                        <p className="text-[11px] text-gray-400 leading-tight mt-0.5">{selectedShopGroup?.group}</p>
+                        <p className="text-[13px] font-bold text-black-800 leading-tight">{selectedShopOption?.label ?? 'Select store'}</p>
+                        <p className="text-[11px] text-black-400 leading-tight mt-0.5">{selectedShopGroup?.group}</p>
                       </div>
                     </div>
                     <svg className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
@@ -305,7 +311,7 @@ export default function WarrantyClient() {
                       {SHOP_OPTIONS.map((group) => (
                         <div key={group.group}>
                           <div className="px-4 pt-3 pb-1.5">
-                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">{group.group}</span>
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-black-400">{group.group}</span>
                           </div>
                           {group.options.map((opt) => {
                             const isSelected = formData.shopPurchased === opt.value;
@@ -317,13 +323,14 @@ export default function WarrantyClient() {
                                   setFormData(prev => ({ ...prev, shopPurchased: opt.value }));
                                   setIsShopDropdownOpen(false);
                                 }}
-                                className={`w-full flex items-center justify-between px-5 py-2.5 text-left text-[13px] transition-colors
-                                  ${isSelected ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-[13px] transition-colors cursor-pointer
+                                  ${isSelected ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
                               >
+                                <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center
+                                  ${isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white'}`}>
+                                  {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                </span>
                                 <span>{opt.label}</span>
-                                {isSelected && (
-                                  <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-                                )}
                               </button>
                             );
                           })}

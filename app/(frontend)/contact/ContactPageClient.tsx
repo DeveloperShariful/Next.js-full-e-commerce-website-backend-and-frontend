@@ -144,8 +144,8 @@ export default function ContactPageClient() {
                   </div>
                 </div>
 
-                {/* VIC & QLD (Side by side) */}
-                <div className="grid grid-cols-2 gap-4 border-t border-gray-200 pt-4 mt-auto">
+                {/* VIC, QLD & WA (Side by side) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-gray-200 pt-4 mt-auto">
                   <div>
                     <h5 className="font-bold text-green-600 uppercase tracking-widest text-[10px] mb-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span> Victoria
@@ -163,6 +163,16 @@ export default function ContactPageClient() {
                     <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm">
                       <p className="font-bold text-gray-900 text-xs md:text-sm leading-tight">Cooroy Motorcycles</p>
                       <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">Shed 4, 5 Taylor Ct, Cooroy</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h5 className="font-bold text-purple-600 uppercase tracking-widest text-[10px] mb-2 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span> Western Australia
+                    </h5>
+                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm">
+                      <p className="font-bold text-gray-900 text-xs md:text-sm leading-tight">Eazy Bikes</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">Unit 1/12 Farral Road, Midvale WA 6056</p>
                     </div>
                   </div>
                 </div>

@@ -161,17 +161,17 @@ const HeroSlider = () => {
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
             </div>
-            <div className="w-full lg:w-[45%] order-2 lg:order-1 p-8 lg:p-[60px] flex flex-col justify-center text-center lg:text-left lg:items-start relative z-10">
+            <div className="w-full lg:w-[45%] order-2 lg:order-1 p-8 pb-16 lg:p-[60px] flex flex-col justify-center text-center lg:text-left lg:items-start relative z-10">
               <p className={`text-sm font-semibold uppercase tracking-[2px] mb-3 text-white-500 transition-all duration-700 delay-100 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 {slide.subtitle}
               </p>
               <p className={`text-white text-[42px] lg:text-[56px] font-extrabold mb-5 leading-[1.1] transition-all duration-700 delay-200 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 {slide.title}
               </p>
-              <p className={`text-lg leading-[1.6] mb-8 text-gray-300 max-w-[480px] lg:max-w-none mx-auto lg:mx-0 transition-all duration-700 delay-300 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <p className={`text-sm lg:text-lg leading-[1.6] mb-6 lg:mb-8 text-gray-300 max-w-[480px] lg:max-w-none mx-auto lg:mx-0 transition-all duration-700 delay-300 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 {slide.desc}
               </p>
-              <div className={`transition-all duration-700 delay-500 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <div className={`transition-all duration-700 delay-500 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
                 <Link href={slide.link} className="inline-flex items-center gap-2 bg-white text-black py-3.5 px-9 rounded-full font-bold text-base transition-all duration-300 hover:bg-red-500 hover:text-white hover:shadow-lg hover:-translate-y-1">
                   Shop Now
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -186,12 +186,14 @@ const HeroSlider = () => {
           <button
             key={index}
             onClick={() => setCurrentSlide(index)}
-            className={`h-2.5 rounded-full transition-all duration-500 ${currentSlide === index
+            className="p-2 flex items-center justify-center"
+            aria-label={`Go to slide ${index + 1}`}
+          >
+            <span className={`h-2.5 rounded-full transition-all duration-500 block ${currentSlide === index
               ? 'bg-red-500 w-8 shadow-[0_0_10px_rgba(239,68,68,0.8)]'
               : 'bg-white/60 w-2.5 hover:bg-white/80'
-            }`}
-            aria-label={`Go to slide ${index + 1}`}
-          />
+            }`} />
+          </button>
         ))}
       </div>
     </section>
@@ -215,7 +217,7 @@ const TrustBadges = () => {
     <section className="py-12 px-2.5 font-sans">
       <div className="max-w-[1500px] mx-auto px-2.5">
         <div className="text-center mb-8">
-          <h1 className="text-[32px] font-bold text-[#1a1a1a] mb-3 tracking-tight">The GoBike Promise: Australias Best Kids Electric Bike</h1>
+          <h2 className="text-[32px] font-bold text-[#1a1a1a] mb-3 tracking-tight">The GoBike Promise: Australias Best Kids Electric Bike</h2>
           <p className="text-lg text-[#666] max-w-[800px] mx-auto leading-[1.5]">We are committed to providing an unmatched riding experience, backed by guarantees you can count on. Here's why GoBike is the choice for Aussie families. Electric balance bike</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-[30px] gap-y-[40px]">
@@ -223,7 +225,7 @@ const TrustBadges = () => {
             <div className="flex items-start gap-4" key={index}>
               <div className="flex-shrink-0 w-8 h-8">{item.icon}</div>
               <div>
-                <h2 className="text-base font-bold text-[#1a1a1a] mb-1.5">{item.title}</h2>
+                <h3 className="text-base font-bold text-[#1a1a1a] mb-1.5">{item.title}</h3>
                 <p className="text-[15px] text-[#666] m-0 leading-[1.6]">{item.description}</p>
               </div>
             </div>

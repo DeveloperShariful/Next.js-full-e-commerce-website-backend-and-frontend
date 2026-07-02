@@ -19,15 +19,23 @@ interface ProductCardProps {
 const StarRating = ({ rating, count }: { rating: number, count: number }) => {
   const totalStars = 5;
   const fullStars = Math.floor(rating);
-  const halfStar = rating % 1 !== 0;
-  const emptyStars = totalStars - fullStars - (halfStar ? 1 : 0);
+  const hasHalf = rating % 1 >= 0.25;
+  const emptyStars = totalStars - fullStars - (hasHalf ? 1 : 0);
 
   return (
-    <div className="text-black-500 text-base mb-4 flex items-center justify-center gap-0.5">
-      {[...Array(fullStars)].map((_, i) => <span key={`full-${i}`}>★</span>)}
-      {halfStar && <span key="half">⭐</span>}
-      {[...Array(emptyStars)].map((_, i) => <span key={`empty-${i}`}>☆</span>)}
-      
+    <div className="text-base mb-4 flex items-center justify-center gap-0.5">
+      {[...Array(fullStars)].map((_, i) => (
+        <span key={`full-${i}`} className="text-black">★</span>
+      ))}
+      {hasHalf && (
+        <span key="half" className="relative inline-block text-gray-300">
+          ★
+          <span className="absolute inset-0 overflow-hidden w-[50%] text-black">★</span>
+        </span>
+      )}
+      {[...Array(emptyStars)].map((_, i) => (
+        <span key={`empty-${i}`} className="text-gray-300">★</span>
+      ))}
       {count > 0 && (
         <span className="text-gray-500 text-xs ml-2 font-normal">
           ({rating.toFixed(1)}) ({count} customer review{count > 1 ? 's' : ''})

@@ -149,7 +149,7 @@ export default function HomePageReviews({ initialReviews, initialSummary }: Prop
                     </div>
                     <div className="flex flex-col items-start">
                       <strong className="font-semibold text-base">{review.reviewer}</strong>
-                      <span className="text-[0.8rem] text-emerald-500 font-medium">Verified review</span>
+                      <span className="text-[0.8rem] text-black font-bold">Verified review</span>
                     </div>
                   </div>
 

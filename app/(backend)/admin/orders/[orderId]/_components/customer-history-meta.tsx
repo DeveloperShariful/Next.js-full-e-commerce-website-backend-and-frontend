@@ -58,13 +58,13 @@ export const CustomerHistoryMeta = ({ history }: { history: CustomerHistoryType 
               <tfoot>
                 <tr className="border-t-2 border-[#c3c4c7]">
                   <td className="pt-3 text-[#3c434a] font-semibold">
-                    {history.totalOrders} orders
+                    Total Orders : {history.totalOrders} 
                   </td>
                   <td className="pt-3 text-right text-[#1d2327] font-semibold">
-                    {formatPrice(history.totalRevenue)}
+                    Total Value : {formatPrice(history.totalRevenue)}
                   </td>
                   <td className="pt-3 text-right text-[#1d2327] font-semibold">
-                    {formatPrice(history.avgValue)}
+                    Avg value : {formatPrice(history.avgValue)}
                   </td>
                 </tr>
               </tfoot>

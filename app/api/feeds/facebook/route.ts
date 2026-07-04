@@ -30,7 +30,7 @@ function stripHtmlTags(html: string): string {
 
 function formatUrl(url: string | null | undefined): string {
   if (!url) return "";
-  return url.replace(/^https?:\/\/(localhost:\d+|[^/]*sharifulbuilds\.com)/, SITE_URL);
+  return url.replace(/^https?:\/\/(localhost:\d+|[^/]*gobike\.au)/, SITE_URL);
 }
 
 // Strip SEO template variables like %title%, %sep%, %sitename%

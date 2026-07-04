@@ -14,8 +14,11 @@ export async function getProductBySlugAction(slug: string) {
           where: { deletedAt: null },
         },
         categories: {
-          take: 1, 
+          take: 1,
           select: {
+            id: true,
+            name: true,
+            slug: true,
             products: {
               where: { status: "ACTIVE", deletedAt: null, slug: { not: slug } },
               take: 4,
@@ -73,6 +76,9 @@ export async function getProductBySlugAction(slug: string) {
       reviewCount: product.reviewCount || 0,
       videoUrl: product.videoUrl || null,
       videoThumbnail: product.videoThumbnail || null,
+      primaryCategory: product.categories?.[0]
+        ? { name: product.categories[0].name, slug: product.categories[0].slug }
+        : null,
       
       // Attributes
       attributes: {

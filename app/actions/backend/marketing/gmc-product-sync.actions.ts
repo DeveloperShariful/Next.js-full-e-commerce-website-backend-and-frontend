@@ -114,7 +114,7 @@ function extractMappedValue(mappedKeys: string[], product: ProductForSync): stri
 function formatGmcUrl(url: string | null | undefined): string {
   if (!url) return "";
   // Replace any localhost or staging origin with the real production SITE_URL
-  return url.replace(/^https?:\/\/(localhost:\d+|[^/]*sharifulbuilds\.com)/, SITE_URL);
+  return url.replace(/^https?:\/\/(localhost:\d+|[^/]*gobike\.au)/, SITE_URL);
 }
 
 // ============================================================================

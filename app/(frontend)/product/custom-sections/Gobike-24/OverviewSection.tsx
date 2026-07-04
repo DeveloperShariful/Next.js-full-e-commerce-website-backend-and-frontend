@@ -15,10 +15,10 @@ export default function OverviewSection() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-10 lg:gap-12 items-center max-w-[1200px] mx-auto">
         <div className="text-center lg:text-left lg:pr-8">
           <h2 className="text-[2.2rem] lg:text-[3rem] font-extrabold leading-[1.2] mb-6 text-[#1a202c]">
-            GoBike 12: The Easiest Way to Teach Your Kid to Ride
+            GoBike 24 Pro: Serious Power for Serious Young Riders
           </h2>
           <p className="text-[1.1rem] leading-[1.7] text-[#4a5568]">
-            Say goodbye to tears and tricky training wheels. The GoBike 12 (ages 2-5) is engineered to be the safest, easiest way for your child to learn. This is not just a bike; it is a confidence-builder. By focusing on balance first, your little rider will master the basics in no time. It is light, durable, and ready for every Aussie backyard. Give the gift of confidence and start their riding journey today.
+            The GoBike 24 Pro is not for beginners — it is for riders aged 13 and above who are ready to own the trails. The most powerful bike in the GoBike lineup, it is engineered to handle rugged forest paths, steep dirt tracks, and anything in between. With a pro-grade motor, a robust frame built for serious off-road abuse, and the torque to match teenage ambition, the GoBike 24 Pro is the e-bike that earns respect on every ride. For the young rider who has outgrown ordinary — this is their machine.
           </p>
         </div>
         <div className="w-full">

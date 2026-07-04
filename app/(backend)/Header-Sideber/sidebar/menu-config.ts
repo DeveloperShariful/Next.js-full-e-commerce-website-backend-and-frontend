@@ -7,7 +7,7 @@ import {
   Undo2, Megaphone, Truck, MedalIcon, MessageCircle,
   Handshake, Link, Network, UserPlus, Facebook, Wallet, RefreshCw, Heart,
   BadgeDollarSign, LayoutGrid, Award, SlidersHorizontal, Tag, Star, Boxes,
-  Code2, Search, Plug,
+  Code2, Search, Plug, Newspaper, FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -92,6 +92,18 @@ export const sidebarConfig: SidebarGroup[] = [
          { name: "Tag Manager",    href: "/admin/marketing/tag-manager",     icon: Code2,     roles: [Role.SUPER_ADMIN, Role.ADMIN] },
          { name: "Merchant Center",href: "/admin/marketing/merchant-center", icon: Link,      roles: [Role.SUPER_ADMIN, Role.ADMIN] },
          { name: "Search Console", href: "/admin/marketing/search-console",  icon: Search,    roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+        ]
+      },
+      {
+        name: "Blog",
+        href: "/admin/blog",
+        icon: Newspaper,
+        roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.EDITOR],
+        submenu: [
+          { name: "All Posts",   href: "/admin/blog",             icon: Newspaper,     roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER, Role.EDITOR] },
+          { name: "Categories",  href: "/admin/blog/categories",  icon: FolderOpen,    roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+          { name: "Comments",    href: "/admin/blog/comments",    icon: MessageCircle, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
+          { name: "Settings",    href: "/admin/blog/settings",    icon: Settings,      roles: [Role.SUPER_ADMIN, Role.ADMIN] },
         ]
       },
       { name: "Coupons", href: "/admin/coupons", icon: TicketPercent , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]},

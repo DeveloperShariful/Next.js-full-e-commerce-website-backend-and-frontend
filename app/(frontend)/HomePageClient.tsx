@@ -88,7 +88,7 @@ const slidesData = [
     subtitle: "The Everyday GoBike Range",
     title: "GOBIKE 12",
     desc: "The perfect first electric bike for toddlers aged 2 years and above transitioning from a balance bike. Features an extra-slow learning mode for beginners.",
-    link: "https://www.sharifulbuilds.com/product/ebike-for-kids-12-inch-electric-bike-ages-2-5",
+    link: "/product/ebike-for-kids-12-inch-electric-bike-ages-2-5",
     img: "https://gobikes.au/wp-content/uploads/2025/08/Gobike-electric-bike-kids-ebike12-inch-ages-for-2-5-1.webp",
     alt: "GoBike 12 Electric Bike",
     width: 1000, height: 803

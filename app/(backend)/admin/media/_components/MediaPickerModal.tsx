@@ -269,8 +269,8 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                           src={file.url}
                           alt={file.altText || file.filename}
                           fill
+                          unoptimized
                           className="object-cover"
-                          sizes="120px"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : file.type === 'VIDEO' ? (

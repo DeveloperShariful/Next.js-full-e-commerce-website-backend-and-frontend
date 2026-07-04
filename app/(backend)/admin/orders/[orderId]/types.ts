@@ -221,8 +221,17 @@ export interface OrderMetaBase {
 }
 
 // Type for Customer History Box
+export interface CustomerHistoryOrderItem {
+  id: string;
+  orderNumber: string;
+  total: number;
+  status: string;
+  createdAt: string | Date;
+}
+
 export interface CustomerHistoryType {
   totalOrders: number;
   totalRevenue: number;
   avgValue: number;
+  orders: CustomerHistoryOrderItem[];
 }

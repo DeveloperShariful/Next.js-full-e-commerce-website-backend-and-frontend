@@ -24,7 +24,7 @@ import { SecuritySidebar } from "./_components/security-risk";
 import { AffiliateSidebar } from "./_components/affiliate-sidebar";
 
 // ✅ Import Strict Types
-import { OrderDetailsType, CustomerHistoryType } from "./types";
+import { OrderDetailsType, CustomerHistoryType, CustomerHistoryOrderItem } from "./types";
 import { BackButton } from "@/app/(backend)/admin/_components/back-button";
 
 export default async function OrderDetailsPage(props: { params: Promise<{ orderId: string }> }) {
@@ -39,29 +39,38 @@ export default async function OrderDetailsPage(props: { params: Promise<{ orderI
   const timezone = await getStoreTimezone();
 
   // ২. Customer History Calculation
-  let customerHistory: CustomerHistoryType = { totalOrders: 0, totalRevenue: 0, avgValue: 0 };
-  
+  let customerHistory: CustomerHistoryType = { totalOrders: 0, totalRevenue: 0, avgValue: 0, orders: [] };
+
   if (order.userId || order.guestEmail) {
-      const history = await db.order.aggregate({
+      const pastOrders = await db.order.findMany({
           where: {
               OR: [
                   { userId: order.userId || undefined },
                   { guestEmail: order.guestEmail || undefined }
               ],
               status: { notIn: ['CANCELLED', 'FAILED'] },
-              deletedAt: null 
+              deletedAt: null
           },
-          _count: { _all: true },
-          _sum: { total: true }
+          select: { id: true, orderNumber: true, total: true, status: true, createdAt: true },
+          orderBy: { createdAt: 'desc' }
       });
-      
-      const tOrders = history._count?._all || 0;
-      const tRevenue = Number(history._sum?.total || 0);
-      
+
+      const orders: CustomerHistoryOrderItem[] = pastOrders.map(o => ({
+          id: o.id,
+          orderNumber: o.orderNumber || '',
+          total: Number(o.total),
+          status: o.status,
+          createdAt: o.createdAt.toISOString()
+      }));
+
+      const tOrders = orders.length;
+      const tRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+
       customerHistory = {
           totalOrders: tOrders,
           totalRevenue: tRevenue,
-          avgValue: tOrders > 0 ? (tRevenue / tOrders) : 0
+          avgValue: tOrders > 0 ? tRevenue / tOrders : 0,
+          orders
       };
   }
 

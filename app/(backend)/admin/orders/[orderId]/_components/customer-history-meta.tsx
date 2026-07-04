@@ -1,71 +1,75 @@
-// File Location: app/admin/orders/[orderId]/_components/customer-history-meta.tsx
-
 "use client";
 
 import { useState } from "react";
-import { ChevronUp, ChevronDown, HelpCircle } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
+import { CustomerHistoryType } from "../types";
+import Link from "next/link";
 
-export const CustomerHistoryMeta = ({ history }: { history: { totalOrders: number, totalRevenue: number, avgValue: number } }) => {
+export const CustomerHistoryMeta = ({ history }: { history: CustomerHistoryType }) => {
   const { formatPrice } = useGlobalStore();
   const [isOpen, setIsOpen] = useState(true);
 
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] mb-5">
-      
-      {/* WordPress Meta Box Header (Collapsible) */}
-      <div 
+
+      {/* Header */}
+      <div
         className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none bg-white hover:bg-[#f6f7f7] transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Customer history</h2>
         <button type="button" className="text-[#646970] hover:text-[#1d2327]">
-            {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
       </div>
 
-      {/* Meta Box Content (3 Columns) */}
       {isOpen && (
-        <div className="p-4 bg-white grid grid-cols-1 sm:grid-cols-3 gap-6">
-            
-            {/* Column 1: Total Orders */}
-            <div>
-                <p className="text-[13px] text-[#3c434a] font-medium m-0 flex items-center gap-1 mb-1">
-                    Total orders 
-                    {/* ✅ FIX: Wrapped icon in span for title attribute */}
-                    <span title="Total successful orders by this customer">
-                        <HelpCircle size={12} className="text-[#a7aaad]" />
-                    </span>
-                </p>
-                <p className="text-[13px] text-[#1d2327] m-0">
-                    {history.totalOrders}
-                </p>
-            </div>
-
-            {/* Column 2: Total Revenue */}
-            <div>
-                <p className="text-[13px] text-[#3c434a] font-medium m-0 flex items-center gap-1 mb-1">
-                    Total revenue 
-                    {/* ✅ FIX: Wrapped icon in span for title attribute */}
-                    <span title="Total amount spent by this customer">
-                        <HelpCircle size={12} className="text-[#a7aaad]" />
-                    </span>
-                </p>
-                <p className="text-[13px] text-[#1d2327] m-0">
+        <div className="p-4">
+          {history.orders.length === 0 ? (
+            <p className="text-[13px] text-[#646970] m-0">No order history found.</p>
+          ) : (
+            <table className="w-full text-[13px] border-collapse">
+              <thead>
+                <tr className="border-b border-[#c3c4c7]">
+                  <th className="text-left text-[#3c434a] font-semibold pb-2 w-1/3">Order</th>
+                  <th className="text-right text-[#3c434a] font-semibold pb-2 w-1/3">Value</th>
+                  <th className="text-right text-[#3c434a] font-semibold pb-2 w-1/3">Avg value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.orders.map((o) => (
+                  <tr key={o.id} className="border-b border-[#f0f0f1] hover:bg-[#f6f7f7]">
+                    <td className="py-2">
+                      <Link
+                        href={`/admin/orders/${o.id}`}
+                        className="text-[#2271b1] hover:text-[#135e96] hover:underline font-medium"
+                      >
+                        #{o.orderNumber}
+                      </Link>
+                    </td>
+                    <td className="py-2 text-right text-[#1d2327]">
+                      {formatPrice(o.total)}
+                    </td>
+                    <td className="py-2 text-right text-[#1d2327]"></td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-[#c3c4c7]">
+                  <td className="pt-3 text-[#3c434a] font-semibold">
+                    {history.totalOrders} orders
+                  </td>
+                  <td className="pt-3 text-right text-[#1d2327] font-semibold">
                     {formatPrice(history.totalRevenue)}
-                </p>
-            </div>
-
-            {/* Column 3: Average Order Value */}
-            <div>
-                <p className="text-[13px] text-[#3c434a] font-medium m-0 flex items-center gap-1 mb-1">
-                    Average order value
-                </p>
-                <p className="text-[13px] text-[#1d2327] m-0">
+                  </td>
+                  <td className="pt-3 text-right text-[#1d2327] font-semibold">
                     {formatPrice(history.avgValue)}
-                </p>
-            </div>
-
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
         </div>
       )}
     </div>

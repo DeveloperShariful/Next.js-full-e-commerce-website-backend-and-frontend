@@ -19,11 +19,10 @@ export default function OverviewSection() {
         <div className="text-center lg:text-left lg:pr-8">
           {/* .mainTitle replaced */}
           <h2 className="text-[2.2rem] lg:text-[3rem] font-extrabold leading-[1.2] mb-6 text-[#1a202c]">
-            GoBike 12: The Easiest Way to Teach Your Kid to Ride
+            GoBike 16: The Perfect Step-Up for Your Growing Adventurer
           </h2>
-          {/* .mainDescription replaced */}
           <p className="text-[1.1rem] leading-[1.7] text-[#4a5568]">
-            Say goodbye to tears and tricky training wheels. The GoBike 12 (ages 2-5) is engineered to be the safest, easiest way for your child to learn. This is not just a bike; it is a confidence-builder. By focusing on balance first, your little rider will master the basics in no time. It is light, durable, and ready for every Aussie backyard. Give the gift of confidence and start their riding journey today.
+            Your kid has mastered the basics — now it is time to level up. The GoBike 16 is built for riders aged 5–9 who are ready to explore pump tracks, dirt trails, and everything in between. With a removable battery pack for easy charging, a lightweight frame, and just the right amount of power, the GoBike 16 gives your child the freedom to ride further and the confidence to ride better. It is not just a bigger bike — it is their first real adventure machine.
           </p>
         </div>
         {/* .overviewSlider replaced */}

@@ -2,13 +2,10 @@
 
 import type { Metadata } from 'next';
 import HomePageClient from './HomePageClient';
-import dynamic from 'next/dynamic';
+import { Suspense } from 'react';
 import { getFeaturedBikesAction } from '@/app/actions/frontend/home/getFeaturedBikesAction';
 import { getHomePageReviewsAction } from '@/app/actions/frontend/home/getHomePageReviewsAction';
-
-const DynamicBlogSection = dynamic(() => import('./blog/DynamicBlogSection'), {
-  ssr: true,
-});
+import { HomeBlogSection } from './blog/HomeBlogSection';
 
 const siteConfig = {
   url: 'https://gobike.au',
@@ -168,7 +165,9 @@ export default async function Home() {
         initialFeaturedBikes={initialFeaturedBikes}
         initialReviewsData={initialReviewsData}
       />
-      <DynamicBlogSection />
+      <Suspense fallback={<div className="py-16" />}>
+        <HomeBlogSection />
+      </Suspense>
     </main>
   );
 }

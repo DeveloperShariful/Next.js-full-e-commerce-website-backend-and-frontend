@@ -20,11 +20,10 @@ export default function OverviewSection() {
         <div className="text-center lg:text-left lg:pr-8">
           {/* .mainTitle replaced */}
           <h2 className="text-[2.2rem] lg:text-[3rem] font-extrabold leading-[1.2] mb-6 text-[#1a202c]">
-            GoBike 12: The Easiest Way to Teach Your Kid to Ride
+            GoBike 20: Where Young Riders Push Their Limits
           </h2>
-          {/* .mainDescription replaced */}
           <p className="text-[1.1rem] leading-[1.7] text-[#4a5568]">
-            Say goodbye to tears and tricky training wheels. The GoBike 12 (ages 2-5) is engineered to be the safest, easiest way for your child to learn. This is not just a bike; it is a confidence-builder. By focusing on balance first, your little rider will master the basics in no time. It is light, durable, and ready for every Aussie backyard. Give the gift of confidence and start their riding journey today.
+            For the rider aged 8–14 who lives for the thrill, the GoBike 20 is the e-bike that keeps up. Built to handle jumps, bike parks, and off-road trails with ease, it delivers real performance in a package designed for growing kids. With longer battery life, performance suspension, and a frame that can take a beating, the GoBike 20 turns every ride into an achievement. This is where kids stop playing and start riding — seriously.
           </p>
         </div>
         {/* .overviewSlider replaced */}

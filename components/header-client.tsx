@@ -244,8 +244,8 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
                   <Image 
                     src="https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids-1.webp" 
                     alt="GoBike Australia Logo" 
-                    width={1846} 
-                    height={417} 
+                    width={1881}
+                    height={468}
                     priority 
                     className="h-[60px] w-auto max-w-full" 
                   />

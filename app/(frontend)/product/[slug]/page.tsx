@@ -148,7 +148,9 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://gobike.au' },
-      { '@type': 'ListItem', position: 2, name: 'Kids Electric Bikes', item: 'https://gobike.au/bikes' },
+      product.primaryCategory
+        ? { '@type': 'ListItem', position: 2, name: product.primaryCategory.name, item: `https://gobike.au/${product.primaryCategory.slug}` }
+        : { '@type': 'ListItem', position: 2, name: 'Product', item: 'https://gobike.au/shop' },
       { '@type': 'ListItem', position: 3, name: product.name, item: `https://gobike.au/product/${product.slug}` }
     ]
   };
@@ -183,7 +185,13 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
       {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />}
       {videoSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(videoSchema) }} />}
 
-      <Breadcrumbs pageTitle={product.name} />
+      <Breadcrumbs items={[
+        { label: 'Home', href: '/' },
+        product.primaryCategory
+          ? { label: product.primaryCategory.name, href: `/${product.primaryCategory.slug}` }
+          : { label: 'Product', href: '/shop' },
+        { label: product.name },
+      ]} />
       
       {/* Client Component কে product পাঠানো হচ্ছে */}
       <ProductClient product={product as any} />

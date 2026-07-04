@@ -149,6 +149,14 @@ enum MediaSource {
   BRAND
   REVIEW
   AFFILIATE
+  BLOG
+}
+
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  ARCHIVED
 }
 
 enum ShippingMethodType {
@@ -385,6 +393,8 @@ model User {
 
   createdTickets  SupportTicket[] @relation("UserCreatedTickets")
   assignedTickets SupportTicket[] @relation("StaffTickets")
+
+  blogPosts             BlogPost[]
 
   affiliateAccount      AffiliateAccount?
   referredByAffiliateId String?
@@ -2653,4 +2663,146 @@ model WarrantyClaim {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// 20. BLOG / CONTENT SYSTEM (SEO)
+// ==========================================
+
+model BlogCategory {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?    @db.Text
+  image       String?
+  color       String?
+  isActive    Boolean    @default(true)
+  menuOrder   Int        @default(0)
+  posts       BlogPost[]
+  metaTitle   String?
+  metaDesc    String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([slug])
+  @@index([isActive, menuOrder(sort: Asc)])
+}
+
+model BlogPost {
+  id    String @id @default(uuid())
+  title String
+  slug  String @unique
+
+  // Content
+  content  String  @db.Text
+  excerpt  String? @db.Text
+
+  // Media
+  featuredImage    String?
+  featuredImageAlt String?
+  videoUrl         String?
+  videoThumbnail   String?
+
+  // Taxonomy
+  categoryId String?
+  category   BlogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags       String[]
+
+  // Author
+  authorId String?
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  // Publishing
+  status      BlogPostStatus @default(DRAFT)
+  publishedAt DateTime?
+  scheduledAt DateTime?
+
+  // Engagement
+  viewCount  Int     @default(0)
+  isFeatured Boolean @default(false)
+  isPinned   Boolean @default(false)
+
+  // Reading
+  readTimeMinutes Int?
+
+  // SEO — basic
+  metaTitle    String?
+  metaDesc     String?  @db.Text
+  ogImage      String?
+  canonicalUrl String?
+  noIndex      Boolean  @default(false)
+  robots       String?
+
+  // SEO — focus & open graph
+  focusKeyword  String?
+  ogTitle       String?
+  ogDescription String?  @db.Text
+
+  // SEO — twitter / X
+  twitterTitle       String?
+  twitterDescription String?  @db.Text
+  twitterCard        String   @default("summary_large_image")
+
+  // SEO — schema
+  schemaType String  @default("BlogPosting")
+
+  // Extras
+  tableOfContents Json?
+  relatedPostIds  String[]
+  keyTakeaways    String[]
+  authorBio       String?  @db.Text
+
+  // Comments
+  comments BlogComment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([categoryId, status])
+  @@index([isFeatured, status])
+  @@index([isPinned, status])
+  @@index([scheduledAt])
+  @@index([createdAt(sort: Desc)])
+}
+
+model BlogComment {
+  id          String  @id @default(uuid())
+  postId      String
+  post        BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  parentId    String?
+  parent      BlogComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     BlogComment[] @relation("CommentReplies")
+
+  authorName  String
+  authorEmail String
+  authorUrl   String?
+  content     String  @db.Text
+
+  isApproved  Boolean @default(false)
+  isSpam      Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([postId, isApproved])
+  @@index([parentId])
+  @@index([isApproved, createdAt(sort: Desc)])
+}
+
+model BlogSettings {
+  id                  String   @id @default("singleton")
+  blogTitle           String   @default("GoBike Blog")
+  blogDescription     String?  @db.Text
+  heroImage           String?
+  postsPerPage        Int      @default(12)
+  commentsEnabled     Boolean  @default(true)
+  commentModeration   Boolean  @default(true)
+  shareEnabled        Boolean  @default(true)
+  sharePlatforms      String[]
+  defaultKeyTakeaways String[]
+  defaultAuthorBio    String?  @db.Text
+  updatedAt           DateTime @updatedAt
 }

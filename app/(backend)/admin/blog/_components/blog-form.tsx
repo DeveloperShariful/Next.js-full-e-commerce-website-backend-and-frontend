@@ -8,6 +8,7 @@ import { X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { fromZonedTime } from "date-fns-tz";
 import { createBlogPost, updateBlogPost, type BlogPostFormData } from "@/app/actions/backend/blog/blog-actions";
+import { saveMediaRecord } from "@/app/actions/backend/media/media-action";
 import { BackButton } from "@/app/(backend)/admin/_components/back-button";
 import MediaPickerModal, { type PickedMedia } from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 import { MediaSource } from "@prisma/client";
@@ -72,6 +73,9 @@ function toSlug(str: string): string {
 export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC", initialData, isEdit }: BlogFormProps) {
   const router = useRouter();
   const ogImgInputRef = useRef<HTMLInputElement>(null);
+  const featuredImgInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const thumbInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<BlogPostFormData>({
     title: initialData?.title ?? "",
@@ -212,12 +216,21 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
   const removeTag = (tag: string) =>
     set("tags", (form.tags ?? []).filter((t) => t !== tag));
 
-  const handleImageUpload = async (file: File, field: "featuredImage" | "ogImage") => {
+  const handleImageUpload = async (file: File, field: "featuredImage" | "ogImage" | "videoUrl" | "videoThumbnail") => {
     setIsUploading(true);
     try {
       const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/upload" });
       set(field, blob.url);
-      toast.success("Image uploaded");
+      // Save to media library DB so it appears in admin media page
+      await saveMediaRecord({
+        url: blob.url,
+        pathname: blob.pathname,
+        filename: file.name,
+        mimeType: file.type,
+        size: file.size,
+        source: MediaSource.BLOG,
+      });
+      toast.success("Uploaded");
     } catch {
       toast.error("Upload failed");
     } finally {
@@ -1074,7 +1087,15 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
                     onClick={() => setFeaturedImgModalOpen(true)}
                     className="text-white text-[12px] bg-black/60 rounded px-3 py-1.5 hover:bg-black/80"
                   >
-                    Change
+                    Library
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => featuredImgInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="text-white text-[12px] bg-black/60 rounded px-3 py-1.5 hover:bg-black/80 disabled:opacity-50"
+                  >
+                    {isUploading ? "..." : "Upload"}
                   </button>
                   <button
                     type="button"
@@ -1086,15 +1107,35 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
                 </div>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setFeaturedImgModalOpen(true)}
-                className="w-full h-32 border-2 border-dashed border-[#c3c4c7] rounded flex flex-col items-center justify-center cursor-pointer hover:border-[#2271b1] hover:bg-[#f6f7f7] transition-colors"
-              >
-                <span className="text-[13px] text-[#646970]">Click to select image</span>
-                <span className="text-[11px] text-[#9ca0a4]">From Media Library</span>
-              </button>
+              <div className="w-full h-32 border-2 border-dashed border-[#c3c4c7] rounded flex flex-col items-center justify-center gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFeaturedImgModalOpen(true)}
+                    className="px-3 py-1.5 text-[13px] border border-[#c3c4c7] rounded bg-white hover:bg-gray-50"
+                  >
+                    Select from Library
+                  </button>
+                  <span className="text-[11px] text-[#646970]">or</span>
+                  <button
+                    type="button"
+                    onClick={() => featuredImgInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="px-3 py-1.5 text-[13px] border border-[#c3c4c7] rounded bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {isUploading ? "Uploading..." : "Upload File"}
+                  </button>
+                </div>
+                <span className="text-[11px] text-[#9ca0a4]">Image from device or media library</span>
+              </div>
             )}
+            <input
+              ref={featuredImgInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "featuredImage"); }}
+            />
             {form.featuredImage && (
               <input
                 type="text"
@@ -1142,14 +1183,32 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setVideoModalOpen(true)}
-                  className="w-full h-16 border-2 border-dashed border-[#c3c4c7] rounded flex items-center justify-center text-[13px] text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] transition-colors"
-                >
-                  + Select Video from Media Library
-                </button>
+                <div className="w-full border-2 border-dashed border-[#c3c4c7] rounded p-3 flex items-center justify-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setVideoModalOpen(true)}
+                    className="px-3 py-1.5 text-[13px] border border-[#c3c4c7] rounded bg-white hover:bg-gray-50"
+                  >
+                    Select from Library
+                  </button>
+                  <span className="text-[11px] text-[#646970]">or</span>
+                  <button
+                    type="button"
+                    onClick={() => videoInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="px-3 py-1.5 text-[13px] border border-[#c3c4c7] rounded bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {isUploading ? "Uploading..." : "Upload File"}
+                  </button>
+                </div>
               )}
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/mp4,video/quicktime,video/x-m4v,video/webm"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "videoUrl"); }}
+              />
             </div>
 
             <div>
@@ -1182,14 +1241,32 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setThumbModalOpen(true)}
-                  className="w-full h-16 border-2 border-dashed border-[#c3c4c7] rounded flex items-center justify-center text-[13px] text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] transition-colors"
-                >
-                  + Select Thumbnail Image
-                </button>
+                <div className="w-full border-2 border-dashed border-[#c3c4c7] rounded p-3 flex items-center justify-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setThumbModalOpen(true)}
+                    className="px-3 py-1.5 text-[13px] border border-[#c3c4c7] rounded bg-white hover:bg-gray-50"
+                  >
+                    Select from Library
+                  </button>
+                  <span className="text-[11px] text-[#646970]">or</span>
+                  <button
+                    type="button"
+                    onClick={() => thumbInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="px-3 py-1.5 text-[13px] border border-[#c3c4c7] rounded bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {isUploading ? "Uploading..." : "Upload File"}
+                  </button>
+                </div>
               )}
+              <input
+                ref={thumbInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, "videoThumbnail"); }}
+              />
             </div>
           </div>
 

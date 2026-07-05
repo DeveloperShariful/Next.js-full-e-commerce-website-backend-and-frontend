@@ -40,7 +40,9 @@ export default function TransdirectClientBox({
   customerAddress,
   customerSuburb,
   customerPostcode,
-  customerState
+  customerState,
+  customerPhone,
+  customerName,
 }: {
   claimId: string,
   status: string,
@@ -50,7 +52,9 @@ export default function TransdirectClientBox({
   customerAddress: string | null,
   customerSuburb: string | null,
   customerPostcode: string | null,
-  customerState: string | null
+  customerState: string | null,
+  customerPhone?: string | null,
+  customerName?: string | null,
 }) {
 
   const [isOpen, setIsOpen] = useState(false);
@@ -62,6 +66,8 @@ export default function TransdirectClientBox({
   const [suburb, setSuburb] = useState(customerSuburb || '');
   const [postcode, setPostcode] = useState(customerPostcode || '');
   const [state, setState] = useState(customerState || 'NSW');
+  const [phone, setPhone] = useState(customerPhone || '');
+  const [name, setName] = useState(customerName || '');
 
   // --- NEW: Props থেকে আসা ভ্যালুগুলো যদি পরে চেঞ্জ হয়, তবে State আপডেট করে নেওয়া ---
   useEffect(() => {
@@ -69,7 +75,9 @@ export default function TransdirectClientBox({
     if (customerSuburb) setSuburb(customerSuburb);
     if (customerPostcode) setPostcode(customerPostcode);
     if (customerState) setState(customerState);
-  }, [customerAddress, customerSuburb, customerPostcode, customerState]);
+    if (customerPhone) setPhone(customerPhone);
+    if (customerName) setName(customerName);
+  }, [customerAddress, customerSuburb, customerPostcode, customerState, customerPhone, customerName]);
 
   // --- Auto Suggestion States ---
   const [searchInput, setSearchInput] = useState('');
@@ -205,6 +213,7 @@ export default function TransdirectClientBox({
   const handleConfirmBooking = async () => {
     if (!selectedCourier || !tempBookingId) return toast.error("Please select a courier.");
     if (!address || !suburb || !postcode) return toast.error("Receiver address is incomplete.");
+    if (!phone) return toast.error("Receiver phone is required.");
     if (!selectedPart) return toast.error("Please select a replacement part.");
 
     setLoadingBooking(true);
@@ -213,10 +222,12 @@ export default function TransdirectClientBox({
     formData.append('partName', selectedPart.name);
     formData.append('tempBookingId', tempBookingId);
     formData.append('selectedCourier', selectedCourier);
+    formData.append('receiverName', name);
     formData.append('address', address);
     formData.append('suburb', suburb);
     formData.append('postcode', postcode);
     formData.append('state', state);
+    formData.append('phone', phone);
 
     const result = await confirmTransdirectBooking(formData);
     
@@ -272,7 +283,7 @@ export default function TransdirectClientBox({
           <div className="space-y-4">
 
             {/* ── STEP 1: ADDRESS ── */}
-            <div className="rounded-lg border border-[#c3c4c7] overflow-hidden">
+            <div className="rounded-lg border border-[#c3c4c7] overflow-visible">
               <div className="flex items-center justify-between px-4 py-2.5 bg-[#f0f6fc] border-b border-[#c3c4c7]/60">
                 <div className="flex items-center gap-2.5">
                   <span className="w-5 h-5 rounded-full bg-[#2271b1] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">1</span>
@@ -284,18 +295,30 @@ export default function TransdirectClientBox({
                 </button>
               </div>
 
-              <div className="p-4 bg-white grid grid-cols-12 gap-3 relative">
+              <div className="p-3 bg-white grid grid-cols-12 gap-2 relative">
+                <div className="col-span-12 md:col-span-6">
+                  <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Receiver Name</label>
+                  <input type="text" value={name} onChange={e => setName(e.target.value)}
+                    className="w-full border border-[#c3c4c7] rounded px-2.5 py-1.5 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] transition-all placeholder:text-[#8c8f94]"
+                    placeholder="e.g. John Smith" />
+                </div>
+                <div className="col-span-12 md:col-span-6">
+                  <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Phone</label>
+                  <input type="text" value={phone} onChange={e => setPhone(e.target.value)}
+                    className="w-full border border-[#c3c4c7] rounded px-2.5 py-1.5 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] transition-all placeholder:text-[#8c8f94]"
+                    placeholder="e.g. 0412345678" />
+                </div>
                 <div className="col-span-12">
                   <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Street Address</label>
                   <input type="text" value={address} onChange={e => setAddress(e.target.value)}
-                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] focus:ring-2 focus:ring-[#2271b1]/20 transition-all placeholder:text-[#8c8f94]"
+                    className="w-full border border-[#c3c4c7] rounded px-2.5 py-1.5 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] transition-all placeholder:text-[#8c8f94]"
                     placeholder="e.g. 52 Bligh Ave" />
                 </div>
 
                 <div className="col-span-12 md:col-span-6 relative" ref={suggestionRef}>
                   <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Suburb / Postcode</label>
                   <input type="text" required value={searchInput || suburb} onChange={handleLocationSearch}
-                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] focus:ring-2 focus:ring-[#2271b1]/20 transition-all placeholder:text-[#8c8f94]"
+                    className="w-full border border-[#c3c4c7] rounded px-2.5 py-1.5 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] transition-all placeholder:text-[#8c8f94]"
                     placeholder="e.g. Sydney or 2000" />
                   {isSearchingAddress && (
                     <div className="absolute right-3 top-[2.1rem] text-[11px] text-[#2271b1] flex items-center gap-1">
@@ -304,10 +327,10 @@ export default function TransdirectClientBox({
                     </div>
                   )}
                   {showSuggestions && suggestions.length > 0 && (
-                    <ul className="absolute z-[100] w-full left-0 top-[4rem] bg-white border border-[#c3c4c7] shadow-xl rounded-lg overflow-hidden">
-                      {suggestions.map((s, idx) => (
+                    <ul className="absolute z-[100] w-full left-0 top-[calc(100%+4px)] bg-white border border-[#c3c4c7] shadow-xl rounded-lg overflow-y-auto max-h-48">
+                      {suggestions.filter(s => s.suburb && s.postcode).map((s, idx) => (
                         <li key={idx} onClick={() => handleSuggestionSelect(s)}
-                          className="px-4 py-2.5 text-[13px] text-[#3c434a] hover:bg-[#2271b1] hover:text-white cursor-pointer border-b border-[#f0f0f1] last:border-0 transition-colors flex justify-between items-center">
+                          className="px-3 py-2 text-[13px] text-[#3c434a] hover:bg-[#2271b1] hover:text-white cursor-pointer border-b border-[#f0f0f1] last:border-0 transition-colors flex justify-between items-center">
                           <span><strong>{s.suburb}</strong>, {s.state}</span>
                           <span className="text-[12px] font-mono opacity-70">{s.postcode}</span>
                         </li>
@@ -319,12 +342,12 @@ export default function TransdirectClientBox({
                 <div className="col-span-6 md:col-span-3">
                   <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">State</label>
                   <input type="text" value={state} onChange={e => setState(e.target.value)} readOnly
-                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#3c434a] bg-[#f6f7f7] outline-none font-semibold" />
+                    className="w-full border border-[#c3c4c7] rounded px-2.5 py-1.5 text-[13px] text-[#3c434a] bg-[#f6f7f7] outline-none font-semibold" />
                 </div>
                 <div className="col-span-6 md:col-span-3">
                   <label className="text-[11px] font-semibold text-[#50575e] uppercase tracking-wide block mb-1">Postcode</label>
                   <input type="text" required value={postcode} onChange={e => setPostcode(e.target.value)} readOnly
-                    className="w-full border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#3c434a] bg-[#f6f7f7] outline-none font-semibold" />
+                    className="w-full border border-[#c3c4c7] rounded px-2.5 py-1.5 text-[13px] text-[#3c434a] bg-[#f6f7f7] outline-none font-semibold" />
                 </div>
               </div>
             </div>
@@ -414,12 +437,11 @@ export default function TransdirectClientBox({
                   </div>
                   <input type="text" value={packageNote} onChange={e => setPackageNote(e.target.value)} placeholder="Package note (optional)"
                     className="w-full mt-3 border border-[#c3c4c7] rounded-md px-3 py-2 text-[13px] text-[#1d2327] outline-none focus:border-[#2271b1] focus:ring-2 focus:ring-[#2271b1]/20 transition-all placeholder:text-[#8c8f94]" />
-                  {selectedPart && (
-                    <button type="button" onClick={handleRefreshQuotes}
-                      className="mt-3 w-full border border-[#2271b1] text-[#2271b1] text-[12px] font-semibold py-2 rounded-md hover:bg-[#2271b1] hover:text-white transition-colors">
-                      Re-fetch Quotes with These Dimensions
-                    </button>
-                  )}
+                  <button type="button" onClick={handleRefreshQuotes}
+                    className="mt-3 w-full bg-[#2271b1] text-white text-[12px] font-semibold py-2 rounded-md hover:bg-[#135e96] transition-colors disabled:opacity-50"
+                    disabled={loadingQuotes}>
+                    Apply &amp; Get Quotes
+                  </button>
                 </div>
               )}
             </div>

@@ -165,6 +165,31 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
                 </div>
               </div>
               
+              <div className="w-full sm:col-span-2">
+                <p className="text-[#8c8f94] mb-1.5 font-medium">Shop Purchased From</p>
+                <span className="font-semibold inline-flex items-center gap-1.5 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full text-[13px] text-gray-800 shadow-sm">
+                  🏪 {claim.shopPurchased || 'GoBike Australia (Online)'}
+                </span>
+              </div>
+
+              {claim.address && (
+                <div className="sm:col-span-2 w-full border-t border-[#f0f0f1] pt-4 mt-2">
+                  <p className="text-[#8c8f94] mb-2 font-semibold uppercase tracking-wider text-[11px]">Submitted Shipping Address</p>
+                  <div className="text-[13px] text-[#3c434a] space-y-1">
+                    <p><span className="text-[#8c8f94]">Name:</span> <strong>{claim.name}</strong></p>
+                    <p><span className="text-[#8c8f94]">Address:</span> {claim.address}</p>
+                    <p><span className="text-[#8c8f94]">Suburb:</span> {claim.suburb}</p>
+                    <p><span className="text-[#8c8f94]">State / Postcode:</span> {claim.state} {claim.postcode}</p>
+                    {claim.phone && (
+                      <p>
+                        <span className="text-[#8c8f94]">Phone:</span>{' '}
+                        <a href={`tel:${claim.phone}`} className="text-[#2271b1] hover:underline font-semibold">{claim.phone}</a>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="sm:col-span-2 w-full mt-2 sm:mt-0">
                 <p className="text-[#8c8f94] mb-1 font-medium">Issue Description</p>
                 <p className="leading-relaxed whitespace-pre-wrap p-3 bg-gray-50 border border-gray-200 rounded text-[13px] text-[#3c434a]">
@@ -307,16 +332,18 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
             </div>
           </div>
 
-          <TransdirectClientBox 
-            claimId={claim.id} 
-            status={claim.status} 
-            trackingNumber={claim.trackingNumber} 
-            replacementPart={claim.replacementPart} 
-            spareParts={spareParts} 
+          <TransdirectClientBox
+            claimId={claim.id}
+            status={claim.status}
+            trackingNumber={claim.trackingNumber}
+            replacementPart={claim.replacementPart}
+            spareParts={spareParts}
+            customerName={claim.name}
             customerAddress={shippingDetails?.address1 || claim.address}
             customerSuburb={shippingDetails?.city || claim.suburb}
             customerPostcode={shippingDetails?.postcode || claim.postcode}
             customerState={shippingDetails?.state || claim.state}
+            customerPhone={billingDetails?.phone || claim.phone}
           />
         </div>
       </div>

@@ -17,25 +17,24 @@ const SHOP_OPTIONS = [
   {
     group: 'NSW Retailers',
     options: [
-      { value: 'On Two Wheels', label: 'On Two Wheels' },
+      { value: 'On Two Wheels Motorsports', label: 'On Two Wheels Motorsports' },
       { value: 'Camden Cycles', label: 'Camden Cycles' },
-      { value: 'Bike Culture', label: 'Bike Culture' },
-      { value: 'Kenthurst Bicycle Centre', label: 'Kenthurst Bicycle Centre' },
-      { value: 'Cyclon', label: 'Cyclon' },
+      { value: 'Engadine Cycles and Scooters', label: 'Engadine Cycles and Scooters' },
+      { value: 'MXR Motorsports Australia', label: 'MXR Motorsports Australia' },
+      { value: 'Penrith Pit Bike', label: 'Penrith Pit Bike' },
+      { value: 'MiniRacer', label: 'MiniRacer' },
     ],
   },
   {
     group: 'Victoria Retailers',
     options: [
-      { value: 'Commuter Cycles', label: 'Commuter Cycles' },
-      { value: 'Bikes Online VIC', label: 'Bikes Online VIC' },
+      { value: 'Ozminis Motorsport', label: 'Ozminis Motorsport' },
     ],
   },
   {
     group: 'Queensland Retailers',
     options: [
-      { value: 'Bikes Brisbane', label: 'Bikes Brisbane' },
-      { value: 'Redland Bay Cycles', label: 'Redland Bay Cycles' },
+      { value: 'Cooroy Motorcycles', label: 'Cooroy Motorcycles' },
     ],
   },
   {

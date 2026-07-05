@@ -13,34 +13,35 @@ import { MediaSource } from '@prisma/client';
 const GOBIKE_ONLINE_VALUE = 'GoBike Australia';
 
 const SHOP_OPTIONS = [
-  { group: 'Online', options: [{ value: 'GoBike Australia', label: 'GoBike Australia (Online)' }] },
+  { group: 'Online', options: [{ value: 'GoBike Australia', label: 'GoBike Australia (Online)', address: '' }] },
   {
     group: 'NSW Retailers',
     options: [
-      { value: 'On Two Wheels Motorsports', label: 'On Two Wheels Motorsports' },
-      { value: 'Camden Cycles', label: 'Camden Cycles' },
-      { value: 'Engadine Cycles and Scooters', label: 'Engadine Cycles and Scooters' },
-      { value: 'MXR Motorsports Australia', label: 'MXR Motorsports Australia' },
-      { value: 'Penrith Pit Bike', label: 'Penrith Pit Bike' },
-      { value: 'MiniRacer', label: 'MiniRacer' },
+      { value: 'On Two Wheels Motorsports', label: 'On Two Wheels Motorsports', address: 'Unit 1, 18 Holborn Circuit, Gledswood Hills NSW 2557' },
+      { value: 'Camden Cycles', label: 'Camden Cycles', address: '184 Argyle Street, Camden NSW 2570' },
+      { value: 'Engadine Cycles and Scooters', label: 'Engadine Cycles and Scooters', address: '26 Station Street, Engadine NSW 2233' },
+      { value: 'Valley Bikeco', label: 'Valley Bikeco', address: '26 Macquarie St, Singleton NSW 2330' },
+      { value: 'MXR Motorsports Australia', label: 'MXR Motorsports Australia', address: '132 Princes Highway, South Nowra NSW 2541' },
+      { value: 'Penrith Pit Bike', label: 'Penrith Pit Bike', address: 'Shop 6A/55-61 York Rd, Jamisontown NSW 2750' },
+      { value: 'MiniRacer', label: 'MiniRacer', address: '6/73 Willarong Rd, Caringbah NSW 2229' },
     ],
   },
   {
     group: 'Victoria Retailers',
     options: [
-      { value: 'Ozminis Motorsport', label: 'Ozminis Motorsport' },
+      { value: 'Ozminis Motorsport', label: 'Ozminis Motorsport', address: "26B O'Sullivan St, Pakenham VIC" },
     ],
   },
   {
     group: 'Queensland Retailers',
     options: [
-      { value: 'Cooroy Motorcycles', label: 'Cooroy Motorcycles' },
+      { value: 'Cooroy Motorcycles', label: 'Cooroy Motorcycles', address: 'Shed 4, 5 Taylor Ct, Cooroy QLD' },
     ],
   },
   {
     group: 'Western Retailers',
     options: [
-      { value: 'Eazy Bikes', label: 'Eazy Bikes' },
+      { value: 'Eazy Bikes', label: 'Eazy Bikes', address: 'Unit 1/12 Farral Road, Midvale WA 6056' },
     ],
   },
 ];
@@ -298,7 +299,9 @@ export default function WarrantyClient() {
                       </div>
                       <div className="text-left">
                         <p className="text-[13px] font-bold text-black-800 leading-tight">{selectedShopOption?.label ?? 'Select store'}</p>
-                        <p className="text-[11px] text-black-400 leading-tight mt-0.5">{selectedShopGroup?.group}</p>
+                        <p className="text-[11px] text-black-400 leading-tight mt-0.5">
+                          {selectedShopOption?.address || selectedShopGroup?.group}
+                        </p>
                       </div>
                     </div>
                     <svg className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
@@ -329,7 +332,12 @@ export default function WarrantyClient() {
                                   ${isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white'}`}>
                                   {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                                 </span>
-                                <span>{opt.label}</span>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="leading-tight">{opt.label}</span>
+                                  {opt.address && (
+                                    <span className="text-[11px] text-gray-400 font-normal leading-tight mt-0.5">{opt.address}</span>
+                                  )}
+                                </div>
                               </button>
                             );
                           })}

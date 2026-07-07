@@ -4,7 +4,7 @@
 import { db } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { calculateGrowth } from "./utils";
-import { DashboardPulse, StatusBreakdown } from "./types";
+import { DashboardPulse, StatusBreakdown, TopProduct } from "./types";
 
 // Helper to fetch single range stats
 async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: Date, prevEndDate: Date): Promise<DashboardPulse> {
@@ -70,6 +70,51 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
   const currentCustomers = await db.user.count({ where: { createdAt: { gte: startDate, lte: endDate }, role: "CUSTOMER" } });
   const prevCustomers = await db.user.count({ where: { createdAt: { gte: prevStartDate, lte: prevEndDate }, role: "CUSTOMER" } });
 
+  // 4. TOP 3 SELLING PRODUCTS with growth (paid orders only)
+  const topProductsCurrent = await db.orderItem.groupBy({
+    by: ['productName'],
+    where: {
+      order: {
+        createdAt: { gte: startDate, lte: endDate },
+        paymentStatus: "PAID",
+        status: { not: OrderStatus.CANCELLED },
+        deletedAt: null,
+      },
+    },
+    _sum: { quantity: true },
+    orderBy: { _sum: { quantity: 'desc' } },
+    take: 3,
+  });
+
+  const topNames = topProductsCurrent.map(p => p.productName);
+  const topProductsPrev = topNames.length > 0
+    ? await db.orderItem.groupBy({
+        by: ['productName'],
+        where: {
+          productName: { in: topNames },
+          order: {
+            createdAt: { gte: prevStartDate, lte: prevEndDate },
+            paymentStatus: "PAID",
+            status: { not: OrderStatus.CANCELLED },
+            deletedAt: null,
+          },
+        },
+        _sum: { quantity: true },
+      })
+    : [];
+
+  const prevQtyMap = new Map(topProductsPrev.map(p => [p.productName, p._sum.quantity ?? 0]));
+
+  const topProducts: TopProduct[] = topProductsCurrent.map(p => {
+    const currentQty = p._sum.quantity ?? 0;
+    const prevQty = prevQtyMap.get(p.productName) ?? 0;
+    return {
+      name: p.productName,
+      quantity: currentQty,
+      growth: calculateGrowth(currentQty, prevQty),
+    };
+  });
+
   return {
     revenue: { 
       value: currentRevenue, 
@@ -81,11 +126,12 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
       unpaid: unpaidCount,
       growth: calculateGrowth(currentOrders.length, prevOrdersCount) 
     },
-    customers: { 
-      value: currentCustomers, 
-      growth: calculateGrowth(currentCustomers, prevCustomers) 
+    customers: {
+      value: currentCustomers,
+      growth: calculateGrowth(currentCustomers, prevCustomers)
     },
-    statusBreakdown: breakdown
+    statusBreakdown: breakdown,
+    topProducts,
   };
 }
 

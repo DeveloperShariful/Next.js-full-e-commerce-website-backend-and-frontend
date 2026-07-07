@@ -3,7 +3,7 @@
 "use client";
 
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { TrendingUp, TrendingDown, Minus, CreditCard, AlertCircle, BarChart2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, CreditCard, AlertCircle, BarChart2, Trophy } from "lucide-react";
 import { DashboardPulse } from "@/app/actions/backend/dashboard/types";
 
 interface BusinessPulseProps {
@@ -45,11 +45,11 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
       </h2>
 
       <div className="p-4">
-        {/* Stats row — 3 cols on sm+, 1 col stacked on mobile */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 pb-5 border-b border-[#f0f0f1]">
+        {/* Stats row — 3 cols */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 pb-2 border-b border-[#f0f0f1]">
 
           {/* Net Sales */}
-          <div className="py-3 sm:py-0 sm:pr-6 border-b sm:border-b-0 sm:border-r border-[#f0f0f1]">
+          <div className="py-1.5 sm:py-0 sm:pr-6 border-b sm:border-b-0 sm:border-r border-[#f0f0f1]">
             <p className="text-[#50575e] text-[12px] font-medium mb-1">Net Sales</p>
             <div className="flex items-baseline flex-wrap gap-y-0.5">
               <p className="text-[22px] font-normal text-[#2271b1] leading-tight">{formatPrice(data.revenue.value)}</p>
@@ -59,7 +59,7 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
           </div>
 
           {/* Total Orders */}
-          <div className="py-3 sm:py-0 sm:px-6 border-b sm:border-b-0 sm:border-r border-[#f0f0f1]">
+          <div className="py-1.5 sm:py-0 sm:px-6 border-b sm:border-b-0 sm:border-r border-[#f0f0f1]">
             <p className="text-[#50575e] text-[12px] font-medium mb-1">Total Orders</p>
             <div className="flex items-baseline flex-wrap gap-y-0.5">
               <p className="text-[22px] font-normal text-[#2271b1] leading-tight">{data.orders.total.toLocaleString()}</p>
@@ -78,7 +78,7 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
           </div>
 
           {/* Signups */}
-          <div className="py-3 sm:py-0 sm:pl-6">
+          <div className="py-1.5 sm:py-0 sm:pl-6">
             <p className="text-[#50575e] text-[12px] font-medium mb-1">Signups</p>
             <div className="flex items-baseline flex-wrap gap-y-0.5">
               <p className="text-[22px] font-normal text-[#2271b1] leading-tight">{data.customers.value.toLocaleString()}</p>
@@ -88,24 +88,54 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
           </div>
         </div>
 
-        {/* Order Status Breakdown */}
-        <div className="pt-4">
-          <p className="text-[12px] font-medium text-[#50575e] mb-2">Order Status Breakdown</p>
-          {Object.keys(data.statusBreakdown).length === 0 ? (
-            <p className="text-[12px] text-[#8c8f94] italic">No orders in this period.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(data.statusBreakdown).map(([status, count]) => (
-                <div
-                  key={status}
-                  className={`px-2 py-1 rounded-sm border text-[11px] font-semibold flex items-center gap-1.5 ${getStatusColor(status)}`}
-                >
-                  <span>{status}</span>
-                  <span className="bg-white px-1.5 rounded-sm border border-inherit text-inherit">{count}</span>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Order Status Breakdown + Top Products — 2 col on md+ */}
+        <div className="pt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+
+          {/* Order Status Breakdown */}
+          <div>
+            <p className="text-[12px] font-medium text-[#50575e] mb-2">Order Status Breakdown</p>
+            {Object.keys(data.statusBreakdown).length === 0 ? (
+              <p className="text-[12px] text-[#8c8f94] italic">No orders in this period.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(data.statusBreakdown).map(([status, count]) => (
+                  <div
+                    key={status}
+                    className={`px-2 py-1 rounded-sm border text-[11px] font-semibold flex items-center gap-1.5 ${getStatusColor(status)}`}
+                  >
+                    <span>{status}</span>
+                    <span className="bg-white px-1.5 rounded-sm border border-inherit text-inherit">{count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top 3 Selling Products */}
+          <div>
+            <p className="text-[12px] font-medium text-[#50575e] mb-2 flex items-center gap-1">
+              <Trophy size={12} className="text-[#f0a500]" /> Top Selling Products
+            </p>
+            {data.topProducts && data.topProducts.length > 0 ? (
+              <div className="space-y-2">
+                {data.topProducts.map((product, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-[11px] font-bold shrink-0 w-4 ${idx === 0 ? 'text-[#f0a500]' : 'text-[#8c8f94]'}`}>#{idx + 1}</span>
+                      <span className="text-[12px] text-[#1d2327] font-medium truncate">{product.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] text-[#50575e]">{product.quantity} sold</span>
+                      <GrowthBadge value={product.growth} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-[#8c8f94] italic">No sales in this period.</p>
+            )}
+          </div>
+
         </div>
       </div>
     </div>

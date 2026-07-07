@@ -16,11 +16,18 @@ export interface StatusBreakdown {
   [key: string]: number; // e.g., PENDING: 5, PROCESSING: 2
 }
 
+export interface TopProduct {
+  name: string;
+  quantity: number;
+  growth: number;
+}
+
 export interface DashboardPulse {
   revenue: PulseMetric;    // Only PAID revenue
   orders: OrderStats;      // Detailed order stats
   customers: PulseMetric;
   statusBreakdown: StatusBreakdown; // List of all statuses
+  topProducts: TopProduct[];
 }
 
 export interface DashboardStats {

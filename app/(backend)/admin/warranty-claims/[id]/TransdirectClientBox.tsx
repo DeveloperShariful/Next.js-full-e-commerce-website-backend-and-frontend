@@ -31,6 +31,16 @@ interface ShippingQuote {
   transitTime: string;
 }
 
+const CUSTOM_BOX_PART: SparePart = {
+  id: '__custom__',
+  databaseId: null,
+  name: 'Custom Box',
+  weight: 0.5,
+  length: 10,
+  width: 5,
+  height: 2,
+};
+
 export default function TransdirectClientBox({
   claimId,
   status,
@@ -201,7 +211,13 @@ export default function TransdirectClientBox({
   const handleProductSelect = (part: SparePart) => {
     setSelectedPart(part);
     setIsOpen(false);
-    fetchLiveQuotes(part); 
+    fetchLiveQuotes(part);
+  };
+
+  const handleCustomBoxSelect = () => {
+    setSelectedPart(CUSTOM_BOX_PART);
+    setIsOpen(false);
+    fetchLiveQuotes(CUSTOM_BOX_PART);
   };
 
   const handleRefreshQuotes = () => {
@@ -366,7 +382,15 @@ export default function TransdirectClientBox({
                       ${(loadingQuotes || status === 'TRASHED' || status === 'REJECTED') ? 'opacity-50 cursor-not-allowed bg-[#f6f7f7] border-[#c3c4c7]' : 'border-[#c3c4c7] hover:border-[#2271b1] hover:shadow-sm'}`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
-                      {selectedPart ? (
+                      {selectedPart?.id === '__custom__' ? (
+                        <>
+                          <div className="w-6 h-6 bg-[#fff8eb] rounded-md flex items-center justify-center text-[12px] border border-[#fbd38d] flex-shrink-0">📦</div>
+                          <span className="font-semibold text-[#1d2327] truncate">Custom Box</span>
+                          <span className="text-[11px] text-[#50575e] bg-[#f0f0f1] px-1.5 py-0.5 rounded flex-shrink-0">
+                            {customWeight || '0.5'}kg · {customLength || '10'}×{customWidth || '5'}×{customHeight || '2'}cm
+                          </span>
+                        </>
+                      ) : selectedPart ? (
                         <>
                           {selectedPart.image?.sourceUrl
                             ? <Image src={selectedPart.image.sourceUrl} alt="Part" width={26} height={26} className="rounded-md object-cover border border-[#c3c4c7] flex-shrink-0" />
@@ -381,10 +405,19 @@ export default function TransdirectClientBox({
 
                   {isOpen && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-[#c3c4c7] rounded-lg shadow-xl max-h-[280px] overflow-y-auto">
-                      {spareParts.length === 0
-                        ? <div className="p-4 text-[#50575e] italic text-center text-[13px]">No spare parts found</div>
-                        : <ul className="py-1">
-                          {spareParts.map((part) => (
+                      <ul className="py-1">
+                        {/* Custom Box — always at top */}
+                        <li onClick={handleCustomBoxSelect}
+                          className="px-3 py-2.5 hover:bg-[#fff8eb] cursor-pointer flex items-center gap-3 border-b-2 border-[#e2e4e7] transition-colors bg-[#fffdf5]">
+                          <div className="w-9 h-9 bg-[#fff8eb] border border-[#fbd38d] rounded-md flex items-center justify-center text-[16px] flex-shrink-0">📦</div>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-[13px] font-semibold text-[#92400e]">Custom Box</span>
+                            <span className="text-[11px] text-[#78350f] mt-0.5">Set your own weight &amp; dimensions (0.5kg 10cm x 5cm x 2cm)</span>
+                          </div>
+                        </li>
+                        {spareParts.length === 0
+                          ? <li className="p-4 text-[#50575e] italic text-center text-[13px]">No spare parts found</li>
+                          : spareParts.map((part) => (
                             <li key={part.id} onClick={() => handleProductSelect(part)}
                               className="px-3 py-2.5 hover:bg-[#f0f6fc] cursor-pointer flex items-center gap-3 border-b border-[#f0f0f1] last:border-0 transition-colors">
                               {part.image?.sourceUrl
@@ -395,9 +428,9 @@ export default function TransdirectClientBox({
                                 <span className="text-[11px] text-[#50575e] mt-0.5">{part.weight || '0.5'} kg</span>
                               </div>
                             </li>
-                          ))}
-                        </ul>
-                      }
+                          ))
+                        }
+                      </ul>
                     </div>
                   )}
                 </div>

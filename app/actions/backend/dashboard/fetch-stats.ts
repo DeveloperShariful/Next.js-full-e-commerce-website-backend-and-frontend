@@ -115,16 +115,31 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
     };
   });
 
-  return {
-    revenue: { 
-      value: currentRevenue, 
-      growth: calculateGrowth(currentRevenue, prevRevenue) 
+  const currentAOV = paidCount > 0 ? currentRevenue / paidCount : 0;
+  const prevPaidCount = await db.order.count({
+    where: {
+      createdAt: { gte: prevStartDate, lte: prevEndDate },
+      paymentStatus: "PAID",
+      status: { not: OrderStatus.CANCELLED },
+      deletedAt: null,
     },
-    orders: { 
+  });
+  const prevAOV = prevPaidCount > 0 ? prevRevenue / prevPaidCount : 0;
+
+  return {
+    revenue: {
+      value: currentRevenue,
+      growth: calculateGrowth(currentRevenue, prevRevenue)
+    },
+    orders: {
       total: currentOrders.length,
       paid: paidCount,
       unpaid: unpaidCount,
-      growth: calculateGrowth(currentOrders.length, prevOrdersCount) 
+      growth: calculateGrowth(currentOrders.length, prevOrdersCount)
+    },
+    avgOrderValue: {
+      value: currentAOV,
+      growth: calculateGrowth(currentAOV, prevAOV),
     },
     customers: {
       value: currentCustomers,

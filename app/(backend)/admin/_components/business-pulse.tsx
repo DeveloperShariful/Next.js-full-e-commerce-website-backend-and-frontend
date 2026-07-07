@@ -45,46 +45,56 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
       </h2>
 
       <div className="p-4">
-        {/* Stats row — 3 cols */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 pb-2 border-b border-[#f0f0f1]">
+        {/* Stats row — 2 cols mobile, 4 cols desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 pb-2 border-b border-[#f0f0f1]">
 
           {/* Net Sales */}
-          <div className="py-1.5 sm:py-0 sm:pr-6 border-b sm:border-b-0 sm:border-r border-[#f0f0f1]">
+          <div className="py-1.5 lg:py-0 pr-3 lg:pr-6 border-b-0 border-r border-[#f0f0f1] col-span-1">
             <p className="text-[#50575e] text-[12px] font-medium mb-1">Net Sales</p>
             <div className="flex items-baseline flex-wrap gap-y-0.5">
-              <p className="text-[22px] font-normal text-[#2271b1] leading-tight">{formatPrice(data.revenue.value)}</p>
+              <p className="text-[20px] font-normal text-[#2271b1] leading-tight">{formatPrice(data.revenue.value)}</p>
               <GrowthBadge value={data.revenue.growth} />
             </div>
-            <p className="text-[11px] text-[#8c8f94] mt-1">Excludes unpaid orders</p>
+            <p className="text-[11px] text-[#8c8f94] mt-1">Excl. unpaid</p>
           </div>
 
           {/* Total Orders */}
-          <div className="py-1.5 sm:py-0 sm:px-6 border-b sm:border-b-0 sm:border-r border-[#f0f0f1]">
+          <div className="py-1.5 lg:py-0 pl-3 lg:px-6 border-b lg:border-b-0 lg:border-r border-[#f0f0f1] col-span-1">
             <p className="text-[#50575e] text-[12px] font-medium mb-1">Total Orders</p>
             <div className="flex items-baseline flex-wrap gap-y-0.5">
-              <p className="text-[22px] font-normal text-[#2271b1] leading-tight">{data.orders.total.toLocaleString()}</p>
+              <p className="text-[20px] font-normal text-[#2271b1] leading-tight">{data.orders.total.toLocaleString()}</p>
               <GrowthBadge value={data.orders.growth} />
             </div>
-            <div className="flex gap-3 mt-1">
+            <div className="flex gap-2 mt-1">
               <div className="flex items-center gap-1 text-[11px] text-[#008a20]">
                 <CreditCard size={10} />
-                <span className="font-semibold">{data.orders.paid}</span> Paid
+                <span className="font-semibold">{data.orders.paid}</span>
               </div>
               <div className="flex items-center gap-1 text-[11px] text-[#d63638]">
                 <AlertCircle size={10} />
-                <span className="font-semibold">{data.orders.unpaid}</span> Unpaid
+                <span className="font-semibold">{data.orders.unpaid}</span>
               </div>
             </div>
           </div>
 
+          {/* Avg. Order Value */}
+          <div className="py-1.5 lg:py-0 pr-3 lg:px-6 border-r border-[#f0f0f1] col-span-1">
+            <p className="text-[#50575e] text-[12px] font-medium mb-1">Avg. Order Value</p>
+            <div className="flex items-baseline flex-wrap gap-y-0.5">
+              <p className="text-[20px] font-normal text-[#2271b1] leading-tight">{formatPrice(data.avgOrderValue.value)}</p>
+              <GrowthBadge value={data.avgOrderValue.growth} />
+            </div>
+            <p className="text-[11px] text-[#8c8f94] mt-1">Per paid order</p>
+          </div>
+
           {/* Signups */}
-          <div className="py-1.5 sm:py-0 sm:pl-6">
+          <div className="py-1.5 lg:py-0 pl-3 lg:pl-6 col-span-1">
             <p className="text-[#50575e] text-[12px] font-medium mb-1">Signups</p>
             <div className="flex items-baseline flex-wrap gap-y-0.5">
-              <p className="text-[22px] font-normal text-[#2271b1] leading-tight">{data.customers.value.toLocaleString()}</p>
+              <p className="text-[20px] font-normal text-[#2271b1] leading-tight">{data.customers.value.toLocaleString()}</p>
               <GrowthBadge value={data.customers.growth} />
             </div>
-            <p className="text-[11px] text-[#8c8f94] mt-1">New accounts created</p>
+            <p className="text-[11px] text-[#8c8f94] mt-1">New accounts</p>
           </div>
         </div>
 

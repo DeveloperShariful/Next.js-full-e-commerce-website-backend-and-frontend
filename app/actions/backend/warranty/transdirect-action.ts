@@ -50,8 +50,8 @@ export async function getTransdirectQuotes(formData: FormData) {
       declared_value: "0.00",
       sender: {
         postcode: config.senderPostcode || "2000",
-        suburb:   (config.senderSuburb  || "Sydney").trim().toUpperCase(),
-        type:     config.senderType     || "business",
+        suburb:   (config.senderSuburb  || "Sydney").split(',')[0].trim().toUpperCase(),
+        type:     (config.senderType || "business").toLowerCase(),
         country:  "AU",
       },
       receiver: {

@@ -26,6 +26,7 @@ export interface DashboardPulse {
   revenue: PulseMetric;    // Only PAID revenue
   orders: OrderStats;      // Detailed order stats
   customers: PulseMetric;
+  avgOrderValue: PulseMetric;
   statusBreakdown: StatusBreakdown; // List of all statuses
   topProducts: TopProduct[];
 }

@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
       total: secureOrderTotal,
       totalDue: secureOrderTotal,
       guestEmail: customerInfo.email,
-      userId: sessionUserId || undefined,
+      userId:      sessionUserId     || undefined,
       affiliateId: cookieAffiliateId || undefined,
       billingAddress: billingJson,
       shippingAddress: shippingJson,
@@ -329,7 +329,7 @@ export async function POST(request: NextRequest) {
     for (let attempt = 0; attempt < MAX_ORDER_NUMBER_RETRIES; attempt++) {
       const nextOrderNumber = await generateNextOrderNumber();
       try {
-        newOrder = await db.order.create({ data: { orderNumber: nextOrderNumber, ...orderData } });
+        newOrder = await db.order.create({ data: { orderNumber: nextOrderNumber, ...orderData } as Prisma.OrderUncheckedCreateInput });
         break;
       } catch (err) {
         const isP2002 = err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
         }
         if (isP2002) {
           const fallback = `${Date.now()}`;
-          newOrder = await db.order.create({ data: { orderNumber: fallback, ...orderData } });
+          newOrder = await db.order.create({ data: { orderNumber: fallback, ...orderData } as Prisma.OrderUncheckedCreateInput });
           break;
         }
         throw err;

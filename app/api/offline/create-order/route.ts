@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
       total: secureOrderTotal,
       totalDue: secureOrderTotal,
       guestEmail: customerInfo.email,
-      userId: sessionUserId || undefined,
+      userId:      sessionUserId     || undefined,
       affiliateId: cookieAffiliateId || undefined,
       billingAddress: billingJson,
       shippingAddress: shippingJson,
@@ -326,8 +326,7 @@ export async function POST(request: NextRequest) {
     // Everything in one transaction — if stock decrement fails, order is NOT created.
     const runTransaction = async (orderNumber: string) =>
       db.$transaction(async (tx) => {
-        const createData = { orderNumber, ...baseOrderData } as unknown as Prisma.OrderUncheckedCreateInput;
-        const order = await tx.order.create({ data: createData });
+        const order = await tx.order.create({ data: { orderNumber, ...baseOrderData } as Prisma.OrderUncheckedCreateInput });
 
         if (discountId) {
           await tx.discount.update({

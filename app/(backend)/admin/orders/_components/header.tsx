@@ -36,6 +36,7 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
 
   const currentStatus = searchParams.get("status") || "all";
   const [query, setQuery] = useState(searchParams.get("query") || "");
+  const [searchError, setSearchError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>(searchParams.get("paymentMethod") || "all");
   
   const [date, setDate] = useState<DateRange | undefined>(() => {
@@ -72,8 +73,14 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmed = query.trim();
+    if (trimmed.length > 0 && trimmed.length < 3) {
+      setSearchError("At least 3 characters required");
+      return;
+    }
+    setSearchError("");
     setActiveAction("search");
-    updateFilters({ query: query || undefined });
+    updateFilters({ query: trimmed || undefined });
   };
 
   const applyFilters = () => {
@@ -154,17 +161,18 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
           })}
         </ul>
 
-        <form onSubmit={handleSearch} className="flex items-center w-full md:w-auto">
-            <input 
-                type="search" 
+        <form onSubmit={handleSearch} className="flex flex-col items-start w-full md:w-auto gap-0.5">
+          <div className="flex items-center w-full">
+            <input
+                type="search"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => { setQuery(e.target.value); setSearchError(""); }}
                 disabled={isPending}
-                className="border border-[#8c8f94] bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none w-full md:w-[200px] disabled:bg-gray-100"
+                className={`border bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:ring-1 outline-none w-full md:w-[200px] disabled:bg-gray-100 ${searchError ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-[#8c8f94] focus:border-[#2271b1] focus:ring-[#2271b1]'}`}
                 placeholder="Search orders..."
             />
-            <button 
-                type="submit" 
+            <button
+                type="submit"
                 disabled={isPending}
                 className="ml-1 border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors whitespace-nowrap disabled:opacity-70 flex items-center gap-1.5"
             >
@@ -174,6 +182,10 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
                    "Search orders"
                 )}
             </button>
+          </div>
+          {searchError && (
+            <p className="text-[11px] text-red-500 leading-none">{searchError}</p>
+          )}
         </form>
       </div>
 

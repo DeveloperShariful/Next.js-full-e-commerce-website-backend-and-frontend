@@ -162,12 +162,15 @@ export async function POST(request: NextRequest) {
       productId: string;
       variantId: string | null;
       productName: string;
+      variantName: string | null;
+      sku: string | null;
       price: number;
       quantity: number;
       total: number;
       taxStatus: TaxStatus;
       isPreOrder: boolean;
       preOrderReleaseDate: Date | null;
+      metadata: Record<string, unknown> | null;
     }> = [];
 
     for (const { item, product, variant } of rawProductResults) {
@@ -196,12 +199,15 @@ export async function POST(request: NextRequest) {
         productId: product.id,
         variantId: item.variationId || null,
         productName: product.name,
+        variantName: variant?.name || null,
+        sku: variant?.sku || null,
         price,
         quantity: item.quantity,
         total: itemTotal,
         taxStatus: product.taxStatus,
         isPreOrder: variant ? variant.isPreOrder : product.isPreOrder,
         preOrderReleaseDate: variant ? variant.preOrderReleaseDate : product.preOrderReleaseDate,
+        metadata: variant?.attributes ? { attributes: variant.attributes as unknown as Record<string, string> } : null,
       });
     }
 

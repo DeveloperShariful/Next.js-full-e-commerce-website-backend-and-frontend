@@ -545,9 +545,14 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
+      const activeMethod = paymentData?.paymentMethodId || selectedPaymentMethod;
+      const createOrderEndpoint = ['cod', 'bank_transfer'].includes(activeMethod)
+        ? '/api/offline/create-order'
+        : '/api/stripe/create-order';
+
       let response: Response;
       try {
-        response = await fetch('/api/stripe/create-order', {
+        response = await fetch(createOrderEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderPayload),

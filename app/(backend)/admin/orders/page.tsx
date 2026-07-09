@@ -61,6 +61,7 @@ export default async function OrdersPage(props: OrdersPageProps) {
         orders={serializedOrders}
         isTrashView={status === 'trash'}
         timezone={timezone}
+        query={query}
       />
 
       {meta && meta.total > 0 && (

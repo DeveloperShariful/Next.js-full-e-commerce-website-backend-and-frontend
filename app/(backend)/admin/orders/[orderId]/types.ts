@@ -42,6 +42,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   total: number;
+  metadata: { attributes?: Record<string, string> } | null;
   product?: {
     id: string;
     stock: number;

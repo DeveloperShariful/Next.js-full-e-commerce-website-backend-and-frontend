@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
-import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
 
@@ -117,14 +117,13 @@ export async function POST(request: Request) {
                 include: { user: { select: { email: true } } },
             });
             if (order && (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID)) {
-                // ✅ Backup: payment done but TransDirect not synced yet → resync
-                if (order.transdirectOrderStatus !== 'booked') {
-                    console.log(`🔄 [PayPal Webhook] Order ${wcOrderId} paid but not synced to TransDirect. Backup sync...`);
-                    try {
-                        await syncOrderToTransdirect(wcOrderId);
-                    } catch (err) {
-                        console.error('[PayPal Webhook] Backup TransDirect sync failed:', err);
-                    }
+                // Backup: already PROCESSING — check if Transdirect sync is done
+                if (order.transdirectOrderStatus === 'booked') {
+                    db.orderNote.create({
+                        data: { orderId: wcOrderId, content: '✅ Transdirect already synced (capture-order) — paypal-webhook skipping sync', isSystem: true }
+                    }).catch(() => {});
+                } else {
+                    queueAndSyncTransdirect(wcOrderId, 'paypal-webhook');
                 }
                 const alreadyEmail = order.guestEmail || order.user?.email;
                 await Promise.allSettled([
@@ -174,11 +173,7 @@ export async function POST(request: Request) {
                         }
                     }
                 });
-                try {
-                    await syncOrderToTransdirect(wcOrderId);
-                } catch (err) {
-                    console.error('[PayPal Webhook] Rescue TransDirect sync failed:', err);
-                }
+                queueAndSyncTransdirect(wcOrderId, 'paypal-webhook-rescue');
 
                 // Post-rescue side effects — email + analytics run in parallel
                 const rescueEmail = order?.guestEmail || order?.user?.email;
@@ -276,11 +271,7 @@ export async function POST(request: Request) {
                     }
                 });
                 if (!isMismatch) {
-                    try {
-                        await syncOrderToTransdirect(wcOrderId);
-                    } catch (err) {
-                        console.error('[PayPal Webhook] TransDirect sync failed:', err);
-                    }
+                    queueAndSyncTransdirect(wcOrderId, 'paypal-webhook-capture');
                 }
 
                 // Email + analytics — only on clean capture (no mismatch), run in parallel

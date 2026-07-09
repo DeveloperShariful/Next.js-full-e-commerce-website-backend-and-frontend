@@ -80,8 +80,16 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
                                             {item.productName}
                                         </a>
                                         <div className="text-[12px] text-[#646970] mt-1 space-y-0.5">
+                                            {item.variantName && (
+                                              <div><span className="font-semibold text-[#3c434a]">Variation:</span> {item.variantName}</div>
+                                            )}
+                                            {item.metadata?.attributes && Object.entries(item.metadata.attributes).map(([key, value]) => (
+                                              <div key={key}>
+                                                <span className="font-semibold text-[#3c434a]">{key}:</span>{' '}
+                                                <span className="inline-block bg-[#f0f6fc] border border-[#c3c4c7] text-[#2271b1] px-1.5 py-0.5 rounded-[2px] text-[11px] font-medium">{value}</span>
+                                              </div>
+                                            ))}
                                             {item.sku && <div><span className="font-semibold text-[#3c434a]">SKU:</span> {item.sku}</div>}
-                                            {item.variantName && <div><span className="font-semibold text-[#3c434a]">Variation:</span> {item.variantName}</div>}
                                         </div>
                                         
                                         {/* SCHEMA: Advanced Pre-Order Item Badge */}

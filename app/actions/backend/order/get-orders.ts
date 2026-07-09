@@ -36,16 +36,44 @@ export async function getOrders(
     // এটি ডেট, পেমেন্ট মেথড এবং সার্চ কোয়ারিগুলো ধরে রাখবে।
     const baseFilterParams: Prisma.OrderWhereInput[] = [];
 
-    if (query) {
+    const trimmedQuery = (query || '').trim();
+    if (trimmedQuery.length >= 3) {
+      // JSON path string_contains is case-sensitive in PostgreSQL.
+      // Generate all practical case variants so "shariful" finds "Shariful" etc.
+      const qLower = trimmedQuery.toLowerCase();
+      const qUpper = trimmedQuery.toUpperCase();
+      const qTitle = trimmedQuery.charAt(0).toUpperCase() + trimmedQuery.slice(1).toLowerCase();
+      const qVariants = [...new Set([trimmedQuery, qLower, qUpper, qTitle])];
+
+      // Expands one JSON field into OR conditions for every case variant
+      const jSearch = (
+        field: 'billingAddress' | 'shippingAddress',
+        path: string[]
+      ): Prisma.OrderWhereInput[] =>
+        qVariants.map(q => ({ [field]: { path, string_contains: q } } as Prisma.OrderWhereInput));
+
       baseFilterParams.push({
         OR: [
-          { orderNumber: { contains: query, mode: 'insensitive' } },
-          { user: { name: { contains: query, mode: 'insensitive' } } },
-          { user: { email: { contains: query, mode: 'insensitive' } } },
-          { guestEmail: { contains: query, mode: 'insensitive' } },
-          // JSON Address Search (Guest Search Supported)
-          { billingAddress: { path: ['firstName'], string_contains: query } },
-          { billingAddress: { path: ['phone'], string_contains: query } }
+          // Standard string fields — already case-insensitive via mode: 'insensitive'
+          { orderNumber:           { contains: trimmedQuery, mode: 'insensitive' } },
+          { paymentId:             { contains: trimmedQuery, mode: 'insensitive' } },
+          { transdirectBookingRef: { contains: trimmedQuery, mode: 'insensitive' } },
+          { user: { name:  { contains: trimmedQuery, mode: 'insensitive' } } },
+          { user: { email: { contains: trimmedQuery, mode: 'insensitive' } } },
+          { guestEmail: { contains: trimmedQuery, mode: 'insensitive' } },
+          { items: { some: { productName: { contains: trimmedQuery, mode: 'insensitive' } } } },
+          // JSON address fields — case-insensitive via case variants
+          ...jSearch('billingAddress',  ['firstName']),
+          ...jSearch('billingAddress',  ['lastName']),
+          ...jSearch('billingAddress',  ['email']),
+          ...jSearch('billingAddress',  ['phone']),
+          ...jSearch('billingAddress',  ['address1']),
+          ...jSearch('billingAddress',  ['city']),
+          ...jSearch('shippingAddress', ['firstName']),
+          ...jSearch('shippingAddress', ['lastName']),
+          ...jSearch('shippingAddress', ['phone']),
+          ...jSearch('shippingAddress', ['address1']),
+          ...jSearch('shippingAddress', ['city']),
         ]
       });
     }

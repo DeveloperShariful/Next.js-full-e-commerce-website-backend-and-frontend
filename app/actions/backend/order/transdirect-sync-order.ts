@@ -6,6 +6,49 @@ import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 // ============================================================================
+// QUEUE HELPER — marks order as "queued" for cron backup
+// ============================================================================
+export async function queueTransdirectSync(orderId: string) {
+  try {
+    await db.order.updateMany({
+      where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
+      data: { transdirectOrderStatus: 'queued', transdirectError: null },
+    });
+  } catch (err) {
+    console.error('[TransdirectQueue] Failed to queue order:', err);
+  }
+}
+
+// ============================================================================
+// QUEUE + IMMEDIATE SYNC — queues for cron backup, then tries sync right away.
+// Called from capture-order and webhooks (fire-and-forget from callers).
+// ============================================================================
+export async function queueAndSyncTransdirect(orderId: string, source: string) {
+  // Step 1: Mark as queued so cron picks it up if this sync fails
+  try {
+    await db.order.updateMany({
+      where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
+      data: { transdirectOrderStatus: 'queued', transdirectError: null },
+    });
+  } catch (err) {
+    console.error(`[TDSync] Failed to queue order ${orderId}:`, err);
+    return;
+  }
+
+  // Step 2: Try to sync immediately
+  const result = await syncOrderToTransdirect(orderId, source);
+
+  if (!result.success) {
+    // syncOrderToTransdirect already wrote the failure note with source.
+    // Re-queue so cron picks it up for retry.
+    await db.order.updateMany({
+      where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
+      data: { transdirectOrderStatus: 'queued' },
+    }).catch(err => console.error(`[TDSync] Re-queue failed for ${orderId}:`, err));
+  }
+}
+
+// ============================================================================
 // RESYNC — Recalculate & Send (manual button in admin)
 // Gets fresh quotes, picks cheapest courier, sends with unique order_id
 // ============================================================================
@@ -56,8 +99,8 @@ export async function resyncOrderToTransdirect(orderId: string) {
       items: quoteItems,
       sender: {
         postcode: config.senderPostcode || "2000",
-        suburb:   (config.senderSuburb  || "Sydney").trim().toUpperCase(),
-        type:     config.senderType     || "business",
+        suburb:   (config.senderSuburb  || "Sydney").split(',')[0].trim().toUpperCase(),
+        type:     (config.senderType    || "business").toLowerCase(),
         country:  "AU",
       },
       receiver: {
@@ -258,7 +301,7 @@ export async function resyncOrderToTransdirect(orderId: string) {
   }
 }
 
-export async function syncOrderToTransdirect(orderId: string) {
+export async function syncOrderToTransdirect(orderId: string, source: string = 'cron') {
   console.log(`\n🚀 [START] Syncing Order: ${orderId}`);
 
   try {
@@ -368,12 +411,12 @@ export async function syncOrderToTransdirect(orderId: string) {
         ? `TransDirect Error: Order ID "${transdirectOrderId}" already exists in TransDirect.`
         : `TransDirect Failed (${res.status}): ${rawErr}`;
 
-      await db.order.update({
-        where: { id: orderId },
-        data: { transdirectOrderStatus: "failed", transdirectError: errMsg }
+      await db.order.updateMany({
+        where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
+        data: { transdirectOrderStatus: 'failed', transdirectError: errMsg },
       });
       await db.orderNote.create({
-        data: { orderId: order.id, content: `❌ TransDirect booking failed: ${errMsg}`, isSystem: true }
+        data: { orderId: order.id, content: `❌ TransDirect sync failed via ${source}: ${errMsg}`, isSystem: true }
       });
       revalidatePath(`/admin/orders/${orderId}`);
       return { success: false, error: errMsg };
@@ -384,12 +427,12 @@ export async function syncOrderToTransdirect(orderId: string) {
       const rawResponse = JSON.stringify(responseData).substring(0, 500);
       console.error(`❌ [TransDirect] HTTP 200 but no booking ID. Response: ${rawResponse}`);
       const errMsg = `TransDirect returned HTTP 200 but no booking ID. Raw: ${rawResponse}`;
-      await db.order.update({
-        where: { id: orderId },
-        data: { transdirectOrderStatus: "failed", transdirectError: errMsg }
+      await db.order.updateMany({
+        where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
+        data: { transdirectOrderStatus: 'failed', transdirectError: errMsg },
       });
       await db.orderNote.create({
-        data: { orderId: order.id, content: `❌ TransDirect sync failed: No booking ID returned. Use "Recalculate & Send" to retry.`, isSystem: true }
+        data: { orderId: order.id, content: `❌ TransDirect sync failed via ${source}: No booking ID returned. Use "Recalculate & Send" to retry.`, isSystem: true }
       });
       revalidatePath(`/admin/orders/${orderId}`);
       return { success: false, error: errMsg };
@@ -443,7 +486,7 @@ export async function syncOrderToTransdirect(orderId: string) {
     await db.orderNote.create({
       data: {
         orderId: order.id,
-        content: `✅ Synced to Transdirect. Booking ID: ${responseData.id}`,
+        content: `✅ Synced to Transdirect via ${source}. Booking ID: ${responseData.id}`,
         isSystem: true
       }
     });
@@ -451,15 +494,13 @@ export async function syncOrderToTransdirect(orderId: string) {
     revalidatePath(`/admin/orders/${orderId}`);
     return { success: true, message: "Synced successfully!" };
 
-  } catch (error: any) {
-    console.error("SYNC_ERROR:", error);
-    const errMsg = error.message || "Unknown error";
-    try {
-      await db.order.update({
-        where: { id: orderId },
-        data: { transdirectOrderStatus: "failed", transdirectError: errMsg }
-      });
-    } catch (_) {}
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('SYNC_ERROR:', errMsg);
+    await db.order.updateMany({
+      where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
+      data: { transdirectOrderStatus: 'failed', transdirectError: errMsg },
+    }).catch(() => {});
     return { success: false, error: errMsg };
   }
 }

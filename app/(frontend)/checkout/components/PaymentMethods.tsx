@@ -3,6 +3,7 @@
 
 import Image from 'next/image';
 import React, { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import type { PaymentIntentResult } from '@stripe/stripe-js';
 import ExpressCheckouts, { type CartItemDTO } from './ExpressCheckouts';
@@ -107,6 +108,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     stripePublicKey,
   } = props;
 
+  const router = useRouter();
   const stripeFormRef = useRef<HTMLFormElement>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
@@ -271,7 +273,11 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     }
 
     // ── Offline methods (Bank Transfer, COD) ─────────────────
-    onPlaceOrder();
+    // Skip /order-confirmation (Stripe-only page) — go straight to success page
+    const result = await onPlaceOrder();
+    if (result?.orderId) {
+      router.push(`/order-success?order_id=${result.orderId}&key=${result.orderKey}`);
+    }
   };
 
   // ============================================================

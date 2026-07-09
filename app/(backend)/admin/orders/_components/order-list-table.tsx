@@ -8,7 +8,7 @@ import Link from "next/link";
 import { isToday, formatDistanceToNow } from "date-fns";
 import { formatTz } from "@/lib/store-time";
 import { toast } from "sonner"; 
-import { Eye, Check, Loader2, Trash2, RefreshCcw, AlertTriangle, Truck } from "lucide-react";
+import { Eye, Check, Loader2, RefreshCcw, AlertTriangle, Truck } from "lucide-react";
 import { bulkUpdateOrderStatus, deleteOrder, restoreOrder } from "@/app/actions/backend/order/bulk-update";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import type { OrderStatus } from "@prisma/client";
@@ -55,9 +55,26 @@ interface OrderListTableProps {
   orders: SerializedOrder[];
   isTrashView?: boolean;
   timezone?: string;
+  query?: string;
 }
 
-export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }: OrderListTableProps) => {
+function highlight(text: string | null | undefined, q: string): React.ReactNode {
+  if (!text || !q || q.length < 3) return text ?? '';
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === q.toLowerCase()
+          ? <mark key={i} className="bg-red-200 text-red-700 px-0 rounded-sm font-semibold">{part}</mark>
+          : part
+      )}
+    </>
+  );
+}
+
+export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", query = "" }: OrderListTableProps) => {
+  const activeQuery = query.trim();
   const router = useRouter();
   const { formatPrice } = useGlobalStore(); 
   
@@ -173,18 +190,24 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }
 
   const formatAddress = (addr: OrderAddress | null | undefined) => {
       if (!addr) return null;
-      const name = `${addr.firstName || ''} ${addr.lastName || ''}`.trim();
+      const firstName = addr.firstName || '';
+      const lastName  = addr.lastName  || '';
+      const name = `${firstName} ${lastName}`.trim();
       const lines = [
           addr.address1,
           addr.address2,
-          `${addr.city} ${addr.state} ${addr.postcode}`,
+          `${addr.city || ''} ${addr.state || ''} ${addr.postcode || ''}`.trim(),
           addr.country !== 'AU' ? addr.country : ''
-      ].filter(Boolean);
-      
+      ].filter(Boolean) as string[];
+
       return (
           <div className="text-[#3c434a] text-[13px]">
-              {name && <strong className="text-[#2271b1] hover:text-[#135e96] block mb-0.5">{name}</strong>}
-              {lines.map((line, i) => <div key={i}>{line}</div>)}
+              {name && (
+                <strong className="text-[#2271b1] hover:text-[#135e96] block mb-0.5">
+                  {highlight(firstName, activeQuery)} {highlight(lastName, activeQuery)}
+                </strong>
+              )}
+              {lines.map((line, i) => <div key={i}>{highlight(line, activeQuery)}</div>)}
           </div>
       );
   };
@@ -298,7 +321,7 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC" }
                                     
                                     <td className="py-3 px-3 align-top min-w-[140px]">
                                         <Link href={`/admin/orders/${order.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline">
-                                            #{order.orderNumber} {customerName}
+                                            #{highlight(order.orderNumber, activeQuery)} {highlight(customerName, activeQuery)}
                                         </Link>
                                         
                                         <div className="text-[12px] text-[#646970] mt-1 xl:hidden">

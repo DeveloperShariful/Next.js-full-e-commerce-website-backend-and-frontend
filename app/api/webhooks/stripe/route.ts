@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
-import { syncOrderToTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
+import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
 
@@ -91,14 +91,13 @@ export async function POST(request: Request) {
 
       // If Frontend already did the job
       if (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID) {
-          // ✅ Backup: payment done but TransDirect not synced yet → resync
-          if (order.transdirectOrderStatus !== 'booked') {
-              console.log(`🔄 [Stripe Webhook] Order ${orderId} paid but not synced to TransDirect. Backup sync...`);
-              try {
-                  await syncOrderToTransdirect(orderId);
-              } catch (err) {
-                  console.error('[Stripe Webhook] Backup TransDirect sync failed:', err);
-              }
+          // Backup: already PROCESSING — check if Transdirect sync is done
+          if (order.transdirectOrderStatus === 'booked') {
+              db.orderNote.create({
+                  data: { orderId, content: '✅ Transdirect already synced (capture-order) — stripe-webhook skipping sync', isSystem: true }
+              }).catch(() => {});
+          } else {
+              queueAndSyncTransdirect(orderId, 'stripe-webhook');
           }
           const alreadyEmail = order.guestEmail || order.user?.email;
           await Promise.allSettled([
@@ -178,11 +177,7 @@ export async function POST(request: Request) {
       });
 
       console.log(`🎉 [Stripe Webhook] Rescue Successful! Order #${orderId} updated.`);
-      try {
-          await syncOrderToTransdirect(orderId);
-      } catch (err) {
-          console.error('[Stripe Webhook] TransDirect sync failed:', err);
-      }
+      queueAndSyncTransdirect(orderId, 'stripe-webhook-rescue');
 
       // Post-rescue side effects — email + abandonedCheckout + analytics run in parallel
       const rescueEmail = order.guestEmail || order.user?.email;

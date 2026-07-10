@@ -180,8 +180,8 @@ export async function POST(request: Request) {
       userId: currentOrder.userId ?? undefined,
     }).catch(() => {});
 
-    // Queue + immediately attempt Transdirect sync (cron retries on fail)
-    queueAndSyncTransdirect(orderId, 'capture-order');
+    // Await Transdirect sync — failure reason written to order note; cron retries if sync fails
+    await queueAndSyncTransdirect(orderId, 'capture-order');
 
     // ── 6. Clear cart server-side ─────────────────────────────
     // Payment is confirmed — clear the cart immediately so header/mini-cart

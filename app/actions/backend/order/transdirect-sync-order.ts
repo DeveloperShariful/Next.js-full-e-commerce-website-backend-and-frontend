@@ -497,10 +497,15 @@ export async function syncOrderToTransdirect(orderId: string, source: string = '
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : 'Unknown error';
     console.error('SYNC_ERROR:', errMsg);
-    await db.order.updateMany({
-      where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
-      data: { transdirectOrderStatus: 'failed', transdirectError: errMsg },
-    }).catch(() => {});
+    await Promise.allSettled([
+      db.order.updateMany({
+        where: { id: orderId, transdirectOrderStatus: { not: 'booked' } },
+        data: { transdirectOrderStatus: 'failed', transdirectError: errMsg },
+      }),
+      db.orderNote.create({
+        data: { orderId, content: `❌ TransDirect sync failed via ${source}: ${errMsg}`, isSystem: true }
+      }),
+    ]);
     return { success: false, error: errMsg };
   }
 }

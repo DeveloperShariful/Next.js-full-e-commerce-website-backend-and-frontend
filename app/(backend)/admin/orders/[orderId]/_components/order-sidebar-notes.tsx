@@ -53,7 +53,7 @@ export const OrderSidebarNotes = ({ order, timezone = "UTC" }: OrderSidebarNotes
         {isOpen && (
             <div className="p-3">
                 {/* Scrollable Notes List */}
-                <div className="max-h-[250px] overflow-y-auto mb-4 border-b border-[#f0f0f1] pb-2">
+                <div className="max-h-auto overflow-y-auto mb-4 border-b border-[#f0f0f1] pb-2">
                     <ul className="space-y-3 m-0 p-0 list-none">
                         {order.orderNotes.length === 0 && (
                             <li className="text-[13px] text-[#646970] italic">There are no notes yet.</li>

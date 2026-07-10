@@ -238,10 +238,10 @@ export async function POST(request: Request) {
       }).catch(() => {});
     }
 
-    // ── 8. Post-payment side-effects (fire-and-forget) ────────
+    // ── 8. Post-payment side-effects ────────────────────────────
     if (successResponse && finalOrderStatus === OrderStatus.PROCESSING) {
-      // Queue + immediately attempt Transdirect sync (cron retries on fail)
-      queueAndSyncTransdirect(wcOrderId, 'capture-order');
+      // Await Transdirect sync — failure reason written to order note; cron retries if sync fails
+      await queueAndSyncTransdirect(wcOrderId, 'capture-order');
     }
 
     if (successResponse) {

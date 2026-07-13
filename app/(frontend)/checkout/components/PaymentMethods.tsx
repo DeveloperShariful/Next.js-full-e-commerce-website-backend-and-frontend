@@ -11,6 +11,7 @@ import PayPalPaymentGateway from './PayPalPaymentGateway';
 import StripePaymentGateway from './StripePaymentGateway';
 import PayPalMessage from './PayPalMessage';
 import { toast } from 'sonner';
+import { clearCartAction } from '@/app/actions/frontend/cart/cartActions';
 
 // Fix #7: fire-and-forget client→server log bridge (auditService is server-only)
 function logCheckoutError(step: string, error: string, metadata?: Record<string, unknown>) {
@@ -111,6 +112,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
   const router = useRouter();
   const stripeFormRef = useRef<HTMLFormElement>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [payId, setPayId] = useState('');
 
   const mainStripeKey = stripePublicKey || gateways.find(g => g.identifier === 'stripe')?.publicKey || '';
   const paypalGateway = gateways.find(g => g.identifier === 'paypal');
@@ -159,6 +161,12 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
           style={{ width: 'auto' }}
         />
       );
+    if (identifier === 'stripe_payto')
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-[#00b4d8] text-white tracking-wide">
+          PayTo
+        </span>
+      );
     return null;
   };
 
@@ -173,7 +181,13 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
       return;
     }
 
-    // ── BNPL: Klarna / Afterpay / Zip ────────────────────────
+    // ── PayTo: validate PayID before proceeding ──────────────
+    if (selectedPaymentMethod === 'stripe_payto' && !payId.trim()) {
+      toast.error('Please enter your PayID (email, phone number, or ABN).');
+      return;
+    }
+
+    // ── BNPL: Klarna / Afterpay / Zip / PayTo ────────────────
     // These methods need explicit payment_method_types on the PI, which is incompatible
     // with the shared PI (automatic_payment_methods used by Express Checkout + Card).
     // Solution: create a fresh dedicated PI for each BNPL payment.
@@ -192,6 +206,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
         // 'stripe_afterpay' → 'afterpay_clearpay'
         // 'stripe_klarna'   → 'klarna'
         // 'stripe_zip'      → 'zip'
+        // 'stripe_payto'    → 'payto'
         let paymentMethodType = selectedPaymentMethod.replace('stripe_', '');
         if (paymentMethodType === 'afterpay') paymentMethodType = 'afterpay_clearpay';
 
@@ -252,6 +267,39 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
             payment_method: { billing_details: billingDetails },
             return_url: returnUrl,
           });
+        } else if (paymentMethodType === 'payto') {
+          // PayTo — async bank notification, NOT a browser redirect like Afterpay/Klarna.
+          // confirmPayToPayment creates the agreement and returns immediately with PI 'processing'.
+          // Stripe webhook fires when bank approves → updates order to PROCESSING + PAID.
+          // No return_url needed — we redirect to order-success ourselves.
+          type PayToConfirm = (
+            secret: string,
+            opts: {
+              payment_method: {
+                payto: { pay_id: string };
+                billing_details: typeof billingDetails;
+              };
+            }
+          ) => Promise<PaymentIntentResult>;
+          const confirmPayTo = (stripe as unknown as { confirmPayToPayment: PayToConfirm }).confirmPayToPayment;
+          const payToResult = await confirmPayTo(bnplClientSecret, {
+            payment_method: {
+              payto: { pay_id: payId.trim() },
+              billing_details: billingDetails,
+            },
+          });
+
+          if (payToResult?.error) {
+            throw new Error(payToResult.error.message || 'PayTo payment failed.');
+          }
+
+          // PI is now 'processing' — bank will approve asynchronously (~15-20s in test mode).
+          // Stripe webhook handles order capture, stock decrement, email, Transdirect sync.
+          // Clear cart now (non-critical — don't block redirect on failure).
+          try { await clearCartAction(); } catch { /* non-critical */ }
+          toast.dismiss('bnpl-redirect');
+          window.location.href = `${window.location.origin}/order-success?order_id=${orderDetails.orderId}&key=${orderDetails.orderKey}`;
+          return;
         }
 
         if (confirmResult?.error) {
@@ -298,6 +346,7 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
     'stripe_afterpay',
     'stripe_zip',
     'stripe_klarna',
+    'stripe_payto',
     'bank_transfer',
     'cod',
   ];
@@ -388,12 +437,38 @@ export default function PaymentMethods(props: PaymentMethodsProps) {
             {/* BNPL / Offline: show description text */}
             {selectedPaymentMethod === gateway.identifier &&
               gateway.identifier !== 'stripe' &&
+              gateway.identifier !== 'stripe_payto' &&
               gateway.description && (
                 <div className="p-[15px] bg-[#f9f9f9] border-t border-[#e0e0e0]">
                   <div
                     className="w-full text-sm text-[#555] leading-normal"
                     dangerouslySetInnerHTML={{ __html: gateway.description }}
                   />
+                </div>
+              )}
+
+            {/* PayTo: description + PayID input field */}
+            {selectedPaymentMethod === gateway.identifier &&
+              gateway.identifier === 'stripe_payto' && (
+                <div className="p-[15px] bg-[#f9f9f9] border-t border-[#e0e0e0] flex flex-col gap-3">
+                  {gateway.description && (
+                    <div
+                      className="w-full text-sm text-[#555] leading-normal"
+                      dangerouslySetInnerHTML={{ __html: gateway.description }}
+                    />
+                  )}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#444] mb-1">
+                      Your PayID <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={payId}
+                      onChange={(e) => setPayId(e.target.value)}
+                      placeholder="Email, mobile number, or ABN"
+                      className="w-full border border-[#d0d0d0] rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 bg-white"
+                    />
+                  </div>
                 </div>
               )}
           </div>

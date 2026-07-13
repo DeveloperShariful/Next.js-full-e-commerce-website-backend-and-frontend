@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
     if (selectedPaymentMethod === 'stripe_klarna') paymentMethodTitle = 'Klarna';
     if (selectedPaymentMethod === 'stripe_afterpay') paymentMethodTitle = 'Afterpay / Clearpay';
     if (selectedPaymentMethod === 'stripe_zip') paymentMethodTitle = 'Zip Pay';
+    if (selectedPaymentMethod === 'stripe_payto') paymentMethodTitle = 'PayTo';
 
     const country = customerInfo.country || 'AU';
     const couponCode = appliedCoupons?.[0]?.code;

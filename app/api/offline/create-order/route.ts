@@ -427,7 +427,7 @@ export async function POST(request: NextRequest) {
 
     // ── Transdirect: COD only (Bank Transfer: admin ships after confirming payment) ─
     if (isCoD) {
-      queueAndSyncTransdirect(orderId, 'offline-cod');
+      await queueAndSyncTransdirect(orderId, 'offline-cod');
     }
 
     // ── Emails (fire-and-forget) ─────────────────────────────────

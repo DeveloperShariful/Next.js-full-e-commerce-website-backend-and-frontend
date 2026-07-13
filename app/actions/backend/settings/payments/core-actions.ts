@@ -3,7 +3,7 @@
 "use server"
 
 import { db } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { auditService } from "@/lib/audit-service"
 import { security } from "@/lib/security"
 import { Prisma, PaymentMode, PaymentProvider } from "@prisma/client"
@@ -103,13 +103,39 @@ export async function toggleGatewayStatus(id: string, isEnabled: boolean) {
     });
 
     revalidatePath("/admin/settings/payments");
+    revalidateTag('payment-methods', 'default'); // invalidate checkout page cache immediately
     return { success: true };
   } catch {
     return { success: false, error: "Failed to update status." };
   }
 }
 
-// 3. Reset DB Data (Updated JSON Defaults - Removed Klarna/Afterpay boolean flags inside settings)
+// 3. Ensure PayTo gateway exists without resetting other gateways (auto-seed)
+export async function ensurePayToGateway() {
+  try {
+    const exists = await db.paymentGateway.findUnique({ where: { identifier: 'stripe_payto' } });
+    if (!exists) {
+      const last = await db.paymentGateway.findFirst({ orderBy: { displayOrder: 'desc' } });
+      await db.paymentGateway.create({
+        data: {
+          identifier: 'stripe_payto',
+          provider: PaymentProvider.STRIPE,
+          name: 'Stripe - PayTo',
+          title: 'PayTo',
+          description: 'Pay directly from your Australian bank account using your PayID (email, phone, or ABN). You\'ll receive a notification in your bank app to approve the payment.',
+          isEnabled: false,
+          mode: PaymentMode.TEST,
+          displayOrder: last ? last.displayOrder + 1 : 10,
+          settings: StripeSettingsSchema.parse({}) as Prisma.InputJsonValue,
+        }
+      });
+    }
+  } catch (err) {
+    console.error('[ensurePayToGateway] failed:', err);
+  }
+}
+
+// 4. Reset DB Data (Updated JSON Defaults - Removed Klarna/Afterpay boolean flags inside settings)
 export async function resetPaymentGatewaysDB() {
   const user = await security.assertAdmin();
   try {
@@ -123,7 +149,8 @@ export async function resetPaymentGatewaysDB() {
         { identifier: "stripe_zip", provider: PaymentProvider.STRIPE, name: "Stripe - Zip Pay", title: "Zip Pay", description: "Flexible repayments.", isEnabled: false, mode: PaymentMode.TEST, settings: StripeSettingsSchema.parse({}) },
         { identifier: "paypal", provider: PaymentProvider.PAYPAL, name: "PayPal", title: "PayPal", description: "Pay with PayPal account.", isEnabled: true, mode: PaymentMode.TEST, settings: PaypalSettingsSchema.parse({}) },
         { identifier: "bank_transfer", provider: PaymentProvider.OFFLINE, name: "Bank Transfer", title: "Direct Bank Transfer", description: "Direct bank wire transfer.", isEnabled: false, mode: PaymentMode.LIVE, settings: OfflineSettingsSchema.parse({ instructions: "Transfer money to our bank account." }) },
-        { identifier: "cod", provider: PaymentProvider.OFFLINE, name: "Cash on Delivery", title: "Cash on Delivery", description: "Pay upon delivery.", isEnabled: false, mode: PaymentMode.LIVE, settings: OfflineSettingsSchema.parse({ instructions: "Pay with cash upon delivery." }) }
+        { identifier: "cod", provider: PaymentProvider.OFFLINE, name: "Cash on Delivery", title: "Cash on Delivery", description: "Pay upon delivery.", isEnabled: false, mode: PaymentMode.LIVE, settings: OfflineSettingsSchema.parse({ instructions: "Pay with cash upon delivery." }) },
+        { identifier: "stripe_payto", provider: PaymentProvider.STRIPE, name: "Stripe - PayTo", title: "PayTo", description: "Pay directly from your Australian bank account using your PayID (email, phone, or ABN). You'll receive a notification in your bank app to approve the payment.", isEnabled: false, mode: PaymentMode.TEST, settings: StripeSettingsSchema.parse({}) },
       ];
 
       for (const [index, m] of defaultMethods.entries()) {

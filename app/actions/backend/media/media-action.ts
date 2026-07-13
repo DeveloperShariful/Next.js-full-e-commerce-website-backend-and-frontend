@@ -3,7 +3,7 @@
 'use server';
 
 import { db } from '@/lib/prisma';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { del, list, type ListBlobResult } from '@vercel/blob';
 import { Media, MediaType, MediaSource, Prisma } from '@prisma/client';
 
@@ -36,6 +36,7 @@ export async function saveMediaRecord(data: {
     });
 
     revalidatePath('/admin/media');
+    revalidateTag('admin-media', 'default');
     return { success: true, media: newMedia };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to save media record';
@@ -44,8 +45,8 @@ export async function saveMediaRecord(data: {
   }
 }
 
-// 2. Fetch all media (Returns strongly typed Media Array, optional source filter)
-export async function getAllMedia(source?: MediaSource): Promise<Media[]> {
+// 2. Fetch all media — cached for 5 min, invalidated by all write operations
+async function _getAllMedia(source?: MediaSource): Promise<Media[]> {
   try {
     return await db.media.findMany({
       where: source ? { source } : undefined,
@@ -55,6 +56,12 @@ export async function getAllMedia(source?: MediaSource): Promise<Media[]> {
     return [];
   }
 }
+
+export const getAllMedia = unstable_cache(
+  _getAllMedia,
+  ['admin-media'],
+  { revalidate: 300, tags: ['admin-media'] }
+);
 
 const isVercelBlobUrl = (url: string) => url.includes('.public.blob.vercel-storage.com');
 
@@ -97,6 +104,7 @@ export async function deleteMedia(id: string): Promise<{ success: boolean; messa
     await db.media.delete({ where: { id } });
 
     revalidatePath('/admin/media');
+    revalidateTag('admin-media', 'default');
     return { success: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Delete failed';
@@ -121,6 +129,7 @@ export async function bulkDeleteMedia(ids: string[]): Promise<{ success: boolean
     await db.media.deleteMany({ where: { id: { in: ids } } });
 
     revalidatePath('/admin/media');
+    revalidateTag('admin-media', 'default');
     return { success: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Bulk delete failed';
@@ -199,6 +208,7 @@ export async function syncAllExistingMedia(): Promise<{ success: boolean; count?
     }
 
     revalidatePath('/admin/media');
+    revalidateTag('admin-media', 'default');
     return { success: true, count: newMediaData.length };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Sync failed';
@@ -241,6 +251,7 @@ export async function syncOldWarrantyMedia(): Promise<{ success: boolean; count?
     }
 
     revalidatePath('/admin/media');
+    revalidateTag('admin-media', 'default');
     return { success: true, count: newMediaData.length };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Sync failed';
@@ -287,6 +298,7 @@ export async function syncFromVercelBlob(): Promise<{ success: boolean; count?: 
     }
 
     revalidatePath('/admin/media');
+    revalidateTag('admin-media', 'default');
     return { success: true, count: newMediaData.length };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Vercel Blob sync failed';

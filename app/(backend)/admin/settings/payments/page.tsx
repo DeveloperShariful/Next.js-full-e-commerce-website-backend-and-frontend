@@ -3,11 +3,12 @@
 export const dynamic = "force-dynamic"
 
 import { AlertTriangle } from "lucide-react"
-import { getAllPaymentGateways } from "@/app/actions/backend/settings/payments/core-actions"
+import { getAllPaymentGateways, ensurePayToGateway } from "@/app/actions/backend/settings/payments/core-actions"
 import { Payment_Methods_List } from "./_components/Payment_Methods_List"
 import { ScrollRestorer } from "@/app/(backend)/admin/_components/back-button"
 
 export default async function PaymentsPage() {
+  await ensurePayToGateway();
   const res = await getAllPaymentGateways()
 
   return (

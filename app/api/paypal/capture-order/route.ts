@@ -1,7 +1,17 @@
 // app/api/paypal/capture-order/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
-import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
+import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
+
+interface PayPalCaptureDetails {
+  id?: string;
+  status?: string;
+  amount?: { value?: string };
+}
+
+interface PayPalCaptureIssue {
+  issue?: string;
+}
 import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
@@ -82,11 +92,11 @@ export async function POST(request: Request) {
     );
 
     const captureData = await captureResponse.json();
-    let captureDetails: any = null;
+    let captureDetails: PayPalCaptureDetails | null = null;
 
     if (!captureResponse.ok) {
       const alreadyCaptured = captureData.details?.some(
-        (d: any) => d.issue === 'ORDER_ALREADY_CAPTURED'
+        (d: PayPalCaptureIssue) => d.issue === 'ORDER_ALREADY_CAPTURED'
       );
 
       if (alreadyCaptured) {
@@ -99,7 +109,7 @@ export async function POST(request: Request) {
         if (!captureDetails) throw new Error('Could not retrieve capture details from PayPal.');
       } else {
         const isDeclined = captureData.details?.some(
-          (d: any) => d.issue === 'INSTRUMENT_DECLINED'
+          (d: PayPalCaptureIssue) => d.issue === 'INSTRUMENT_DECLINED'
         );
         await db.order.update({
           where: { id: wcOrderId },
@@ -198,7 +208,7 @@ export async function POST(request: Request) {
           amount: capturedAmount,
           transactionId,
           status: paymentStatus,
-          rawResponse: captureData as any,
+          rawResponse: captureData as unknown as Prisma.InputJsonValue,
         },
       });
 

@@ -246,16 +246,80 @@ export default function WarrantyClient() {
             </p>
           </div>
 
-          <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">What is Covered?</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Our comprehensive warranty covers manufacturing defects in the frame, motor, battery,
-              and controller. Standard wear and tear (tires, brake pads) or damage from misuse are
-              not covered.
-            </p>
-            <a href="/warranty" className="text-blue-600 font-semibold text-sm hover:underline">
-              Read Full Warranty Policy →
-            </a>
+          {/* HOW TO SUBMIT GUIDE */}
+          <div className="rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-900 px-6 py-4">
+              <h3 className="text-base font-bold text-white">How to Submit Your Claim</h3>
+              <p className="text-gray-400 text-[13px] mt-0.5">Follow the steps below based on where you purchased your GoBike.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+
+              {/* ONLINE PATH */}
+              <div className="bg-white p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600">Option A</p>
+                    <p className="text-[14px] font-extrabold text-gray-900 leading-tight">Purchased Online from GoBike</p>
+                  </div>
+                </div>
+
+                <ol className="space-y-3">
+                  {[
+                    { n: '1', text: 'Select <strong>GoBike Australia (Online)</strong> from the shop dropdown.' },
+                    { n: '2', text: 'Enter your <strong>Order Number</strong> (e.g. #12345) — we\'ll automatically find your shipping address.' },
+                    { n: '3', text: 'Enter your <strong>Email</strong> and <strong>Full Name</strong>.' },
+                    { n: '4', text: 'Upload a <strong>video or photo</strong> showing the fault.' },
+                    { n: '5', text: 'Describe the issue and hit <strong>Submit</strong>.' },
+                  ].map(s => (
+                    <li key={s.n} className="flex items-start gap-3">
+                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-extrabold flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</span>
+                      <p className="text-[13px] text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: s.text }} />
+                    </li>
+                  ))}
+                </ol>
+
+                <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-[12px] text-blue-700">
+                  <span className="font-bold">✓ No address needed</span> — your delivery address is fetched automatically from your order.
+                </div>
+              </div>
+
+              {/* RETAIL PATH */}
+              <div className="bg-white p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-amber-600">Option B</p>
+                    <p className="text-[14px] font-extrabold text-gray-900 leading-tight">Purchased from a Retail Store</p>
+                  </div>
+                </div>
+
+                <ol className="space-y-3">
+                  {[
+                    { n: '1', text: 'Select your <strong>retail store</strong> from the dropdown (NSW, VIC, QLD or WA).' },
+                    { n: '2', text: '<strong>Order Number is optional</strong> for retail purchases — leave it blank if you don\'t have it.' },
+                    { n: '3', text: 'Enter your <strong>Email Address</strong>.' },
+                    { n: '4', text: 'Fill in your <strong>full delivery address</strong> — we\'ll ship the replacement part directly to you.' },
+                    { n: '5', text: 'Upload a <strong>video or photo</strong> of the issue and hit <strong>Submit</strong>.' },
+                  ].map(s => (
+                    <li key={s.n} className="flex items-start gap-3">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-extrabold flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</span>
+                      <p className="text-[13px] text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: s.text }} />
+                    </li>
+                  ))}
+                </ol>
+
+                <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-[12px] text-amber-800">
+                  <span className="font-bold">📍 Address required</span> — since you didn&apos;t buy online, we need your address to send the replacement part.
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
 

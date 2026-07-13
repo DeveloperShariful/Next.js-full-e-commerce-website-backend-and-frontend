@@ -62,8 +62,8 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
         </div>
 
         {/* Sidebar Content */}
-        <div className="h-full sidebar-mobile-override overflow-hidden">
-            <AdminSidebar user={user} /> 
+        <div className="h-full sidebar-mobile-override overflow-x-hidden">
+            <AdminSidebar user={user} />
         </div>
       </div>
 
@@ -74,6 +74,14 @@ export function MobileSidebar({ user }: MobileSidebarProps) {
           border-right: none !important;
           height: 100vh !important;
           top: 0 !important;
+        }
+        .sidebar-mobile-override aside nav {
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
+        .sidebar-mobile-override aside nav::-webkit-scrollbar {
+          display: none;
         }
       `}</style>
     </>

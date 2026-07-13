@@ -141,9 +141,12 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
           {/* LEFT: Preview */}
           <div className="w-full md:w-[65%] h-[40vh] md:h-full border-b md:border-b-0 md:border-r border-[#dcdcde] flex items-center justify-center p-4 md:p-8 relative bg-[#f0f0f1]">
             {selectedFile.type === 'VIDEO' ? (
-              <video controls className="w-full max-h-full shadow-lg bg-black object-contain">
-                <source src={selectedFile.url} type={selectedFile.mimeType} />
-              </video>
+              <video
+                key={selectedFile.id}
+                controls
+                src={selectedFile.url}
+                className="w-full max-h-full shadow-lg bg-black object-contain"
+              />
             ) : selectedFile.type === 'DOCUMENT' ? (
               <div className="flex flex-col items-center justify-center text-gray-500">
                 <IoDocumentTextOutline size={80} className="text-[#2271b1] mb-4" />

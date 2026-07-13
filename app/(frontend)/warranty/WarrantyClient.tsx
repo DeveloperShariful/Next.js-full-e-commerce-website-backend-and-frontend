@@ -322,7 +322,7 @@ export default function WarrantyClient() {
             </div>
           </div>
         </div>
-
+  
         <div className="mt-8">
           <div className="bg-white p-2 sm:p-10 rounded-2xl shadow-lg border border-gray-100">
             <h2 className="text-xl font-extrabold text-gray-900 mb-6 pb-4 border-b border-gray-100">Submit Your Claim</h2>

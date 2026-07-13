@@ -135,7 +135,14 @@ export default function MediaGrid(props: MediaGridProps) {
           >
             {file.type === MediaType.VIDEO ? (
               <div className="w-full h-full relative bg-[#1d2327]">
-                <video src={`${file.url}#t=1`} className="w-full h-full object-cover" preload="metadata" muted playsInline />
+                <video
+                  src={file.url}
+                  className="w-full h-full object-cover"
+                  preload="metadata"
+                  muted
+                  playsInline
+                  onLoadedMetadata={(e) => { e.currentTarget.currentTime = 1; }}
+                />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="bg-black/50 rounded-full p-1.5">
                     <svg className="w-4 h-4 text-white fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>

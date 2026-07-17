@@ -14,6 +14,7 @@ const GOBIKE_ONLINE_VALUE = 'GoBike Australia';
 
 const SHOP_OPTIONS = [
   { group: 'Online', options: [{ value: 'GoBike Australia', label: 'GoBike Australia (Online)', address: '' }] },
+  { group: 'Others', options: [{ value: 'Others', label: 'OTHERS', address: '' }] },
   {
     group: 'NSW Retailers',
     options: [
@@ -382,7 +383,7 @@ export default function WarrantyClient() {
 
                   {/* Dropdown panel */}
                   {isShopDropdownOpen && (
-                    <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
+                    <div className="absolute z-5 top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
                       {SHOP_OPTIONS.map((group) => (
                         <div key={group.group}>
                           <div className="px-4 pt-3 pb-1.5">

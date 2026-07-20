@@ -30,7 +30,7 @@ const SHOP_OPTIONS = [
   {
     group: 'Victoria Retailers',
     options: [
-      { value: 'Ozminis Motorsport', label: 'Ozminis Motorsport', address: "26B O'Sullivan St, Pakenham VIC" },
+      { value: '', label: 'Seeking Applicants — Starting January 2027', address: '', disabled: true },
     ],
   },
   {
@@ -391,6 +391,15 @@ export default function WarrantyClient() {
                           </div>
                           {group.options.map((opt) => {
                             const isSelected = formData.shopPurchased === opt.value;
+                            if ((opt as { disabled?: boolean }).disabled) {
+                              return (
+                                <div key={opt.label} className="px-4 py-2.5 flex items-center gap-2">
+                                  <span className="text-[11px] font-bold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md leading-tight">
+                                    {opt.label}
+                                  </span>
+                                </div>
+                              );
+                            }
                             return (
                               <button
                                 key={opt.value}

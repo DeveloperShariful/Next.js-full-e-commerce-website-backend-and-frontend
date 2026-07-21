@@ -72,18 +72,29 @@ export default function FeatureSlider({ title, features }: FeatureSliderProps) {
         )}
       </div>
       <div className="relative w-full overflow-hidden">
-        <div 
+        <div
           className="flex transition-transform duration-500 ease-in-out"
-          style={{ 
+          style={{
             width: `${(100 / itemsPerPage) * features.length}%`,
-            transform: `translateX(-${(100 / features.length) * currentIndex}%)` 
+            transform: `translateX(-${(100 / features.length) * currentIndex}%)`
           }}
         >
           {features.map((feature, index) => (
-            <div key={index} className="box-border px-2">
-              <div className="rounded-xl overflow-hidden bg-white border border-slate-200 h-full">
-                <div className="relative w-full pt-[60%] bg-slate-50">
-                  <Image src={feature.imageSrc} alt={feature.imageAlt} fill style={{ objectFit: 'cover' }} sizes="33vw"/>
+            <div
+              key={index}
+              className="box-border px-2 flex-shrink-0"
+              style={{ width: `${100 / features.length}%` }}
+            >
+              <div className="rounded-xl overflow-hidden bg-white border border-slate-200 h-full transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1.5 hover:border-slate-300">
+                <div className="relative w-full pt-[60%] bg-slate-50 overflow-hidden">
+                  <Image
+                    src={feature.imageSrc}
+                    alt={feature.imageAlt}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    className="transition-transform duration-500 ease-out hover:scale-105"
+                    sizes="33vw"
+                  />
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-semibold mb-2 text-slate-800">{feature.title}</h3>

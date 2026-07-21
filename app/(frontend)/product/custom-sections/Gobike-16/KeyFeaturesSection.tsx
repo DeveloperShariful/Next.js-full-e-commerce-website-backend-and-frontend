@@ -1,13 +1,14 @@
 // ফাইল পাথ: app/product/custom-sections/Gobike-16/KeyFeaturesSection.tsx
 import FeatureSlider from '../FeatureSlider';
+import AnimateOnScroll from '../AnimateOnScroll';
 import styles from '../GobikeSections.module.css';
 
 const keyFeatures = [
   {
-    imageSrc: 'https://gobikes.au/wp-content/uploads/2025/10/16-R-Handlebars.webp',
-    imageAlt: 'GoBike 16 e-bike showing the easy-to-use twist throttle and handlebar grip.',
+    imageSrc: 'https://rgy4iw8lybyokbyt.public.blob.vercel-storage.com/16%20inch%20throttle%20image-1SR3ChT5ZxCswxAhWMxnf4pR04KR5X.webp',
+    imageAlt: 'GoBike 16 twist throttle handlebar close-up showing precise speed control for kids.',
     title: 'Intuitive Twist Throttle',
-    description: 'Gives your little rider full control over their speed with a simple twist. The high-grip handlebar ensures their hands stay put, even on bumpy trails.'
+    description: 'One smooth twist is all it takes — your rider gets instant, precise speed control right at their fingertips. The ergonomic high-grip handlebar keeps hands locked in confidently, whether cruising the park or tackling rough tracks. No complicated buttons, no confusion — just pure ride-ready control.'
   },
   {
     imageSrc: 'https://gobikes.au/wp-content/uploads/2025/10/16-Y-R-Motor.webp',
@@ -31,9 +32,10 @@ const keyFeatures = [
 
 export default function KeyFeaturesSection() {
   return (
-    // .sectionContainer replaced
-    <section className="w-full py-12 px-[5%] md:px-[1%] box-border"> 
-      <FeatureSlider title="More Key Features" features={keyFeatures} />
+    <section className="w-full py-12 px-[5%] md:px-[1%] box-border">
+      <AnimateOnScroll direction="up">
+        <FeatureSlider title="More Key Features" features={keyFeatures} />
+      </AnimateOnScroll>
     </section>
   );
 }

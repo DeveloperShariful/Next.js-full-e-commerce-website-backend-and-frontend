@@ -117,7 +117,9 @@ export default function ContactPageClient() {
             <div className="lg:col-span-7 bg-[#f8f9fa] border border-gray-200 rounded-2xl p-3 md:p-3 flex flex-col">
               <h2 className="text-xl font-black uppercase tracking-tight text-gray-900 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-200 pb-4">
                 <span>Authorized Retailers</span>
-                <span className="self-start sm:self-auto text-[10px] font-bold text-gray-400 bg-white px-5 py-1 rounded-full border border-gray-200"> 9 Locations </span>
+                <Link href="/retailers" className="self-start sm:self-auto text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-4 py-1 rounded-full border border-blue-200 transition-colors">
+                  View All →
+                </Link>
               </h2>
 
               <div className="flex-1 flex flex-col gap-5">
@@ -150,9 +152,11 @@ export default function ContactPageClient() {
                     <h5 className="font-bold text-green-600 uppercase tracking-widest text-[10px] mb-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span> Victoria
                     </h5>
-                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm">
-                      <p className="font-bold text-gray-900 text-xs md:text-sm leading-tight">Ozminis Motorsport</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">26B O'Sullivan St, Pakenham</p>
+                    <div className="bg-white p-2.5 rounded-lg border border-amber-100 shadow-sm flex flex-col gap-1">
+                      <span className="text-[10px] font-black uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded self-start leading-tight">
+                        Seeking Applicants
+                      </span>
+                      <p className="text-[10px] text-gray-400 leading-snug">Starting January 2027</p>
                     </div>
                   </div>
 

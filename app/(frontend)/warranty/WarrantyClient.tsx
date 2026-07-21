@@ -40,7 +40,7 @@ const SHOP_OPTIONS = [
     ],
   },
   {
-    group: 'Western Retailers',
+    group: 'Western Australia Retailers',
     options: [
       { value: 'Eazy Bikes', label: 'Eazy Bikes', address: 'Unit 1/12 Farral Road, Midvale WA 6056' },
     ],

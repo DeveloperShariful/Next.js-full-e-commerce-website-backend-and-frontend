@@ -61,21 +61,32 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
   const featuredPost = page === 1 && !category ? posts[0] ?? null : null;
   const gridPosts = page === 1 && !category ? posts.slice(1) : posts;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    name: "GoBike Australia Blog",
-    description: "Expert tips and guides about kids electric bikes and balancing bikes.",
-    url: "https://gobike.au/blog",
-    blogPost: posts.map((p) => ({
-      "@type": "BlogPosting",
-      headline: p.title,
-      description: p.excerpt,
-      url: `https://gobike.au/blog/${p.slug}`,
-      datePublished: p.publishedAt,
-      image: p.featuredImage,
-    })),
-  };
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      name: "GoBike Australia Blog",
+      description: "Expert tips and guides about kids electric bikes and balancing bikes.",
+      url: "https://gobike.au/blog",
+      publisher: { "@id": "https://gobike.au/#organization" },
+      blogPost: posts.map((p) => ({
+        "@type": "BlogPosting",
+        headline: p.title,
+        description: p.excerpt,
+        url: `https://gobike.au/blog/${p.slug}`,
+        datePublished: p.publishedAt,
+        image: p.featuredImage,
+      })),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://gobike.au" },
+        { "@type": "ListItem", position: 2, name: "Blog", item: "https://gobike.au/blog" },
+      ],
+    },
+  ];
 
   return (
     <div>
@@ -106,6 +117,19 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
       </div>
 
       <div className="max-w-[1400px] mx-auto mb-20 px-4 font-sans">
+
+        {/* SEO Intro — only shown on page 1 with no category filter */}
+        {page === 1 && !category && (
+          <div className="mb-10 bg-gray-50 border border-gray-100 rounded-2xl p-6 md:p-8">
+            <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 mb-3">Kids Electric Bike Tips, Guides & News</h2>
+            <p className="text-gray-600 leading-relaxed text-sm md:text-base mb-4">
+              Welcome to the GoBike Australia blog — your go-to resource for everything about kids electric bikes, balance bikes and family riding adventures across Australia. Our expert team publishes in-depth safety guides, age-by-age buying advice, maintenance tips and real-world product reviews to help Australian parents make confident decisions. Whether you're choosing between the GoBike 12 and GoBike 16, learning how to care for a lithium-ion battery, or looking for the best riding locations near you, you'll find practical, well-researched content here.
+            </p>
+            <p className="text-gray-600 leading-relaxed text-sm md:text-base">
+              From beginner balance bikes for toddlers aged 2–5, to high-performance electric dirt bikes for teenagers, our articles cover every stage of a young rider's journey. Browse by category to find guides on safety gear, skill progression, trail recommendations and how to get the most out of your GoBike electric bike. New articles are published regularly — bookmark this page or subscribe to our newsletter to stay up to date with the latest from GoBike Australia.
+            </p>
+          </div>
+        )}
 
         {/* Category Tabs */}
         {categories.length > 0 && (

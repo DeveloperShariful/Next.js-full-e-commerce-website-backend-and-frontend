@@ -36,29 +36,43 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const contactJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "name": "GoBike Australia",
-  "url": "https://gobike.au",
-  "telephone": "+61-426-067-277",
-  "email": "gobike@gobike.au",
-  "address": {
-    "@type": "PostalAddress",
-    "addressLocality": "Camden",
-    "addressRegion": "NSW",
-    "addressCountry": "AU"
-  },
-  "openingHours": "Mo-Fr 09:00-17:00",
-  "contactPoint": {
-    "@type": "ContactPoint",
+const contactJsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": "https://gobike.au/#localbusiness",
+    "name": "GoBike Australia",
+    "url": "https://gobike.au",
     "telephone": "+61-426-067-277",
-    "contactType": "customer service",
     "email": "gobike@gobike.au",
-    "areaServed": "AU",
-    "availableLanguage": "English"
-  }
-};
+    "priceRange": "$$",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Camden South",
+      "addressRegion": "NSW",
+      "postalCode": "2570",
+      "addressCountry": "AU"
+    },
+    "geo": { "@type": "GeoCoordinates", "latitude": -34.05, "longitude": 150.69 },
+    "openingHoursSpecification": { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "09:00", "closes": "17:00" },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+61-426-067-277",
+      "contactType": "customer service",
+      "email": "gobike@gobike.au",
+      "areaServed": "AU",
+      "availableLanguage": "English"
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://gobike.au" },
+      { "@type": "ListItem", position: 2, name: "Contact Us", item: "https://gobike.au/contact" },
+    ],
+  },
+];
 
 export default function ContactPage() {
   return (

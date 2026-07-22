@@ -66,9 +66,19 @@ const jsonLdData = {
   ]
 };
 
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://gobike.au" },
+    { "@type": "ListItem", position: 2, name: "FAQ", item: "https://gobike.au/faq" },
+  ],
+};
+
 export default function FaqPage() {
   return (
     <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([jsonLdData, breadcrumbJsonLd]) }} />
       <Breadcrumbs />
       <>
         {/* .faqPageContainer replaced */}
@@ -357,11 +367,6 @@ export default function FaqPage() {
 
         </div>
 
-        {/* SEO এর জন্য JSON-LD স্ক্রিপ্ট */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdData) }}
-        />
       </>
     </div>
   );

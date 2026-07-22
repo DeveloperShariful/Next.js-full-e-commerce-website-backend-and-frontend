@@ -111,6 +111,63 @@ export default async function RootLayout({
           suppressHydrationWarning={true}
           className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
         >
+          {/* Global structured data — Organization + WebSite + SearchAction */}
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify([
+                {
+                  "@context": "https://schema.org",
+                  "@type": "Organization",
+                  "@id": "https://gobike.au/#organization",
+                  name: "GoBike Australia",
+                  url: "https://gobike.au",
+                  logo: {
+                    "@type": "ImageObject",
+                    url: "https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids.webp",
+                    width: 1861,
+                    height: 430,
+                  },
+                  contactPoint: {
+                    "@type": "ContactPoint",
+                    contactType: "customer support",
+                    email: "gobike@gobike.au",
+                    areaServed: "AU",
+                    availableLanguage: "English",
+                  },
+                  address: {
+                    "@type": "PostalAddress",
+                    addressLocality: "Camden South",
+                    addressRegion: "NSW",
+                    addressCountry: "AU",
+                  },
+                  sameAs: [
+                    "https://www.facebook.com/Go-Bike-104997195659873",
+                    "https://www.instagram.com/gobikeoz/",
+                    "https://www.youtube.com/@Gobike-r7b",
+                    "https://www.tiktok.com/@gobikeoz",
+                    "https://www.linkedin.com/company/112710706",
+                  ],
+                },
+                {
+                  "@context": "https://schema.org",
+                  "@type": "WebSite",
+                  "@id": "https://gobike.au/#website",
+                  url: "https://gobike.au",
+                  name: "GoBike Australia",
+                  publisher: { "@id": "https://gobike.au/#organization" },
+                  potentialAction: {
+                    "@type": "SearchAction",
+                    target: {
+                      "@type": "EntryPoint",
+                      urlTemplate: "https://gobike.au/shop?q={search_term_string}",
+                    },
+                    "query-input": "required name=search_term_string",
+                  },
+                },
+              ]),
+            }}
+          />
           <NextTopLoader
             color="#56ff08ff"
             initialPosition={0.08}

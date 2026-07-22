@@ -1,5 +1,6 @@
 // ফাইল পাথ: app/product/custom-sections/Gobike-24/KeyFeaturesSection.tsx
 import FeatureSlider from '../FeatureSlider';
+import AnimateOnScroll from '../AnimateOnScroll';
 import styles from '../GobikeSections.module.css';
 
 // Note: Using existing image placeholders. Update URLs to actual 24" bike images if available.
@@ -33,8 +34,10 @@ const keyFeatures = [
 export default function KeyFeaturesSection() {
   return (
     // .sectionContainer replaced
-    <section className="w-full py-12 px-[5%] md:px-[1%] box-border"> 
-      <FeatureSlider title="More Key Features" features={keyFeatures} />
+    <section className="w-full py-12 px-[5%] md:px-[1%] box-border">
+      <AnimateOnScroll direction="up">
+        <FeatureSlider title="More Key Features" features={keyFeatures} />
+      </AnimateOnScroll>
     </section>
   );
 }

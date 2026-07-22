@@ -1,5 +1,6 @@
 // ফাইল পাথ: app/product/custom-sections/Gobike-20/KeyFeaturesSection.tsx
 import FeatureSlider from '../FeatureSlider';
+import AnimateOnScroll from '../AnimateOnScroll';
 import styles from '../GobikeSections.module.css';
 
 const keyFeatures = [
@@ -32,8 +33,10 @@ const keyFeatures = [
 export default function KeyFeaturesSection() {
   return (
     // .sectionContainer replaced
-    <section className="w-full py-12 px-[5%] md:px-[1%] box-border"> 
-      <FeatureSlider title="More Key Features" features={keyFeatures} />
+    <section className="w-full py-12 px-[5%] md:px-[1%] box-border">
+      <AnimateOnScroll direction="up">
+        <FeatureSlider title="More Key Features" features={keyFeatures} />
+      </AnimateOnScroll>
     </section>
   );
 }

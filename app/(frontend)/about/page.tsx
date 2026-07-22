@@ -38,28 +38,61 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const aboutJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  "name": "GoBike Australia",
-  "url": "https://gobike.au",
-  "foundingDate": "2023",
-  "description": "GoBike Australia creates safe, high-performance electric balance bikes for kids aged 2-16.",
-  "address": {
-    "@type": "PostalAddress",
-    "addressLocality": "Camden",
-    "addressRegion": "NSW",
-    "addressCountry": "AU"
+const aboutJsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": "https://gobike.au/#localbusiness",
+    "name": "GoBike Australia",
+    "url": "https://gobike.au",
+    "foundingDate": "2023",
+    "description": "GoBike Australia creates safe, high-performance electric balance bikes for kids aged 2–16, shipped free Australia-wide with a 1-year warranty.",
+    "image": "https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids.webp",
+    "priceRange": "$$",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Camden South",
+      "addressLocality": "Camden South",
+      "addressRegion": "NSW",
+      "postalCode": "2570",
+      "addressCountry": "AU"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": -34.05,
+      "longitude": 150.69
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+61-426-067-277",
+      "contactType": "customer service",
+      "email": "gobike@gobike.au",
+      "areaServed": "AU",
+      "availableLanguage": "English"
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+      "opens": "09:00",
+      "closes": "17:00"
+    },
+    "sameAs": [
+      "https://www.facebook.com/Go-Bike-104997195659873",
+      "https://www.instagram.com/gobikeoz/",
+      "https://www.youtube.com/@Gobike-r7b",
+      "https://www.tiktok.com/@gobikeoz",
+      "https://www.linkedin.com/company/112710706",
+    ],
   },
-  "contactPoint": {
-    "@type": "ContactPoint",
-    "telephone": "+61-426-067-277",
-    "contactType": "customer service",
-    "email": "gobike@gobike.au",
-    "areaServed": "AU"
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://gobike.au" },
+      { "@type": "ListItem", position: 2, name: "About Us", item: "https://gobike.au/about" },
+    ],
   },
-  "sameAs": ["https://twitter.com/GoBikeAU"]
-};
+];
 
 export default function AboutPage() {
   return (
@@ -68,6 +101,7 @@ export default function AboutPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutJsonLd) }}
       />
+
       <Breadcrumbs />
       
       {/* .about-us-page-wrapper replaced */}

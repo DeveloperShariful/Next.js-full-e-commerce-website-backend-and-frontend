@@ -29,7 +29,6 @@ export default function robots(): MetadataRoute.Robots {
           '/search?',
           '/*?*sort=',
           '/*?*filter=',
-          '/*?*page=',
         ],
       },
       { userAgent: 'GPTBot',          disallow: ['/'] },

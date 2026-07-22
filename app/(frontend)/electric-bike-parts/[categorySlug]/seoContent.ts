@@ -1,6 +1,84 @@
 // app/electric-bike-parts/[categorySlug]/seoContent.ts
 
 export const seoContentMap: Record<string, any> = {
+
+  // ---------------- BIKES PAGE ----------------
+  'bikes': {
+    h1: "Kids Electric Bikes Australia",
+    keywords: [
+      'kids electric bike', 'electric bike for kids', 'kids ebike australia',
+      'childrens electric bike', 'electric balance bike kids', 'buy kids electric bike'
+    ],
+    topIntro: `Shop Australia's most trusted range of <strong>kids electric bikes</strong>, designed for riders aged 2–16. From the beginner-friendly GoBike 12 to the trail-ready GoBike 24 Pro, every bike in our range is built with safety, durability and real riding fun in mind. Free Australia-wide shipping and a 1-year warranty on every bike. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">View our full bike range →</a>`,
+    bottomSections: [
+      {
+        h2: "The Best Kids Electric Bikes in Australia",
+        p: "GoBike Australia designs kids electric bikes for every stage of a rider's journey. The GoBike 12 is the perfect starting point for toddlers aged 2–5, featuring a low seat height, lightweight aluminium frame and a gentle speed limiter for safe learning. The GoBike 16 steps things up for riders aged 5–9 with a powerful 700W hub motor and hydraulic front suspension. Older kids aged 8–14 will love the GoBike 20 with its 1200W motor and all-weather disc brakes, while teens and serious riders can tackle any trail with the flagship GoBike 24 Pro and its 2500W motor. Every model is shipped free Australia-wide and backed by our 1-year warranty and local support team."
+      },
+      {
+        h2: "Why Choose a GoBike Kids Electric Bike?",
+        p: "Every GoBike kids electric bike is designed to grow with your child. Our bikes feature adjustable seat heights, ergonomic handlebars and progressive speed modes that allow parents to limit top speed as kids build their skills and confidence. Key safety features include hydraulic disc brakes, puncture-proof tyres and durable aluminium frames that can handle the knocks and drops of everyday riding. GoBike is an Australian-owned brand with a dedicated local support team, genuine spare parts availability and a responsive warranty process — giving parents total peace of mind long after purchase."
+      }
+    ],
+    faqs: [
+      { q: "What age is a kids electric bike suitable for?", a: "GoBike offers electric bikes for children aged 2 and up. The GoBike 12 suits toddlers aged 2–5, while the GoBike 24 Pro is designed for teens aged 13 and above." },
+      { q: "Are kids electric bikes safe?", a: "Yes. GoBike electric bikes feature speed limiters, hydraulic disc brakes, low seat heights and durable frames designed specifically for young riders." },
+      { q: "Do kids electric bikes come with a warranty?", a: "Yes. Every GoBike electric bike is backed by a 1-year manufacturer's warranty, with local Australian support available." },
+      { q: "Can I get spare parts for my kids electric bike?", a: "Yes. GoBike stocks a full range of genuine spare parts including batteries, motors, tyres and brakes for all models." }
+    ]
+  },
+
+  // ---------------- APPAREL PAGE ----------------
+  'apparel': {
+    h1: "Kids Riding Apparel & Safety Gear",
+    keywords: [
+      'kids riding gear', 'kids bike apparel', 'electric bike helmet kids',
+      'kids motorbike gear australia', 'childrens bike safety gear', 'kids riding helmet'
+    ],
+    topIntro: `Gear up your young rider with <strong>kids riding apparel</strong> designed for real performance and maximum protection. From helmets and gloves to jerseys and protective pads, GoBike stocks quality riding gear for children aged 2–16. The right gear builds confidence, keeps kids safe and lets them ride harder for longer. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">Browse our kids electric bikes →</a>`,
+    bottomSections: [
+      {
+        h2: "Quality Kids Riding Gear for Every Level",
+        p: "Whether your child is just starting out on the GoBike 12 or hitting jumps on the GoBike 24 Pro, having the right protective gear is essential. Our kids riding apparel range includes certified helmets with adjustable fit systems, impact-resistant gloves, breathable jerseys and padded protective gear. Every piece is selected with young riders in mind — lightweight enough to not restrict movement, but tough enough to handle the demands of active riding. Our apparel suits a range of sizes to grow with your child through each stage of their riding journey."
+      },
+      {
+        h2: "Why Proper Riding Gear Matters for Kids",
+        p: "Protective riding gear is the single most important investment you can make alongside a kids electric bike. A quality helmet protects against head impacts, while gloves improve handlebar grip and protect hands during falls. Padded shorts and knee guards allow young riders to build confidence without fear of injury. GoBike recommends full protective gear for all riding sessions, especially for faster models like the GoBike 20 and 24. Our team is happy to help you find the right size and specification for your child's age, weight and riding style."
+      }
+    ],
+    faqs: [
+      { q: "What protective gear does a child need for an electric bike?", a: "At minimum, children should wear a certified helmet and gloves. For more advanced riding, knee guards, elbow pads and padded shorts are also recommended." },
+      { q: "How do I choose the right size kids riding helmet?", a: "Measure the circumference of your child's head just above their eyebrows and match it to the helmet sizing chart. A proper fit should be snug without pressure points." },
+      { q: "Is riding apparel necessary for beginner riders?", a: "Yes. Even beginner riders benefit from a quality helmet and gloves, as falls are more common during the learning phase." },
+      { q: "Does GoBike stock certified safety helmets?", a: "Yes. All helmets in our range meet Australian safety certification standards for kids riding and electric bike use." }
+    ]
+  },
+
+  // ---------------- SPARE PARTS PAGE ----------------
+  'spare-parts': {
+    h1: "Kids Electric Bike Spare Parts Australia",
+    keywords: [
+      'electric bike spare parts', 'kids ebike parts', 'electric bike parts australia',
+      'gobike spare parts', 'kids electric bike accessories', 'ebike replacement parts'
+    ],
+    topIntro: `Keep your kids electric bike running at its best with genuine <strong>electric bike spare parts</strong> from GoBike Australia. From batteries and motors to brakes and tyres, we stock a comprehensive range of replacement and upgrade parts for the entire GoBike lineup. Fast Australia-wide shipping and local support make keeping your bike on the trail easy. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">View our kids electric bike range →</a>`,
+    bottomSections: [
+      {
+        h2: "Genuine Electric Bike Parts for Every GoBike Model",
+        p: "GoBike stocks genuine spare parts for every model in our range, including the GoBike 12, 16, 20 and 24 Pro. Our parts catalogue covers batteries, hub motors, controllers, throttle assemblies, hydraulic brake kits, callipers, disc rotors, brake levers, replacement tyres, inner tubes, wiring looms and more. Using genuine parts ensures full electrical compatibility, safe operation and continued warranty coverage on your bike. Whether you're carrying out routine maintenance, replacing a worn component or upgrading your rider's setup, you'll find the right part for your GoBike model in our store."
+      },
+      {
+        h2: "Australian Spare Parts Support You Can Count On",
+        p: "GoBike is an Australian-owned business with a dedicated local support team. When you need spare parts, our team can help diagnose the fault, identify the correct replacement component and get it shipped to your door quickly. All eligible spare parts are backed by a warranty, and our team is available via phone, email and live chat to answer technical questions. We believe that a great riding experience doesn't end at the point of sale — ongoing support, genuine parts availability and fast fulfilment are all part of the GoBike ownership experience."
+      }
+    ],
+    faqs: [
+      { q: "How do I find the right spare part for my GoBike?", a: "Check your bike's model number (found on the frame label) and contact our support team or browse our parts catalogue for compatible options." },
+      { q: "Are GoBike spare parts covered by warranty?", a: "Yes. Eligible spare parts purchased from GoBike Australia are backed by a warranty. Terms vary by product — contact our support team for details." },
+      { q: "How quickly are spare parts shipped?", a: "Most spare parts ship within 1–3 business days. Delivery times vary by location, but we offer fast Australia-wide shipping." },
+      { q: "Can I fit electric bike spare parts myself?", a: "Many components such as tyres, brake pads and batteries are straightforward to replace. For motor or controller replacements, professional installation is recommended." }
+    ]
+  },
   // ---------------- BATTERY PAGE ----------------
   'battery': {
     h1: "Electric Bike Batteries",

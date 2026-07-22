@@ -161,6 +161,10 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
+      {/* SEO H1 — server-rendered so Google always sees it */}
+      <h1 className="sr-only">
+        GoBike Australia — Kids Electric Bikes for Ages 2–16
+      </h1>
       <HomePageClient
         initialFeaturedBikes={initialFeaturedBikes}
         initialReviewsData={initialReviewsData}

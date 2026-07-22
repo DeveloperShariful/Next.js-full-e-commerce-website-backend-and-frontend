@@ -66,22 +66,32 @@ export default function HubFeedPage() {
     }).sort((a, b) => new Date(b.frontmatter.date).getTime() - new Date(a.frontmatter.date).getTime());
   }
 
-  // --- JSON-LD SCHEMA FOR GOOGLE (ItemList & CollectionPage) ---
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    'name': 'GoBike Australia Hub',
-    'description': 'A collection of videos, news, and guides about kids electric bikes.',
-    'url': 'https://gobikes.au/kids-ebike-hub',
-    'mainEntity': {
-      '@type': 'ItemList',
-      'itemListElement': posts.map((post, index) => ({
-        '@type': 'ListItem',
-        'position': index + 1,
-        'url': `https://gobikes.au/kids-ebike-hub/${post.slug}`
-      }))
-    }
-  };
+  // --- JSON-LD SCHEMA FOR GOOGLE (CollectionPage + BreadcrumbList) ---
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      'name': 'GoBike Australia Hub',
+      'description': 'A collection of videos, news, and guides about kids electric bikes.',
+      'url': 'https://gobike.au/kids-ebike-hub',
+      'mainEntity': {
+        '@type': 'ItemList',
+        'itemListElement': posts.map((post, index) => ({
+          '@type': 'ListItem',
+          'position': index + 1,
+          'url': `https://gobike.au/kids-ebike-hub/${post.slug}`,
+        })),
+      },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://gobike.au' },
+        { '@type': 'ListItem', position: 2, name: 'Kids eBike Hub', item: 'https://gobike.au/kids-ebike-hub' },
+      ],
+    },
+  ];
 
   return (
     <div>

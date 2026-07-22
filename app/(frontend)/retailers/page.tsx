@@ -5,9 +5,24 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Authorized Retailers",
+  title: "Authorised GoBike Retailers Australia | Find a Store Near You",
   description:
-    "Find an authorised GoBike retailer near you across New South Wales, Victoria, Queensland, and Western Australia.",
+    "Find your nearest authorised GoBike retailer across NSW, VIC, QLD and WA. All retailers are fully authorised to sell, service and support warranty claims on GoBike electric bikes.",
+  alternates: { canonical: "https://gobike.au/retailers" },
+  keywords: [
+    "gobike retailers", "kids electric bike store australia", "gobike dealer",
+    "electric bike shop nsw", "kids ebike retailer", "gobike authorised dealer",
+  ],
+  openGraph: {
+    title: "Authorised GoBike Retailers Australia | Find a Store Near You",
+    description: "Find your nearest authorised GoBike retailer across NSW, VIC, QLD and WA.",
+    url: "https://gobike.au/retailers",
+    siteName: "GoBike Australia",
+    images: [{ url: "https://gobike.au/wp-content/uploads/2025/11/gobike-ebike-safe-speed-modes.jpg", width: 1200, height: 630, alt: "GoBike Authorised Retailers Australia" }],
+    locale: "en_AU",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", site: "@GoBikeAU", title: "Authorised GoBike Retailers Australia", description: "Find your nearest authorised GoBike store." },
 };
 
 const NSW_RETAILERS = [
@@ -119,9 +134,41 @@ function MapPinIcon() {
   );
 }
 
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://gobike.au" },
+    { "@type": "ListItem", position: 2, name: "Authorised Retailers", item: "https://gobike.au/retailers" },
+  ],
+};
+
+const retailerListJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  name: "Authorised GoBike Retailers Australia",
+  description: "All authorised GoBike electric bike retailers across Australia",
+  numberOfItems: NSW_RETAILERS.length + 2,
+  itemListElement: [
+    ...NSW_RETAILERS.map((r, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item: {
+        "@type": "Store",
+        name: r.name,
+        address: { "@type": "PostalAddress", streetAddress: r.address, addressLocality: r.suburb, addressCountry: "AU" },
+        url: `https://www.google.com/maps/search/?api=1&query=${r.mapQuery}`,
+      },
+    })),
+    { "@type": "ListItem", position: NSW_RETAILERS.length + 1, item: { "@type": "Store", name: "Cooroy Motorcycles", address: { "@type": "PostalAddress", streetAddress: "Shed 4, 5 Taylor Ct", addressLocality: "Cooroy QLD 4563", addressCountry: "AU" } } },
+    { "@type": "ListItem", position: NSW_RETAILERS.length + 2, item: { "@type": "Store", name: "Eazy Bikes", address: { "@type": "PostalAddress", streetAddress: "Unit 1/12 Farral Road", addressLocality: "Midvale WA 6056", addressCountry: "AU" } } },
+  ],
+};
+
 export default function RetailersPage() {
   return (
     <div className="bg-white min-h-screen pb-16 font-sans text-gray-900">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([breadcrumbJsonLd, retailerListJsonLd]) }} />
       <Breadcrumbs pageTitle="Authorized Retailers" />
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-6 lg:pt-10">

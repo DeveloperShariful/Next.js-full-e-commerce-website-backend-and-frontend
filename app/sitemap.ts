@@ -77,6 +77,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/privacy-policy`,            lastModified: new Date(), changeFrequency: 'yearly',  priority: 0.3 },
     { url: `${BASE_URL}/refund-and-returns-policy`, lastModified: new Date(), changeFrequency: 'yearly',  priority: 0.3 },
     { url: `${BASE_URL}/terms-and-conditions`,      lastModified: new Date(), changeFrequency: 'yearly',  priority: 0.3 },
+    { url: `${BASE_URL}/retailers`,                lastModified: new Date(), changeFrequency: 'monthly', priority: 0.6 },
   ];
 
   // ── 2. Products from DB (with images + video for Google sitemap) ──────────
@@ -153,14 +154,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // skip silently
   }
 
-  // ── 4. Blog posts from /blogs/*.md ────────────────────────────────────────
-  const blogPages: MetadataRoute.Sitemap = readMarkdownSlugs('blogs').map(post => ({
-    url: `${BASE_URL}/blog/${post.slug}`,
-    lastModified: post.lastModified,
-    changeFrequency: 'monthly' as const,
-    priority: 0.65,
-    ...(post.image && { images: [post.image] }),
-  }));
+  // ── 4. Blog posts from DB (with markdown fallback) ───────────────────────
+  let blogPages: MetadataRoute.Sitemap = [];
+  try {
+    const blogPosts = await db.blogPost.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { slug: true, updatedAt: true, featuredImage: true },
+      orderBy: { publishedAt: 'desc' },
+    });
+    blogPages = blogPosts
+      .filter(p => p.slug)
+      .map(p => ({
+        url: `${BASE_URL}/blog/${p.slug}`,
+        lastModified: p.updatedAt,
+        changeFrequency: 'monthly' as const,
+        priority: 0.65,
+        ...(p.featuredImage && { images: [p.featuredImage] }),
+      }));
+  } catch {
+    blogPages = readMarkdownSlugs('blogs').map(post => ({
+      url: `${BASE_URL}/blog/${post.slug}`,
+      lastModified: post.lastModified,
+      changeFrequency: 'monthly' as const,
+      priority: 0.65,
+      ...(post.image && { images: [post.image] }),
+    }));
+  }
 
   // ── 5. Kids eBike Hub posts from /hub-posts/*.md ──────────────────────────
   const hubPages: MetadataRoute.Sitemap = readMarkdownSlugs('hub-posts').map(post => ({

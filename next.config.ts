@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async redirects() {
+    return [
+      // Fix broken links in product descriptions (old short paths → correct category paths)
+      { source: '/spare-parts', destination: '/electric-bike-parts/spare-parts', permanent: true },
+      { source: '/tyre-and-tube', destination: '/electric-bike-parts/tyre-and-tube', permanent: true },
+    ];
+  },
   images: {
     remotePatterns: [
       {

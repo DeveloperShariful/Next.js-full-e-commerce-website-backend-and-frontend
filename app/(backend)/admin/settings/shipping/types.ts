@@ -42,11 +42,15 @@ export interface ShippingOptionsData {
     enableShippingCalc: boolean;
     hideShippingCosts: boolean;
     shippingDestination: string;
-    
+
     sellingLocation: string;
     sellingCountries: string[];
     shippingLocation: string;
     shippingCountries: string[];
+
+    fallbackShippingEnabled: boolean;
+    fallbackShippingName: string;
+    fallbackShippingCost: number;
 }
 
 export interface ComponentProps {

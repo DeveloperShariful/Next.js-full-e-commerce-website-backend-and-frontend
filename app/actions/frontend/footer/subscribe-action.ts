@@ -2,6 +2,7 @@
 
 'use server';
 
+import { headers } from 'next/headers';
 import { db } from '@/lib/prisma';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { subscribeUserToKlaviyo } from '@/app/actions/backend/marketing/klaviyo.actions';
@@ -14,6 +15,23 @@ export async function subscribeNewsletter(formData: FormData) {
   }
 
   const cleanEmail = email.toLowerCase().trim();
+
+  const headersList = await headers();
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const rateKey = `subscribe_${ip}`;
+  const windowStart = new Date(Date.now() - 60 * 60 * 1000); // 1 hour
+
+  try {
+    const recentCount = await db.systemLog.count({
+      where: { source: 'SUBSCRIBE_RATE_LIMIT', message: rateKey, createdAt: { gte: windowStart } },
+    });
+    if (recentCount >= 5) {
+      return { success: false, message: 'Too many requests. Please try again later.' };
+    }
+    await db.systemLog.create({
+      data: { level: 'INFO', source: 'SUBSCRIBE_RATE_LIMIT', message: rateKey, context: { ip, email: cleanEmail } },
+    });
+  } catch { /* non-critical */ }
 
   try {
     const existingUser = await db.user.findUnique({

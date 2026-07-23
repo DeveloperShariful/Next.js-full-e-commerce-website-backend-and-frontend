@@ -75,14 +75,9 @@ export async function GET(request: Request) {
   try {
     // ── Auth Check — query param (manual) OR Vercel Cron Bearer header ──
     const url    = new URL(request.url);
-    const secret = url.searchParams.get("secret");
     const authHeader = request.headers instanceof Headers ? request.headers.get("authorization") : null;
     const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    if (
-      secret !== process.env.CRON_SECRET &&
-      secret !== "sync_all_my_old_data" &&
-      bearerSecret !== process.env.CRON_SECRET
-    ) {
+    if (bearerSecret !== process.env.CRON_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

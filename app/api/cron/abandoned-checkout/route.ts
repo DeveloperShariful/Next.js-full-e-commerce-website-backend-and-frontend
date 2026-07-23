@@ -12,13 +12,11 @@ export async function GET(request: Request) {
   const internalKey = process.env.INTERNAL_API_KEY;
 
   if (cronSecret || internalKey) {
-    const { searchParams } = new URL(request.url);
-    const querySecret  = searchParams.get('secret');
     const authHeader   = request.headers.get('authorization');
     const bearerSecret = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     const xApiKey      = request.headers.get('x-api-key');
 
-    const validCron   = cronSecret   && (bearerSecret === cronSecret || querySecret === cronSecret);
+    const validCron   = cronSecret   && bearerSecret === cronSecret;
     const validManual = internalKey  && xApiKey === internalKey;
 
     if (!validCron && !validManual) {

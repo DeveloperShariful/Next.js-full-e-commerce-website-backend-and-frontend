@@ -12,14 +12,18 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isProtectedRoute = ["/admin", "/profile", "/affiliates"].some((path) =>
-        nextUrl.pathname.startsWith(path)
-      );
+      const isAdminRoute = nextUrl.pathname.startsWith('/admin');
+      const isProtectedRoute = isAdminRoute ||
+        ["/profile", "/affiliates"].some((path) => nextUrl.pathname.startsWith(path));
 
-      if (isProtectedRoute) {
-        if (isLoggedIn) return true;
-        return false; // লগইন না থাকলে রিডাইরেক্ট করবে
+      if (!isProtectedRoute) return true;
+      if (!isLoggedIn) return false;
+
+      if (isAdminRoute) {
+        const role = auth?.user?.role as string | undefined;
+        return ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EDITOR', 'SUPPORT'].includes(role ?? '');
       }
+
       return true;
     },
     async jwt({ token, user }) {

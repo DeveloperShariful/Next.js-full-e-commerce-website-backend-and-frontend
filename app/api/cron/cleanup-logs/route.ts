@@ -9,10 +9,8 @@ export async function GET(req: Request) {
   try {
     const authHeader = req.headers instanceof Headers ? req.headers.get("authorization") : null;
     const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    const { searchParams } = new URL(req.url);
-    const querySecret = searchParams.get("secret");
 
-    if (bearerSecret !== process.env.CRON_SECRET && querySecret !== process.env.CRON_SECRET) {
+    if (bearerSecret !== process.env.CRON_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

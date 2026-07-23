@@ -8,6 +8,7 @@ import { Role, AddressType, Prisma } from '@prisma/client';
 import { sendNotification } from '@/app/api/email/send-notification';
 import bcrypt from "bcryptjs";
 import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import { logActivity } from '@/lib/activity-logger';
 
 // Helper function to extract address data from FormData
@@ -347,40 +348,64 @@ export async function bulkChangeRole(ids: string[], newRole: Role) {
 }
 
 export async function sendPasswordReset(formData: FormData) {
-  // Logic remains unchanged...
-  const email = formData.get('email') as string;
-  if (!email) return { success: false, message: 'Email is missing.' };
+  const email = (formData.get('email') as string)?.toLowerCase().trim();
+  if (!email) return { success: false, message: 'Email is required.' };
+
+  const genericSuccess = { success: true, message: `If that email is registered, a reset link has been sent.` };
+
+  // Rate limit: max 3 requests per IP per 30 minutes (email bombing protection)
+  try {
+    const { headers } = await import('next/headers');
+    const headersList = await headers();
+    const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+    const rateKey = `pwreset_${ip}`;
+    const windowStart = new Date(Date.now() - 30 * 60 * 1000);
+    const recentCount = await db.systemLog.count({
+      where: { source: 'PWRESET_RATE_LIMIT', message: rateKey, createdAt: { gte: windowStart } },
+    });
+    if (recentCount >= 3) {
+      return { success: false, message: 'Too many requests. Please wait 30 minutes before trying again.' };
+    }
+    await db.systemLog.create({
+      data: { level: 'INFO', source: 'PWRESET_RATE_LIMIT', message: rateKey, context: { ip, email } },
+    });
+  } catch { /* rate limit non-critical — continue */ }
 
   try {
     const user = await db.user.findUnique({ where: { email } });
-    if (!user) {
-      return { success: false, message: 'User not found.' };
+    if (!user || !user.password) {
+      // Generic response — don't reveal whether email is registered
+      return genericSuccess;
     }
 
-    const resetToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password?token=${resetToken}&email=${email}`;
+    // Cryptographically secure token
+    const resetToken = randomBytes(32).toString('hex');
+    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+
+    // Delete any existing tokens for this email first
+    await db.verificationToken.deleteMany({ where: { identifier: email } });
 
     await db.verificationToken.create({
       data: {
         identifier: email,
         token: resetToken,
-        expires: new Date(Date.now() + 1000 * 60 * 60 * 24) 
-      }
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
+      },
     });
 
     await sendNotification({
-      trigger: "PASSWORD_RESET", 
+      trigger: "PASSWORD_RESET",
       recipient: email,
-      data: { 
+      data: {
         customer_name: user.name || "Customer",
-        reset_link: resetLink 
-      }
+        reset_link: resetLink,
+      },
     });
 
-    return { success: true, message: `Password reset link sent to ${email}` };
+    return genericSuccess;
   } catch (error: unknown) {
     console.error('Password reset failed:', error);
-    return { success: false, message: 'Failed to send reset link.' };
+    return { success: false, message: 'Failed to send reset link. Please try again.' };
   }
 }
 

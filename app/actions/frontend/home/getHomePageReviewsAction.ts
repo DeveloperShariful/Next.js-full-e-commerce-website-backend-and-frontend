@@ -1,4 +1,4 @@
-// app/actions/storefront/home/getHomePageReviewsAction.ts
+﻿// app/actions/storefront/home/getHomePageReviewsAction.ts
 "use server";
 
 import { unstable_cache } from "next/cache";
@@ -38,7 +38,7 @@ async function _fetchHomePageReviews() {
       orderBy: {
         createdAt: "desc",
       },
-      take: 10, // আপনি চাইলে লিমিট বাড়াতে বা কমাতে পারেন
+      take: 100,
       include: {
         user: {
           select: { name: true }, // রিভিউয়ারের নাম

@@ -367,7 +367,7 @@ export async function getCheckoutDataAction(
         : Promise.resolve([]),
       db.taxRate.findFirst({ where: { country, isActive: true } }),
       db.transdirectConfig.findUnique({ where: { id: "transdirect_config" } }),
-      db.storeSettings.findUnique({ where: { id: "settings" }, select: { taxSettings: true } }),
+      db.storeSettings.findUnique({ where: { id: "settings" }, select: { taxSettings: true, generalConfig: true } }),
     ]);
 
     const taxSettings = storeSettings?.taxSettings as { enableTax?: boolean; pricesIncludeTax?: boolean } | null;
@@ -587,6 +587,17 @@ export async function getCheckoutDataAction(
 
       if (transdirectRates.length > 0) {
         availableShippingRates = [...availableShippingRates, ...transdirectRates];
+      } else if (transdirectConfig?.isEnabled && transdirectConfig.apiKey) {
+        // TD was enabled and attempted but returned no quotes — show admin-configured fallback
+        const gc = storeSettings?.generalConfig as { fallbackShippingEnabled?: boolean; fallbackShippingName?: string; fallbackShippingCost?: number } | null;
+        if (gc?.fallbackShippingEnabled !== false) {
+          const fallbackName = (gc?.fallbackShippingName ?? 'Standard Shipping').trim() || 'Standard Shipping';
+          availableShippingRates.push({
+            id: 'fallback_shipping',
+            label: fallbackName,
+            cost: Number((Number(gc?.fallbackShippingCost ?? 95.50)).toFixed(2)),
+          });
+        }
       }
       availableShippingRates.sort((a, b) => a.cost - b.cost);
 

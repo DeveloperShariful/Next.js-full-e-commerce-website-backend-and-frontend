@@ -6,6 +6,7 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaStar, FaTimes, FaPlayCircle } from 'react-icons/fa';
+import { textToSafeHtml } from '@/lib/sanitize';
 
 interface ReviewSummary {
   review_count: number;
@@ -157,7 +158,7 @@ export default function HomePageReviews({ initialReviews, initialSummary }: Prop
 
                   <div
                     className="text-[#333] leading-[1.6] text-[0.95rem] mb-4 flex-grow [&>p:last-child]:mb-0"
-                    dangerouslySetInnerHTML={{ __html: review.review }}
+                    dangerouslySetInnerHTML={{ __html: textToSafeHtml(review.review) }}
                   />
 
                   {review.review_media && review.review_media.length > 0 && (

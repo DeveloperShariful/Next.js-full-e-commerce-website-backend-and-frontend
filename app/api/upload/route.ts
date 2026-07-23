@@ -17,7 +17,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             'image/png',
             'image/webp',
             'image/gif',
-            'image/svg+xml',
             'video/mp4',
             'video/quicktime',
             'video/x-m4v',

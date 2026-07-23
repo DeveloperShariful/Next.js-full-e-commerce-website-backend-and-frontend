@@ -112,6 +112,53 @@ export default function Shipping_Options({ options, refreshData }: ComponentProp
                             </td>
                         </tr>
 
+                        {/* Fallback Shipping Rate */}
+                        <tr className={trResponsiveClass}>
+                            <th scope="row" className={thResponsiveClass}>
+                                <label>Fallback Shipping Rate</label>
+                            </th>
+                            <td className={tdResponsiveClass}>
+                                <div className="space-y-[12px]">
+                                    <label className="flex items-start gap-2 cursor-pointer w-fit">
+                                        <input
+                                            type="checkbox"
+                                            name="fallback_shipping_enabled"
+                                            value="true"
+                                            defaultChecked={options.fallbackShippingEnabled ?? true}
+                                            className="border-[#8c8f94] rounded-[3px] focus:ring-[#2271b1] text-[#2271b1] w-4 h-4 mt-[1px]"
+                                        />
+                                        <span className="text-[13px] text-[#3c434a]">Show a fallback shipping option when Transdirect quotes are unavailable</span>
+                                    </label>
+                                    <div className="flex flex-wrap gap-4">
+                                        <div>
+                                            <label className="block text-[12px] text-[#646970] mb-1">Rate Name</label>
+                                            <input
+                                                type="text"
+                                                name="fallback_shipping_name"
+                                                defaultValue={options.fallbackShippingName ?? 'Standard Shipping'}
+                                                className="border border-[#8c8f94] rounded-[3px] text-[13px] px-[8px] py-[5px] w-[200px] focus:border-[#2271b1] outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[12px] text-[#646970] mb-1">Cost (AUD)</label>
+                                            <div className="relative">
+                                                <span className="absolute left-2 top-[5px] text-[13px] text-[#646970]">$</span>
+                                                <input
+                                                    type="number"
+                                                    name="fallback_shipping_cost"
+                                                    defaultValue={options.fallbackShippingCost ?? 95.50}
+                                                    step="0.01"
+                                                    min="0"
+                                                    className="border border-[#8c8f94] rounded-[3px] text-[13px] pl-[20px] pr-[8px] py-[5px] w-[120px] focus:border-[#2271b1] outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-[12px] text-[#646970] m-0">Shown at checkout only when no Transdirect quotes are returned for the customer&apos;s address.</p>
+                                </div>
+                            </td>
+                        </tr>
+
                     </tbody>
                 </table>
 

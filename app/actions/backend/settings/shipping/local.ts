@@ -34,11 +34,15 @@ export async function getShippingData() {
         enableShippingCalc: config.enableShippingCalc ?? true,
         hideShippingCosts: config.hideShippingCosts ?? false,
         shippingDestination: config.shippingDestination ?? 'billing',
-        
+
         sellingLocation: config.sellingLocation || 'all',
         sellingCountries: config.sellingCountries || [],
         shippingLocation: config.shippingLocation || 'all',
         shippingCountries: config.shippingCountries || [],
+
+        fallbackShippingEnabled: config.fallbackShippingEnabled ?? true,
+        fallbackShippingName: config.fallbackShippingName ?? 'Standard Shipping',
+        fallbackShippingCost: config.fallbackShippingCost ?? 95.50,
     };
 
     // ✅ FIX: Serialize data to handle Decimal objects
@@ -212,7 +216,10 @@ export async function updateShippingOptions(formData: FormData) {
       ...currentConfig,
       enableShippingCalc: enableCalc,
       hideShippingCosts: hideCosts,
-      shippingDestination: shipDest
+      shippingDestination: shipDest,
+      fallbackShippingEnabled: formData.get("fallback_shipping_enabled") === "true",
+      fallbackShippingName: (formData.get("fallback_shipping_name") as string)?.trim() || 'Standard Shipping',
+      fallbackShippingCost: parseFloat(formData.get("fallback_shipping_cost") as string) || 95.50,
     };
 
     await db.storeSettings.update({

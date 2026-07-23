@@ -16,18 +16,31 @@ export async function registerUser(formData: FormData) {
   if (password.length < 8) return { error: "Password must be at least 8 characters" };
 
   try {
-    const existingUser = await db.user.findUnique({ where: { email } });
-    if (existingUser) return { error: "Email already in use" };
+    const existingUser = await db.user.findUnique({ where: { email }, select: { id: true, password: true } });
+
+    // Real account exists (has password) — reject
+    if (existingUser?.password) return { error: "Email already in use" };
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await db.user.create({
-      data: { name: name || null, email, password: hashedPassword },
-    });
-
-    await db.wallet.create({
-      data: { userId: newUser.id, balance: 0, points: 0 },
-    });
+    if (existingUser) {
+      // Ghost account (created by review/subscribe, no password) — upgrade to real account
+      await db.user.update({
+        where: { id: existingUser.id },
+        data: { name: name || undefined, password: hashedPassword, role: 'CUSTOMER', isActive: true },
+      });
+      const walletExists = await db.wallet.findUnique({ where: { userId: existingUser.id } });
+      if (!walletExists) {
+        await db.wallet.create({ data: { userId: existingUser.id, balance: 0, points: 0 } });
+      }
+    } else {
+      const newUser = await db.user.create({
+        data: { name: name || null, email, password: hashedPassword },
+      });
+      await db.wallet.create({
+        data: { userId: newUser.id, balance: 0, points: 0 },
+      });
+    }
   } catch {
     return { error: "Could not create account. Please try again." };
   }

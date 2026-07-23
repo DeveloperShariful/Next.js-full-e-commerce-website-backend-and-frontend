@@ -50,10 +50,7 @@ export async function GET(request: Request) {
     // ── Auth ──
     const url    = new URL(request.url);
     const secret = url.searchParams.get("secret");
-    if (
-      secret !== process.env.CRON_SECRET &&
-      secret !== "sync_all_my_old_data"
-    ) {
+    if (secret !== process.env.CRON_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

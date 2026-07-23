@@ -6,6 +6,7 @@ import { useState, FormEvent, useEffect, ChangeEvent } from 'react';
 import { toast } from 'sonner';
 import { FaStar, FaImage, FaReply, FaTimes, FaPlayCircle } from 'react-icons/fa';
 import Image from 'next/image';
+import { textToSafeHtml } from '@/lib/sanitize';
 
 // --- নতুন Server Action ইম্পোর্ট করা হলো ---
 import { submitReviewAction } from '@/app/actions/frontend/product/submitReviewAction';
@@ -353,7 +354,7 @@ export default function ReviewForm({ productId, averageRating, reviewCount, revi
                                     </div>
                                 }
                                 <div className="text-[0.8rem] text-emerald-700 font-semibold inline-block mb-3">✓ Verified review</div>
-                                <div className="text-[0.95rem] leading-[1.6] text-gray-600 mb-3" dangerouslySetInnerHTML={{ __html: edge.node.content }} />
+                                <div className="text-[0.95rem] leading-[1.6] text-gray-600 mb-3" dangerouslySetInnerHTML={{ __html: textToSafeHtml(edge.node.content) }} />
                                 
                                 {edge.node.reviewMedia && edge.node.reviewMedia.length > 0 && (
                                     <div className="flex gap-3 flex-wrap mt-2 mb-4">
@@ -416,7 +417,7 @@ export default function ReviewForm({ productId, averageRating, reviewCount, revi
                                                         <strong className="text-[0.9rem] font-bold text-gray-900">{reply.node.author.node.name}</strong>
                                                         <FormattedDate dateString={reply.node.date} />
                                                     </div>
-                                                    <div className="text-[0.9rem] leading-[1.6] text-gray-600" dangerouslySetInnerHTML={{ __html: reply.node.content }} />
+                                                    <div className="text-[0.9rem] leading-[1.6] text-gray-600" dangerouslySetInnerHTML={{ __html: textToSafeHtml(reply.node.content) }} />
                                                 </div>
                                             </div>
                                         ))}

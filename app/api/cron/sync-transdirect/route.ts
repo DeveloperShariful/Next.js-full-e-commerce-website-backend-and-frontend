@@ -20,11 +20,9 @@ function buildError(attempt: number, msg: string): string {
 export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
-    const { searchParams } = new URL(req.url);
-    const query = searchParams.get('secret');
     const bearer = (req.headers instanceof Headers ? req.headers.get('authorization') : null)
       ?.replace('Bearer ', '');
-    if (query !== cronSecret && bearer !== cronSecret) {
+    if (bearer !== cronSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }

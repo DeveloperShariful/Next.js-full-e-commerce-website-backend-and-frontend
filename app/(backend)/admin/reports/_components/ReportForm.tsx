@@ -1,12 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import { Loader2, CheckCircle2, AlertTriangle, CalendarDays, FileText, ClipboardList, MessageSquare, Send } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Loader2, CheckCircle2, AlertTriangle, CalendarDays, FileText, ClipboardList, MessageSquare, Send, ImagePlus, X, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { upload } from '@vercel/blob/client';
 import { submitDailyReport } from '@/app/actions/backend/reports/report-actions';
+import Image from 'next/image';
 
 interface Props {
   todaySubmitted?: boolean;
+}
+
+interface PreviewImage {
+  file: File;
+  preview: string;
+  uploading: boolean;
+  url?: string;
+  error?: boolean;
 }
 
 export default function ReportForm({ todaySubmitted }: Props) {
@@ -15,17 +25,100 @@ export default function ReportForm({ todaySubmitted }: Props) {
   const [isDuplicate, setIsDuplicate] = useState(false);
   const [pendingData, setPendingData] = useState<FormData | null>(null);
   const [summary, setSummary]         = useState('');
+  const [images, setImages]           = useState<PreviewImage[]>([]);
+  const [isDragging, setIsDragging]   = useState(false);
 
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const dropZoneRef   = useRef<HTMLDivElement>(null);
   const today = new Date().toISOString().split('T')[0];
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, force = false) => {
-    e?.preventDefault?.();
+  // ─── Upload a single file to Vercel Blob ────────────────────────────────────
+  const uploadFile = useCallback(async (file: File, index: number) => {
+    setImages(prev => prev.map((img, i) => i === index ? { ...img, uploading: true } : img));
+    try {
+      const blob = await upload(
+        `reports/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+        file,
+        { access: 'public', handleUploadUrl: '/api/upload' },
+      );
+      setImages(prev => prev.map((img, i) => i === index ? { ...img, uploading: false, url: blob.url } : img));
+    } catch {
+      setImages(prev => prev.map((img, i) => i === index ? { ...img, uploading: false, error: true } : img));
+      toast.error(`Failed to upload ${file.name}`);
+    }
+  }, []);
+
+  // ─── Add files (from any source) ────────────────────────────────────────────
+  const addFiles = useCallback((files: File[]) => {
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) return;
+    if (images.length + imageFiles.length > 5) {
+      toast.error('Maximum 5 images allowed');
+      return;
+    }
+    const startIndex = images.length;
+    const newPreviews: PreviewImage[] = imageFiles.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      uploading: false,
+    }));
+    setImages(prev => {
+      const updated = [...prev, ...newPreviews];
+      // Start uploads
+      imageFiles.forEach((file, i) => {
+        uploadFile(file, startIndex + i);
+      });
+      return updated;
+    });
+  }, [images.length, uploadFile]);
+
+  // ─── Paste handler (Ctrl+V) ──────────────────────────────────────────────────
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const imageItems = items.filter(item => item.kind === 'file' && item.type.startsWith('image/'));
+      if (imageItems.length === 0) return;
+      e.preventDefault();
+      const files = imageItems.map(item => item.getAsFile()).filter((f): f is File => f !== null);
+      addFiles(files);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [addFiles]);
+
+  // ─── Drag & drop ─────────────────────────────────────────────────────────────
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = () => setIsDragging(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    addFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // ─── Build FormData with image URLs ─────────────────────────────────────────
+  const buildFormData = (form: HTMLFormElement | null, force = false): FormData => {
+    const fd = form ? new FormData(form) : new FormData();
+    const uploadedUrls = images.filter(img => img.url).map(img => img.url as string);
+    fd.set('imageUrls', JSON.stringify(uploadedUrls));
+    if (force) fd.set('forceSubmit', 'true');
+    return fd;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const stillUploading = images.some(img => img.uploading);
+    if (stillUploading) { toast.error('Please wait for images to finish uploading'); return; }
     setIsLoading(true);
     setIsDuplicate(false);
 
-    const formData = force && pendingData ? pendingData : new FormData(e.currentTarget ?? undefined as never);
-    if (force) formData.set('forceSubmit', 'true');
-
+    const formData = buildFormData(e.currentTarget);
     const res = await submitDailyReport(formData);
 
     if (res.isDuplicate) {
@@ -34,11 +127,11 @@ export default function ReportForm({ todaySubmitted }: Props) {
       setIsLoading(false);
       return;
     }
-
     if (res.success) {
       toast.success(res.message);
       setSubmitted(true);
       setSummary('');
+      setImages([]);
       setPendingData(null);
       setTimeout(() => setSubmitted(false), 5000);
     } else {
@@ -59,6 +152,7 @@ export default function ReportForm({ todaySubmitted }: Props) {
       toast.success(res.message);
       setSubmitted(true);
       setSummary('');
+      setImages([]);
       setPendingData(null);
       setTimeout(() => setSubmitted(false), 5000);
     } else {
@@ -195,14 +289,107 @@ export default function ReportForm({ todaySubmitted }: Props) {
             />
           </div>
 
+          {/* ── Image Upload ─────────────────────────────────────────────────── */}
+          <div>
+            <label className="flex items-center gap-1.5 text-[13px] font-semibold text-[#1d2327] mb-1">
+              <ImagePlus size={13} className="text-[#2271b1]" />
+              Attach Images
+              <span className="text-[11px] font-normal text-[#646970] ml-1">(optional, max 5)</span>
+            </label>
+            <p className="text-[11px] text-[#646970] mb-2">
+              Screenshots, photos, or any work evidence. Paste with{' '}
+              <kbd className="bg-[#f0f0f1] border border-[#dcdcde] rounded px-1 text-[10px] font-mono">Ctrl+V</kbd>
+              , drag & drop, or click to browse.
+            </p>
+
+            {/* Drop zone */}
+            <div
+              ref={dropZoneRef}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-[3px] p-4 text-center cursor-pointer transition-colors ${
+                isDragging
+                  ? 'border-[#2271b1] bg-blue-50'
+                  : 'border-[#c3c4c7] hover:border-[#2271b1] hover:bg-[#f0f6fc]'
+              } ${images.length >= 5 ? 'opacity-40 pointer-events-none' : ''}`}
+            >
+              <Upload size={18} className="mx-auto mb-1.5 text-[#9ca3af]" />
+              <p className="text-[12px] text-[#646970]">
+                {images.length >= 5
+                  ? 'Maximum 5 images reached'
+                  : 'Click to browse · Drag & drop · Ctrl+V to paste'}
+              </p>
+              <p className="text-[11px] text-[#9ca3af] mt-0.5">PNG, JPG, WEBP, GIF</p>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={e => {
+                addFiles(Array.from(e.target.files ?? []));
+                e.target.value = '';
+              }}
+            />
+
+            {/* Previews */}
+            {images.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {images.map((img, i) => (
+                  <div key={i} className="relative group aspect-square rounded overflow-hidden border border-[#dcdcde] bg-[#f6f7f7]">
+                    <Image
+                      src={img.preview}
+                      alt={`Preview ${i + 1}`}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                    {/* Uploading overlay */}
+                    {img.uploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Loader2 size={16} className="text-white animate-spin" />
+                      </div>
+                    )}
+                    {/* Error overlay */}
+                    {img.error && (
+                      <div className="absolute inset-0 bg-red-500/70 flex items-center justify-center">
+                        <AlertTriangle size={14} className="text-white" />
+                      </div>
+                    )}
+                    {/* Done checkmark */}
+                    {img.url && !img.uploading && (
+                      <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                        <CheckCircle2 size={10} className="text-white" />
+                      </div>
+                    )}
+                    {/* Remove button */}
+                    {!img.uploading && (
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); removeImage(i); }}
+                        className="absolute top-1 right-1 w-5 h-5 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="pt-1 border-t border-[#f0f0f1]">
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || images.some(img => img.uploading)}
               className="bg-[#2271b1] hover:bg-[#135e96] text-white border border-[#2271b1] hover:border-[#135e96] rounded-[3px] px-5 py-2 text-[13px] font-semibold shadow-sm disabled:opacity-60 flex items-center gap-2 transition-colors"
             >
               {isLoading ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
-              {isLoading ? 'Submitting...' : 'Submit Report'}
+              {isLoading ? 'Submitting...' : images.some(img => img.uploading) ? 'Uploading images...' : 'Submit Report'}
             </button>
           </div>
         </form>

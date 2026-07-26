@@ -25,6 +25,7 @@ export interface DailyReport {
   summary: string;
   tasks: string;
   notes: string;
+  images: string[];
   createdAt: Date;
   reviewed: boolean;
   reviewedAt?: string;
@@ -98,6 +99,13 @@ export async function submitDailyReport(formData: FormData) {
     || new Date().toISOString().split('T')[0];
   const forceSubmit = formData.get('forceSubmit') === 'true';
 
+  let images: string[] = [];
+  try {
+    const raw = (formData.get('imageUrls') as string) ?? '[]';
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) images = parsed.filter((u): u is string => typeof u === 'string');
+  } catch { images = []; }
+
   if (!summary) return { success: false, isDuplicate: false, message: 'Summary is required.' };
 
   if (!forceSubmit) {
@@ -127,6 +135,7 @@ export async function submitDailyReport(formData: FormData) {
         reportDate,
         tasks:      tasks || '',
         notes:      notes || '',
+        images,
         reviewed:   false,
       },
     },
@@ -215,19 +224,24 @@ export async function getDailyReports(
   });
 
   const parse = (log: typeof allLogs[number]): DailyReport => {
-    const ctx = (log.context ?? {}) as Record<string, string>;
+    const ctx = (log.context ?? {}) as Record<string, unknown>;
+    const rawImages = ctx.images;
+    const images = Array.isArray(rawImages)
+      ? (rawImages as unknown[]).filter((u): u is string => typeof u === 'string')
+      : [];
     return {
       id:         log.id,
-      userName:   ctx.userName   ?? 'Unknown',
-      userRole:   ctx.userRole   ?? '',
-      reportDate: ctx.reportDate ?? '',
+      userName:   (ctx.userName   as string) ?? 'Unknown',
+      userRole:   (ctx.userRole   as string) ?? '',
+      reportDate: (ctx.reportDate as string) ?? '',
       summary:    log.message,
-      tasks:      ctx.tasks      ?? '',
-      notes:      ctx.notes      ?? '',
+      tasks:      (ctx.tasks      as string) ?? '',
+      notes:      (ctx.notes      as string) ?? '',
+      images,
       createdAt:  log.createdAt,
-      reviewed:   ctx.reviewed === 'true' || (ctx.reviewed as unknown) === true,
-      reviewedAt: ctx.reviewedAt,
-      reviewedBy: ctx.reviewedBy,
+      reviewed:   ctx.reviewed === 'true' || ctx.reviewed === true,
+      reviewedAt: ctx.reviewedAt as string | undefined,
+      reviewedBy: ctx.reviewedBy as string | undefined,
     };
   };
 
@@ -285,19 +299,24 @@ export async function exportReportsCSV(filters?: ReportFilters): Promise<string>
   });
 
   const parseAll = (log: typeof allLogs[number]): DailyReport => {
-    const ctx = (log.context ?? {}) as Record<string, string>;
+    const ctx = (log.context ?? {}) as Record<string, unknown>;
+    const rawImgs = ctx.images;
+    const images = Array.isArray(rawImgs)
+      ? (rawImgs as unknown[]).filter((u): u is string => typeof u === 'string')
+      : [];
     return {
       id:         log.id,
-      userName:   ctx.userName   ?? 'Unknown',
-      userRole:   ctx.userRole   ?? '',
-      reportDate: ctx.reportDate ?? '',
+      userName:   (ctx.userName   as string) ?? 'Unknown',
+      userRole:   (ctx.userRole   as string) ?? '',
+      reportDate: (ctx.reportDate as string) ?? '',
       summary:    log.message,
-      tasks:      ctx.tasks      ?? '',
-      notes:      ctx.notes      ?? '',
+      tasks:      (ctx.tasks      as string) ?? '',
+      notes:      (ctx.notes      as string) ?? '',
+      images,
       createdAt:  log.createdAt,
-      reviewed:   ctx.reviewed === 'true' || (ctx.reviewed as unknown) === true,
-      reviewedAt: ctx.reviewedAt,
-      reviewedBy: ctx.reviewedBy,
+      reviewed:   ctx.reviewed === 'true' || ctx.reviewed === true,
+      reviewedAt: ctx.reviewedAt as string | undefined,
+      reviewedBy: ctx.reviewedBy as string | undefined,
     };
   };
 

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { ChevronDown, ChevronUp, Calendar, Clock, FileText, CheckCircle2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Calendar, Clock, FileText, CheckCircle2, Loader2, ImageIcon } from 'lucide-react';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import { markReportReviewed } from '@/app/actions/backend/reports/report-actions';
 import type { DailyReport } from '@/app/actions/backend/reports/report-actions';
@@ -148,6 +149,22 @@ function ReportCard({ report, isOwnerView }: { report: DailyReport; isOwnerView?
           <Section label="Summary" content={report.summary} />
           {report.tasks && <Section label="Tasks Completed" content={report.tasks} mono />}
           {report.notes && <Section label="Notes" content={report.notes} />}
+
+          {/* Images */}
+          {report.images.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-[#646970] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <ImageIcon size={11} /> Attached Images ({report.images.length})
+              </p>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {report.images.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group relative aspect-square rounded overflow-hidden border border-[#dcdcde] bg-[#f6f7f7] block">
+                    <Image src={url} alt={`Attachment ${i + 1}`} fill className="object-cover group-hover:opacity-80 transition-opacity" unoptimized />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Admin actions */}
           {isOwnerView && !reviewed && (

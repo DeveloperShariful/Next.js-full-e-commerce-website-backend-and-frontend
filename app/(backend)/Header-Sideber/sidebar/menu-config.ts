@@ -7,7 +7,7 @@ import {
   Undo2, Megaphone, Truck, MedalIcon, MessageCircle,
   Handshake, Link, Network, UserPlus, Facebook, Wallet, RefreshCw, Heart,
   BadgeDollarSign, LayoutGrid, Award, SlidersHorizontal, Tag, Star, Boxes,
-  Code2, Search, Plug, Newspaper, FolderOpen,
+  Code2, Search, Plug, Newspaper, FolderOpen, ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -67,6 +67,7 @@ export const sidebarConfig: SidebarGroup[] = [
       { name: "Shipments", href: "/admin/shipments", icon: Truck },
       { name: "Support Ticket", href: "/admin/support", icon: MessageSquare },
       { name: "Warranty-Cliem", href: "/admin/warranty-claims", icon: Megaphone },
+      { name: "Daily Reports", href: "/admin/reports", icon: ClipboardList },
       {
         name: "Finance",
         href: "/admin/wallet",

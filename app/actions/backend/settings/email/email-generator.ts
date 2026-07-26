@@ -130,6 +130,21 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
           customer_name: metaStr('customer_name', 'Valued Customer'),
           checkout_url: metaStr('checkout_url', `${appUrl}/checkout`),
       };
+  } else if (template.triggerEvent === 'DAILY_REPORT') {
+      variables = {
+          staff_name:  metaStr('staff_name',  'Staff Member'),
+          staff_role:  metaStr('staff_role',  'Staff'),
+          report_date: metaStr('report_date', new Date().toISOString().split('T')[0]),
+          summary:     metaStr('summary',     'No summary provided.'),
+          tasks:       metaStr('tasks',       'N/A'),
+          notes:       metaStr('notes',       'N/A'),
+      };
+  } else if (template.triggerEvent === 'DAILY_REPORT_REMINDER') {
+      variables = {
+          staff_name:  metaStr('staff_name',  'Team Member'),
+          report_date: metaStr('report_date', new Date().toISOString().split('T')[0]),
+          submit_url:  metaStr('submit_url',  `${appUrl}/admin/reports`),
+      };
   } else if (order) {
       const currency = order.currency || "$";
       const formatMoney = (amount: number) => {
@@ -165,7 +180,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
   // ============================================================
   let orderDetailsHtml = "";
 
-  if (order && !template.triggerEvent?.includes("WARRANTY") && template.triggerEvent !== "PASSWORD_RESET" && template.triggerEvent !== "NEWSLETTER_SUBSCRIPTION" && !template.triggerEvent?.includes("CONTACT_FORM")) {
+  if (order && !template.triggerEvent?.includes("WARRANTY") && template.triggerEvent !== "PASSWORD_RESET" && template.triggerEvent !== "NEWSLETTER_SUBSCRIPTION" && !template.triggerEvent?.includes("CONTACT_FORM") && template.triggerEvent !== "DAILY_REPORT") {
       const currency = order.currency || "$";
       const formatMoney = (amount: number) => {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount).replace('USD', currency);
@@ -371,6 +386,14 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
     actionButton = `
       <div style="text-align: center; margin: 32px 0;">
         <a href="${appUrl}/shop" class="btn" style="background-color: ${baseColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: 700; border-radius: 6px; display: inline-block; font-size: 16px;">Shop Now</a>
+      </div>
+    `;
+  }
+
+  if (template.triggerEvent === 'DAILY_REPORT_REMINDER' && metadata?.submit_url) {
+    actionButton = `
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${metadata.submit_url}" class="btn" style="background-color: ${baseColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: 700; border-radius: 6px; display: inline-block; font-size: 16px;">Submit My Report</a>
       </div>
     `;
   }

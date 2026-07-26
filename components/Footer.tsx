@@ -196,13 +196,14 @@ export default function Footer() {
                   <ul className="list-none p-0 m-0 space-y-2">
                       <li><a href="/sign-in" className="text-[#555] hover:text-black hover:font-bold transition-all">Log In/Register</a></li>
                       
-                      {['/track-order', '/shipping-policy', '/contact', '/faq', '/terms-and-conditions', '/privacy-policy', '/refund-and-returns-policy'].map((path) => (
+                      {['/track-order', '/shipping-policy', '/contact', '/faq', '/terms-and-conditions', '/privacy-policy', '/refund-and-returns-policy', '/sitemap'].map((path) => (
                         <li key={path}>
                             <Link href={path} className="text-[#555] hover:text-black hover:font-bold transition-all">
                                 {
-                                  path === '/contact' ? 'Contact Us' : 
-                                  path === '/faq' ? 'FAQs' : 
-                                  path === '/terms-and-conditions' ? 'Terms & Condition' : 
+                                  path === '/contact' ? 'Contact Us' :
+                                  path === '/faq' ? 'FAQs' :
+                                  path === '/terms-and-conditions' ? 'Terms & Condition' :
+                                  path === '/sitemap' ? 'Sitemap' :
                                   path.substring(1).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
                                 }
                             </Link>

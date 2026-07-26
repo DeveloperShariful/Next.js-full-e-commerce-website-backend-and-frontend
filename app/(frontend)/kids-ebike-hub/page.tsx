@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     'childrens electric dirt bike'
   ],
   alternates: { 
-    canonical: 'https://gobikes.au/kids-ebike-hub' 
+    canonical: 'https://gobike.au/kids-ebike-hub' 
   },
   robots: {
     index: true,
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'GoBike Hub | Kids Electric Bike Videos & News',
     description: "Watch the latest GoBike customer videos, team rider action, and read expert sizing guides.",
-    url: 'https://gobikes.au/kids-ebike-hub',
+    url: 'https://gobike.au/kids-ebike-hub',
     siteName: 'GoBike Australia',
     images: [
       {

@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = getHubContent(slug);
   if (!post) return { title: 'Not Found | GoBike Hub' };
   
-  const siteUrl = 'https://gobikes.au';
+  const siteUrl = 'https://gobike.au';
   const postUrl = `${siteUrl}/kids-ebike-hub/${slug}`;
   
   return {
@@ -68,7 +68,7 @@ export default async function SingleHubPage({ params }: Props) {
   }
 
   const { frontmatter, content } = post;
-  const siteUrl = 'https://gobikes.au';
+  const siteUrl = 'https://gobike.au';
   const postUrl = `${siteUrl}/kids-ebike-hub/${slug}`;
   const publishDate = frontmatter.date ? new Date(frontmatter.date).toISOString() : new Date().toISOString();
 

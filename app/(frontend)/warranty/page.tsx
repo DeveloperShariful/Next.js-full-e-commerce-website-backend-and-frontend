@@ -12,12 +12,12 @@ export const metadata: Metadata = {
     'GoBike customer service', 'submit ebike warranty', 'Australia kids bike repair'
   ],
   alternates: {
-    canonical: 'https://gobike.au/warranty-claim',
+    canonical: 'https://gobike.au/warranty',
   },
   openGraph: {
     title: 'Submit a Warranty Claim | GoBike Australia',
     description: 'Fast and easy warranty claims for your GoBike electric balance bike. Upload a video and get back to riding.',
-    url: 'https://gobike.au/warranty-claim',
+    url: 'https://gobike.au/warranty',
     siteName: 'GoBike Australia',
     locale: 'en_AU',
     type: 'website',

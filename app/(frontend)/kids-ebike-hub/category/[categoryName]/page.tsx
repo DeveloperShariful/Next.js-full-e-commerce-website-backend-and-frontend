@@ -19,7 +19,7 @@ function slugify(text: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { categoryName } = await params;
   const formattedTitle = categoryName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  const canonicalUrl = `https://gobikes.au/kids-ebike-hub/category/${categoryName}`;
+  const canonicalUrl = `https://gobike.au/kids-ebike-hub/category/${categoryName}`;
 
   return {
     title: `${formattedTitle} | Kids Electric Bike Hub | GoBike Australia`,
@@ -69,13 +69,13 @@ export default async function CategoryPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     'name': `${displayName} - GoBike Hub`,
-    'url': `https://gobikes.au/kids-ebike-hub/category/${categoryName}`,
+    'url': `https://gobike.au/kids-ebike-hub/category/${categoryName}`,
     'mainEntity': {
       '@type': 'ItemList',
       'itemListElement': posts.map((post, index) => ({
         '@type': 'ListItem',
         'position': index + 1,
-        'url': `https://gobikes.au/kids-ebike-hub/${post.slug}`
+        'url': `https://gobike.au/kids-ebike-hub/${post.slug}`
       }))
     }
   };

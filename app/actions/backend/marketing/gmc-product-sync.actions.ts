@@ -47,6 +47,7 @@ interface ProductForSync {
   price: Prisma.Decimal;
   stock: number;
   trackQuantity: boolean;
+  isPreOrder: boolean;
   condition: string;
   barcode: string | null;
   mpn: string | null;
@@ -61,6 +62,13 @@ interface ProductForSync {
   material: string | null;
   pattern: string | null;
   productType: string | null;
+  sku: string | null;
+  salePrice: Prisma.Decimal | null;
+  saleStart: Date | null;
+  saleEnd: Date | null;
+  countryOfManufacture: string | null;
+  weightUnit: string | null;
+  dimensionUnit: string | null;
   metafields: Prisma.JsonValue;
   brand: { name: string } | null;
   tags: ProductTag[];
@@ -167,6 +175,7 @@ export async function syncProductToGoogle(productId: string) {
     }) as ProductForSync | null;
 
     if (!product) return { success: false, error: "Product not found." };
+    if (!product.featuredImage) return { success: false, error: "Product has no featured image. Google requires imageLink — add a featured image first." };
 
     const mappingRules =
       config.gmcAttributeMapping
@@ -231,7 +240,7 @@ export async function syncProductToGoogle(productId: string) {
       contentLanguage: config.gmcLanguage || "en",
       targetCountry: config.gmcTargetCountry || "AU",
       channel: "online",
-      availability: product.trackQuantity === false || product.stock > 0 ? "in stock" : "out of stock",
+      availability: product.isPreOrder ? "preorder" : (product.trackQuantity === false || product.stock > 0 ? "in stock" : "out of stock"),
       condition: product.condition.toLowerCase(),
       price: { value: Number(product.price).toFixed(2), currency: "AUD" },
       brand: product.brand?.name || "Generic",
@@ -241,6 +250,26 @@ export async function syncProductToGoogle(productId: string) {
       ageGroup: product.ageGroup || undefined,
       isBundle: product.googleIsBundle,
     };
+
+    // Sale price — only send if it's a valid discount below regular price
+    if (product.salePrice && Number(product.salePrice) > 0 && Number(product.salePrice) < Number(product.price)) {
+      googleProductParams.salePrice = { value: Number(product.salePrice).toFixed(2), currency: "AUD" };
+      if (product.saleStart && product.saleEnd) {
+        const fmt = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
+        googleProductParams.salePriceEffectiveDate = `${fmt(product.saleStart)}/${fmt(product.saleEnd)}`;
+      }
+    }
+
+    // identifier_exists: false is required by Google when product has no GTIN or MPN
+    // Without it, Google will flag the product as "incomplete" and may disapprove it
+    if (!product.barcode && !product.mpn) {
+      googleProductParams.identifierExists = false;
+    }
+
+    // Country of origin
+    if (product.countryOfManufacture) {
+      googleProductParams.countryOfOrigin = product.countryOfManufacture;
+    }
 
     if (product.images && product.images.length > 1) {
       googleProductParams.additionalImageLinks = product.images.slice(1, 11).map((img) => formatGmcUrl(img.url));
@@ -259,11 +288,13 @@ export async function syncProductToGoogle(productId: string) {
       googleProductParams.productTypes = [product.categories.map((c) => c.name).join(" > ")];
     }
 
-    if (product.weight) googleProductParams.shippingWeight = { value: Number(product.weight), unit: "kg" };
+    const weightUnit = product.weightUnit ?? "kg";
+    const dimUnit = product.dimensionUnit ?? "cm";
+    if (product.weight) googleProductParams.shippingWeight = { value: Number(product.weight), unit: weightUnit };
     if (product.length && product.width && product.height) {
-      googleProductParams.shippingLength = { value: Number(product.length), unit: "cm" };
-      googleProductParams.shippingWidth = { value: Number(product.width), unit: "cm" };
-      googleProductParams.shippingHeight = { value: Number(product.height), unit: "cm" };
+      googleProductParams.shippingLength = { value: Number(product.length), unit: dimUnit };
+      googleProductParams.shippingWidth = { value: Number(product.width), unit: dimUnit };
+      googleProductParams.shippingHeight = { value: Number(product.height), unit: dimUnit };
     }
 
     if (google_size) googleProductParams.sizes = [google_size];
@@ -476,8 +507,14 @@ export async function syncLiveProductStatuses() {
 
     const shoppingContent = await getGoogleContentClient(config as GmcConfig);
 
-    const response = await shoppingContent.productstatuses.list({ merchantId: config.gmcMerchantId });
-    const googleStatuses = response.data.resources || [];
+    const firstStatusPage = await shoppingContent.productstatuses.list({ merchantId: config.gmcMerchantId, maxResults: 250 });
+    const googleStatuses = [...(firstStatusPage.data.resources ?? [])];
+    let statusNextToken: string | undefined = firstStatusPage.data.nextPageToken ?? undefined;
+    while (statusNextToken) {
+      const statusPage = await shoppingContent.productstatuses.list({ merchantId: config.gmcMerchantId, maxResults: 250, pageToken: statusNextToken });
+      googleStatuses.push(...(statusPage.data.resources ?? []));
+      statusNextToken = statusPage.data.nextPageToken ?? undefined;
+    }
     if (googleStatuses.length === 0) return { success: true };
 
     // Batch-fetch all local statuses and product IDs to avoid N+1 queries
@@ -614,6 +651,139 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     console.error("Error in syncSingleProductStatusFromGoogle:", msg);
+    return { success: false, error: msg };
+  }
+}
+
+// ============================================================================
+// 11. GET REAL GOOGLE MC LIVE STATS (product count + status breakdown)
+// ============================================================================
+export async function getGoogleMCStats() {
+  await security.assertAdmin();
+  try {
+    const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
+    if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) {
+      return { success: false, data: null };
+    }
+    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
+    const merchantId = config.gmcMerchantId;
+
+    // Paginated product count
+    const firstPage = await shoppingContent.products.list({ merchantId, maxResults: 250 });
+    let totalProducts = (firstPage.data.resources ?? []).length;
+    let nextToken: string | undefined = firstPage.data.nextPageToken ?? undefined;
+    while (nextToken) {
+      const res = await shoppingContent.products.list({ merchantId, maxResults: 250, pageToken: nextToken });
+      totalProducts += (res.data.resources ?? []).length;
+      nextToken = res.data.nextPageToken ?? undefined;
+    }
+
+    // Status breakdown from Google's own review system (paginated)
+    const firstStatusPage = await shoppingContent.productstatuses.list({ merchantId, maxResults: 250 });
+    const statuses = [...(firstStatusPage.data.resources ?? [])];
+    let statusNextToken: string | undefined = firstStatusPage.data.nextPageToken ?? undefined;
+    while (statusNextToken) {
+      const statusPage = await shoppingContent.productstatuses.list({ merchantId, maxResults: 250, pageToken: statusNextToken });
+      statuses.push(...(statusPage.data.resources ?? []));
+      statusNextToken = statusPage.data.nextPageToken ?? undefined;
+    }
+    let approved = 0, disapproved = 0, pending = 0;
+    for (const s of statuses) {
+      const dests = s.destinationStatuses ?? [];
+      if (dests.some((d) => d.status === "disapproved")) disapproved++;
+      else if (dests.some((d) => d.status === "pending")) pending++;
+      else approved++;
+    }
+
+    return {
+      success: true,
+      data: { totalProducts, approved, disapproved, pending },
+    };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, data: null, error: msg };
+  }
+}
+
+// ============================================================================
+// 12. CLEANUP STALE GOOGLE MC PRODUCTS
+// Deletes products from Google MC that are NOT:
+//   - gla_XXXX (old WooCommerce imports — kept intentionally)
+//   - Matching a current DB product ID
+// ============================================================================
+export async function cleanupStaleGoogleProducts() {
+  await security.assertAdmin();
+  try {
+    const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
+    if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) {
+      return { success: false, error: "GMC is not enabled or Merchant ID is missing." };
+    }
+
+    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
+    const merchantId = config.gmcMerchantId;
+
+    // 1. Get all current DB product IDs (non-deleted)
+    const dbProducts = await db.product.findMany({
+      where: { deletedAt: null },
+      select: { id: true },
+    });
+    const validDbIds = new Set(dbProducts.map((p) => p.id));
+
+    // 2. List ALL products currently in Google MC (paginated)
+    const allGoogleProductIds: string[] = [];
+    const firstPage = await shoppingContent.products.list({ merchantId, maxResults: 250 });
+    for (const item of firstPage.data.resources ?? []) {
+      if (item.id) allGoogleProductIds.push(item.id);
+    }
+    let nextToken: string | undefined = firstPage.data.nextPageToken ?? undefined;
+    while (nextToken) {
+      const res = await shoppingContent.products.list({ merchantId, maxResults: 250, pageToken: nextToken });
+      for (const item of res.data.resources ?? []) {
+        if (item.id) allGoogleProductIds.push(item.id);
+      }
+      nextToken = res.data.nextPageToken ?? undefined;
+    }
+
+    // 3. Identify stale products to delete
+    // Google product ID format: "online:en:AU:{offerId}"
+    const toDelete: string[] = [];
+    for (const googleId of allGoogleProductIds) {
+      const offerId = googleId.split(":").pop() ?? "";
+      const isGla = offerId.startsWith("gla_");
+      const isInDb = validDbIds.has(offerId);
+      if (!isGla && !isInDb) {
+        toDelete.push(googleId);
+      }
+    }
+
+    if (toDelete.length === 0) {
+      return { success: true, deleted: 0, total: allGoogleProductIds.length, message: "No stale products found." };
+    }
+
+    // 4. Delete in batches of 5 to respect rate limits
+    const BATCH = 5;
+    let deleted = 0;
+    for (let i = 0; i < toDelete.length; i += BATCH) {
+      const batch = toDelete.slice(i, i + BATCH);
+      await Promise.all(
+        batch.map((googleProductId) =>
+          shoppingContent.products.delete({ merchantId, productId: googleProductId }).catch(() => null)
+        )
+      );
+      deleted += batch.length;
+    }
+
+    revalidatePath("/admin/marketing/merchant-center");
+    return {
+      success: true,
+      deleted,
+      kept: allGoogleProductIds.length - deleted,
+      total: allGoogleProductIds.length,
+      message: `Deleted ${deleted} stale product(s) from Google MC. ${allGoogleProductIds.length - deleted} kept.`,
+    };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("GMC Cleanup Error:", msg);
     return { success: false, error: msg };
   }
 }

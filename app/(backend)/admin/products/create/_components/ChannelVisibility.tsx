@@ -97,7 +97,7 @@ export function ChannelVisibility({ productId }: Props) {
           {/* Dropdown Selection */}
           <div>
             <label className="block text-[11px] font-semibold text-[#1d2327] mb-1.5 uppercase tracking-wide">
-              Google for WooCommerce
+              Google Merchant Center
             </label>
             <select
               value={visibility}

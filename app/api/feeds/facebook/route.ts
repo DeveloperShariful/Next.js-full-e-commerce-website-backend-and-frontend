@@ -62,7 +62,7 @@ export async function GET() {
         status: "ACTIVE",
         deletedAt: null,
         // Exclude digital/downloadable — Facebook Shop only supports physical goods
-        productType: { notIn: ["DOWNLOADABLE", "VIRTUAL"] },
+        productType: { notIn: ["DOWNLOADABLE", "VIRTUAL", "GIFT_CARD"] },
         OR: [
           { facebookSyncMode: null },
           { facebookSyncMode: "SYNC_AND_SHOW" },
@@ -83,6 +83,7 @@ export async function GET() {
         saleEnd: true,
         stock: true,
         trackQuantity: true,
+        isPreOrder: true,
         featuredImage: true,
         mpn: true,
         barcode: true,
@@ -134,7 +135,7 @@ export async function GET() {
     `;
 
     products.forEach((product) => {
-      const availabilityStatus = (product.trackQuantity === false || product.stock > 0) ? "in stock" : "out of stock";
+      const availabilityStatus = product.isPreOrder ? "preorder" : ((product.trackQuantity === false || product.stock > 0) ? "in stock" : "out of stock");
 
       const finalTitle =
         (product.googleTitle && product.googleTitle.trim() !== "" && !isSeoTemplate(product.googleTitle))
@@ -193,7 +194,7 @@ export async function GET() {
         product.variants.forEach((variant) => {
           const variantId = `${product.id}_${variant.id}`;
           const variantTitle = `${finalTitle} - ${variant.name}`;
-          const variantAvailability = (variant.trackQuantity === false || variant.stock > 0) ? "in stock" : "out of stock";
+          const variantAvailability = product.isPreOrder ? "preorder" : ((variant.trackQuantity === false || variant.stock > 0) ? "in stock" : "out of stock");
           const variantStock = safeStock(variant.stock);
 
           const variantImage = variant.images && variant.images.length > 0
@@ -228,8 +229,11 @@ export async function GET() {
       <g:price>${Number(variant.price).toFixed(2)} AUD</g:price>
           `;
 
-          if (variant.salePrice) {
+          if (variant.salePrice && Number(variant.salePrice) < Number(variant.price)) {
             xml += `      <g:sale_price>${Number(variant.salePrice).toFixed(2)} AUD</g:sale_price>\n`;
+            if (product.saleStart && product.saleEnd) {
+              xml += `      <g:sale_price_effective_date>${product.saleStart.toISOString().replace(/\.\d{3}Z$/, "Z")}/${product.saleEnd.toISOString().replace(/\.\d{3}Z$/, "Z")}</g:sale_price_effective_date>\n`;
+            }
           }
           if (variant.sku) {
             xml += `      <g:mpn>${escapeXml(variant.sku)}</g:mpn>\n`;
@@ -261,9 +265,6 @@ export async function GET() {
           if (product.gender)   xml += `      <g:gender>${escapeXml(product.gender.toLowerCase())}</g:gender>\n`;
           if (product.ageGroup) xml += `      <g:age_group>${escapeXml(product.ageGroup.toLowerCase())}</g:age_group>\n`;
           if (categoryName) xml += `      <g:google_product_category>${escapeXml(categoryName)}</g:google_product_category>\n`;
-          if (product.saleStart && product.saleEnd) {
-            xml += `      <g:sale_price_effective_date>${product.saleStart.toISOString()}/${product.saleEnd.toISOString()}</g:sale_price_effective_date>\n`;
-          }
           if (Array.isArray(product.customLabels)) {
             (product.customLabels as string[]).forEach((label, idx) => {
               if (idx <= 4 && label) xml += `      <g:custom_label_${idx}>${escapeXml(label)}</g:custom_label_${idx}>\n`;
@@ -295,8 +296,11 @@ export async function GET() {
       <g:price>${finalPrice.toFixed(2)} AUD</g:price>
         `;
 
-        if (product.salePrice && !product.facebookPrice) {
+        if (product.salePrice && !product.facebookPrice && Number(product.salePrice) < Number(product.price)) {
           xml += `      <g:sale_price>${Number(product.salePrice).toFixed(2)} AUD</g:sale_price>\n`;
+          if (product.saleStart && product.saleEnd) {
+            xml += `      <g:sale_price_effective_date>${product.saleStart.toISOString().replace(/\.\d{3}Z$/, "Z")}/${product.saleEnd.toISOString().replace(/\.\d{3}Z$/, "Z")}</g:sale_price_effective_date>\n`;
+          }
         }
         if (product.mpn)     xml += `      <g:mpn>${escapeXml(product.mpn)}</g:mpn>\n`;
         if (product.barcode) xml += `      <g:gtin>${escapeXml(product.barcode)}</g:gtin>\n`;
@@ -319,14 +323,12 @@ export async function GET() {
         if (feedMaterial) xml += `      <g:material>${escapeXml(feedMaterial)}</g:material>\n`;
         if (feedPattern)  xml += `      <g:pattern>${escapeXml(feedPattern)}</g:pattern>\n`;
         if (google_multipack) xml += `      <g:multipack>${escapeXml(google_multipack)}</g:multipack>\n`;
+        if (product.googleIsBundle) xml += `      <g:is_bundle>yes</g:is_bundle>\n`;
         if (google_adult_content) xml += `      <g:adult>yes</g:adult>\n`;
         if (google_availability_date) {
           xml += `      <g:availability_date>${new Date(google_availability_date).toISOString()}</g:availability_date>\n`;
         }
         if (categoryName) xml += `      <g:google_product_category>${escapeXml(categoryName)}</g:google_product_category>\n`;
-        if (product.saleStart && product.saleEnd) {
-          xml += `      <g:sale_price_effective_date>${product.saleStart.toISOString()}/${product.saleEnd.toISOString()}</g:sale_price_effective_date>\n`;
-        }
         if (Array.isArray(product.customLabels)) {
           (product.customLabels as string[]).forEach((label, idx) => {
             if (idx <= 4 && label) xml += `      <g:custom_label_${idx}>${escapeXml(label)}</g:custom_label_${idx}>\n`;

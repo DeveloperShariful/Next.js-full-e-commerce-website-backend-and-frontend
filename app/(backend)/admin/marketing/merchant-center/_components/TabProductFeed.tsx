@@ -7,6 +7,8 @@ import {
   bulkUpdateProductVisibility,
   syncSingleProductStatusFromGoogle,
   syncLiveProductStatuses,
+  cleanupStaleGoogleProducts,
+  getGoogleMCStats,
 } from "@/app/actions/backend/marketing/gmc-product-sync.actions";
 
 // ─────────────────────────────────────────────────────────────
@@ -199,6 +201,8 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
   const [bulkAction, setBulkAction] = useState<string>("");
   const [isScanning, setIsScanning] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [realMCStats, setRealMCStats] = useState<{ totalProducts: number; approved: number; disapproved: number; pending: number } | null>(null);
 
   const activeCount = syncLogs.filter(l => l.status === "SYNCED" && parseGoogleIssues(l.googleIssues).length === 0).length;
   const disapprovedCount = syncLogs.filter(l => l.status === "FAILED").length;
@@ -252,22 +256,45 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
 
   const handleRefreshAll = async () => {
     setIsSyncing(true); setErrorMsg(null); setSuccessMsg(null);
-    const res = await syncLiveProductStatuses();
-    if (res.success) { setSuccessMsg("All statuses refreshed from Google!"); router.refresh(); }
+    const [statusRes, mcRes] = await Promise.all([
+      syncLiveProductStatuses(),
+      getGoogleMCStats(),
+    ]);
+    if (statusRes.success) { setSuccessMsg("All statuses refreshed from Google!"); router.refresh(); }
     else setErrorMsg("Failed to refresh statuses from Google.");
+    if (mcRes.success && mcRes.data) setRealMCStats(mcRes.data);
     setIsSyncing(false);
+  };
+
+  const handleCleanup = async () => {
+    if (!window.confirm("This will delete all Google MC products that are NOT gla_XXXX and NOT in your current DB. Continue?")) return;
+    setIsCleaningUp(true); setErrorMsg(null); setSuccessMsg(null);
+    const res = await cleanupStaleGoogleProducts();
+    if (res.success) { setSuccessMsg(res.message ?? "Cleanup complete!"); router.refresh(); }
+    else setErrorMsg(res.error ?? "Cleanup failed.");
+    setIsCleaningUp(false);
   };
 
   return (
     <div className="w-full text-[#3c434a] pb-10 space-y-6">
 
-      {/* ── STAT CARDS ───────────────────────────────────────────────────── */}
-      <div className="bg-white border border-[#ccd0d4] rounded-lg overflow-hidden shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ccd0d4] px-5 py-3">
-          <h2 className="text-[15px] font-semibold text-[#1d2327]">Product Feed Overview</h2>
+      {/* ── HEADER BUTTONS ───────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[15px] font-semibold text-[#1d2327]">Product Feed Overview</h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCleanup}
+            disabled={isCleaningUp || isSyncing}
+            className="inline-flex items-center gap-2 bg-white border border-[#d63638] text-[#d63638] rounded-md px-4 py-1.5 text-[12px] font-semibold hover:bg-[#fcf0f1] disabled:opacity-50 transition-all cursor-pointer shadow-sm"
+          >
+            <svg className={`w-3.5 h-3.5 ${isCleaningUp ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            {isCleaningUp ? "Cleaning up…" : "Remove Duplicates"}
+          </button>
           <button
             onClick={handleRefreshAll}
-            disabled={isSyncing}
+            disabled={isSyncing || isCleaningUp}
             className="inline-flex items-center gap-2 bg-white border border-[#ccd0d4] text-[#2271b1] rounded-md px-4 py-1.5 text-[12px] font-semibold hover:bg-[#f0f6fc] hover:border-[#2271b1] disabled:opacity-50 transition-all cursor-pointer shadow-sm"
           >
             <svg className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,13 +303,20 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
             {isSyncing ? "Refreshing…" : "Refresh from Google"}
           </button>
         </div>
+      </div>
+
+      {/* ── DB FEED STATS ────────────────────────────────────────────────── */}
+      <div className="bg-white border border-[#ccd0d4] rounded-lg overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-[#ccd0d4] bg-[#f9fafb]">
+          <p className="text-[12px] font-semibold text-[#646970] uppercase tracking-wider">Your DB Feed — Local Status</p>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-[#e5e7eb]">
           {[
             { label: "Active", value: activeCount, color: "text-emerald-600", bg: "bg-emerald-50", icon: "✓" },
             { label: "Warnings", value: warningCount, color: "text-amber-600", bg: "bg-amber-50", icon: "⚠" },
             { label: "Disapproved", value: disapprovedCount, color: "text-red-600", bg: "bg-red-50", icon: "✕" },
             { label: "Not Synced", value: notSyncedCount, color: "text-slate-500", bg: "bg-slate-50", icon: "○" },
-            { label: "Total", value: totalProducts, color: "text-[#1d2327]", bg: "bg-white", icon: "#" },
+            { label: "DB Total", value: totalProducts, color: "text-[#1d2327]", bg: "bg-white", icon: "#" },
           ].map(({ label, value, color, bg, icon }) => (
             <div key={label} className={`${bg} p-5`}>
               <div className="flex items-center gap-2 mb-2">
@@ -297,8 +331,45 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
           <div className="bg-red-50 border-t border-red-200 px-5 py-2.5 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
             <p className="text-[12px] text-red-700 font-medium m-0">
-              <strong>{disapprovedCount} product{disapprovedCount > 1 ? "s" : ""}</strong> disapproved by Google — click <strong>Refresh from Google</strong> for the latest status, then expand each product to see full issue details.
+              <strong>{disapprovedCount} product{disapprovedCount > 1 ? "s" : ""}</strong> disapproved by Google — expand each card below to see full issue details.
             </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── REAL GOOGLE MC LIVE STATS ─────────────────────────────────────── */}
+      <div className="bg-white border border-[#ccd0d4] rounded-lg overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-[#ccd0d4] bg-[#e8f0fe]">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-[#1a73e8] flex items-center justify-center">
+              <span className="text-white text-[9px] font-bold">G</span>
+            </div>
+            <p className="text-[12px] font-semibold text-[#1a73e8] uppercase tracking-wider">Google MC — Real Live Data</p>
+            {!realMCStats && (
+              <span className="text-[11px] text-[#9aa0a6] ml-1">— click Refresh from Google to load</span>
+            )}
+          </div>
+        </div>
+        {realMCStats ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-[#e5e7eb]">
+            {[
+              { label: "Total in MC", value: realMCStats.totalProducts, color: "text-[#1a73e8]", bg: "bg-[#e8f0fe]", icon: "#" },
+              { label: "Approved", value: realMCStats.approved, color: "text-emerald-600", bg: "bg-emerald-50", icon: "✓" },
+              { label: "Disapproved", value: realMCStats.disapproved, color: "text-red-600", bg: "bg-red-50", icon: "✕" },
+              { label: "Under Review", value: realMCStats.pending, color: "text-amber-600", bg: "bg-amber-50", icon: "⏳" },
+            ].map(({ label, value, color, bg, icon }) => (
+              <div key={label} className={`${bg} p-5`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-[13px] font-bold ${color}`}>{icon}</span>
+                  <span className="text-[12px] text-[#6b7280] font-medium">{label}</span>
+                </div>
+                <p className={`text-[32px] font-light leading-none ${color}`}>{value}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-5 py-8 text-center">
+            <p className="text-[13px] text-[#9aa0a6]">Click <strong className="text-[#2271b1]">Refresh from Google</strong> to fetch real-time data directly from Google Merchant Center.</p>
           </div>
         )}
       </div>
@@ -406,7 +477,10 @@ export default function TabProductFeed({ syncLogs, totalProducts }: Props) {
                         ) : (
                           <>
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                            View all {issues.length} issue{issues.length !== 1 ? "s" : ""} with destination
+                            {issues.length > 0
+                              ? `View all ${issues.length} issue${issues.length !== 1 ? "s" : ""} with destination`
+                              : "View error details"
+                            }
                           </>
                         )}
                       </button>

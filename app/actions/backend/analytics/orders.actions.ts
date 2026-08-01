@@ -110,7 +110,7 @@ export async function getOrdersAnalyticsData(
       totalProducts,
       itemsSold,
       couponUsed: order.couponCode || null,
-      netSales: Number(order.netAmount) || 0,
+      netSales: Math.max(0, Number(order.subtotal) - Number(order.discountTotal)),
       attribution: order.utmSource ? `Campaign: ${order.utmSource}` : "Organic",
     };
   });

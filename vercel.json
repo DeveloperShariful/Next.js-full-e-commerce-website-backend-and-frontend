@@ -2,31 +2,31 @@
   "crons": [
     {
       "path": "/api/cron/affiliate-check",
-      "schedule": "0 2 * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/email/process-email-queue",
-      "schedule": "0 * * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/abandoned-checkout",
-      "schedule": "30 * * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/cleanup-logs",
-      "schedule": "0 3 * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/sync-transdirect",
-      "schedule": "0 * * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/sync-analytics",
-      "schedule": "0 */3 * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/daily-report-reminder",
-      "schedule": "0 7 * * 1-5"
+      "schedule": "0 23 * * *"
     }
   ]
 }

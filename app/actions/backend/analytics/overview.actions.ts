@@ -83,9 +83,9 @@ export async function getOverviewData(
     return acc;
   }, getDefaultSummary());
 
-  currentSummary.averageOrderValue = 
-    currentSummary.totalOrders > 0 
-      ? currentSummary.netSales / currentSummary.totalOrders 
+  currentSummary.averageOrderValue =
+    currentSummary.totalOrders > 0
+      ? currentSummary.totalSales / currentSummary.totalOrders
       : 0;
 
   // ৫. Previous Summary Calculation
@@ -100,9 +100,9 @@ export async function getOverviewData(
     return acc;
   }, getDefaultSummary());
 
-  previousSummary.averageOrderValue = 
-    previousSummary.totalOrders > 0 
-      ? previousSummary.netSales / previousSummary.totalOrders 
+  previousSummary.averageOrderValue =
+    previousSummary.totalOrders > 0
+      ? previousSummary.totalSales / previousSummary.totalOrders
       : 0;
 
   return {

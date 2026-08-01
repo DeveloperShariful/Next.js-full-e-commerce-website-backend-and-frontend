@@ -260,10 +260,11 @@ export async function GET(request: Request) {
       // ── Analytics Schema এর definition অনুযায়ী ──
       // grossSales = ট্যাক্স, শিপিং, ডিসকাউন্ট বাদে অরিজিনাল দাম = subtotal field
       // netSales   = ডিসকাউন্ট বাদ দেওয়ার পর = netAmount field
-      stat.grossSales    += Number(order.subtotal)      || 0;
-      stat.netSales      += Number(order.netAmount)     || 0;
-      stat.totalTax      += Number(order.taxTotal)      || 0;
-      stat.totalShipping += Number(order.shippingTotal) || 0;
+      stat.grossSales    += Number(order.subtotal)       || 0;
+      // netSales = subtotal - discounts (order.netAmount defaults to 0 on old/imported orders)
+      stat.netSales      += Math.max(0, (Number(order.subtotal) || 0) - (Number(order.discountTotal) || 0));
+      stat.totalTax      += Number(order.taxTotal)       || 0;
+      stat.totalShipping += Number(order.shippingTotal)  || 0;
       stat.totalDiscounts += Number(order.discountTotal) || 0;
       stat.totalOrders   += 1;
 

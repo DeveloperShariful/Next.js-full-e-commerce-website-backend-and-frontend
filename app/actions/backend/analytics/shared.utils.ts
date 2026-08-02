@@ -111,13 +111,11 @@ export function parseDateRange(
       case "last_7_days":
         currentFrom.setDate(currentFrom.getDate() - 7);
         currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setDate(currentTo.getDate() - 1);
         currentTo.setHours(23, 59, 59, 999);
         break;
       case "last_30_days":
         currentFrom.setDate(currentFrom.getDate() - 30);
         currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setDate(currentTo.getDate() - 1);
         currentTo.setHours(23, 59, 59, 999);
         break;
       case "week_to_date":

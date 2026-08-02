@@ -10,6 +10,7 @@ import { DashboardPulse, StatusBreakdown, TopProduct } from "./types";
 async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: Date, prevEndDate: Date): Promise<DashboardPulse> {
   
   // 1. REVENUE (Strictly PAID orders only, excluding trashed)
+  // Net Sales = subtotal - discountTotal (product revenue, excl. shipping & tax — matches Analytics)
   const currentPaid = await db.order.aggregate({
     where: {
       createdAt: { gte: startDate, lte: endDate },
@@ -17,7 +18,7 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
       status: { not: OrderStatus.CANCELLED },
       deletedAt: null,
     },
-    _sum: { total: true }
+    _sum: { subtotal: true, discountTotal: true }
   });
 
   const prevPaid = await db.order.aggregate({
@@ -27,12 +28,11 @@ async function getStatsForRange(startDate: Date, endDate: Date, prevStartDate: D
       status: { not: OrderStatus.CANCELLED },
       deletedAt: null,
     },
-    _sum: { total: true }
+    _sum: { subtotal: true, discountTotal: true }
   });
 
-  // ✅ FIX: Convert aggregated Decimal to Number
-  const currentRevenue = Number(currentPaid._sum.total || 0);
-  const prevRevenue = Number(prevPaid._sum.total || 0);
+  const currentRevenue = Math.max(0, Number(currentPaid._sum.subtotal || 0) - Number(currentPaid._sum.discountTotal || 0));
+  const prevRevenue    = Math.max(0, Number(prevPaid._sum.subtotal    || 0) - Number(prevPaid._sum.discountTotal    || 0));
 
   // 2. ORDER COUNTS (Total, Paid, Unpaid, excluding trashed)
   const currentOrders = await db.order.findMany({

@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   LineChart,
   Line,
@@ -51,6 +51,8 @@ export default function AnalyticsChart({
 }: AnalyticsChartProps) {
   
   const { timezone } = useGlobalStore();
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
 
   // States for interactive controls
   const [interval, setInterval] = useState<IntervalType>("day");
@@ -174,7 +176,7 @@ export default function AnalyticsChart({
 
       {/* 🔥 Chart Body Area */}
       <div className="p-4 h-[350px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        {!isMounted ? <div className="w-full h-full" /> : <ResponsiveContainer width="100%" height="100%">
           {chartType === "line" ? (
             <LineChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e4e7" />
@@ -205,7 +207,7 @@ export default function AnalyticsChart({
               )}
             </BarChart>
           )}
-        </ResponsiveContainer>
+        </ResponsiveContainer>}
       </div>
     </div>
   );

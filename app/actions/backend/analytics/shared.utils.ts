@@ -108,6 +108,18 @@ export function parseDateRange(
         currentTo.setDate(currentTo.getDate() - 1);
         currentTo.setHours(23, 59, 59, 999);
         break;
+      case "last_7_days":
+        currentFrom.setDate(currentFrom.getDate() - 7);
+        currentFrom.setHours(0, 0, 0, 0);
+        currentTo.setDate(currentTo.getDate() - 1);
+        currentTo.setHours(23, 59, 59, 999);
+        break;
+      case "last_30_days":
+        currentFrom.setDate(currentFrom.getDate() - 30);
+        currentFrom.setHours(0, 0, 0, 0);
+        currentTo.setDate(currentTo.getDate() - 1);
+        currentTo.setHours(23, 59, 59, 999);
+        break;
       case "week_to_date":
         const dayOfWeek = currentFrom.getDay();
         const diffToMonday = currentFrom.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
@@ -136,6 +148,21 @@ export function parseDateRange(
         currentTo.setMonth(currentTo.getMonth(), 0);
         currentTo.setHours(23, 59, 59, 999);
         break;
+      case "quarter_to_date": {
+        const qMonth = Math.floor(currentFrom.getMonth() / 3) * 3;
+        currentFrom.setMonth(qMonth, 1);
+        currentFrom.setHours(0, 0, 0, 0);
+        currentTo.setHours(23, 59, 59, 999);
+        break;
+      }
+      case "last_quarter": {
+        const lqMonth = Math.floor(currentFrom.getMonth() / 3) * 3;
+        currentFrom.setMonth(lqMonth - 3, 1);
+        currentFrom.setHours(0, 0, 0, 0);
+        currentTo.setMonth(lqMonth, 0);
+        currentTo.setHours(23, 59, 59, 999);
+        break;
+      }
       case "year_to_date":
         currentFrom.setMonth(0, 1);
         currentFrom.setHours(0, 0, 0, 0);

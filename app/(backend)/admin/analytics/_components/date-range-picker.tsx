@@ -12,6 +12,8 @@ import { useGlobalStore } from "@/app/providers/global-store-provider";
 const PRESETS = [
   { label: "Today", value: "today" },
   { label: "Yesterday", value: "yesterday" },
+  { label: "Last 7 days", value: "last_7_days" },
+  { label: "Last 30 days", value: "last_30_days" },
   { label: "Week to date", value: "week_to_date" },
   { label: "Last week", value: "last_week" },
   { label: "Month to date", value: "month_to_date" },

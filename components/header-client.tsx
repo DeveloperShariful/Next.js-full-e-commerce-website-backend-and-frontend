@@ -82,14 +82,7 @@ const navItems: NavItem[] = [
   { path: '/about', label: 'About' },
   { path: '/contact', label: 'Contact' },
   { path: '/faq', label: 'FAQ' },
-  { 
-    path: '/kids-ebike-hub', 
-    label: 'Hub & Blog',
-    subItems: [
-      { path: '/kids-ebike-hub', label: 'The GoBike Hub', tag: 'Videos & News' },
-      { path: '/blog', label: 'Official Blog', tag: 'Guides & Tips' },
-    ]
-  },
+  { path: '/blog',label: 'Official Blog' },
 ];
 
 interface InitialUser {

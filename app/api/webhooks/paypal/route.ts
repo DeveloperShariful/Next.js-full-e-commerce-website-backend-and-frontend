@@ -1,7 +1,7 @@
 // app/api/webhook/paypal/route.ts
 
 import { headers } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { db } from '@/lib/prisma';
 import { OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
@@ -119,11 +119,14 @@ export async function POST(request: Request) {
             if (order && (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID)) {
                 // Backup: already PROCESSING — check if Transdirect sync is done
                 if (order.transdirectOrderStatus === 'booked') {
-                    db.orderNote.create({
-                        data: { orderId: wcOrderId, content: '✅ Transdirect already synced (capture-order) — paypal-webhook skipping sync', isSystem: true }
-                    }).catch(() => {});
+                    after(async () => {
+                      await db.orderNote.create({
+                          data: { orderId: wcOrderId, content: '✅ Transdirect already synced (capture-order) — paypal-webhook skipping sync', isSystem: true }
+                      }).catch(() => {});
+                    });
                 } else {
-                    queueAndSyncTransdirect(wcOrderId, 'paypal-webhook');
+                    // Awaited directly (not after()) — avoids racing capture-order's own sync trigger.
+                    await queueAndSyncTransdirect(wcOrderId, 'paypal-webhook');
                 }
                 const alreadyEmail = order.guestEmail || order.user?.email;
                 await Promise.allSettled([
@@ -173,18 +176,22 @@ export async function POST(request: Request) {
                         }
                     }
                 });
-                queueAndSyncTransdirect(wcOrderId, 'paypal-webhook-rescue');
+                // Awaited directly (not after()) — avoids racing capture-order's own sync trigger.
+                await queueAndSyncTransdirect(wcOrderId, 'paypal-webhook-rescue');
 
                 // Post-rescue side effects — email + analytics run in parallel
                 const rescueEmail = order?.guestEmail || order?.user?.email;
 
-                // Affiliate — fire-and-forget (external API, non-critical)
-                if (process.env.INTERNAL_API_KEY) {
-                    fetch(`${APP_URL}/api/affiliate/process-order`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.INTERNAL_API_KEY },
-                        body: JSON.stringify({ orderId: wcOrderId }),
-                    }).catch(err => console.error('[PayPal Webhook] Affiliate trigger failed:', err));
+                // Affiliate — deferred with after() (external API, non-critical)
+                const internalApiKeyRescue = process.env.INTERNAL_API_KEY;
+                if (internalApiKeyRescue) {
+                    after(async () => {
+                      await fetch(`${APP_URL}/api/affiliate/process-order`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-api-key': internalApiKeyRescue },
+                          body: JSON.stringify({ orderId: wcOrderId }),
+                      }).catch(err => console.error('[PayPal Webhook] Affiliate trigger failed:', err));
+                    });
                 }
 
                 const rescueAnalyticsItems = await db.orderItem.findMany({
@@ -271,20 +278,24 @@ export async function POST(request: Request) {
                     }
                 });
                 if (!isMismatch) {
-                    queueAndSyncTransdirect(wcOrderId, 'paypal-webhook-capture');
+                    // Awaited directly (not after()) — avoids racing capture-order's own sync trigger.
+                    await queueAndSyncTransdirect(wcOrderId, 'paypal-webhook-capture');
                 }
 
                 // Email + analytics — only on clean capture (no mismatch), run in parallel
                 if (!isMismatch) {
                     const syncEmail = order.guestEmail || order.user?.email;
 
-                    // Affiliate — fire-and-forget (external API, non-critical)
-                    if (process.env.INTERNAL_API_KEY) {
-                        fetch(`${APP_URL}/api/affiliate/process-order`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.INTERNAL_API_KEY },
-                            body: JSON.stringify({ orderId: wcOrderId }),
-                        }).catch(err => console.error('[PayPal Webhook] Affiliate trigger failed:', err));
+                    // Affiliate — deferred with after() (external API, non-critical)
+                    const internalApiKeySync = process.env.INTERNAL_API_KEY;
+                    if (internalApiKeySync) {
+                        after(async () => {
+                          await fetch(`${APP_URL}/api/affiliate/process-order`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'x-api-key': internalApiKeySync },
+                              body: JSON.stringify({ orderId: wcOrderId }),
+                          }).catch(err => console.error('[PayPal Webhook] Affiliate trigger failed:', err));
+                        });
                     }
 
                     const syncItems = await db.orderItem.findMany({
@@ -405,20 +416,24 @@ export async function POST(request: Request) {
                         data: { orderId: txn.orderId, content: disputeNote, isSystem: true },
                     }).catch(err => console.error('[PayPal Webhook] Dispute note error:', err));
 
-                    auditService.systemLog(
-                        'CRITICAL',
-                        'PAYPAL_DISPUTE',
-                        `⚠️ PayPal dispute on order ${txn.orderId} — Respond immediately`,
-                        { orderId: txn.orderId, disputeId, reason: event.resource.reason, amount: disputeAmt }
-                    ).catch(() => {});
+                    after(async () => {
+                      await auditService.systemLog(
+                          'CRITICAL',
+                          'PAYPAL_DISPUTE',
+                          `⚠️ PayPal dispute on order ${txn.orderId} — Respond immediately`,
+                          { orderId: txn.orderId, disputeId, reason: event.resource.reason, amount: disputeAmt }
+                      ).catch(() => {});
+                    });
                 } else {
                     // Order not found by transaction — still log the critical alert
-                    auditService.systemLog(
-                        'CRITICAL',
-                        'PAYPAL_DISPUTE',
-                        `⚠️ PayPal dispute filed — ${disputeNote}`,
-                        { disputeId, txnId, reason: event.resource.reason }
-                    ).catch(() => {});
+                    after(async () => {
+                      await auditService.systemLog(
+                          'CRITICAL',
+                          'PAYPAL_DISPUTE',
+                          `⚠️ PayPal dispute filed — ${disputeNote}`,
+                          { disputeId, txnId, reason: event.resource.reason }
+                      ).catch(() => {});
+                    });
                 }
             }
         }

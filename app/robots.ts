@@ -31,14 +31,11 @@ export default function robots(): MetadataRoute.Robots {
           '/*?*filter=',
         ],
       },
-      { userAgent: 'GPTBot',          disallow: ['/'] },
-      { userAgent: 'ChatGPT-User',    disallow: ['/'] },
-      { userAgent: 'CCBot',           disallow: ['/'] },
-      { userAgent: 'anthropic-ai',    disallow: ['/'] },
-      { userAgent: 'Claude-Web',      disallow: ['/'] },
-      { userAgent: 'Google-Extended', disallow: ['/'] },
-      { userAgent: 'PerplexityBot',   disallow: ['/'] },
-      { userAgent: 'Omgilibot',       disallow: ['/'] },
+      // AI bots: allowed (fall through to the '*' rule above — same access as
+      // regular crawlers, still blocked from /admin/, /checkout/, /cart, etc).
+      // Omgilibot is a third-party data reseller (not an AI assistant itself)
+      // with no direct benefit, so it stays blocked.
+      { userAgent: 'Omgilibot', disallow: ['/'] },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
     host: baseUrl,

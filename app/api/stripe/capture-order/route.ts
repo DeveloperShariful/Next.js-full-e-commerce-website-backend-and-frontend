@@ -1,5 +1,5 @@
 // app/api/stripe/capture-order/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
@@ -171,16 +171,19 @@ export async function POST(request: Request) {
 
     console.log(`🎉 [Stripe Capture] Order ${orderId} → PROCESSING. Stock decremented.`);
 
-    // Activity log — fire-and-forget, never blocks the response
-    logActivity({
-      action: 'CHECKOUT_ORDER_PLACED',
-      entityType: 'Order',
-      entityId: orderId,
-      details: { gateway: 'stripe', amount: capturedAmount, transactionId: paymentIntent.id },
-      userId: currentOrder.userId ?? undefined,
-    }).catch(() => {});
+    // Activity log — deferred with after() (non-critical, survives past the response).
+    after(async () => {
+      await logActivity({
+        action: 'CHECKOUT_ORDER_PLACED',
+        entityType: 'Order',
+        entityId: orderId,
+        details: { gateway: 'stripe', amount: capturedAmount, transactionId: paymentIntent.id },
+        userId: currentOrder.userId ?? undefined,
+      }).catch(() => {});
+    });
 
-    // Await Transdirect sync — failure reason written to order note; cron retries if sync fails
+    // Transdirect sync — awaited directly (not after()), to avoid racing the
+    // payment webhook's own backup sync trigger.
     await queueAndSyncTransdirect(orderId, 'capture-order');
 
     // ── 6. Clear cart server-side ─────────────────────────────
@@ -216,100 +219,103 @@ export async function POST(request: Request) {
       console.error('[Stripe Capture] Cart clear failed (non-critical):', cartErr);
     }
 
-    // ── 7. Post-capture side-effects (fire-and-forget) ────────
-    // Confirmation emails
-    const customerEmail = currentOrder.guestEmail || currentOrder.user?.email;
-    if (customerEmail) {
-      sendNotification({
-        trigger: 'ORDER_PROCESSING',
-        recipient: customerEmail,
-        orderId,
-      }).catch(err => console.error('[Stripe Capture] Customer email failed:', err));
-    }
-    sendNotification({
-      trigger: 'ORDER_CREATED_ADMIN',
-      recipient: '',
-      orderId,
-    }).catch(err => console.error('[Stripe Capture] Admin email failed:', err));
-
-    db.orderNote.create({
-      data: {
-        orderId,
-        content: `📧 [capture-order] Email queued — customer: ${customerEmail || 'none'}, admin: ✓`,
-        isSystem: true,
+    // ── 7-8. Post-capture side-effects — deferred with after() so the
+    // response reaches the customer immediately (genuinely best-effort:
+    // logging/emails/affiliate/analytics, none of it blocks order correctness).
+    after(async () => {
+      const customerEmail = currentOrder.guestEmail || currentOrder.user?.email;
+      if (customerEmail) {
+        await sendNotification({
+          trigger: 'ORDER_PROCESSING',
+          recipient: customerEmail,
+          orderId,
+        }).catch(err => console.error('[Stripe Capture] Customer email failed:', err));
       }
-    }).catch(() => {});
+      await sendNotification({
+        trigger: 'ORDER_CREATED_ADMIN',
+        recipient: '',
+        orderId,
+      }).catch(err => console.error('[Stripe Capture] Admin email failed:', err));
 
-    // Affiliate commission
-    if (!process.env.INTERNAL_API_KEY) {
-      console.error('[Stripe Capture] INTERNAL_API_KEY not set — affiliate commission skipped for order:', orderId);
-    } else {
-      fetch(`${APP_URL}/api/affiliate/process-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.INTERNAL_API_KEY,
-        },
-        body: JSON.stringify({ orderId }),
-      }).catch(err => console.error('[Stripe Capture] Affiliate trigger failed:', err));
-    }
+      await db.orderNote.create({
+        data: {
+          orderId,
+          content: `📧 [capture-order] Email queued — customer: ${customerEmail || 'none'}, admin: ✓`,
+          isSystem: true,
+        }
+      }).catch(() => {});
 
-    // ── 8. Analytics update (fire-and-forget — does not block response) ──
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      // Affiliate commission
+      if (!process.env.INTERNAL_API_KEY) {
+        console.error('[Stripe Capture] INTERNAL_API_KEY not set — affiliate commission skipped for order:', orderId);
+      } else {
+        await fetch(`${APP_URL}/api/affiliate/process-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.INTERNAL_API_KEY,
+          },
+          body: JSON.stringify({ orderId }),
+        }).catch(err => console.error('[Stripe Capture] Affiliate trigger failed:', err));
+      }
 
-    const subtotal = Number(currentOrder.subtotal);
-    const discountTotal = Number(currentOrder.discountTotal);
-    const taxTotal = Number(currentOrder.taxTotal);
-    const shippingCost = Number(currentOrder.shippingTotal);
-    const isFirstOrder = currentOrder.isFirstOrder;
-    const totalItemsSold = orderItems.reduce((sum, i) => sum + i.quantity, 0);
+      // Analytics update
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    Promise.allSettled([
-      db.analytics.upsert({
-        where: { date: today },
-        create: {
-          date: today,
-          grossSales: subtotal,
-          netSales: subtotal - discountTotal,
-          totalTax: taxTotal,
-          totalShipping: shippingCost,
-          totalDiscounts: discountTotal,
-          totalOrders: 1,
-          productsSold: totalItemsSold,
-          newCustomers: isFirstOrder ? 1 : 0,
-          returningCustomers: isFirstOrder ? 0 : 1,
-        },
-        update: {
-          grossSales: { increment: subtotal },
-          netSales: { increment: subtotal - discountTotal },
-          totalTax: { increment: taxTotal },
-          totalShipping: { increment: shippingCost },
-          totalDiscounts: { increment: discountTotal },
-          totalOrders: { increment: 1 },
-          productsSold: { increment: totalItemsSold },
-          newCustomers: { increment: isFirstOrder ? 1 : 0 },
-          returningCustomers: { increment: isFirstOrder ? 0 : 1 },
-        },
-      }),
-      ...orderItems
-        .filter(i => !!i.productId)
-        .map(({ productId, quantity, total }) =>
-          db.productAnalytics.upsert({
-            where: { date_productId: { date: today, productId: productId! } },
-            create: {
-              date: today,
-              productId: productId!,
-              itemsSold: quantity,
-              netSales: Number(total),
-            },
-            update: {
-              itemsSold: { increment: quantity },
-              netSales: { increment: Number(total) },
-            },
-          })
-        ),
-    ]).catch(err => console.error('[Stripe Capture] Analytics update failed:', err));
+      const subtotal = Number(currentOrder.subtotal);
+      const discountTotal = Number(currentOrder.discountTotal);
+      const taxTotal = Number(currentOrder.taxTotal);
+      const shippingCost = Number(currentOrder.shippingTotal);
+      const isFirstOrder = currentOrder.isFirstOrder;
+      const totalItemsSold = orderItems.reduce((sum, i) => sum + i.quantity, 0);
+
+      await Promise.allSettled([
+        db.analytics.upsert({
+          where: { date: today },
+          create: {
+            date: today,
+            grossSales: subtotal,
+            netSales: subtotal - discountTotal,
+            totalTax: taxTotal,
+            totalShipping: shippingCost,
+            totalDiscounts: discountTotal,
+            totalOrders: 1,
+            productsSold: totalItemsSold,
+            newCustomers: isFirstOrder ? 1 : 0,
+            returningCustomers: isFirstOrder ? 0 : 1,
+          },
+          update: {
+            grossSales: { increment: subtotal },
+            netSales: { increment: subtotal - discountTotal },
+            totalTax: { increment: taxTotal },
+            totalShipping: { increment: shippingCost },
+            totalDiscounts: { increment: discountTotal },
+            totalOrders: { increment: 1 },
+            productsSold: { increment: totalItemsSold },
+            newCustomers: { increment: isFirstOrder ? 1 : 0 },
+            returningCustomers: { increment: isFirstOrder ? 0 : 1 },
+          },
+        }),
+        ...orderItems
+          .filter(i => !!i.productId)
+          .map(({ productId, quantity, total }) =>
+            db.productAnalytics.upsert({
+              where: { date_productId: { date: today, productId: productId! } },
+              create: {
+                date: today,
+                productId: productId!,
+                itemsSold: quantity,
+                netSales: Number(total),
+              },
+              update: {
+                itemsSold: { increment: quantity },
+                netSales: { increment: Number(total) },
+              },
+            })
+          ),
+      ]).catch(err => console.error('[Stripe Capture] Analytics update failed:', err));
+    });
 
     return NextResponse.json({ success: true, orderId });
 

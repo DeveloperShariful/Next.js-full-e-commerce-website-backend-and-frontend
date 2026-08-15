@@ -1,7 +1,7 @@
 // app/api/paypal/create-order/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
-import { Prisma, OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
+import { Prisma, OrderStatus, PaymentStatus, TaxStatus, ShippingMethodType } from '@prisma/client';
 import { auth } from '@/auth';
 import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { auditService } from '@/lib/audit-service';
@@ -29,7 +29,7 @@ interface AddressDTO {
   country?: string;
 }
 interface CouponDTO { code: string; amount?: number; }
-interface ShippingRateDTO { id: string; label: string; cost: number; isTransdirect?: boolean; tdBookingId?: number; tdCourierKey?: string; }
+interface ShippingRateDTO { id: string; label: string; cost: number; isTransdirect?: boolean; tdBookingId?: number; tdCourierKey?: string; isLocalPickup?: boolean; }
 interface MetaDataDTO { key: string; value: string; }
 
 const MAX_ORDER_NUMBER_RETRIES = 5;
@@ -216,21 +216,39 @@ export async function POST(request: NextRequest) {
     let shippingMethodLabel = 'Standard Shipping';
     let tdBookingId: string | undefined;
     let tdCourierKey: string | undefined;
+    let tdCourierPrice: number | undefined;
+    let isLocalPickup = false;
     if (selectedShipping) {
       const matchedRate = shippingRates?.find(r => r.id === selectedShipping);
       if (matchedRate) {
         shippingCost = Number(matchedRate.cost);
         shippingMethodLabel = matchedRate.label;
-        if (matchedRate.isTransdirect) {
+        if (matchedRate.isLocalPickup) {
+          isLocalPickup = true;
+        } else if (matchedRate.isTransdirect) {
           tdBookingId  = matchedRate.tdBookingId ? String(matchedRate.tdBookingId) : undefined;
           tdCourierKey = matchedRate.tdCourierKey ?? undefined;
           console.log(`[PayPal Order] TransDirect: bookingId=${tdBookingId}, courier=${tdCourierKey}`);
+        } else {
+          // Free/flat shipping selected — still pick cheapest Transdirect rate for fulfilment.
+          // Its quoted price (tdCourierPrice) is carried via metadata so sync-time doesn't
+          // need to re-fetch a quote (avoids latency + declared_value mismatches).
+          const cheapestTd = shippingRates
+            ?.filter(r => r.isTransdirect && r.tdBookingId && r.tdCourierKey)
+            .sort((a, b) => a.cost - b.cost)[0];
+          if (cheapestTd) {
+            tdBookingId    = cheapestTd.tdBookingId ? String(cheapestTd.tdBookingId) : undefined;
+            tdCourierKey   = cheapestTd.tdCourierKey;
+            tdCourierPrice = cheapestTd.cost;
+            console.log(`[PayPal Order] Free shipping → Transdirect fallback: bookingId=${tdBookingId}, courier=${tdCourierKey}, price=${tdCourierPrice}`);
+          }
         }
       } else {
         const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
         if (shippingRate) {
           shippingCost = Number(shippingRate.price);
           shippingMethodLabel = shippingRate.name;
+          if (shippingRate.type === 'LOCAL_PICKUP') isLocalPickup = true;
         }
       }
     }
@@ -282,6 +300,7 @@ export async function POST(request: NextRequest) {
     metaDataArray.push({ key: '_created_via', value: 'Headless_PayPal_Create_Order_API' });
     if (cookieAffiliateId) metaDataArray.push({ key: 'solid_affiliate_id', value: cookieAffiliateId });
     if (cookieVisitId) metaDataArray.push({ key: 'solid_affiliate_visit_id', value: cookieVisitId });
+    if (tdCourierPrice !== undefined) metaDataArray.push({ key: '_td_courier_price', value: String(tdCourierPrice) });
 
     const hasPreOrderItems = validOrderItems.some(i => i.isPreOrder);
     const billingJson = JSON.parse(JSON.stringify(customerInfo));
@@ -317,6 +336,7 @@ export async function POST(request: NextRequest) {
       utmMedium:     utmMedium     || null,
       utmCampaign:   utmCampaign   || null,
       referringSite: referringSite || null,
+      ...(isLocalPickup && { shippingType: ShippingMethodType.LOCAL_PICKUP }),
       transdirectQuoteId: tdBookingId ?? null,
       selectedCourierCode: tdCourierKey ?? null,
       hasPreOrderItems,

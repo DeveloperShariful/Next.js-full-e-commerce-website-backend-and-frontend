@@ -1,5 +1,5 @@
 // app/api/paypal/capture-order/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
 
@@ -115,13 +115,15 @@ export async function POST(request: Request) {
           where: { id: wcOrderId },
           data: { status: OrderStatus.FAILED, paymentStatus: PaymentStatus.UNPAID },
         });
-        logActivity({
-          action: 'CHECKOUT_PAYMENT_FAILED',
-          entityType: 'Order',
-          entityId: wcOrderId,
-          details: { gateway: 'paypal', reason: isDeclined ? 'INSTRUMENT_DECLINED' : 'CAPTURE_FAILED' },
-          userId: order.userId ?? undefined,
-        }).catch(() => {});
+        after(async () => {
+          await logActivity({
+            action: 'CHECKOUT_PAYMENT_FAILED',
+            entityType: 'Order',
+            entityId: wcOrderId,
+            details: { gateway: 'paypal', reason: isDeclined ? 'INSTRUMENT_DECLINED' : 'CAPTURE_FAILED' },
+            userId: order.userId ?? undefined,
+          }).catch(() => {});
+        });
         return NextResponse.json({
           success: false,
           status: 'FAILED',
@@ -237,122 +239,128 @@ export async function POST(request: Request) {
       }
     });
 
-    // Activity log — fire-and-forget, never blocks the response
-    if (isFullSuccess) {
-      logActivity({
-        action: 'CHECKOUT_ORDER_PLACED',
-        entityType: 'Order',
-        entityId: wcOrderId,
-        details: { gateway: 'paypal', amount: capturedAmount, transactionId },
-        userId: order.userId ?? undefined,
-      }).catch(() => {});
-    }
+    // ── 7. Activity log — deferred with after() (non-critical).
+    after(async () => {
+      if (isFullSuccess) {
+        await logActivity({
+          action: 'CHECKOUT_ORDER_PLACED',
+          entityType: 'Order',
+          entityId: wcOrderId,
+          details: { gateway: 'paypal', amount: capturedAmount, transactionId },
+          userId: order.userId ?? undefined,
+        }).catch(() => {});
+      }
+    });
 
-    // ── 8. Post-payment side-effects ────────────────────────────
+    // Transdirect sync — awaited directly (not after()), to avoid racing the
+    // payment webhook's own backup sync trigger.
     if (successResponse && finalOrderStatus === OrderStatus.PROCESSING) {
-      // Await Transdirect sync — failure reason written to order note; cron retries if sync fails
       await queueAndSyncTransdirect(wcOrderId, 'capture-order');
     }
 
-    if (successResponse) {
-      // Confirmation emails
-      const customerEmail = order.guestEmail || order.user?.email;
-      if (customerEmail) {
-        sendNotification({
-          trigger: 'ORDER_PROCESSING',
-          recipient: customerEmail,
-          orderId: wcOrderId,
-        }).catch(err => console.error('[PayPal Capture] Customer email failed:', err));
-      }
-      sendNotification({
-        trigger: 'ORDER_CREATED_ADMIN',
-        recipient: '',
-        orderId: wcOrderId,
-      }).catch(err => console.error('[PayPal Capture] Admin email failed:', err));
-
-      db.orderNote.create({
-        data: {
-          orderId: wcOrderId,
-          content: `📧 [capture-order] Email queued — customer: ${customerEmail || 'none'}, admin: ✓`,
-          isSystem: true,
+    // ── 8. Post-payment side-effects — deferred with after() so the response
+    // reaches the customer immediately. Genuinely best-effort (logging/analytics),
+    // independent of whether Transdirect sync above succeeded or failed.
+    after(async () => {
+      if (successResponse) {
+        // Confirmation emails
+        const customerEmail = order.guestEmail || order.user?.email;
+        if (customerEmail) {
+          await sendNotification({
+            trigger: 'ORDER_PROCESSING',
+            recipient: customerEmail,
+            orderId: wcOrderId,
+          }).catch(err => console.error('[PayPal Capture] Customer email failed:', err));
         }
-      }).catch(() => {});
+        await sendNotification({
+          trigger: 'ORDER_CREATED_ADMIN',
+          recipient: '',
+          orderId: wcOrderId,
+        }).catch(err => console.error('[PayPal Capture] Admin email failed:', err));
 
-      // Affiliate commission
-      if (!process.env.INTERNAL_API_KEY) {
-        console.error('[PayPal Capture] INTERNAL_API_KEY not set — affiliate commission skipped for order:', wcOrderId);
-      } else {
-        fetch(`${APP_URL}/api/affiliate/process-order`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.INTERNAL_API_KEY,
-          },
-          body: JSON.stringify({ orderId: wcOrderId }),
-        }).catch(err => console.error('[PayPal Capture] Affiliate trigger failed:', err));
-      }
+        await db.orderNote.create({
+          data: {
+            orderId: wcOrderId,
+            content: `📧 [capture-order] Email queued — customer: ${customerEmail || 'none'}, admin: ✓`,
+            isSystem: true,
+          }
+        }).catch(() => {});
 
-      // ✅ NEW: Daily analytics update (matches stripe/capture-order behaviour)
-      // Only runs on confirmed COMPLETED payments — not on PENDING/FAILED.
-      if (isFullSuccess && orderItems.length > 0) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const subtotal = Number(order.subtotal);
-        const discountTotal = Number(order.discountTotal);
-        const taxTotal = Number(order.taxTotal);
-        const shippingCost = Number(order.shippingTotal);
-        const isFirstOrder = order.isFirstOrder;
-        const totalItemsSold = orderItems.reduce((sum, i) => sum + i.quantity, 0);
-
-        // fire-and-forget — does not block the response to the user
-        Promise.allSettled([
-          db.analytics.upsert({
-            where: { date: today },
-            create: {
-              date: today,
-              grossSales: subtotal,
-              netSales: subtotal - discountTotal,
-              totalTax: taxTotal,
-              totalShipping: shippingCost,
-              totalDiscounts: discountTotal,
-              totalOrders: 1,
-              productsSold: totalItemsSold,
-              newCustomers: isFirstOrder ? 1 : 0,
-              returningCustomers: isFirstOrder ? 0 : 1,
+        // Affiliate commission
+        if (!process.env.INTERNAL_API_KEY) {
+          console.error('[PayPal Capture] INTERNAL_API_KEY not set — affiliate commission skipped for order:', wcOrderId);
+        } else {
+          await fetch(`${APP_URL}/api/affiliate/process-order`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.INTERNAL_API_KEY,
             },
-            update: {
-              grossSales: { increment: subtotal },
-              netSales: { increment: subtotal - discountTotal },
-              totalTax: { increment: taxTotal },
-              totalShipping: { increment: shippingCost },
-              totalDiscounts: { increment: discountTotal },
-              totalOrders: { increment: 1 },
-              productsSold: { increment: totalItemsSold },
-              newCustomers: { increment: isFirstOrder ? 1 : 0 },
-              returningCustomers: { increment: isFirstOrder ? 0 : 1 },
-            },
-          }),
-          ...orderItems
-            .filter(i => !!i.productId)
-            .map(({ productId, quantity, total }) =>
-              db.productAnalytics.upsert({
-                where: { date_productId: { date: today, productId: productId! } },
-                create: {
-                  date: today,
-                  productId: productId!,
-                  itemsSold: quantity,
-                  netSales: Number(total),
-                },
-                update: {
-                  itemsSold: { increment: quantity },
-                  netSales: { increment: Number(total) },
-                },
-              })
-            ),
-        ]).catch(err => console.error('[PayPal Capture] Analytics update failed:', err));
+            body: JSON.stringify({ orderId: wcOrderId }),
+          }).catch(err => console.error('[PayPal Capture] Affiliate trigger failed:', err));
+        }
+
+        // ✅ Daily analytics update (matches stripe/capture-order behaviour)
+        // Only runs on confirmed COMPLETED payments — not on PENDING/FAILED.
+        if (isFullSuccess && orderItems.length > 0) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          const subtotal = Number(order.subtotal);
+          const discountTotal = Number(order.discountTotal);
+          const taxTotal = Number(order.taxTotal);
+          const shippingCost = Number(order.shippingTotal);
+          const isFirstOrder = order.isFirstOrder;
+          const totalItemsSold = orderItems.reduce((sum, i) => sum + i.quantity, 0);
+
+          await Promise.allSettled([
+            db.analytics.upsert({
+              where: { date: today },
+              create: {
+                date: today,
+                grossSales: subtotal,
+                netSales: subtotal - discountTotal,
+                totalTax: taxTotal,
+                totalShipping: shippingCost,
+                totalDiscounts: discountTotal,
+                totalOrders: 1,
+                productsSold: totalItemsSold,
+                newCustomers: isFirstOrder ? 1 : 0,
+                returningCustomers: isFirstOrder ? 0 : 1,
+              },
+              update: {
+                grossSales: { increment: subtotal },
+                netSales: { increment: subtotal - discountTotal },
+                totalTax: { increment: taxTotal },
+                totalShipping: { increment: shippingCost },
+                totalDiscounts: { increment: discountTotal },
+                totalOrders: { increment: 1 },
+                productsSold: { increment: totalItemsSold },
+                newCustomers: { increment: isFirstOrder ? 1 : 0 },
+                returningCustomers: { increment: isFirstOrder ? 0 : 1 },
+              },
+            }),
+            ...orderItems
+              .filter(i => !!i.productId)
+              .map(({ productId, quantity, total }) =>
+                db.productAnalytics.upsert({
+                  where: { date_productId: { date: today, productId: productId! } },
+                  create: {
+                    date: today,
+                    productId: productId!,
+                    itemsSold: quantity,
+                    netSales: Number(total),
+                  },
+                  update: {
+                    itemsSold: { increment: quantity },
+                    netSales: { increment: Number(total) },
+                  },
+                })
+              ),
+          ]).catch(err => console.error('[PayPal Capture] Analytics update failed:', err));
+        }
       }
-    }
+    });
 
     return NextResponse.json({
       success: successResponse,

@@ -1,7 +1,7 @@
 // app/api/webhook/stripe/route.ts
 
 import { headers } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TransactionType } from '@prisma/client';
@@ -93,11 +93,14 @@ export async function POST(request: Request) {
       if (order.status === OrderStatus.PROCESSING || order.paymentStatus === PaymentStatus.PAID) {
           // Backup: already PROCESSING — check if Transdirect sync is done
           if (order.transdirectOrderStatus === 'booked') {
-              db.orderNote.create({
-                  data: { orderId, content: '✅ Transdirect already synced (capture-order) — stripe-webhook skipping sync', isSystem: true }
-              }).catch(() => {});
+              after(async () => {
+                await db.orderNote.create({
+                    data: { orderId, content: '✅ Transdirect already synced (capture-order) — stripe-webhook skipping sync', isSystem: true }
+                }).catch(() => {});
+              });
           } else {
-              queueAndSyncTransdirect(orderId, 'stripe-webhook');
+              // Awaited directly (not after()) — avoids racing capture-order's own sync trigger.
+              await queueAndSyncTransdirect(orderId, 'stripe-webhook');
           }
           const alreadyEmail = order.guestEmail || order.user?.email;
           await Promise.allSettled([
@@ -177,18 +180,22 @@ export async function POST(request: Request) {
       });
 
       console.log(`🎉 [Stripe Webhook] Rescue Successful! Order #${orderId} updated.`);
-      queueAndSyncTransdirect(orderId, 'stripe-webhook-rescue');
+      // Awaited directly (not after()) — avoids racing capture-order's own sync trigger.
+      await queueAndSyncTransdirect(orderId, 'stripe-webhook-rescue');
 
       // Post-rescue side effects — email + abandonedCheckout + analytics run in parallel
       const rescueEmail = order.guestEmail || order.user?.email;
 
-      // Affiliate — fire-and-forget (external API, non-critical)
-      if (process.env.INTERNAL_API_KEY) {
-        fetch(`${APP_URL}/api/affiliate/process-order`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.INTERNAL_API_KEY },
-          body: JSON.stringify({ orderId }),
-        }).catch(err => console.error('[Stripe Webhook] Affiliate trigger failed:', err));
+      // Affiliate — deferred with after() (external API, non-critical)
+      const internalApiKey = process.env.INTERNAL_API_KEY;
+      if (internalApiKey) {
+        after(async () => {
+          await fetch(`${APP_URL}/api/affiliate/process-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': internalApiKey },
+            body: JSON.stringify({ orderId }),
+          }).catch(err => console.error('[Stripe Webhook] Affiliate trigger failed:', err));
+        });
       }
 
       // Fetch analytics data (2 queries in parallel)
@@ -364,12 +371,14 @@ export async function POST(request: Request) {
                 }).catch(err => console.error('[Stripe Webhook] Dispute note error:', err));
 
                 // CRITICAL system alert — appears in admin SystemLog immediately
-                auditService.systemLog(
-                    'CRITICAL',
-                    'STRIPE_CHARGEBACK',
-                    `⚠️ Chargeback on order ${txn.orderId} — $${amount} — Respond by ${dueDate}`,
-                    { orderId: txn.orderId, disputeId: dispute.id, reason: dispute.reason, amount, dueDate }
-                ).catch(() => {});
+                after(async () => {
+                  await auditService.systemLog(
+                      'CRITICAL',
+                      'STRIPE_CHARGEBACK',
+                      `⚠️ Chargeback on order ${txn.orderId} — $${amount} — Respond by ${dueDate}`,
+                      { orderId: txn.orderId, disputeId: dispute.id, reason: dispute.reason, amount, dueDate }
+                  ).catch(() => {});
+                });
             }
         }
     }

@@ -47,6 +47,7 @@ export interface ShippingRateDTO {
   isTransdirect?: boolean;
   tdBookingId?: number;   // TransDirect temp booking ID
   tdCourierKey?: string;  // e.g. "couriers_please"
+  isLocalPickup?: boolean;
 }
 
 export interface CouponDTO {
@@ -535,7 +536,7 @@ export async function getCheckoutDataAction(
           } else if (rate.type === "FLAT_RATE" && totalWeight >= minWeight && totalWeight <= maxWeight) {
             availableShippingRates.push({ id: rate.id, label: rate.name, cost });
           } else if (rate.type === "LOCAL_PICKUP") {
-            availableShippingRates.push({ id: rate.id, label: rate.name, cost: 0 });
+            availableShippingRates.push({ id: rate.id, label: rate.name, cost: 0, isLocalPickup: true });
           }
         });
       });

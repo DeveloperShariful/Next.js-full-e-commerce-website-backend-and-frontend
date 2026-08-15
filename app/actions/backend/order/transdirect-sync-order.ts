@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { ShippingMethodType } from "@prisma/client";
 
 // ============================================================================
 // QUEUE HELPER — marks order as "queued" for cron backup
@@ -24,6 +25,24 @@ export async function queueTransdirectSync(orderId: string) {
 // Called from capture-order and webhooks (fire-and-forget from callers).
 // ============================================================================
 export async function queueAndSyncTransdirect(orderId: string, source: string) {
+  // Local pickup orders don't need shipping — skip entirely.
+  // Wrapped in try/catch: this is purely an early-exit optimization — if the
+  // lookup itself fails (e.g. transient DB error), fall through to the normal
+  // flow below instead of throwing. syncOrderToTransdirect has its own
+  // LOCAL_PICKUP guard, so pickup orders still get caught correctly there.
+  try {
+    const orderShipType = await db.order.findUnique({
+      where: { id: orderId },
+      select: { shippingType: true },
+    });
+    if (orderShipType?.shippingType === ShippingMethodType.LOCAL_PICKUP) {
+      console.log(`[TDSync] Skipping local pickup order ${orderId} — no Transdirect sync needed`);
+      return;
+    }
+  } catch (err) {
+    console.error(`[TDSync] Shipping-type lookup failed for order ${orderId} (continuing anyway):`, err);
+  }
+
   // Step 1: Mark as queued so cron picks it up if this sync fails
   try {
     await db.order.updateMany({
@@ -95,7 +114,7 @@ export async function resyncOrderToTransdirect(orderId: string) {
     }));
 
     const quotePayload = {
-      declared_value: "0.00",
+      declared_value: Number(order.subtotal),
       items: quoteItems,
       sender: {
         postcode: config.senderPostcode || "2000",
@@ -328,6 +347,12 @@ export async function syncOrderToTransdirect(orderId: string, source: string = '
       return { success: true, message: "Already synced to TransDirect" };
     }
 
+    // Local pickup — customer collects in store, no shipping needed
+    if (order.shippingType === ShippingMethodType.LOCAL_PICKUP) {
+      console.log(`✅ [TransDirect] Order ${orderId} is local pickup — skipping sync`);
+      return { success: true, message: "Local pickup — no Transdirect sync needed" };
+    }
+
     const shipping: any = order.shippingAddress || {};
 
     const cleanSuburb = (text: string) => {
@@ -349,11 +374,153 @@ export async function syncOrderToTransdirect(orderId: string, source: string = '
     // ✅ Unique order_id with "-S" suffix — avoids conflict with old WooCommerce order IDs
     const transdirectOrderId = `${order.orderNumber}-S`;
 
-    const tempBookingId = order.transdirectQuoteId;
-    const selectedCourier = (order.selectedCourierCode || "").toLowerCase();
+    let tempBookingId = order.transdirectQuoteId;
+    let selectedCourier = (order.selectedCourierCode || "").toLowerCase();
+
+    // ── Self-healing: no courier saved (e.g. free shipping via PayPal/Bank Transfer) ──
+    // Fetch fresh quotes and pick the cheapest so sync can proceed without admin action.
+    if (!selectedCourier) {
+      console.log(`[TDSync] No courier code for order ${orderId} — fetching fresh quotes`);
+      const quoteItems = order.items.map(item => ({
+        weight:      Number(item.product?.weight)  > 0 ? Number(item.product?.weight)  : 1,
+        height:      Number(item.product?.height)  > 0 ? Number(item.product?.height)  : 10,
+        width:       Number(item.product?.width)   > 0 ? Number(item.product?.width)   : 10,
+        length:      Number(item.product?.length)  > 0 ? Number(item.product?.length)  : 10,
+        quantity:    item.quantity,
+        description: "carton",
+      }));
+      const quotePayload = {
+        declared_value: Number(order.subtotal),
+        items: quoteItems,
+        sender: {
+          postcode: config.senderPostcode || "2000",
+          suburb:   (config.senderSuburb || "Sydney").split(',')[0].trim().toUpperCase(),
+          type:     (config.senderType || "business").toLowerCase(),
+          country:  "AU",
+        },
+        receiver: {
+          postcode: String(shipping.postcode || "2000").trim(),
+          suburb:   cleanSuburb(shipping.city || "Sydney").toUpperCase(),
+          type:     "residential",
+          country:  "AU",
+        },
+      };
+      try {
+        const quoteRes = await fetch("https://www.transdirect.com.au/api/bookings/v4", {
+          method:  "POST",
+          headers: { "Api-Key": config.apiKey, "Content-Type": "application/json", "Accept": "application/json" },
+          body:    JSON.stringify(quotePayload),
+        });
+        if (quoteRes.ok) {
+          const quoteData = await quoteRes.json();
+          if (quoteData.quotes && quoteData.id) {
+            let cheapestCourier = "";
+            let cheapestCost    = Infinity;
+            for (const [courierKey, quote] of Object.entries(quoteData.quotes as Record<string, any>)) {
+              const cost = parseFloat((quote as any).total || "9999");
+              if (cost < cheapestCost) { cheapestCost = cost; cheapestCourier = courierKey; }
+            }
+            if (cheapestCourier) {
+              tempBookingId    = String(quoteData.id);
+              selectedCourier  = cheapestCourier.toLowerCase();
+              // Save to DB so cron retries don't re-fetch
+              await db.order.update({
+                where: { id: orderId },
+                data: { transdirectQuoteId: tempBookingId, selectedCourierCode: selectedCourier },
+              });
+              console.log(`[TDSync] Auto-selected cheapest courier: ${selectedCourier} @ $${cheapestCost}`);
+            }
+          }
+        }
+      } catch (qErr) {
+        console.error(`[TDSync] Fresh quote fetch failed for order ${orderId}:`, qErr);
+      }
+    }
+
+    // ── Free-shipping courier price fix ──
+    // Transdirect returns [] with HTTP 200 when courier_price is 0.
+    // Customer paid $0 (free/promotional shipping), but Transdirect still needs the
+    // REAL courier cost. Fast path: reuse the price already quoted at checkout time
+    // (saved in order.metadata by create-order) — no extra API call, no added latency.
+    let courierPrice = Number(order.shippingTotal);
+    if (courierPrice === 0 && selectedCourier) {
+      const metaArr = Array.isArray(order.metadata)
+        ? (order.metadata as unknown as Array<{ key: string; value: string }>)
+        : [];
+      const savedPrice = parseFloat(metaArr.find(m => m?.key === '_td_courier_price')?.value ?? '');
+
+      if (!isNaN(savedPrice) && savedPrice > 0) {
+        courierPrice = savedPrice;
+        console.log(`[TDSync] Free shipping — using checkout-quoted courier price: $${courierPrice} (no API call)`);
+      } else {
+        // Fallback: no saved price (e.g. old order) — fetch a fresh quote.
+        // declared_value must match the real order value, or Transdirect may silently
+        // refuse to convert the temp booking into a real order for high-value parcels.
+        console.log(`[TDSync] Free shipping — no saved price, fetching actual courier cost for "${selectedCourier}"`);
+        try {
+          const priceRes = await fetch("https://www.transdirect.com.au/api/bookings/v4", {
+            method:  "POST",
+            headers: { "Api-Key": config.apiKey, "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({
+              declared_value: Number(order.subtotal),
+              items: order.items.map(item => ({
+                weight:      Number(item.product?.weight)  > 0 ? Number(item.product?.weight)  : 1,
+                height:      Number(item.product?.height)  > 0 ? Number(item.product?.height)  : 10,
+                width:       Number(item.product?.width)   > 0 ? Number(item.product?.width)   : 10,
+                length:      Number(item.product?.length)  > 0 ? Number(item.product?.length)  : 10,
+                quantity:    item.quantity,
+                description: "carton",
+              })),
+              sender: {
+                postcode: config.senderPostcode || "2000",
+                suburb:   (config.senderSuburb || "Sydney").split(',')[0].trim().toUpperCase(),
+                type:     (config.senderType || "business").toLowerCase(),
+                country:  "AU",
+              },
+              receiver: {
+                postcode: String(shipping.postcode || "2000").trim(),
+                suburb:   cleanSuburb(shipping.city || "Sydney").toUpperCase(),
+                type:     "residential",
+                country:  "AU",
+              },
+            }),
+          });
+          if (priceRes.ok) {
+            const priceData = await priceRes.json();
+            if (priceData.quotes && priceData.id) {
+              const quotes = priceData.quotes as Record<string, any>;
+              const quote  = quotes[selectedCourier];
+              if (quote?.total) {
+                courierPrice  = parseFloat(quote.total);
+                tempBookingId = String(priceData.id);
+                await db.order.update({ where: { id: orderId }, data: { transdirectQuoteId: tempBookingId } });
+                console.log(`[TDSync] Actual courier cost: $${courierPrice} (${selectedCourier})`);
+              } else {
+                // Preferred courier unavailable in fresh quotes — fall back to cheapest available
+                let bestKey = "", bestCost = Infinity;
+                for (const [key, q] of Object.entries(quotes)) {
+                  const cost = parseFloat((q as any).total || "9999");
+                  if (cost < bestCost) { bestCost = cost; bestKey = key; }
+                }
+                if (bestKey) {
+                  courierPrice    = bestCost;
+                  selectedCourier = bestKey.toLowerCase();
+                  tempBookingId   = String(priceData.id);
+                  await db.order.update({ where: { id: orderId }, data: { transdirectQuoteId: tempBookingId, selectedCourierCode: selectedCourier } });
+                  console.log(`[TDSync] Courier unavailable — switched to cheapest: ${selectedCourier} @ $${courierPrice}`);
+                }
+              }
+            }
+          }
+        } catch (priceErr) {
+          console.error(`[TDSync] Could not fetch courier price for free-shipping order ${orderId}:`, priceErr);
+        }
+      }
+    }
 
     console.log(`🔑 Temp booking ID: ${tempBookingId ?? "none"}`);
     console.log(`🚚 Courier: ${selectedCourier || "unknown"}`);
+    console.log(`💰 Courier price: $${courierPrice} (customer paid: $${order.shippingTotal})`);
     console.log(`📍 Receiver suburb: ${cleanSuburb(shipping.city)}, postcode: ${shipping.postcode}, state: ${shipping.state}`);
     console.log(`📍 Receiver address: ${shipping.address1}`);
     console.log(`📞 Receiver phone: ${validPhone}`);
@@ -367,7 +534,7 @@ export async function syncOrderToTransdirect(orderId: string, source: string = '
       purchased_time:  order.createdAt.toISOString(),
       sale_price:      Number(order.total),
       selected_courier: selectedCourier,
-      courier_price:   Number(order.shippingTotal),
+      courier_price:   courierPrice,
       paid_time:       new Date().toISOString(),
       buyer_name:      `${shipping.firstName || ''} ${shipping.lastName || ''}`.trim() || 'Guest',
       buyer_email:     order.guestEmail || order.user?.email || 'customer@example.com',

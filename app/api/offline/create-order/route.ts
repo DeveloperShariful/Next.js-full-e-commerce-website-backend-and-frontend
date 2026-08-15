@@ -2,9 +2,9 @@
 // Handles ONLY offline payment methods: Cash on Delivery (cod) and Bank Transfer (bank_transfer).
 // Completely isolated from Stripe / PayPal — no payment gateway logic here.
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { db } from '@/lib/prisma';
-import { Prisma, OrderStatus, PaymentStatus, TaxStatus } from '@prisma/client';
+import { Prisma, OrderStatus, PaymentStatus, TaxStatus, ShippingMethodType } from '@prisma/client';
 import { auth } from '@/auth';
 import { cookies } from 'next/headers';
 import type { ShippingRateDTO } from '@/app/actions/frontend/checkout/checkoutActions';
@@ -209,21 +209,38 @@ export async function POST(request: NextRequest) {
     let shippingMethodLabel = 'Standard Shipping';
     let tdBookingId: string | undefined;
     let tdCourierKey: string | undefined;
+    let tdCourierPrice: number | undefined;
+    let isLocalPickup = false;
 
     if (selectedShipping) {
       const matchedRate = shippingRates?.find(r => r.id === selectedShipping);
       if (matchedRate) {
         shippingCost = Number(matchedRate.cost);
         shippingMethodLabel = matchedRate.label;
-        if (matchedRate.isTransdirect) {
+        if (matchedRate.isLocalPickup) {
+          isLocalPickup = true;
+        } else if (matchedRate.isTransdirect) {
           tdBookingId  = matchedRate.tdBookingId ? String(matchedRate.tdBookingId) : undefined;
           tdCourierKey = matchedRate.tdCourierKey ?? undefined;
+        } else {
+          // Free/flat shipping selected — still pick cheapest Transdirect rate for fulfilment.
+          // Its quoted price (tdCourierPrice) is carried via metadata so sync-time doesn't
+          // need to re-fetch a quote (avoids latency + declared_value mismatches).
+          const cheapestTd = shippingRates
+            ?.filter(r => r.isTransdirect && r.tdBookingId && r.tdCourierKey)
+            .sort((a, b) => a.cost - b.cost)[0];
+          if (cheapestTd) {
+            tdBookingId    = cheapestTd.tdBookingId ? String(cheapestTd.tdBookingId) : undefined;
+            tdCourierKey   = cheapestTd.tdCourierKey;
+            tdCourierPrice = cheapestTd.cost;
+          }
         }
       } else {
         const shippingRate = await db.shippingRate.findUnique({ where: { id: selectedShipping } });
         if (shippingRate) {
           shippingCost = Number(shippingRate.price);
           shippingMethodLabel = shippingRate.name;
+          if (shippingRate.type === 'LOCAL_PICKUP') isLocalPickup = true;
         }
       }
     }
@@ -275,6 +292,7 @@ export async function POST(request: NextRequest) {
     metaDataArray.push({ key: '_created_via', value: 'Offline_Payment_Create_Order_API' });
     if (cookieAffiliateId) metaDataArray.push({ key: 'solid_affiliate_id', value: cookieAffiliateId });
     if (cookieVisitId) metaDataArray.push({ key: 'solid_affiliate_visit_id', value: cookieVisitId });
+    if (tdCourierPrice !== undefined) metaDataArray.push({ key: '_td_courier_price', value: String(tdCourierPrice) });
 
     const hasPreOrderItems = validOrderItems.some(i => i.isPreOrder);
     const dbOrderItems = validOrderItems.map(({ taxStatus: _ts, ...rest }) => rest);
@@ -312,6 +330,7 @@ export async function POST(request: NextRequest) {
       utmSource: utmSource || null,
       utmMedium: utmMedium || null,
       utmCampaign: utmCampaign || null,
+      ...(isLocalPickup && { shippingType: ShippingMethodType.LOCAL_PICKUP }),
       transdirectQuoteId: tdBookingId ?? null,
       selectedCourierCode: tdCourierKey ?? null,
       hasPreOrderItems,
@@ -416,16 +435,20 @@ export async function POST(request: NextRequest) {
       console.error('[Offline Order] Cart clear failed (non-critical):', cartErr);
     }
 
-    // ── Activity log (fire-and-forget) ───────────────────────────
-    logActivity({
-      action: 'CHECKOUT_ORDER_PLACED',
-      entityType: 'Order',
-      entityId: orderId,
-      details: { gateway: selectedPaymentMethod, amount: secureOrderTotal },
-      userId: newOrder.userId ?? undefined,
-    }).catch(() => {});
+    // ── Activity log (deferred with after() so it survives past the response) ─
+    after(async () => {
+      await logActivity({
+        action: 'CHECKOUT_ORDER_PLACED',
+        entityType: 'Order',
+        entityId: orderId,
+        details: { gateway: selectedPaymentMethod, amount: secureOrderTotal },
+        userId: newOrder.userId ?? undefined,
+      }).catch(() => {});
+    });
 
     // ── Transdirect: COD only (Bank Transfer: admin ships after confirming payment) ─
+    // Awaited directly (not after()) — queueAndSyncTransdirect's own internal
+    // steps are already wrapped in try/catch, so it won't throw synchronously.
     if (isCoD) {
       await queueAndSyncTransdirect(orderId, 'offline-cod');
     }

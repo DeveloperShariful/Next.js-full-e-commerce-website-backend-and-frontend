@@ -89,7 +89,7 @@ export default function CreativeManager({ initialCreatives }: Props) {
     <div className="w-full space-y-4 animate-in fade-in duration-500 pb-20">
 
       {/* Filter tabs + Add New — WP style */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[#c3c4c7]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-2 pb-2 border-b border-[#c3c4c7]">
         <div className="flex flex-wrap items-center gap-0 text-[13px]">
           {FILTER_TABS.map((tab, idx) => (
             <span key={tab.key} className="flex items-center">

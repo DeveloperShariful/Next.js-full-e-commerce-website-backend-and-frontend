@@ -75,7 +75,7 @@ export default function CouponTagManager({ couponsData, tagsData, affiliates }: 
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
     >
       {/* WP pipe-link main tabs */}
-      <div className="flex items-center gap-0 text-[13px] pb-2 border-b border-[#c3c4c7]">
+      <div className="flex items-center gap-0 text-[13px] px-2 pb-2 border-b border-[#c3c4c7]">
         <button
           onClick={() => setActiveTab("coupons")}
           className={cn(

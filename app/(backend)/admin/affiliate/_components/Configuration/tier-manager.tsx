@@ -62,7 +62,7 @@ export default function TierManager({ initialTiers }: TierManagerProps) {
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
     >
       {/* WP Toolbar */}
-      <div className="flex items-center justify-between pb-2 border-b border-[#c3c4c7]">
+      <div className="flex items-center justify-between px-2 pb-2 border-b border-[#c3c4c7]">
         <span className="text-[13px] text-[#50575e]">
           {initialTiers.length} tier{initialTiers.length !== 1 ? "s" : ""} defined
         </span>

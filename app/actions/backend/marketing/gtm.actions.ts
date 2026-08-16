@@ -145,6 +145,29 @@ export async function fetchGtmWorkspaceDetails(accountPath: string, containerId:
 }
 
 // ============================================================================
+// 3a. DISCONNECT GTM CONTAINER (unlink only — keeps Google account connected
+// for Merchant Center/Ads, which share the same OAuth connection)
+// ============================================================================
+export async function disconnectGtmContainer() {
+  try {
+    await db.marketingIntegration.update({
+      where: { id: "marketing_config" },
+      data: {
+        gtmContainerId: null,
+        gtmEnabled: false,
+      },
+    });
+
+    revalidateTag("marketing-config", "default");
+    revalidatePath("/admin/marketing/gtm");
+    return { success: true, message: "GTM container disconnected." };
+  } catch (error: any) {
+    console.error("Error disconnecting GTM container:", error);
+    return { success: false, error: "Failed to disconnect GTM container." };
+  }
+}
+
+// ============================================================================
 // 3. SAVE SELECTED GTM CONTAINER ID TO DATABASE
 // ============================================================================
 export async function saveGtmContainerId(containerId: string) {

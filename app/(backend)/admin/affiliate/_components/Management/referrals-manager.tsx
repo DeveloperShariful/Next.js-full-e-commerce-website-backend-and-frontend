@@ -131,7 +131,7 @@ export default function ReferralsManager({ data, currentPage }: Props) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-2">
         <div>
           <h2 className="text-[15px] font-semibold text-[#1d2327]">Referrals & Commissions</h2>
           <p className="text-[#50575e] text-[12px] mt-0.5">

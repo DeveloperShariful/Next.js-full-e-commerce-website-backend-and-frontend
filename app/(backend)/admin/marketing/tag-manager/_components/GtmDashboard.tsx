@@ -4,11 +4,12 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
-import { Settings, Info, RefreshCw, Layers, ShieldCheck } from "lucide-react";
-import { 
-  fetchGtmAccountsAndContainers, 
-  fetchGtmWorkspaceDetails, 
-  saveGtmContainerId 
+import { Settings, Info, RefreshCw, Layers, ShieldCheck, Unlink } from "lucide-react";
+import {
+  fetchGtmAccountsAndContainers,
+  fetchGtmWorkspaceDetails,
+  saveGtmContainerId,
+  disconnectGtmContainer
 } from "@/app/actions/backend/marketing/gtm.actions";
 
 // Types
@@ -133,6 +134,19 @@ export default function GtmDashboard({ config }: Props) {
     });
   };
 
+  const handleDisconnectGtm = () => {
+    startTransition(async () => {
+      const res = await disconnectGtmContainer();
+      if (res.success) {
+        toast.success("GTM container disconnected.");
+        setSelectedContainerId("");
+        setWorkspaceDetails(null);
+      } else {
+        toast.error(res.error || "Failed to disconnect GTM container.");
+      }
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#f0f0f1] flex items-center justify-center text-[13px] text-[#646970]">
@@ -182,9 +196,21 @@ export default function GtmDashboard({ config }: Props) {
 
         {/* GTM Selector Panel */}
         <div className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm overflow-hidden">
-          <div className="border-b border-[#ccd0d4] px-4 py-3 bg-[#f9f9f9] flex items-center gap-2">
-            <Settings size={14} className="text-[#50575e]" />
-            <h3 className="text-[14px] font-semibold text-[#1d2327] m-0">GTM Container Settings</h3>
+          <div className="border-b border-[#ccd0d4] px-4 py-3 bg-[#f9f9f9] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Settings size={14} className="text-[#50575e]" />
+              <h3 className="text-[14px] font-semibold text-[#1d2327] m-0">GTM Container Settings</h3>
+            </div>
+            {config?.gtmContainerId && (
+              <button
+                type="button"
+                onClick={handleDisconnectGtm}
+                disabled={isPending}
+                className="text-[12px] font-semibold text-[#b32d2e] hover:text-[#8a2222] flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <Unlink size={12} /> {isPending ? "Disconnecting..." : "Disconnect"}
+              </button>
+            )}
           </div>
           
           <div className="p-5 sm:p-6 space-y-1">
@@ -226,12 +252,12 @@ export default function GtmDashboard({ config }: Props) {
           </div>
 
           {selectedContainerId && (
-            <div className="bg-[#f9f9f9] border-t border-[#ccd0d4] px-5 py-3.5 flex flex-wrap gap-3 justify-end">
+            <div className="bg-[#f9f9f9] border-t border-[#ccd0d4] px-5 py-3.5 flex flex-col sm:flex-row sm:flex-wrap gap-2.5 sm:gap-3 sm:justify-end">
                <button
                  type="button"
                  onClick={handleLoadGtmDetails}
                  disabled={isLoadingDetails}
-                 className="bg-white hover:bg-[#f6f7f7] border border-[#c3c4c7] text-[#2271b1] px-4 py-1.5 rounded-[3px] text-[12px] font-semibold cursor-pointer shadow-sm flex items-center gap-1.5 disabled:opacity-50 transition-all"
+                 className="w-full sm:w-auto bg-white hover:bg-[#f6f7f7] border border-[#c3c4c7] text-[#2271b1] px-4 py-2 sm:py-1.5 rounded-[3px] text-[12px] font-semibold cursor-pointer shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
                >
                  <RefreshCw size={12} className={isLoadingDetails ? "animate-spin" : ""} />
                  {isLoadingDetails ? "Reading GTM..." : "Load Live Workspace"}
@@ -241,7 +267,7 @@ export default function GtmDashboard({ config }: Props) {
                  type="button"
                  onClick={handleSaveGtmId}
                  disabled={isPending}
-                 className="bg-[#2271b1] hover:bg-[#135e96] border border-[#2271b1] text-white px-5 py-1.5 rounded-[3px] text-[12px] font-semibold cursor-pointer shadow-sm disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                 className="w-full sm:w-auto bg-[#2271b1] hover:bg-[#135e96] border border-[#2271b1] text-white px-5 py-2 sm:py-1.5 rounded-[3px] text-[12px] font-semibold cursor-pointer shadow-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
                >
                  <ShieldCheck size={14} /> {isPending ? "Connecting..." : "Connect GTM Container"}
                </button>

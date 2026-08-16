@@ -63,7 +63,7 @@ export default function KycManager({ initialDocuments }: Props) {
     <div className="w-full space-y-4 animate-in fade-in duration-500 pb-20">
 
       {/* Status tabs — WooCommerce pipe-link style */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-[#c3c4c7]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-2 pb-2 border-b border-[#c3c4c7]">
         <div className="flex flex-wrap items-center gap-0 text-[13px]">
           {STATUS_TABS.map((tab, idx) => (
             <span key={tab.key} className="flex items-center">

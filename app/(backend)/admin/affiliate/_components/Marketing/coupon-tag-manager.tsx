@@ -75,7 +75,7 @@ export default function CouponTagManager({ couponsData, tagsData, affiliates }: 
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
     >
       {/* WP pipe-link main tabs */}
-      <div className="flex items-center gap-0 text-[13px] px-2 pb-2 border-b border-[#c3c4c7]">
+      <div className="flex items-center gap-0 text-[13px] px-3 pb-2 border-b border-[#c3c4c7]">
         <button
           onClick={() => setActiveTab("coupons")}
           className={cn(
@@ -163,7 +163,7 @@ function CouponsTab({
   return (
     <div className="space-y-3">
       {/* Sub-toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3">
         <div className="flex flex-wrap items-center text-[13px]">
           {FILTER_TABS.map((tab, idx) => (
             <span key={tab.key} className="flex items-center">

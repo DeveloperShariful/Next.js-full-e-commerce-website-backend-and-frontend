@@ -74,7 +74,7 @@ export default function CampaignsContestsManager({ campaignsData, contestsData }
     <div className="w-full space-y-4 animate-in fade-in duration-500 pb-20">
 
       {/* WooCommerce pipe-link sub-tabs */}
-      <div className="flex flex-wrap items-center gap-0 text-[13px] px-2 pb-2 border-b border-[#c3c4c7]">
+      <div className="flex flex-wrap items-center gap-0 text-[13px] px-3 pb-2 border-b border-[#c3c4c7]">
         <button
           onClick={() => setActiveTab("campaigns")}
           className={cn(

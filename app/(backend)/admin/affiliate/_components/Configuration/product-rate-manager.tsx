@@ -123,7 +123,7 @@ export default function ProductRateManager({ initialRates }: Props) {
   return (
     <div className="space-y-0">
       {/* ── WP Toolbar ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-3 border-b border-[#c3c4c7]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-3 border-b border-[#c3c4c7]">
         <p className="text-[13px] text-[#50575e]">
           Product-level overrides take priority over global and tier rates.
           <span className="hidden sm:inline">

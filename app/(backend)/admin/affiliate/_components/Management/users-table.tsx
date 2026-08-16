@@ -274,7 +274,7 @@ export default function AffiliateUsersTable({
     <div className="w-full space-y-6 animate-in fade-in duration-500 pb-20">
       
       {/* 1. TOP TABS — WooCommerce pipe-separated text links */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-2 pb-2 border-b border-[#c3c4c7]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 pb-2 border-b border-[#c3c4c7]">
         <div className="flex flex-wrap items-center gap-0 text-[13px]">
           <button onClick={() => handleTabChange("ALL")} className={cn("px-0 py-1", activeTab === "ALL" ? "font-semibold text-[#1d2327]" : "text-[#2271b1] hover:text-[#135e96] hover:underline")}>
             All ({totalEntries})

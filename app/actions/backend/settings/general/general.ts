@@ -80,7 +80,18 @@ export async function updateGeneralSettings(formData: FormData) {
     const maintenance = formData.get("maintenance") === "true";
     const timezone = formData.get("timezone") as string || "UTC";
 
+    // Preserve fields stored in generalConfig by OTHER pages (e.g. the
+    // Affiliate admin's "enableAffiliateProgram" toggle) — this form doesn't
+    // manage those fields, so overwriting the whole object without spreading
+    // the existing value first would silently wipe them out on every save.
+    const existingSettings = await db.storeSettings.findUnique({
+      where: { id: "settings" },
+      select: { generalConfig: true },
+    });
+    const existingGeneralConfig = (existingSettings?.generalConfig as Record<string, unknown>) || {};
+
     const generalConfig = {
+      ...existingGeneralConfig,
       sellingLocation: formData.get("conf_selling_location"),
       sellingCountries: sellingCountries,
       shippingLocation: formData.get("conf_shipping_location"),

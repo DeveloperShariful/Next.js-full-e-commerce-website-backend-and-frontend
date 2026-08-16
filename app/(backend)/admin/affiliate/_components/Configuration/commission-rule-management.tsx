@@ -147,7 +147,7 @@ export default function CommissionRuleManagement({ initialRules, categories }: R
       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
     >
       {/* WP Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2 border-b border-[#c3c4c7]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-2 border-b border-[#c3c4c7]">
         <span className="text-[13px] text-[#50575e]">
           Higher priority rules execute first.{" "}
           <span className="hidden sm:inline">{initialRules.length} rule{initialRules.length !== 1 ? "s" : ""} defined.</span>

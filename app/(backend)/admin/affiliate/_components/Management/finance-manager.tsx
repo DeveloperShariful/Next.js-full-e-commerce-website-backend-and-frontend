@@ -69,7 +69,7 @@ export default function FinanceManager({ payoutsData, ledgerData, currentPage }:
     <div className="w-full space-y-0 animate-in fade-in duration-500 pb-20">
 
       {/* Sub-tabs — WooCommerce pipe-link style */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-2 pb-2 border-b border-[#c3c4c7] mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 pb-2 border-b border-[#c3c4c7] mb-4">
         <div className="flex flex-wrap items-center gap-0 text-[13px]">
           <button
             onClick={() => setActiveTab("payouts")}
@@ -215,7 +215,7 @@ function PayoutsTab({
   return (
     <div className="space-y-4">
       {/* Status filter pipe links */}
-      <div className="flex flex-wrap items-center gap-0 text-[13px] px-2 pb-2 border-b border-[#c3c4c7]">
+      <div className="flex flex-wrap items-center gap-0 text-[13px] px-3 pb-2 border-b border-[#c3c4c7]">
         {statusTabs.map((s, idx) => (
           <span key={s} className="flex items-center">
             {idx > 0 && <span className="text-[#c3c4c7] px-2">|</span>}

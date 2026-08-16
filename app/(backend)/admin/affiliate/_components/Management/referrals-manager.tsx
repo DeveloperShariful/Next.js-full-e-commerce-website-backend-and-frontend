@@ -131,7 +131,7 @@ export default function ReferralsManager({ data, currentPage }: Props) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3">
         <div>
           <h2 className="text-[15px] font-semibold text-[#1d2327]">Referrals & Commissions</h2>
           <p className="text-[#50575e] text-[12px] mt-0.5">
@@ -141,13 +141,13 @@ export default function ReferralsManager({ data, currentPage }: Props) {
           </p>
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row gap-2">
           {/* Run ready approvals (holding period done) */}
           <button
             onClick={handleRunReady}
             disabled={isPending || data.readyCount === 0}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded border",
+              "w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-[12px] font-medium rounded border",
               data.readyCount > 0
                 ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
                 : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
@@ -162,7 +162,7 @@ export default function ReferralsManager({ data, currentPage }: Props) {
             <button
               onClick={handleBulkApprove}
               disabled={isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded border bg-[#2271b1] text-white border-[#2271b1] hover:bg-[#135e96]"
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-[12px] font-medium rounded border bg-[#2271b1] text-white border-[#2271b1] hover:bg-[#135e96]"
             >
               <GitMerge className="w-3.5 h-3.5" />
               Approve Selected ({selected.size})
@@ -171,7 +171,7 @@ export default function ReferralsManager({ data, currentPage }: Props) {
 
           <button
             onClick={() => startTransition(() => router.refresh())}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded border border-[#8c8f94] text-[#50575e] hover:bg-white"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-[12px] font-medium rounded border border-[#8c8f94] text-[#50575e] hover:bg-white"
           >
             <RefreshCw className={cn("w-3.5 h-3.5", isPending && "animate-spin")} />
             Refresh
@@ -179,35 +179,36 @@ export default function ReferralsManager({ data, currentPage }: Props) {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {/* Status tabs */}
-        <div className="flex gap-1 bg-white border border-[#8c8f94] rounded p-0.5">
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => navigate({ status: s === "ALL" ? null : s })}
-              className={cn(
-                "px-3 py-1 text-[11px] font-medium rounded transition-colors",
-                activeStatus === s
-                  ? "bg-[#2271b1] text-white"
-                  : "text-[#50575e] hover:bg-[#f0f0f1]"
-              )}
-            >
-              {s}
-            </button>
+      {/* Status tabs — WooCommerce pipe-link style, matching the rest of admin */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 pb-2 border-b border-[#c3c4c7]">
+        <div className="flex flex-wrap items-center gap-0 text-[13px]">
+          {STATUSES.map((s, idx) => (
+            <span key={s} className="flex items-center">
+              {idx > 0 && <span className="text-[#c3c4c7] px-2">|</span>}
+              <button
+                onClick={() => navigate({ status: s === "ALL" ? null : s })}
+                className={cn(
+                  "px-0 py-1",
+                  activeStatus === s
+                    ? "font-semibold text-[#1d2327]"
+                    : "text-[#2271b1] hover:text-[#135e96] hover:underline"
+                )}
+              >
+                {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+              </button>
+            </span>
           ))}
         </div>
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
+        <div className="relative w-full sm:w-auto sm:min-w-[220px] sm:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8c8f94]" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && navigate({ search: search || null })}
             placeholder="Search affiliate or order…"
-            className="w-full pl-8 pr-3 py-1.5 text-[12px] border border-[#8c8f94] rounded bg-white focus:outline-none focus:border-[#2271b1]"
+            className="w-full pl-8 pr-3 py-1.5 text-[12px] border border-[#c3c4c7] rounded bg-white focus:outline-none focus:border-[#2271b1]"
           />
         </div>
       </div>

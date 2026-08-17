@@ -165,15 +165,11 @@ const HeroSlider = () => {
               <p className={`text-sm font-semibold uppercase tracking-[2px] mb-3 text-white-500 transition-all duration-700 delay-100 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 {slide.subtitle}
               </p>
-              {index === 0 ? (
-                <h1 className={`text-white text-[42px] lg:text-[56px] font-extrabold mb-5 leading-[1.1] transition-all duration-700 delay-200 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                  {slide.title}
-                </h1>
-              ) : (
-                <p className={`text-white text-[42px] lg:text-[56px] font-extrabold mb-5 leading-[1.1] transition-all duration-700 delay-200 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                  {slide.title}
-                </p>
-              )}
+              {/* Not an <h1> — the page's real SEO h1 is the sr-only one in page.tsx;
+                  a second h1 here would create a "multiple H1" SEO issue. */}
+              <p className={`text-white text-[42px] lg:text-[56px] font-extrabold mb-5 leading-[1.1] transition-all duration-700 delay-200 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                {slide.title}
+              </p>
               <p className={`text-sm lg:text-lg leading-[1.6] mb-6 lg:mb-8 text-gray-300 max-w-[480px] lg:max-w-none mx-auto lg:mx-0 transition-all duration-700 delay-300 ${currentSlide === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                 {slide.desc}
               </p>

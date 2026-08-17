@@ -11,7 +11,7 @@ export async function HomeBlogSection() {
       <div className="max-w-[1300px] mx-auto">
         <div className="flex items-end justify-between mb-12">
           <div>
-            <p className="text-xs font-bold tracking-widest uppercase text-gray-400 mb-2">
+            <p className="text-xs font-bold tracking-widest uppercase text-gray-600 mb-2">
               From the GoBike Blog
             </p>
             <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
@@ -47,14 +47,20 @@ export async function HomeBlogSection() {
                   {post.category && (
                     <span
                       className="absolute top-3 left-3 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md text-white"
-                      style={{ backgroundColor: post.category.color ?? "#111" }}
+                      style={{
+                        backgroundColor: post.category.color ?? "#111",
+                        // Darkens whatever color an admin picks in the CMS so white
+                        // text always keeps enough contrast (WCAG AA) on top of it.
+                        backgroundImage: "linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5))",
+                        backgroundBlendMode: "multiply",
+                      }}
                     >
                       {post.category.name}
                     </span>
                   )}
                 </div>
                 <div className="p-6 flex flex-col flex-grow">
-                  <p className="text-xs text-gray-400 mb-2">
+                  <p className="text-xs text-gray-600 mb-2">
                     {post.publishedAt
                       ? new Date(post.publishedAt).toLocaleDateString("en-AU", {
                           day: "numeric",

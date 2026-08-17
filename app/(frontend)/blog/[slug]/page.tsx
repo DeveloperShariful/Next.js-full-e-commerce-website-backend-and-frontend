@@ -279,7 +279,11 @@ export default async function NewBlogPostPage({ params }: Props) {
             <Link
               href={`/blog?category=${post.category.slug}`}
               className="inline-block mb-4 px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full text-white"
-              style={{ backgroundColor: post.category.color ?? "#111" }}
+              style={{
+                backgroundColor: post.category.color ?? "#111",
+                backgroundImage: "linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5))",
+                backgroundBlendMode: "multiply",
+              }}
             >
               {post.category.name}
             </Link>
@@ -301,7 +305,7 @@ export default async function NewBlogPostPage({ params }: Props) {
               </>
             )}
             {post.readTimeMinutes && (
-              <span className="ml-2 text-gray-400">· {post.readTimeMinutes} min read</span>
+              <span className="ml-2 text-gray-600">· {post.readTimeMinutes} min read</span>
             )}
           </p>
         </header>

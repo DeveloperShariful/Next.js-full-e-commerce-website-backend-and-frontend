@@ -162,7 +162,7 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
 
         {posts.length === 0 ? (
           <div className="text-center py-24">
-            <p className="text-2xl font-bold text-gray-400 mb-4">No posts yet</p>
+            <p className="text-2xl font-bold text-gray-600 mb-4">No posts yet</p>
             <p className="text-gray-500">Check back soon for expert tips and guides.</p>
           </div>
         ) : (
@@ -204,7 +204,11 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                     {featuredPost.category && (
                       <span
                         className="absolute top-4 left-4 px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg text-white shadow-sm"
-                        style={{ backgroundColor: featuredPost.category.color ?? "#111" }}
+                        style={{
+                          backgroundColor: featuredPost.category.color ?? "#111",
+                          backgroundImage: "linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5))",
+                          backgroundBlendMode: "multiply",
+                        }}
                       >
                         {featuredPost.category.name}
                       </span>
@@ -286,7 +290,11 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                           {post.category && (
                             <span
                               className="absolute top-3 left-3 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md text-white z-20"
-                              style={{ backgroundColor: post.category.color ?? "#111" }}
+                              style={{
+                                backgroundColor: post.category.color ?? "#111",
+                                backgroundImage: "linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5))",
+                                backgroundBlendMode: "multiply",
+                              }}
                             >
                               {post.category.name}
                             </span>
@@ -298,7 +306,7 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                           <h2 className="text-lg md:text-xl font-bold mb-2 text-gray-900 group-hover:text-blue-600 leading-snug line-clamp-2 transition-colors">
                             {post.title}
                           </h2>
-                          <p className="text-xs text-gray-400 mb-3">
+                          <p className="text-xs text-gray-600 mb-3">
                             {post.publishedAt
                               ? new Date(post.publishedAt).toLocaleDateString("en-AU", {
                                   day: "numeric",

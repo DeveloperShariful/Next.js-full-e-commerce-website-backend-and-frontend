@@ -20,7 +20,13 @@ const siteConfig = {
   phone: '+61-426-067-277',
 };
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  // Freshness signal for search engines/Ahrefs — homepage previously had no
+  // date signal at all (no article:modified_time, no dateModified in JSON-LD),
+  // unlike /bikes, /shop, /apparel etc. which already set this.
+  const currentDate = new Date().toISOString();
+
+  return {
   metadataBase: new URL(siteConfig.url),
   title: siteConfig.title,
   description: siteConfig.description,
@@ -66,7 +72,13 @@ export const metadata: Metadata = {
     images: [siteConfig.ogImage],
     site: '@gobikeoz',
   },
-};
+  other: {
+    'article:modified_time': currentDate,
+    'og:updated_time': currentDate,
+    'last-modified': currentDate,
+  },
+  };
+}
 
 const faqSchema = {
   '@context': 'https://schema.org',
@@ -123,6 +135,16 @@ const organizationSchema = {
   },
 };
 
+const webPageSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  url: siteConfig.url,
+  name: siteConfig.title,
+  description: siteConfig.description,
+  isPartOf: { '@type': 'WebSite', url: siteConfig.url, name: siteConfig.siteName },
+  dateModified: new Date().toISOString(),
+};
+
 const websiteSchema = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
@@ -149,6 +171,10 @@ export default async function Home() {
 
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}

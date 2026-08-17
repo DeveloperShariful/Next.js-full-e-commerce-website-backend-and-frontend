@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/prisma';
+import { getStoreTimezone } from '@/lib/get-store-timezone';
+import { formatTz } from '@/lib/store-time';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { startOfDay } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,14 +16,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // This cron fires late in the UTC day, which is already the next calendar
+  // day in the store's local timezone — so "today"/weekday must be computed
+  // in store-local time, not UTC, or Friday-evening UTC runs (already
+  // Saturday morning locally) would wrongly treat it as a weekday.
+  const timezone = await getStoreTimezone();
+  const nowZoned = toZonedTime(new Date(), timezone);
+
   // Only run on weekdays (Mon–Fri)
-  const dayOfWeek = new Date().getDay(); // 0=Sun, 6=Sat
+  const dayOfWeek = nowZoned.getDay(); // 0=Sun, 6=Sat (in store-local time)
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     return NextResponse.json({ skipped: true, reason: 'Weekend' });
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const todayStart = new Date(today + 'T00:00:00.000Z');
+  const today = formatTz(new Date(), timezone, 'yyyy-MM-dd');
+  const todayStart = fromZonedTime(startOfDay(nowZoned), timezone);
 
   // Get all active staff users who should submit reports
   const staffUsers = await db.user.findMany({

@@ -5,17 +5,19 @@ import { db } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { headers } from 'next/headers';
 import { Prisma } from '@prisma/client';
+import { sanitizeEmail } from '@/lib/sanitize-email';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, cartItems, subtotal } = body as {
+    const { cartItems, subtotal } = body as {
       email: string;
       cartItems: unknown[];
       subtotal: number;
     };
+    const email = body.email ? sanitizeEmail(body.email as string) : '';
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ success: false }, { status: 400 });

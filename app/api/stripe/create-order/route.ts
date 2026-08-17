@@ -4,6 +4,7 @@ import { db } from '@/lib/prisma';
 import { Prisma, OrderStatus, PaymentStatus, TaxStatus, ShippingMethodType } from '@prisma/client';
 import { auth } from '@/auth';
 import type { ShippingRateDTO } from '@/app/actions/frontend/checkout/checkoutActions';
+import { sanitizeEmail } from '@/lib/sanitize-email';
 
 interface CartItemDTO {
   id: string;
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
     if (!customerInfo?.email || !customerInfo?.firstName) {
       return NextResponse.json({ error: 'Billing details (Name and Email) are required.' }, { status: 400 });
     }
+    customerInfo.email = sanitizeEmail(customerInfo.email);
 
     // Resolve session user
     const session = await auth();

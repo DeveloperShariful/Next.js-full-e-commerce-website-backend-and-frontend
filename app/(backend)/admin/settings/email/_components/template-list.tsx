@@ -19,7 +19,7 @@ export const TemplateList = ({ templates, refreshData }: Props) => {
 
   const saveScroll = () => {
     sessionStorage.setItem("settings-email-scroll-y", String(window.scrollY));
-    sessionStorage.setItem("settings-email-return-url", window.location.href);
+    sessionStorage.setItem("settings-email-return-url", "/admin/settings/email?subtab=templates");
   };
 
   const handleRefresh = async () => {

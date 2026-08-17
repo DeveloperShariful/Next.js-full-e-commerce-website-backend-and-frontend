@@ -199,6 +199,7 @@ export interface OrderDetailsType {
   utmMedium: string | null;
   utmCampaign: string | null;
   referringSite: string | null;
+  recoveredFromAbandonedCart: boolean;
 
   // Relations
   user: OrderUser | null;

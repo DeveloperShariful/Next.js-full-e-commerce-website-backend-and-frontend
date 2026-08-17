@@ -242,7 +242,7 @@ export async function bulkStatusAction(ids: string[], status: AffiliateStatus): 
         });
 
         if (status === "ACTIVE" || status === "REJECTED") {
-            const templateSlug = status === "ACTIVE" ? "AFFILIATE_APPROVED" : "AFFILIATE_REJECTED";
+            const templateSlug = status === "ACTIVE" ? "affiliate_approved" : "affiliate_rejected";
             
             for (const acc of toUpdate) {
                  await tx.notificationQueue.create({

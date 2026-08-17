@@ -1077,7 +1077,8 @@ model Order {
   utmSource         String? // e.g. "facebook", "google", "newsletter"
   utmMedium         String? // e.g. "cpc", "social", "email"
   utmCampaign       String? // e.g. "summer_sale_2025"
-  referringSite     String? // কোন ওয়েবসাইট থেকে আসল
+  recoveredFromAbandonedCart Boolean @default(false) // abandoned-cart drip email theke ei order eseche kina
+  referringSite     String? //কোন ওয়েবসাইট থেকে আসল
   status            OrderStatus       @default(PENDING)
   paymentStatus     PaymentStatus     @default(UNPAID)
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
@@ -1195,6 +1196,7 @@ model Order {
   @@index([deletedAt])
   @@index([guestEmail])
   @@index([subscriptionId])
+  @@index([recoveredFromAbandonedCart])
 }
 
 model OrderItem {

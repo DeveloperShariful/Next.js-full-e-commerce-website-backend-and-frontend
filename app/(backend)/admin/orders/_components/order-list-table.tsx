@@ -43,6 +43,7 @@ interface SerializedOrder {
   utmMedium: string | null;
   utmCampaign: string | null;
   referringSite: string | null;
+  recoveredFromAbandonedCart: boolean;
   total: number;
   refundedAmount: number;
   deletedAt: string | Date | null;
@@ -324,6 +325,12 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                             #{highlight(order.orderNumber, activeQuery)} {highlight(customerName, activeQuery)}
                                         </Link>
                                         
+                                        {order.recoveredFromAbandonedCart && (
+                                            <span className="inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap bg-[#f0e6fb] text-[#7c3aed] mt-1">
+                                                ↩ Recovered Cart
+                                            </span>
+                                        )}
+
                                         <div className="text-[12px] text-[#646970] mt-1 xl:hidden">
                                             Origin: {originText}
                                         </div>
@@ -420,7 +427,12 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                     </td>
                                     
                                     <td className="py-3 px-3 align-top text-[13px] text-[#646970] hidden xl:table-cell">
-                                        {originText}
+                                        {order.recoveredFromAbandonedCart && (
+                                            <span className="inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap bg-[#f0e6fb] text-[#7c3aed] mb-1">
+                                                ↩ Recovered Cart
+                                            </span>
+                                        )}
+                                        <div>{originText}</div>
                                     </td>
                                 </tr>
                             );

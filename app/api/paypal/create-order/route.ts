@@ -5,6 +5,7 @@ import { Prisma, OrderStatus, PaymentStatus, TaxStatus, ShippingMethodType } fro
 import { auth } from '@/auth';
 import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { auditService } from '@/lib/audit-service';
+import { sanitizeEmail } from '@/lib/sanitize-email';
 
 // ============================================================================
 // INTERFACES
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest) {
     if (!customerInfo?.email || !customerInfo?.firstName) {
       return NextResponse.json({ error: 'Billing details (Name and Email) are required.' }, { status: 400 });
     }
+    customerInfo.email = sanitizeEmail(customerInfo.email);
 
     // Auth — resolve logged-in user if any
     const session = await auth();

@@ -14,13 +14,24 @@ import { buildGlobalStoreData } from "@/lib/build-global-data";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const session = await auth();
-  if (!session?.user?.email) redirect("/sign-in");
+  // A Server Component can't clear cookies itself — if the session is
+  // invalid (e.g. the DB-sync check in auth.ts's jwt callback killed it),
+  // route through force-signout first so the stale cookie is actually
+  // cleared, otherwise proxy.ts's middleware would still see it as valid
+  // and bounce the browser straight back to /admin (infinite redirect loop).
+  if (!session?.user?.email) redirect("/api/auth/force-signout?callbackUrl=/sign-in");
 
   const dbUser = await db.user.findUnique({
     where: { email: session.user.email },
   });
 
-  if (!dbUser || dbUser.role === Role.CUSTOMER) redirect("/");
+  // No matching User row = the session cookie outlived the account (deleted
+  // user) — same stale-cookie loop risk as above, so clear it properly too.
+  if (!dbUser) redirect("/api/auth/force-signout?callbackUrl=/sign-in");
+
+  // A valid CUSTOMER session is not invalid, just insufficient — send them
+  // home without signing them out of their (legitimate) customer session.
+  if (dbUser.role === Role.CUSTOMER) redirect("/");
 
   const adminUser = {
     name: dbUser.name,

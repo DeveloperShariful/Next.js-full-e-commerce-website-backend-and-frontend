@@ -125,7 +125,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
           customer_phone: metaStr("customer_phone", "Not Provided"),
           message: metaStr("message", "No message content"),
       };
-  } else if (template.triggerEvent === 'ABANDONED_CHECKOUT') {
+  } else if (template.triggerEvent === 'ABANDONED_CHECKOUT' || template.triggerEvent?.startsWith('ABANDONED_CART_')) {
       variables = {
           customer_name: metaStr('customer_name', 'Valued Customer'),
           checkout_url: metaStr('checkout_url', `${appUrl}/checkout`),
@@ -398,7 +398,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
     `;
   }
 
-  if (template.triggerEvent === 'ABANDONED_CHECKOUT') {
+  if (template.triggerEvent === 'ABANDONED_CHECKOUT' || template.triggerEvent?.startsWith('ABANDONED_CART_')) {
     const checkoutUrl = metaStr('checkout_url', `${appUrl}/checkout`);
     const currency    = metaStr('currency', 'AUD');
     const subtotal    = metaStr('subtotal', '0');

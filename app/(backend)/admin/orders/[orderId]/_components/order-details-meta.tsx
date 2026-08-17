@@ -231,6 +231,11 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                         <DollarSign size={10}/> Invoice: {order.invoiceNumber}
                     </span>
                 )}
+                {order.recoveredFromAbandonedCart && (
+                    <span className="flex items-center gap-1 text-[#7c3aed] font-semibold bg-[#f0e6fb] px-1 rounded border border-[#dcc7f7]">
+                        ↩ Recovered from Abandoned Cart
+                    </span>
+                )}
             </div>
         </div>
       </div>

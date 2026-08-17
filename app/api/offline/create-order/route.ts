@@ -12,6 +12,7 @@ import { sendNotification } from '@/app/api/email/send-notification';
 import { logActivity } from '@/lib/activity-logger';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sanitizeEmail } from '@/lib/sanitize-email';
+import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
 
 // ============================================================================
 // TYPES
@@ -280,7 +281,7 @@ export async function POST(request: NextRequest) {
     const previousOrderCount = await db.order.count({
       where: {
         OR: [
-          { guestEmail: customerInfo.email },
+          { guestEmail: { equals: customerInfo.email, mode: 'insensitive' } },
           ...(sessionUserId ? [{ userId: sessionUserId }] : []),
         ],
         paymentStatus: PaymentStatus.PAID,
@@ -461,17 +462,8 @@ export async function POST(request: NextRequest) {
 
     // Stop the abandoned-cart reminder sequence — order completed.
     if (customerEmail) {
-      db.abandonedCheckout.updateMany({
-        where: { email: customerEmail, isRecovered: false },
-        data: { isRecovered: true, recoveredAt: new Date() },
-      }).then(recovery => {
-        if (recovery.count > 0) {
-          return db.order.update({
-            where: { id: orderId },
-            data: { recoveredFromAbandonedCart: true },
-          });
-        }
-      }).catch(err => console.error('[Offline Order] AbandonedCheckout recovery mark failed:', err));
+      markOrderRecoveredIfAbandoned(customerEmail, orderId)
+        .catch(err => console.error('[Offline Order] AbandonedCheckout recovery mark failed:', err));
     }
 
     sendNotification({ trigger: emailTrigger, recipient: customerEmail, orderId })

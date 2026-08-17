@@ -9,6 +9,7 @@ import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
+import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -103,16 +104,12 @@ export async function POST(request: Request) {
               await queueAndSyncTransdirect(orderId, 'stripe-webhook');
           }
           const alreadyEmail = order.guestEmail || order.user?.email;
-          // Awaited first (not folded into the allSettled batch below) so we know
-          // whether an abandoned checkout was actually closed before deciding to
-          // tag the order — otherwise every order with an email would get flagged.
-          const alreadyRecovery = alreadyEmail
-            ? await db.abandonedCheckout.updateMany({ where: { email: alreadyEmail, isRecovered: false }, data: { isRecovered: true, recoveredAt: new Date() } })
-            : { count: 0 };
+          // Awaited first (not folded into the allSettled batch below) since it
+          // does its own DB writes internally.
+          if (alreadyEmail) {
+            await markOrderRecoveredIfAbandoned(alreadyEmail, orderId);
+          }
           await Promise.allSettled([
-            alreadyRecovery.count > 0
-              ? db.order.update({ where: { id: orderId }, data: { recoveredFromAbandonedCart: true } })
-              : Promise.resolve(),
             db.paymentWebhookLog.update({ where: { eventId: event.id }, data: { processed: true } }),
             sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId }),
             alreadyEmail
@@ -223,12 +220,8 @@ export async function POST(request: Request) {
         sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId }),
       ];
       if (rescueEmail) {
-        // Awaited first so we know whether an abandoned checkout was actually
-        // closed before deciding to tag the order.
-        const rescueRecovery = await db.abandonedCheckout.updateMany({ where: { email: rescueEmail, isRecovered: false }, data: { isRecovered: true, recoveredAt: new Date() } });
-        if (rescueRecovery.count > 0) {
-          sideEffects.push(db.order.update({ where: { id: orderId }, data: { recoveredFromAbandonedCart: true } }));
-        }
+        // Awaited first since it does its own DB writes internally.
+        await markOrderRecoveredIfAbandoned(rescueEmail, orderId);
         sideEffects.push(
           sendNotification({ trigger: 'ORDER_PROCESSING', recipient: rescueEmail, orderId }),
         );

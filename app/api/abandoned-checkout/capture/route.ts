@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const userAgent = headerList.get('user-agent') || null;
 
     const existing = await db.abandonedCheckout.findFirst({
-      where: { email, isRecovered: false },
+      where: { email: { equals: email, mode: 'insensitive' }, isRecovered: false },
       orderBy: { updatedAt: 'desc' },
       select: { id: true, userId: true },
     });

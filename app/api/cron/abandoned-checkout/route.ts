@@ -91,7 +91,7 @@ export async function GET(request: Request) {
         const trigger = SEQUENCE[step];
 
         // 1. Send recovery email via system queue
-        await sendNotification({
+        const sendResult = await sendNotification({
           trigger,
           recipient: email,
           data: {
@@ -102,6 +102,15 @@ export async function GET(request: Request) {
             currency,
           },
         });
+
+        // If the template is missing/disabled (or any other queueing failure),
+        // don't advance remindersSent — otherwise this row silently "uses up"
+        // a step with no email ever sent, and markOrderRecoveredIfAbandoned()
+        // would later treat it as a genuine recovery when none happened.
+        if (!sendResult.success) {
+          console.error(`[AbandonedCheckout Cron] sendNotification failed for ${email} (${trigger}):`, sendResult.error);
+          continue;
+        }
 
         // 2. Fire Klaviyo "Abandoned Checkout" event (if configured)
         if (klaviyoKey) {

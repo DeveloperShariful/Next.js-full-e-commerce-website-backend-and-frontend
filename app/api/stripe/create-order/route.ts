@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
     const previousOrderCount = await db.order.count({
       where: {
         OR: [
-          { guestEmail: customerInfo.email },
+          { guestEmail: { equals: customerInfo.email, mode: 'insensitive' } },
           ...(sessionUserId ? [{ userId: sessionUserId }] : []),
         ],
         paymentStatus: PaymentStatus.PAID,

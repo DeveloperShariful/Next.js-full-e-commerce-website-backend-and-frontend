@@ -16,6 +16,7 @@ import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { logActivity } from '@/lib/activity-logger';
+import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -268,17 +269,8 @@ export async function POST(request: Request) {
 
         // Stop the abandoned-cart reminder sequence — order completed.
         if (customerEmail) {
-          const recovery = await db.abandonedCheckout.updateMany({
-            where: { email: customerEmail, isRecovered: false },
-            data: { isRecovered: true, recoveredAt: new Date() },
-          }).catch(err => { console.error('[PayPal Capture] AbandonedCheckout recovery mark failed:', err); return { count: 0 }; });
-
-          if (recovery.count > 0) {
-            await db.order.update({
-              where: { id: wcOrderId },
-              data: { recoveredFromAbandonedCart: true },
-            }).catch(err => console.error('[PayPal Capture] Order recovery flag failed:', err));
-          }
+          await markOrderRecoveredIfAbandoned(customerEmail, wcOrderId)
+            .catch(err => console.error('[PayPal Capture] AbandonedCheckout recovery mark failed:', err));
         }
 
         if (customerEmail) {

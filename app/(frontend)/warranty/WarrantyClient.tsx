@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { submitWarrantyClaim } from '@/app/actions/frontend/warranty/warranty-action';
 import { saveMediaRecord } from '@/app/actions/backend/media/media-action';
-import { upload } from '@vercel/blob/client';
+import { uploadToCloudinaryOrFallback } from '@/lib/upload-media';
 import { toast } from 'sonner';
 import { MediaSource } from '@prisma/client';
 
@@ -118,25 +118,21 @@ export default function WarrantyClient() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/upload-warranty',
-          onUploadProgress: (p: { loaded: number; total: number }) => {
-            const overall = Math.round(((i * 100) + (p.loaded / p.total) * 100) / totalFiles);
-            setUploadProgress(overall);
-          },
+        const uploaded = await uploadToCloudinaryOrFallback(file, 'warranty-claims', (pct) => {
+          const overall = Math.round(((i * 100) + pct) / totalFiles);
+          setUploadProgress(overall);
         });
 
         await saveMediaRecord({
-          url: blob.url,
-          pathname: blob.pathname,
-          filename: file.name,
-          mimeType: file.type,
-          size: file.size,
+          url: uploaded.url,
+          pathname: uploaded.pathname,
+          filename: uploaded.filename,
+          mimeType: uploaded.mimeType,
+          size: uploaded.size,
           source: MediaSource.WARRANTY,
         });
 
-        newUploadedUrls.push(blob.url);
+        newUploadedUrls.push(uploaded.url);
       }
 
       setUploadedMediaUrls(prev => [...prev, ...newUploadedUrls]);

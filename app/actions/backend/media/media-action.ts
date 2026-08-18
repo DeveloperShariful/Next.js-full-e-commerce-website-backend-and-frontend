@@ -5,6 +5,7 @@
 import { db } from '@/lib/prisma';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { del, list, type ListBlobResult } from '@vercel/blob';
+import { cloudinary } from '@/lib/cloudinary';
 import { Media, MediaType, MediaSource, Prisma } from '@prisma/client';
 
 // 1. Save uploaded file info
@@ -37,6 +38,7 @@ export async function saveMediaRecord(data: {
 
     revalidatePath('/admin/media');
     revalidateTag('admin-media', 'default');
+    revalidateTag('storage-usage', 'default');
     return { success: true, media: newMedia };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to save media record';
@@ -64,6 +66,28 @@ export const getAllMedia = unstable_cache(
 );
 
 const isVercelBlobUrl = (url: string) => url.includes('.public.blob.vercel-storage.com');
+const isCloudinaryUrl = (url: string) => url.includes('res.cloudinary.com');
+
+// Recovers {publicId, resourceType} from our own delivery URL shape (see
+// lib/cloudinary.ts / lib/upload-media.ts) so a deleted Media row's file
+// actually gets removed from Cloudinary too, not just the DB.
+function parseCloudinaryUrl(url: string): { publicId: string; resourceType: 'image' | 'video' } | null {
+  const videoMatch = url.match(/\/video\/upload\/.+\/v\d+\/(.+)\.[a-zA-Z0-9]+$/);
+  if (videoMatch) return { publicId: videoMatch[1], resourceType: 'video' };
+
+  const imageMatch = url.match(/\/image\/upload\/.+\/v\d+\/(.+)$/);
+  if (imageMatch) return { publicId: imageMatch[1], resourceType: 'image' };
+
+  return null;
+}
+
+async function deleteFromCloudinary(url: string) {
+  const parsed = parseCloudinaryUrl(url);
+  if (!parsed) return;
+  await cloudinary.uploader
+    .destroy(parsed.publicId, { resource_type: parsed.resourceType })
+    .catch(err => console.error('Cloudinary delete failed for', url, err));
+}
 
 // Helper: Remove all references to a URL from every table
 async function cascadeDeleteByUrl(url: string) {
@@ -100,11 +124,13 @@ export async function deleteMedia(id: string): Promise<{ success: boolean; messa
     if (!media) return { success: false, message: 'Media not found' };
 
     if (media.pathname && isVercelBlobUrl(media.pathname)) await del(media.pathname);
+    else if (isCloudinaryUrl(media.url)) await deleteFromCloudinary(media.url);
     await cascadeDeleteByUrl(media.url);
     await db.media.delete({ where: { id } });
 
     revalidatePath('/admin/media');
     revalidateTag('admin-media', 'default');
+    revalidateTag('storage-usage', 'default');
     return { success: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Delete failed';
@@ -123,13 +149,18 @@ export async function bulkDeleteMedia(ids: string[]): Promise<{ success: boolean
     const pathnames = mediaRecords
       .map(m => m.pathname)
       .filter((p): p is string => !!p && isVercelBlobUrl(p));
+    const cloudinaryUrls = mediaRecords
+      .map(m => m.url)
+      .filter(isCloudinaryUrl);
 
     if (pathnames.length > 0) await del(pathnames);
+    await Promise.all(cloudinaryUrls.map(deleteFromCloudinary));
     await Promise.all(mediaRecords.map(m => cascadeDeleteByUrl(m.url)));
     await db.media.deleteMany({ where: { id: { in: ids } } });
 
     revalidatePath('/admin/media');
     revalidateTag('admin-media', 'default');
+    revalidateTag('storage-usage', 'default');
     return { success: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Bulk delete failed';
@@ -306,3 +337,65 @@ export async function syncFromVercelBlob(): Promise<{ success: boolean; count?: 
     return { success: false, message };
   }
 }
+
+// 9. STORAGE USAGE — Cloudinary account usage (has a real plan/credit limit)
+// + Vercel Blob total size (no account-level quota available without a
+// separate Vercel API token, so this side is usage-only, no limit).
+export interface StorageUsage {
+  cloudinary: {
+    plan: string;
+    creditsUsed: number;
+    creditsLimit: number;
+    usedPercent: number;
+    storageBytes: number;
+    bandwidthBytes: number;
+  } | null;
+  vercelBlob: {
+    totalBytes: number;
+    fileCount: number;
+  } | null;
+}
+
+async function _getStorageUsage(): Promise<StorageUsage> {
+  const [cloudinaryResult, vercelResult] = await Promise.allSettled([
+    cloudinary.api.usage(),
+    (async () => {
+      let totalBytes = 0;
+      let fileCount = 0;
+      let cursor: string | undefined;
+      let iterations = 0;
+      do {
+        const result: ListBlobResult = await list({ cursor, limit: 1000 });
+        for (const blob of result.blobs) {
+          totalBytes += blob.size;
+          fileCount++;
+        }
+        cursor = result.cursor;
+        iterations++;
+      } while (cursor && iterations < MAX_BLOB_SYNC_PAGES);
+      return { totalBytes, fileCount };
+    })(),
+  ]);
+
+  return {
+    cloudinary: cloudinaryResult.status === 'fulfilled' ? {
+      plan: cloudinaryResult.value.plan,
+      creditsUsed: cloudinaryResult.value.credits?.usage ?? 0,
+      creditsLimit: cloudinaryResult.value.credits?.limit ?? 0,
+      usedPercent: cloudinaryResult.value.credits?.used_percent ?? 0,
+      storageBytes: cloudinaryResult.value.storage?.usage ?? 0,
+      bandwidthBytes: cloudinaryResult.value.bandwidth?.usage ?? 0,
+    } : null,
+    vercelBlob: vercelResult.status === 'fulfilled' ? vercelResult.value : null,
+  };
+}
+
+// External API calls (Cloudinary + full Vercel Blob listing) — cached 10min
+// so the media page doesn't hit both on every single render. Tagged so
+// delete/upload actions can force a fresh read instead of waiting out the
+// full 10 minutes.
+export const getStorageUsage = unstable_cache(
+  _getStorageUsage,
+  ['storage-usage'],
+  { revalidate: 600, tags: ['storage-usage'] }
+);

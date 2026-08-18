@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { upload } from '@vercel/blob/client';
+import { uploadMediaFile, uploadToCloudinaryOrFallback } from '@/lib/upload-media';
 import { getAllMedia, saveMediaRecord } from '@/app/actions/backend/media/media-action';
 import { Media, MediaSource } from '@prisma/client';
 import Image from 'next/image';
@@ -110,24 +110,27 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     setIsUploading(true);
     setUploadProgress(0);
 
+    const effectiveSource = source ?? MediaSource.GENERAL;
+    const folder = effectiveSource.toLowerCase();
+    // Warranty images are customer/phone-sourced (occasional HEIC), so they
+    // go to Cloudinary too, same as the dedicated warranty-claim form —
+    // every other source only sends video there, images stay on Vercel Blob.
+    const uploadFile = (file: File, onProgress: (pct: number) => void) =>
+      effectiveSource === MediaSource.WARRANTY
+        ? uploadToCloudinaryOrFallback(file, folder, onProgress)
+        : uploadMediaFile(file, folder, onProgress);
+
     for (const file of files) {
       try {
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/upload',
-          onUploadProgress: (p: { loaded: number; total: number }) => {
-            const total = p.total || 1;
-            setUploadProgress(Math.round((p.loaded / total) * 100));
-          },
-        });
+        const uploaded = await uploadFile(file, (pct) => setUploadProgress(pct));
 
         const dbResult = await saveMediaRecord({
-          url: blob.url,
-          pathname: blob.pathname,
-          filename: file.name,
-          mimeType: file.type,
-          size: file.size,
-          source: source ?? MediaSource.GENERAL,
+          url: uploaded.url,
+          pathname: uploaded.pathname,
+          filename: uploaded.filename,
+          mimeType: uploaded.mimeType,
+          size: uploaded.size,
+          source: effectiveSource,
         });
 
         if (!dbResult.success) {

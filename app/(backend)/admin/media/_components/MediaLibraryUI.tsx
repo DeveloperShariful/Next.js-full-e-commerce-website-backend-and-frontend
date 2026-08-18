@@ -3,21 +3,23 @@
 'use client';
 
 import { useState, useRef, useMemo, useCallback } from 'react';
-import { upload } from '@vercel/blob/client';
-import { saveMediaRecord, bulkDeleteMedia, getAllMedia } from '@/app/actions/backend/media/media-action';
+import { uploadMediaFile } from '@/lib/upload-media';
+import { saveMediaRecord, bulkDeleteMedia, getAllMedia, type StorageUsage } from '@/app/actions/backend/media/media-action';
 import { Media } from '@prisma/client';
 import MediaToolbar from './MediaToolbar';
 import MediaGrid from './MediaGrid';
 import MediaModal from './MediaModal';
+import StorageUsageWidget from './StorageUsageWidget';
 
 type ViewMode = 'grid' | 'list';
 type SortBy = 'date' | 'name' | 'size';
 
 type MediaLibraryUIProps = {
   initialMedia: Media[];
+  storageUsage: StorageUsage;
 };
 
-export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
+export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibraryUIProps) {
   const [mediaList, setMediaList] = useState<Media[]>(initialMedia);
   const [showUploader, setShowUploader] = useState(false);
 
@@ -112,21 +114,14 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/upload',
-          onUploadProgress: (progressEvent: { loaded: number; total: number }) => {
-            const total = progressEvent.total || 1;
-            setUploadProgress(Math.round((progressEvent.loaded / total) * 100));
-          },
-        });
+        const uploaded = await uploadMediaFile(file, 'general', (pct) => setUploadProgress(pct));
 
         const dbResult = await saveMediaRecord({
-          url: blob.url,
-          pathname: blob.pathname,
-          filename: file.name,
-          mimeType: file.type,
-          size: file.size,
+          url: uploaded.url,
+          pathname: uploaded.pathname,
+          filename: uploaded.filename,
+          mimeType: uploaded.mimeType,
+          size: uploaded.size,
           source: 'GENERAL',
         });
 
@@ -182,6 +177,10 @@ export default function MediaLibraryUI({ initialMedia }: MediaLibraryUIProps) {
         >
           {showUploader ? 'Cancel Upload' : 'Add New Media File'}
         </button>
+      </div>
+
+      <div className="px-2 md:px-0">
+        <StorageUsageWidget usage={storageUsage} />
       </div>
 
       {/* Slide-down Uploader */}

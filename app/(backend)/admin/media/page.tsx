@@ -1,6 +1,6 @@
 // app/(backend)/admin/media/page.tsx
 
-import { getAllMedia } from '@/app/actions/backend/media/media-action';
+import { getAllMedia, getStorageUsage } from '@/app/actions/backend/media/media-action';
 import MediaLibraryUI from './_components/MediaLibraryUI';
 import type { Metadata } from 'next';
 
@@ -10,12 +10,15 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminMediaPage() {
-  // Now initialMedia is strongly typed as Media[] 
-  const initialMedia = await getAllMedia();
+  // Now initialMedia is strongly typed as Media[]
+  const [initialMedia, storageUsage] = await Promise.all([
+    getAllMedia(),
+    getStorageUsage(),
+  ]);
 
   return (
     <div className="w-full bg-[#f0f0f1] min-h-screen">
-        <MediaLibraryUI initialMedia={initialMedia} />
+        <MediaLibraryUI initialMedia={initialMedia} storageUsage={storageUsage} />
     </div>
   );
 }

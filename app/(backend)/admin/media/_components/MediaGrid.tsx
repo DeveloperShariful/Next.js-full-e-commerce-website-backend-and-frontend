@@ -78,7 +78,7 @@ export default function MediaGrid(props: MediaGridProps) {
                   <td className="px-3 py-2">
                     <div className="w-10 h-10 relative bg-[#f0f0f1] rounded-sm overflow-hidden shrink-0">
                       {file.type === MediaType.IMAGE ? (
-                        <Image src={file.url} alt={file.altText || file.filename} fill sizes="40px" className="object-cover"
+                        <Image src={file.url} alt={file.altText || file.filename} fill unoptimized className="object-cover"
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : file.type === MediaType.VIDEO ? (
@@ -163,7 +163,7 @@ export default function MediaGrid(props: MediaGridProps) {
                   src={file.url}
                   alt={file.altText || file.filename}
                   fill
-                  sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 15vw"
+                  unoptimized
                   className={`object-cover transition-transform ${isBulkMode && isSelected ? 'scale-95 opacity-80' : ''}`}
                   onError={(e) => {
                     const parent = (e.target as HTMLImageElement).parentElement;

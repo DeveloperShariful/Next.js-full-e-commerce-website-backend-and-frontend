@@ -3,7 +3,7 @@
 import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { upload } from "@vercel/blob/client";
+import { uploadMediaFile } from "@/lib/upload-media";
 import { X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { fromZonedTime } from "date-fns-tz";
@@ -219,15 +219,15 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
   const handleImageUpload = async (file: File, field: "featuredImage" | "ogImage" | "videoUrl" | "videoThumbnail") => {
     setIsUploading(true);
     try {
-      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/upload" });
-      set(field, blob.url);
+      const uploaded = await uploadMediaFile(file, 'blog');
+      set(field, uploaded.url);
       // Save to media library DB so it appears in admin media page
       await saveMediaRecord({
-        url: blob.url,
-        pathname: blob.pathname,
-        filename: file.name,
-        mimeType: file.type,
-        size: file.size,
+        url: uploaded.url,
+        pathname: uploaded.pathname,
+        filename: uploaded.filename,
+        mimeType: uploaded.mimeType,
+        size: uploaded.size,
         source: MediaSource.BLOG,
       });
       toast.success("Uploaded");

@@ -96,7 +96,14 @@ export function parseDateRange(
   // clock (see storeDayStart's doc comment).
   const now = toZonedTime(new Date(), timezone);
   const tzEnd = (d: Date) => fromZonedTime(endOfDay(d), timezone);
-  const tzStart = (d: Date) => storeDayStart(d, timezone);
+  // `d` here is always something derived from `now` (already zoned once,
+  // above) — converting straight back with fromZonedTime, exactly mirroring
+  // tzEnd. Do NOT route this through storeDayStart: that helper internally
+  // calls toZonedTime again on its input, and applying toZonedTime a second
+  // time to an already-zoned Date silently jumps a full day forward for
+  // part of the day (store-local ~20:00–23:59) — currentFrom would land
+  // after currentTo and every query returns zero rows.
+  const tzStart = (d: Date) => fromZonedTime(startOfDay(d), timezone);
 
   let currentFrom: Date;
   let currentTo: Date;
@@ -105,8 +112,11 @@ export function parseDateRange(
   if (period === "custom" && customFrom && customTo) {
     // customFrom/customTo arrive as "yyyy-MM-dd" already picked in the
     // store's timezone (see date-range-picker.tsx) — parse as a plain
-    // calendar date, not a UTC instant.
-    currentFrom = tzStart(new Date(`${customFrom}T00:00:00`));
+    // calendar date, not a UTC instant. Unlike the preset branches below,
+    // these are raw/naive Dates (not already zoned), so storeDayStart's
+    // single toZonedTime application is the correct (and needed) conversion
+    // here.
+    currentFrom = storeDayStart(new Date(`${customFrom}T00:00:00`), timezone);
     currentTo = tzEnd(new Date(`${customTo}T00:00:00`));
   } else {
     // PRESET LOGIC

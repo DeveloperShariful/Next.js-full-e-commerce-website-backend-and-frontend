@@ -52,7 +52,14 @@ interface ShippingFormProps {
   // billing form data in sessionStorage. On page reload, billing form would load
   // shipping address data!
   sessionKey?: string;
+  // Fired when the email field loses focus — lets the parent trigger an
+  // abandoned-cart capture immediately instead of waiting for the debounce.
+  onEmailBlur?: (email: string) => void;
 }
+
+// Kept in sync with the server-side check in abandoned-checkout/capture —
+// requires a 2+ char TLD so "user@gmail.c" reads as incomplete, not invalid.
+const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const selectStyles = {
   control: (provided: CSSObject) => ({
@@ -80,8 +87,10 @@ export default function ShippingForm({
   onAddressChange,
   defaultValues = {},
   sessionKey = 'checkout_billing_form', // ✅ Default key for billing form
+  onEmailBlur,
 }: ShippingFormProps) {
 
+  const [emailTouched, setEmailTouched] = useState(false);
   const [formData, setFormData] = useState<ShippingFormData>(() => {
     // ✅ FIX: Uses `sessionKey` (prop) instead of hardcoded constant.
     // Billing form uses 'checkout_billing_form'.
@@ -176,9 +185,16 @@ export default function ShippingForm({
             type="email"
             value={formData.email}
             onChange={handleInputChange}
-            className={inputClass}
+            onBlur={() => {
+              setEmailTouched(true);
+              if (EMAIL_FORMAT.test(formData.email)) onEmailBlur?.(formData.email);
+            }}
+            className={`${inputClass} ${emailTouched && formData.email && !EMAIL_FORMAT.test(formData.email) ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}`}
             required
           />
+          {emailTouched && formData.email && !EMAIL_FORMAT.test(formData.email) && (
+            <p className="mt-1.5 text-sm text-red-600">Please enter a complete email address (e.g. name@example.com).</p>
+          )}
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect
 import { logActivity } from '@/lib/activity-logger';
 import { getStoreTimezone } from '@/lib/get-store-timezone';
 import { storeDateKey } from '@/lib/store-time';
+import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -232,6 +233,10 @@ export async function POST(request: Request) {
           recipient: customerEmail,
           orderId,
         }).catch(err => console.error('[Stripe Capture] Customer email failed:', err));
+
+        // Stop the abandoned-cart reminder sequence — order completed.
+        await markOrderRecoveredIfAbandoned(customerEmail, orderId)
+          .catch(err => console.error('[Stripe Capture] AbandonedCheckout recovery mark failed:', err));
       }
       await sendNotification({
         trigger: 'ORDER_CREATED_ADMIN',

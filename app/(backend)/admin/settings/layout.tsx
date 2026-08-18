@@ -27,12 +27,14 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     >
       <div className="w-full">
         {isRootPage && (
-          <>
-            <h1 className="text-[23px] font-normal text-[#1d2327] m-0 mb-[15px] leading-tight">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-y-1.5 gap-x-8 mb-4 border-b border-slate-200">
+            <h1 className="text-[20px] font-bold text-slate-900 m-0 pb-2.5 leading-none shrink-0">
               Settings
             </h1>
-            <SettingsTabNav />
-          </>
+            <div className="w-full sm:w-auto sm:min-w-0 sm:flex-1">
+              <SettingsTabNav />
+            </div>
+          </div>
         )}
         <div className="animate-in fade-in duration-150 w-full">
           {children}

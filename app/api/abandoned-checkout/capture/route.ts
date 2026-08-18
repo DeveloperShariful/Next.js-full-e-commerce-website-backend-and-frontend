@@ -19,7 +19,11 @@ export async function POST(request: Request) {
     };
     const email = body.email ? sanitizeEmail(body.email as string) : '';
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // Requires a 2+ char TLD (after autocorrect above already fixed the
+    // common truncations) — rejects genuinely-still-mid-typing states like
+    // "user@gmail.c" outright instead of saving them and emailing a bounce
+    // for the next 7 days.
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       return NextResponse.json({ success: false }, { status: 400 });
     }
     if (!Array.isArray(cartItems) || cartItems.length === 0) {

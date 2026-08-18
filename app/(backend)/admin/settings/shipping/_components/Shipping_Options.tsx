@@ -27,7 +27,7 @@ export default function Shipping_Options({ options, refreshData }: ComponentProp
     };
 
     // WP Responsive Form Classes
-    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-4 md:pb-0 mb-4 md:mb-0 align-top";
+    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-3 md:pb-0 align-top";
     const thResponsiveClass = "block md:table-cell w-full md:w-[250px] pt-[5px] md:py-[15px] pr-[10px] text-[13px] font-medium text-[#1d2327] mb-1 md:mb-0 align-top";
     const tdResponsiveClass = "block md:table-cell py-[5px] md:py-[15px] align-top";
 

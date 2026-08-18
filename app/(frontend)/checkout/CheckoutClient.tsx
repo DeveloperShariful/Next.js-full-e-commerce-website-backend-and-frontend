@@ -216,21 +216,38 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
   );
 
   // Abandoned checkout capture — fire-and-forget when a valid email is entered.
+  const captureAbandoned = useCallback((email: string, items: typeof cartItems, sub: number) => {
+    fetch('/api/abandoned-checkout/capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, cartItems: items, subtotal: sub }),
+    }).catch(() => {});
+  }, []);
+
+  // 5s debounce — a safety net for cases where blur never fires (autofill,
+  // clicking straight to "place order"). Most captures happen instantly via
+  // handleEmailBlur below instead, once the user actually leaves the field.
   const debouncedCaptureAbandoned = useCallback(
-    debounce((email: string, items: typeof cartItems, sub: number) => {
-      fetch('/api/abandoned-checkout/capture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, cartItems: items, subtotal: sub }),
-      }).catch(() => {});
-    }, 2000),
+    debounce(captureAbandoned, 5000),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
+  // Fires the moment the user leaves the email field (real signal that
+  // they're done typing) instead of waiting out the debounce — passed to
+  // ShippingForm as onEmailBlur. ShippingForm already validates the format
+  // before calling this, so no re-check needed here.
+  const handleEmailBlur = useCallback((email: string) => {
+    if (cartItems.length === 0) return;
+    captureAbandoned(email, cartItems, totals?.subtotal ?? 0);
+  }, [cartItems, totals?.subtotal, captureAbandoned]);
+
   useEffect(() => {
     const email = customerInfo.email;
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    // Requires a 2+ char TLD so a brief typing pause mid-domain (e.g. right
+    // after "user@gmail.c") doesn't fire the capture request at all — kept
+    // in sync with the server-side check in abandoned-checkout/capture.
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return;
     if (cartItems.length === 0) return;
     debouncedCaptureAbandoned(email, cartItems, totals?.subtotal ?? 0);
   }, [customerInfo.email, cartItems, totals?.subtotal, debouncedCaptureAbandoned]);
@@ -653,6 +670,7 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
           onAddressChange={handleAddressChange}
           defaultValues={customerInfo}
           sessionKey="checkout_billing_form"
+          onEmailBlur={handleEmailBlur}
         />
 
         <div className="mt-[5px] p-4 bg-[#f9f9f9] border border-[#ddd]">

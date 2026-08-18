@@ -30,22 +30,23 @@ export default function EmailTab() {
   });
 
   const [logPage, setLogPage] = useState(1);
+  const [logSearch, setLogSearch] = useState("");
 
   const fetchData = async () => {
     try {
       const [configRes, templatesRes, logsRes] = await Promise.all([
         getEmailConfiguration(),
-        getEmailTemplates(), 
-        getEmailLogs(logPage),
+        getEmailTemplates(),
+        getEmailLogs(logPage, logSearch),
       ]);
 
       setData({
         config: (configRes.success && configRes.data) ? configRes.data : null,
         templates: (templatesRes.success && Array.isArray(templatesRes.data)) ? templatesRes.data : [],
         logs: (logsRes.success && Array.isArray(logsRes.logs)) ? logsRes.logs : [],
-        logsMeta: { 
-            total: logsRes.success ? (logsRes.total || 0) : 0, 
-            pages: logsRes.success ? (logsRes.pages || 0) : 0 
+        logsMeta: {
+            total: logsRes.success ? (logsRes.total || 0) : 0,
+            pages: logsRes.success ? (logsRes.pages || 0) : 0
         },
       });
 
@@ -58,7 +59,12 @@ export default function EmailTab() {
 
   useEffect(() => {
     fetchData();
-  }, [logPage]);
+  }, [logPage, logSearch]);
+
+  const handleLogSearch = (query: string) => {
+    setLogPage(1);
+    setLogSearch(query);
+  };
 
   if (loading) {
     return (
@@ -71,21 +77,23 @@ export default function EmailTab() {
   return (
     <div>
       <ScrollRestorer scrollKey="settings-email-scroll-y" />
-      <div className="mb-6 pb-4 border-b border-slate-100">
+      <div className="mb-2 pb-2 border-b border-slate-100">
         <h2 className="text-xl font-bold text-slate-800">Email Settings & Notifications</h2>
         <p className="text-slate-500 text-xs mt-1">
           Configure SMTP, customize email templates, and view system email logs.
         </p>
       </div>
-      
-      <EmailSettingsView 
+
+      <EmailSettingsView
         config={data.config}
         templates={data.templates}
         logs={data.logs}
         logsMeta={data.logsMeta}
         currentLogPage={logPage}
         onLogPageChange={setLogPage}
-        refreshData={fetchData} 
+        logSearch={logSearch}
+        onLogSearch={handleLogSearch}
+        refreshData={fetchData}
       />
     </div>
   );

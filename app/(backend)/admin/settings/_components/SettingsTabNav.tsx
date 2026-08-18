@@ -15,21 +15,23 @@ export default function SettingsTabNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex flex-wrap gap-[4px] border-b border-[#c3c4c7] mb-[20px]">
+    <nav className="flex flex-nowrap items-center gap-1 overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {TABS.map((tab) => {
         const isActive = pathname.startsWith(tab.href)
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className={`text-[14px] px-[15px] py-[8px] font-semibold transition-all duration-150 border border-b-0 rounded-t-[3px] outline-none ${
+            className={`relative px-3 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors outline-none ${
               isActive
-                ? "border-[#c3c4c7] bg-[#f0f0f1] text-[#1d2327] -mb-[1px] pb-[9px]"
-                : "border-transparent bg-transparent text-[#2271b1] hover:text-[#135e96]"
+                ? "text-slate-900"
+                : "text-slate-500 hover:text-slate-800"
             }`}
-            style={{ lineHeight: "1.71428571" }}
           >
             {tab.label}
+            {isActive && (
+              <span className="absolute left-0 right-0 -bottom-px h-[2px] rounded-full bg-blue-600" />
+            )}
           </Link>
         )
       })}

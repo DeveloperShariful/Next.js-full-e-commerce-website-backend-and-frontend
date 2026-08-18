@@ -10,6 +10,7 @@ import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
 import { getStoreTimezone } from '@/lib/get-store-timezone';
 import { storeDateKey } from '@/lib/store-time';
+import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -131,6 +132,12 @@ export async function POST(request: Request) {
                     await queueAndSyncTransdirect(wcOrderId, 'paypal-webhook');
                 }
                 const alreadyEmail = order.guestEmail || order.user?.email;
+                // Stop the abandoned-cart reminder sequence — order completed.
+                // Awaited first (not folded into the allSettled batch below) since it
+                // does its own DB writes internally.
+                if (alreadyEmail) {
+                    await markOrderRecoveredIfAbandoned(alreadyEmail, wcOrderId);
+                }
                 await Promise.allSettled([
                     db.paymentWebhookLog.update({ where: { eventId: String(event.id) }, data: { processed: true } }),
                     sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId: wcOrderId }),
@@ -183,6 +190,12 @@ export async function POST(request: Request) {
 
                 // Post-rescue side effects — email + analytics run in parallel
                 const rescueEmail = order?.guestEmail || order?.user?.email;
+
+                // Stop the abandoned-cart reminder sequence — order completed.
+                if (rescueEmail) {
+                    await markOrderRecoveredIfAbandoned(rescueEmail, wcOrderId)
+                        .catch(err => console.error('[PayPal Webhook] AbandonedCheckout recovery mark failed:', err));
+                }
 
                 // Affiliate — deferred with after() (external API, non-critical)
                 const internalApiKeyRescue = process.env.INTERNAL_API_KEY;
@@ -287,6 +300,12 @@ export async function POST(request: Request) {
                 // Email + analytics — only on clean capture (no mismatch), run in parallel
                 if (!isMismatch) {
                     const syncEmail = order.guestEmail || order.user?.email;
+
+                    // Stop the abandoned-cart reminder sequence — order completed.
+                    if (syncEmail) {
+                        await markOrderRecoveredIfAbandoned(syncEmail, wcOrderId)
+                            .catch(err => console.error('[PayPal Webhook] AbandonedCheckout recovery mark failed:', err));
+                    }
 
                     // Affiliate — deferred with after() (external API, non-critical)
                     const internalApiKeySync = process.env.INTERNAL_API_KEY;

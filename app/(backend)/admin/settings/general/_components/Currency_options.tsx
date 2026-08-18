@@ -19,7 +19,7 @@ export default function Currency_options({ data, updateNestedData }: Props) {
 
     // WP Responsive Form Classes
     const wpInputClass = "border border-[#8c8f94] rounded-[3px] px-[8px] py-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] focus:outline-none w-full md:w-[25em] max-w-full box-border bg-white";
-    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-4 md:pb-0 mb-4 md:mb-0 align-top";
+    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-3 md:pb-0 align-top";
     const thResponsiveClass = "block md:table-cell w-full md:w-[250px] pt-[5px] md:py-[15px] pr-[10px] text-[13px] font-medium text-[#1d2327] mb-1 md:mb-0 align-top";
     const tdResponsiveClass = "block md:table-cell py-[5px] md:py-[15px] align-top";
 

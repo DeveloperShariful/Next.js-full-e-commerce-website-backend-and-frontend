@@ -56,7 +56,7 @@ export default function General_Options({ data, updateNestedData }: Props) {
     const wpMultiSelectWrapper = "border border-[#8c8f94] rounded-[3px] px-[4px] py-[2px] text-[13px] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] min-h-[30px] w-full md:w-[25em] max-w-full box-border bg-white flex flex-wrap gap-[4px] cursor-text focus-within:border-[#2271b1] focus-within:shadow-[0_0_0_1px_#2271b1]";
     const wpTagClass = "bg-[#f0f0f1] border border-[#c3c4c7] text-[#3c434a] text-[12px] px-[6px] py-[2px] rounded-[3px] flex items-center gap-1 leading-tight";
     
-    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-4 md:pb-0 mb-4 md:mb-0 align-top";
+    const trResponsiveClass = "block md:table-row border-b border-[#f0f0f1] md:border-none pb-3 md:pb-0 align-top";
     const thResponsiveClass = "block md:table-cell w-full md:w-[250px] pt-[5px] md:py-[15px] pr-[10px] text-[13px] font-medium text-[#1d2327] mb-1 md:mb-0 align-top";
     const tdResponsiveClass = "block md:table-cell py-[5px] md:py-[15px] align-top";
 

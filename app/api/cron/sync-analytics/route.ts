@@ -12,7 +12,7 @@ import { SUCCESS_STATUSES } from "@/app/actions/backend/analytics/shared.utils";
 import { getStoreTimezone } from "@/lib/get-store-timezone";
 import { storeDayStart } from "@/lib/store-time";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
-import { format, addDays } from "date-fns";
+import { format, addDays, subDays, endOfDay } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -69,9 +69,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Optional: নির্দিষ্ট date range sync করার option
-    const fromParam = url.searchParams.get("from"); // e.g. "2024-01-01"
-    const toParam   = url.searchParams.get("to");   // e.g. "2024-12-31"
+    // Optional: নির্দিষ্ট date range sync করার option (manual/backfill use —
+    // e.g. ?from=2024-01-01&to=2024-12-31 for a full historical rebuild)
+    const explicitFromParam = url.searchParams.get("from");
+    const explicitToParam   = url.searchParams.get("to");
 
     // Date <-> "yyyy-MM-dd" round-trip, in the store's timezone (not UTC) —
     // must match the real-time write sites (see lib/store-time.ts's
@@ -80,6 +81,35 @@ export async function GET(request: Request) {
     const timezone = await getStoreTimezone();
     const toDateStr = (d: Date): string => format(toZonedTime(d, timezone), "yyyy-MM-dd");
     const fromDateStr = (s: string): Date => fromZonedTime(new Date(`${s}T00:00:00`), timezone);
+    const toDateEndInstant = (s: string): Date => fromZonedTime(endOfDay(new Date(`${s}T00:00:00`)), timezone);
+
+    // Runs several times a day (see vercel.json), but only actually touches
+    // the database at the store's business-hours slots — every other
+    // invocation returns immediately, before any DB call, so Neon can stay
+    // suspended outside that window (same pattern as the abandoned-checkout
+    // cron). This also means a misconfigured/DST-drifted cron schedule can
+    // never cause an off-hours run — it just gets skipped here.
+    const nowZoned = toZonedTime(new Date(), timezone);
+    const localHour = nowZoned.getHours();
+    const SYNC_HOURS = [10, 14, 18];
+    if (!explicitFromParam && !SYNC_HOURS.includes(localHour)) {
+      return NextResponse.json({ success: true, skipped: true, localHour });
+    }
+
+    // No explicit range = routine automated run: reconcile only the last 3
+    // store-local days (today plus a 2-day buffer for late refunds/edits) —
+    // cheap enough to run several times a day. A full historical rebuild
+    // only happens when from/to are passed explicitly (manual/one-off).
+    // NOTE: nowZoned is already the zoned representation, so plain format()
+    // is used here (not toDateStr, which would re-apply toZonedTime and
+    // double-shift the result).
+    const fromParam = explicitFromParam ?? format(subDays(nowZoned, 2), "yyyy-MM-dd");
+    const toParam   = explicitToParam   ?? format(nowZoned, "yyyy-MM-dd");
+
+    // Built once and reused below — spreading two separate `{ orderDate: {...} }`
+    // objects into the same where-clause would make the second overwrite the
+    // first (same key), silently dropping the `gte` bound entirely.
+    const orderDateFilter = { orderDate: { gte: fromDateStr(fromParam), lte: toDateEndInstant(toParam) } };
 
     console.log("🚀 Analytics Sync Started...");
 
@@ -101,8 +131,7 @@ export async function GET(request: Request) {
         where: {
           status:    { in: SUCCESS_STATUSES },
           deletedAt: null,
-          ...(fromParam ? { orderDate: { gte: fromDateStr(fromParam) } } : {}),
-          ...(toParam   ? { orderDate: { lte: new Date(toParam + "T23:59:59.999Z") } } : {}),
+          ...orderDateFilter,
         },
         select: {
           id:            true,
@@ -122,8 +151,7 @@ export async function GET(request: Request) {
         where: {
           status:    { in: REFUNDED_STATUSES },
           deletedAt: null,
-          ...(fromParam ? { orderDate: { gte: fromDateStr(fromParam) } } : {}),
-          ...(toParam   ? { orderDate: { lte: new Date(toParam + "T23:59:59.999Z") } } : {}),
+          ...orderDateFilter,
         },
         select: {
           orderDate:     true,
@@ -138,8 +166,7 @@ export async function GET(request: Request) {
           order: {
             status:    { in: SUCCESS_STATUSES },
             deletedAt: null,
-            ...(fromParam ? { orderDate: { gte: fromDateStr(fromParam) } } : {}),
-            ...(toParam   ? { orderDate: { lte: new Date(toParam + "T23:59:59.999Z") } } : {}),
+            ...orderDateFilter,
           },
         },
         select: {

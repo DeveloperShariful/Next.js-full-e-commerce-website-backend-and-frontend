@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { DateRange, SUCCESS_STATUSES } from "./shared.utils";
+import { storeDateKey } from "@/lib/store-time";
 
 export interface TopProductData {
   id: string;
@@ -32,13 +33,20 @@ export interface LeaderboardsResponse {
 }
 
 export async function getLeaderboardsData(
-  currentRange: DateRange
+  currentRange: DateRange,
+  timezone: string
 ): Promise<LeaderboardsResponse> {
+
+  // ProductAnalytics.date is a @db.Date column — needs the date-key form
+  // (see storeDateKey's doc comment in lib/store-time.ts). Order.orderDate
+  // below is a real timestamp, so it correctly keeps using currentRange as-is.
+  const dateKeyFrom = storeDateKey(currentRange.from, timezone);
+  const dateKeyTo = storeDateKey(currentRange.to, timezone);
 
   const [productGroups, categoryGroups, channelGroups] = await Promise.all([
     db.productAnalytics.groupBy({
       by: ["productId"],
-      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      where: { date: { gte: dateKeyFrom, lte: dateKeyTo } },
       _sum: { itemsSold: true, netSales: true },
       orderBy: { _sum: { itemsSold: "desc" } },
       take: 5,
@@ -46,7 +54,7 @@ export async function getLeaderboardsData(
     db.productAnalytics.groupBy({
       by: ["categoryId"],
       where: {
-        date: { gte: currentRange.from, lte: currentRange.to },
+        date: { gte: dateKeyFrom, lte: dateKeyTo },
         categoryId: { not: null },
       },
       _sum: { itemsSold: true, netSales: true },

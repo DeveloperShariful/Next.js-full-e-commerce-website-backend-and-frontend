@@ -3,6 +3,8 @@
 import { db } from "@/lib/prisma";
 import { sendNotification } from "@/app/api/email/send-notification";
 import { Prisma } from "@prisma/client";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
+import { storeDateKey } from "@/lib/store-time";
 
 export const safeFloat = (val: unknown): number => {
   if (val === null || val === undefined || val === "") return 0;
@@ -37,8 +39,8 @@ export const round = (num: number): number => {
 
 // 🔥 FIXED: Changed 'totalSales' to 'netSales' and 'grossSales' to match schema
 export async function updateAnalytics(amount: number) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const timezone = await getStoreTimezone();
+    const today = storeDateKey(new Date(), timezone);
     try {
         await db.analytics.upsert({
             where: { date: today },

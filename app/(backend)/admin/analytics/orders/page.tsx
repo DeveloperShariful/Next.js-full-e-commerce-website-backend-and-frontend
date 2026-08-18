@@ -27,15 +27,13 @@ export default async function OrdersAnalyticsPage(props: OrdersPageProps) {
   
   const customFrom = searchParams.from;
   const customTo = searchParams.to;
-  
-  const dates = parseDateRange(period, compare, customFrom, customTo);
+
+  const timezone = await getStoreTimezone();
+  const dates = parseDateRange(period, compare, customFrom, customTo, timezone);
   const isComparing = compare !== "none";
 
   // Fetch data specifically for Orders Tab
-  const [data, timezone] = await Promise.all([
-    getOrdersAnalyticsData(dates.current, dates.previous),
-    getStoreTimezone(),
-  ]);
+  const data = await getOrdersAnalyticsData(dates.current, dates.previous, timezone);
 
   // Formatting dates for the Chart Legend
   const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime()

@@ -3,7 +3,8 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { DateRange, SerializedAnalytics, serializeAnalyticsData } from "./shared.utils";
+import { DateRange, SerializedAnalytics, serializeAnalyticsData, SUCCESS_STATUSES } from "./shared.utils";
+import { storeDateKey } from "@/lib/store-time";
 
 export interface ProductTableRow {
   id: string;
@@ -32,21 +33,32 @@ export interface ProductsAnalyticsResponse {
 
 export async function getProductsAnalyticsData(
   currentRange: DateRange,
-  previousRange: DateRange
+  previousRange: DateRange,
+  timezone: string
 ): Promise<ProductsAnalyticsResponse> {
+
+  // Analytics.date/ProductAnalytics.date are @db.Date columns — need the
+  // date-key form, not the real-instant range boundaries (see storeDateKey's
+  // doc comment in lib/store-time.ts). The orderItem.groupBy query further
+  // below filters Order.orderDate (a real timestamp) and correctly keeps
+  // using currentRange as-is.
+  const currentFromKey = storeDateKey(currentRange.from, timezone);
+  const currentToKey = storeDateKey(currentRange.to, timezone);
+  const previousFromKey = storeDateKey(previousRange.from, timezone);
+  const previousToKey = storeDateKey(previousRange.to, timezone);
 
   const [currentDataRaw, previousDataRaw, productGroups] = await Promise.all([
     db.analytics.findMany({
-      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      where: { date: { gte: currentFromKey, lte: currentToKey } },
       orderBy: { date: "asc" },
     }),
     db.analytics.findMany({
-      where: { date: { gte: previousRange.from, lte: previousRange.to } },
+      where: { date: { gte: previousFromKey, lte: previousToKey } },
       orderBy: { date: "asc" },
     }),
     db.productAnalytics.groupBy({
       by: ["productId"],
-      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      where: { date: { gte: currentFromKey, lte: currentToKey } },
       _sum: { itemsSold: true, netSales: true },
       orderBy: { _sum: { itemsSold: "desc" } },
     }),
@@ -85,7 +97,10 @@ export async function getProductsAnalyticsData(
       by: ["productId"],
       where: {
         productId: { in: productIds },
-        order: { orderDate: { gte: currentRange.from, lte: currentRange.to } },
+        order: {
+          orderDate: { gte: currentRange.from, lte: currentRange.to },
+          status: { in: SUCCESS_STATUSES },
+        },
       },
       _count: { id: true },
     }),

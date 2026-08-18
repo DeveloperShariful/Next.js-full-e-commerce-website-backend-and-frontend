@@ -13,6 +13,8 @@ import { logActivity } from '@/lib/activity-logger';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sanitizeEmail } from '@/lib/sanitize-email';
 import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
+import { getStoreTimezone } from '@/lib/get-store-timezone';
+import { storeDateKey } from '@/lib/store-time';
 
 // ============================================================================
 // TYPES
@@ -492,50 +494,56 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Analytics (fire-and-forget) ──────────────────────────────
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const totalItemsSold = validOrderItems.reduce((sum, i) => sum + i.quantity, 0);
+    // Only COD orders are confirmed/PROCESSING immediately — Bank Transfer
+    // orders start AWAITING_PAYMENT/UNPAID and shouldn't count as a sale
+    // until payment is actually confirmed (a later status-change path).
+    if (isCoD) {
+      const totalItemsSold = validOrderItems.reduce((sum, i) => sum + i.quantity, 0);
 
-    Promise.allSettled([
-      db.analytics.upsert({
-        where: { date: today },
-        create: {
-          date: today,
-          grossSales: subtotal,
-          netSales: subtotal - discountTotal,
-          totalTax: taxTotal,
-          totalShipping: shippingCost,
-          totalDiscounts: discountTotal,
-          totalOrders: 1,
-          productsSold: totalItemsSold,
-          newCustomers: isFirstOrder ? 1 : 0,
-          returningCustomers: isFirstOrder ? 0 : 1,
-        },
-        update: {
-          grossSales:         { increment: subtotal },
-          netSales:           { increment: subtotal - discountTotal },
-          totalTax:           { increment: taxTotal },
-          totalShipping:      { increment: shippingCost },
-          totalDiscounts:     { increment: discountTotal },
-          totalOrders:        { increment: 1 },
-          productsSold:       { increment: totalItemsSold },
-          newCustomers:       { increment: isFirstOrder ? 1 : 0 },
-          returningCustomers: { increment: isFirstOrder ? 0 : 1 },
-        },
-      }),
-      ...validOrderItems
-        .filter(i => !!i.productId)
-        .map(({ productId, quantity, total }) =>
-          db.productAnalytics.upsert({
-            where: { date_productId: { date: today, productId } },
-            create: { date: today, productId, itemsSold: quantity, netSales: Number(total) },
-            update: {
-              itemsSold: { increment: quantity },
-              netSales:  { increment: Number(total) },
+      getStoreTimezone().then(analyticsTimezone => {
+        const today = storeDateKey(new Date(), analyticsTimezone);
+        return Promise.allSettled([
+          db.analytics.upsert({
+            where: { date: today },
+            create: {
+              date: today,
+              grossSales: subtotal,
+              netSales: subtotal - discountTotal,
+              totalTax: taxTotal,
+              totalShipping: shippingCost,
+              totalDiscounts: discountTotal,
+              totalOrders: 1,
+              productsSold: totalItemsSold,
+              newCustomers: isFirstOrder ? 1 : 0,
+              returningCustomers: isFirstOrder ? 0 : 1,
             },
-          })
-        ),
-    ]).catch(err => console.error('[Offline Order] Analytics update failed:', err));
+            update: {
+              grossSales:         { increment: subtotal },
+              netSales:           { increment: subtotal - discountTotal },
+              totalTax:           { increment: taxTotal },
+              totalShipping:      { increment: shippingCost },
+              totalDiscounts:     { increment: discountTotal },
+              totalOrders:        { increment: 1 },
+              productsSold:       { increment: totalItemsSold },
+              newCustomers:       { increment: isFirstOrder ? 1 : 0 },
+              returningCustomers: { increment: isFirstOrder ? 0 : 1 },
+            },
+          }),
+          ...validOrderItems
+            .filter(i => !!i.productId)
+            .map(({ productId, quantity, total }) =>
+              db.productAnalytics.upsert({
+                where: { date_productId: { date: today, productId } },
+                create: { date: today, productId, itemsSold: quantity, netSales: Number(total) },
+                update: {
+                  itemsSold: { increment: quantity },
+                  netSales:  { increment: Number(total) },
+                },
+              })
+            ),
+        ]);
+      }).catch(err => console.error('[Offline Order] Analytics update failed:', err));
+    }
 
     return NextResponse.json({
       success: true,

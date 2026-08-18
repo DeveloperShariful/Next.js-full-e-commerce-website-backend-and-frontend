@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auditService } from "@/lib/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
@@ -72,6 +72,7 @@ export async function createFraudRuleAction(data: FraudRuleInput): Promise<Actio
       newData: newRule
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate?view=fraud");
     return { success: true, message: "Security rule activated." };
   } catch (error: unknown) {
@@ -102,6 +103,7 @@ export async function toggleFraudRuleAction(id: string, isActive: boolean): Prom
       entityId: id,
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate?view=fraud");
     return { success: true, message: `Rule ${isActive ? "enabled" : "disabled"}.` };
   } catch (error: unknown) {
@@ -129,6 +131,7 @@ export async function deleteFraudRuleAction(id: string): Promise<ActionResponse>
       entityId: id
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate?view=fraud");
     return { success: true, message: "Rule removed." };
   } catch (error: unknown) {

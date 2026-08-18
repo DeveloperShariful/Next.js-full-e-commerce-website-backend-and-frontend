@@ -8,6 +8,8 @@ import { sendNotification } from '@/app/api/email/send-notification';
 import { cookies } from 'next/headers';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { logActivity } from '@/lib/activity-logger';
+import { getStoreTimezone } from '@/lib/get-store-timezone';
+import { storeDateKey } from '@/lib/store-time';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -260,8 +262,8 @@ export async function POST(request: Request) {
       }
 
       // Analytics update
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const analyticsTimezone = await getStoreTimezone();
+      const today = storeDateKey(new Date(), analyticsTimezone);
 
       const subtotal = Number(currentOrder.subtotal);
       const discountTotal = Number(currentOrder.discountTotal);

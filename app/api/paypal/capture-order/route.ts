@@ -17,6 +17,8 @@ import { sendNotification } from '@/app/api/email/send-notification';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { logActivity } from '@/lib/activity-logger';
 import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
+import { getStoreTimezone } from '@/lib/get-store-timezone';
+import { storeDateKey } from '@/lib/store-time';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -311,8 +313,8 @@ export async function POST(request: Request) {
         // ✅ Daily analytics update (matches stripe/capture-order behaviour)
         // Only runs on confirmed COMPLETED payments — not on PENDING/FAILED.
         if (isFullSuccess && orderItems.length > 0) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+          const analyticsTimezone = await getStoreTimezone();
+          const today = storeDateKey(new Date(), analyticsTimezone);
 
           const subtotal = Number(order.subtotal);
           const discountTotal = Number(order.discountTotal);

@@ -1,6 +1,12 @@
 //File: app/actions/backend/analytics/shared.utils.ts
 
 import { Analytics, OrderStatus } from "@prisma/client";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import {
+  startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear,
+  addDays, subDays, subMonths, subYears,
+} from "date-fns";
+import { storeDayStart } from "@/lib/store-time";
 
 // Single source of truth for all analytics files — must match sync-analytics/route.ts
 export const SUCCESS_STATUSES: OrderStatus[] = [
@@ -77,101 +83,96 @@ export function formatNumber(value: number): string {
 }
 
 export function parseDateRange(
-  period: string, 
-  compare: string, 
-  customFrom?: string, 
-  customTo?: string
+  period: string,
+  compare: string,
+  customFrom: string | undefined,
+  customTo: string | undefined,
+  timezone: string
 ): { current: DateRange; previous: DateRange } {
-  const currentFrom = new Date();
-  const currentTo = new Date();
+  // All boundaries are computed on the store's local wall-clock calendar
+  // (matching app/actions/backend/dashboard/index.ts's `tz()` pattern), then
+  // converted to the equivalent UTC instant for the DB query — otherwise
+  // "today"/"this week" etc. drift by ~10 hours against the server's UTC
+  // clock (see storeDayStart's doc comment).
+  const now = toZonedTime(new Date(), timezone);
+  const tzEnd = (d: Date) => fromZonedTime(endOfDay(d), timezone);
+  const tzStart = (d: Date) => storeDayStart(d, timezone);
+
+  let currentFrom: Date;
+  let currentTo: Date;
 
   // 🔴 100% ACCURATE CUSTOM DATE LOGIC
   if (period === "custom" && customFrom && customTo) {
-    const parsedFrom = new Date(customFrom);
-    const parsedTo = new Date(customTo);
-    
-    currentFrom.setTime(parsedFrom.getTime());
-    currentFrom.setHours(0, 0, 0, 0);
-    
-    currentTo.setTime(parsedTo.getTime());
-    currentTo.setHours(23, 59, 59, 999);
+    // customFrom/customTo arrive as "yyyy-MM-dd" already picked in the
+    // store's timezone (see date-range-picker.tsx) — parse as a plain
+    // calendar date, not a UTC instant.
+    currentFrom = tzStart(new Date(`${customFrom}T00:00:00`));
+    currentTo = tzEnd(new Date(`${customTo}T00:00:00`));
   } else {
     // PRESET LOGIC
     switch (period) {
       case "today":
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(now);
+        currentTo = tzEnd(now);
         break;
       case "yesterday":
-        currentFrom.setDate(currentFrom.getDate() - 1);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setDate(currentTo.getDate() - 1);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(subDays(now, 1));
+        currentTo = tzEnd(subDays(now, 1));
         break;
       case "last_7_days":
-        currentFrom.setDate(currentFrom.getDate() - 7);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(subDays(now, 7));
+        currentTo = tzEnd(now);
         break;
       case "last_30_days":
-        currentFrom.setDate(currentFrom.getDate() - 30);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(subDays(now, 30));
+        currentTo = tzEnd(now);
         break;
-      case "week_to_date":
-        const dayOfWeek = currentFrom.getDay();
-        const diffToMonday = currentFrom.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        currentFrom.setDate(diffToMonday);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setHours(23, 59, 59, 999);
+      case "week_to_date": {
+        const dayOfWeek = now.getDay();
+        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        currentFrom = tzStart(addDays(now, diffToMonday));
+        currentTo = tzEnd(now);
         break;
-      case "last_week":
-        const lastWeekDate = new Date();
-        lastWeekDate.setDate(lastWeekDate.getDate() - 7);
-        const lwDayOfWeek = lastWeekDate.getDay();
-        const lwDiffToMonday = lastWeekDate.getDate() - lwDayOfWeek + (lwDayOfWeek === 0 ? -6 : 1);
-        currentFrom.setDate(lwDiffToMonday - 7);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setDate(lwDiffToMonday - 1);
-        currentTo.setHours(23, 59, 59, 999);
+      }
+      case "last_week": {
+        const dayOfWeek = now.getDay();
+        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const thisMonday = addDays(now, diffToMonday);
+        currentFrom = tzStart(subDays(thisMonday, 7));
+        currentTo = tzEnd(subDays(thisMonday, 1));
         break;
+      }
       case "month_to_date":
-        currentFrom.setDate(1);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(startOfMonth(now));
+        currentTo = tzEnd(now);
         break;
       case "last_month":
-        currentFrom.setMonth(currentFrom.getMonth() - 1, 1);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setMonth(currentTo.getMonth(), 0);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(startOfMonth(subMonths(now, 1)));
+        currentTo = tzEnd(endOfMonth(subMonths(now, 1)));
         break;
       case "quarter_to_date": {
-        const qMonth = Math.floor(currentFrom.getMonth() / 3) * 3;
-        currentFrom.setMonth(qMonth, 1);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setHours(23, 59, 59, 999);
+        const qMonth = Math.floor(now.getMonth() / 3) * 3;
+        currentFrom = tzStart(new Date(now.getFullYear(), qMonth, 1));
+        currentTo = tzEnd(now);
         break;
       }
       case "last_quarter": {
-        const lqMonth = Math.floor(currentFrom.getMonth() / 3) * 3;
-        currentFrom.setMonth(lqMonth - 3, 1);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setMonth(lqMonth, 0);
-        currentTo.setHours(23, 59, 59, 999);
+        const qMonth = Math.floor(now.getMonth() / 3) * 3;
+        const thisQuarterStart = new Date(now.getFullYear(), qMonth, 1);
+        const lastQuarterEnd = subDays(thisQuarterStart, 1);
+        const lqMonth = Math.floor(lastQuarterEnd.getMonth() / 3) * 3;
+        currentFrom = tzStart(new Date(lastQuarterEnd.getFullYear(), lqMonth, 1));
+        currentTo = tzEnd(lastQuarterEnd);
         break;
       }
       case "year_to_date":
-        currentFrom.setMonth(0, 1);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(startOfYear(now));
+        currentTo = tzEnd(now);
         break;
       case "last_year":
       default:
-        currentFrom.setFullYear(currentFrom.getFullYear() - 1, 0, 1);
-        currentFrom.setHours(0, 0, 0, 0);
-        currentTo.setFullYear(currentTo.getFullYear() - 1, 11, 31);
-        currentTo.setHours(23, 59, 59, 999);
+        currentFrom = tzStart(startOfYear(subYears(now, 1)));
+        currentTo = tzEnd(endOfYear(subYears(now, 1)));
         break;
     }
   }

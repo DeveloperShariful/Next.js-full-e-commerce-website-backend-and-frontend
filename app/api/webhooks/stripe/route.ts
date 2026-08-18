@@ -10,6 +10,8 @@ import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect
 import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
 import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
+import { getStoreTimezone } from '@/lib/get-store-timezone';
+import { storeDateKey } from '@/lib/store-time';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -213,8 +215,8 @@ export async function POST(request: Request) {
         }),
       ]);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const analyticsTimezone = await getStoreTimezone();
+      const today = storeDateKey(new Date(), analyticsTimezone);
 
       const sideEffects: Promise<unknown>[] = [
         sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId }),

@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { DateRange, SerializedAnalytics, serializeAnalyticsData, SUCCESS_STATUSES } from "./shared.utils";
+import { storeDateKey } from "@/lib/store-time";
 
 export interface OrderTableRow {
   id: string;
@@ -40,17 +41,22 @@ export interface OrdersAnalyticsResponse {
 
 export async function getOrdersAnalyticsData(
   currentRange: DateRange,
-  previousRange: DateRange
+  previousRange: DateRange,
+  timezone: string
 ): Promise<OrdersAnalyticsResponse> {
 
+  // Analytics.date is a @db.Date column — needs the date-key form (see
+  // storeDateKey's doc comment in lib/store-time.ts). The order.findMany
+  // call further below filters Order.orderDate (a real timestamp) and
+  // correctly keeps using currentRange as-is.
   // ১. Chart Data & Summaries from Analytics lookup table
   const currentDataRaw = await db.analytics.findMany({
-    where: { date: { gte: currentRange.from, lte: currentRange.to } },
+    where: { date: { gte: storeDateKey(currentRange.from, timezone), lte: storeDateKey(currentRange.to, timezone) } },
     orderBy: { date: "asc" },
   });
 
   const previousDataRaw = await db.analytics.findMany({
-    where: { date: { gte: previousRange.from, lte: previousRange.to } },
+    where: { date: { gte: storeDateKey(previousRange.from, timezone), lte: storeDateKey(previousRange.to, timezone) } },
     orderBy: { date: "asc" },
   });
 

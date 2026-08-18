@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { DateRange, SerializedAnalytics, serializeAnalyticsData, SUCCESS_STATUSES } from "./shared.utils";
+import { storeDateKey } from "@/lib/store-time";
 
 export interface CouponTableRow {
   code: string;
@@ -31,16 +32,21 @@ export interface CouponsAnalyticsResponse {
 
 export async function getCouponsAnalyticsData(
   currentRange: DateRange,
-  previousRange: DateRange
+  previousRange: DateRange,
+  timezone: string
 ): Promise<CouponsAnalyticsResponse> {
 
+  // Analytics.date is a @db.Date column — needs the date-key form (see
+  // storeDateKey's doc comment in lib/store-time.ts). The order.groupBy
+  // calls below filter Order.orderDate (a real timestamp) and correctly
+  // keep using currentRange/previousRange as-is.
   const [currentDataRaw, previousDataRaw, couponGroups, previousCouponGroups] = await Promise.all([
     db.analytics.findMany({
-      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      where: { date: { gte: storeDateKey(currentRange.from, timezone), lte: storeDateKey(currentRange.to, timezone) } },
       orderBy: { date: "asc" },
     }),
     db.analytics.findMany({
-      where: { date: { gte: previousRange.from, lte: previousRange.to } },
+      where: { date: { gte: storeDateKey(previousRange.from, timezone), lte: storeDateKey(previousRange.to, timezone) } },
       orderBy: { date: "asc" },
     }),
     db.order.groupBy({

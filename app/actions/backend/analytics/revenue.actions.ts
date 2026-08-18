@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { DateRange, SerializedAnalytics, serializeAnalyticsData } from "./shared.utils";
+import { storeDateKey } from "@/lib/store-time";
 
 export interface RevenueTableRow {
   date: string;
@@ -96,16 +97,19 @@ function buildSummary(data: SerializedAnalytics[]) {
 
 export async function getRevenueAnalyticsData(
   currentRange: DateRange,
-  previousRange: DateRange
+  previousRange: DateRange,
+  timezone: string
 ): Promise<RevenueAnalyticsResponse> {
 
+  // Analytics.date is a @db.Date column — needs the date-key form, not the
+  // real-instant range boundaries (see storeDateKey's doc comment in lib/store-time.ts).
   const [currentDataRaw, previousDataRaw] = await Promise.all([
     db.analytics.findMany({
-      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      where: { date: { gte: storeDateKey(currentRange.from, timezone), lte: storeDateKey(currentRange.to, timezone) } },
       orderBy: { date: "desc" },
     }),
     db.analytics.findMany({
-      where: { date: { gte: previousRange.from, lte: previousRange.to } },
+      where: { date: { gte: storeDateKey(previousRange.from, timezone), lte: storeDateKey(previousRange.to, timezone) } },
       orderBy: { date: "desc" },
     }),
   ]);

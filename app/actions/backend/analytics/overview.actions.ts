@@ -3,11 +3,12 @@
 "use server";
 
 import { db } from "@/lib/prisma"; // আপনার কাস্টম db ইমপোর্ট করা হলো
-import { 
-  DateRange, 
-  SerializedAnalytics, 
-  serializeAnalyticsData 
+import {
+  DateRange,
+  SerializedAnalytics,
+  serializeAnalyticsData
 } from "./shared.utils";
+import { storeDateKey } from "@/lib/store-time";
 
 // রিটার্ন টাইপের স্ট্রিক্ট ইন্টারফেস
 export interface OverviewSummaryData {
@@ -42,15 +43,19 @@ const getDefaultSummary = (): OverviewSummaryData => ({
 
 export async function getOverviewData(
   currentRange: DateRange,
-  previousRange: DateRange
+  previousRange: DateRange,
+  timezone: string
 ): Promise<OverviewActionResponse> {
   
   // ১. বর্তমান সময়ের ডেটা ফেচ (Current Period)
+  // Analytics.date is a @db.Date column (calendar date only, no time/zone) —
+  // needs the date-key form, not the real-instant range boundaries (see
+  // storeDateKey's doc comment in lib/store-time.ts).
   const currentDataRaw = await db.analytics.findMany({
     where: {
       date: {
-        gte: currentRange.from,
-        lte: currentRange.to,
+        gte: storeDateKey(currentRange.from, timezone),
+        lte: storeDateKey(currentRange.to, timezone),
       },
     },
     orderBy: { date: "asc" },
@@ -60,8 +65,8 @@ export async function getOverviewData(
   const previousDataRaw = await db.analytics.findMany({
     where: {
       date: {
-        gte: previousRange.from,
-        lte: previousRange.to,
+        gte: storeDateKey(previousRange.from, timezone),
+        lte: storeDateKey(previousRange.to, timezone),
       },
     },
     orderBy: { date: "asc" },

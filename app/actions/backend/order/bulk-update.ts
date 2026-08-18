@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 import { OrderStatus } from "@prisma/client";
 import { restockInventory, sendOrderEmail } from "./order-utils";
 import { logActivity } from "@/lib/activity-logger";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
+import { storeDateKey } from "@/lib/store-time";
 
 // সাকসেস স্ট্যাটাস এরে (টাইপ সেফ)
 const SUCCESS_STATUSES: OrderStatus[] = [
@@ -25,8 +27,8 @@ async function adjustAnalyticsForOrder(orderId: string, sign: 1 | -1) {
   // যদি অর্ডারটি সাকসেস স্ট্যাটাসের না হয়, তবে অ্যানালিটিক্সে হাত দেওয়ার দরকার নেই
   if (!SUCCESS_STATUSES.includes(order.status)) return;
 
-  const statDate = new Date(order.orderDate);
-  statDate.setUTCHours(0, 0, 0, 0); // UTC midnight-এ অ্যানালিটিক্স ডেট সেট করা হলো
+  const timezone = await getStoreTimezone();
+  const statDate = storeDateKey(order.orderDate, timezone);
 
   const netSales = (Number(order.netAmount) || 0) * sign;
   const grossSales = (Number(order.subtotal) || 0) * sign;
@@ -118,8 +120,8 @@ export async function bulkUpdateOrderStatus(orderIds: string[], status: OrderSta
       data: notesData
     });
 
-    const todayDate = new Date();
-    todayDate.setHours(0,0,0,0);
+    const bulkAnalyticsTimezone = await getStoreTimezone();
+    const todayDate = storeDateKey(new Date(), bulkAnalyticsTimezone);
 
     for (const order of oldOrders) {
       if (status === "DELIVERED" && order.status !== "DELIVERED") {

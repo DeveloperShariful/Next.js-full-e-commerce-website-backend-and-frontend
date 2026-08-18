@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { ShippingMethodType } from "@prisma/client";
 
 // --- GET DATA ---
@@ -227,6 +227,7 @@ export async function updateShippingOptions(formData: FormData) {
       data: { generalConfig: newConfig }
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/settings/shipping");
     return { success: true, message: "Shipping options saved" };
   } catch (error) {

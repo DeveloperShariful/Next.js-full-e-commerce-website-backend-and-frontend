@@ -26,11 +26,12 @@ export default async function RevenueAnalyticsPage(props: RevenuePageProps) {
   
   const customFrom = searchParams.from;
   const customTo = searchParams.to;
-  
-  const dates = parseDateRange(period, compare, customFrom, customTo);
+
+  const timezone = await getStoreTimezone();
+  const dates = parseDateRange(period, compare, customFrom, customTo, timezone);
   const isComparing = compare !== "none";
 
-  const data = await getRevenueAnalyticsData(dates.current, dates.previous);
+  const data = await getRevenueAnalyticsData(dates.current, dates.previous, timezone);
 
   const cards = [
     { title: "Gross sales", value: data.summary.grossSales, prev: data.previousSummary.grossSales, isCurrency: true },
@@ -47,8 +48,6 @@ export default async function RevenueAnalyticsPage(props: RevenuePageProps) {
     { title: "Refund rate", value: data.summary.refundRate, prev: data.previousSummary.refundRate, isNegative: true },
     { title: "Repeat purchase rate", value: data.summary.repeatPurchaseRate, prev: data.previousSummary.repeatPurchaseRate, isNegative: false },
   ];
-
-  const timezone = await getStoreTimezone();
 
   // Formatting dates for the Chart Legend
   const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime()

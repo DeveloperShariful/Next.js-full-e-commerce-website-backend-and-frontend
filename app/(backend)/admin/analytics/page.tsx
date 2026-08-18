@@ -27,14 +27,14 @@ export default async function AnalyticsOverviewPage(props: PageProps) {
   
   const customFrom = searchParams.from;
   const customTo = searchParams.to;
-  
-  const dates = parseDateRange(period, compare, customFrom, customTo);
+
+  const timezone = await getStoreTimezone();
+  const dates = parseDateRange(period, compare, customFrom, customTo, timezone);
   const isComparing = compare !== "none";
 
-  const [overviewData, leaderboardsData, timezone] = await Promise.all([
-    getOverviewData(dates.current, dates.previous),
-    getLeaderboardsData(dates.current),
-    getStoreTimezone(),
+  const [overviewData, leaderboardsData] = await Promise.all([
+    getOverviewData(dates.current, dates.previous, timezone),
+    getLeaderboardsData(dates.current, timezone),
   ]);
 
   // Formatting dates for the Chart Legend

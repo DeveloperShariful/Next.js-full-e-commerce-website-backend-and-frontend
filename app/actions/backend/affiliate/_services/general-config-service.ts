@@ -4,7 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { AffiliateGeneralSettings, AffiliateConfigDTO, ActionResponse } from "../types";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auditService } from "@/lib/audit-service";
 import { affiliateGeneralSchema } from "../schemas";
 import { getChanges } from "../get-changes";
@@ -288,6 +288,7 @@ export async function updateGeneralSettingsAction(data: AffiliateGeneralSettings
       });
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate");
     return { success: true, message: "Configuration saved successfully." };
   } catch (error: unknown) {

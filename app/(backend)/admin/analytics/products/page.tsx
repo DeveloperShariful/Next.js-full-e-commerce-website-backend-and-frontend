@@ -27,12 +27,13 @@ export default async function ProductsAnalyticsPage(props: ProductsPageProps) {
   
   const customFrom = searchParams.from;
   const customTo = searchParams.to;
-  
-  const dates = parseDateRange(period, compare, customFrom, customTo);
+
+  const timezone = await getStoreTimezone();
+  const dates = parseDateRange(period, compare, customFrom, customTo, timezone);
   const isComparing = compare !== "none";
 
   // Fetch data specifically for Products Tab
-  const data = await getProductsAnalyticsData(dates.current, dates.previous);
+  const data = await getProductsAnalyticsData(dates.current, dates.previous, timezone);
 
   // We need to calculate Previous Summary dynamically to show the % badges properly.
   const previousSummary = data.previousChartData.reduce(
@@ -44,8 +45,6 @@ export default async function ProductsAnalyticsPage(props: ProductsPageProps) {
     },
     { itemsSold: 0, netSales: 0, orders: 0 }
   );
-
-  const timezone = await getStoreTimezone();
 
   // Formatting dates for the Chart Legend
   const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime()

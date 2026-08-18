@@ -27,15 +27,13 @@ export default async function CategoriesAnalyticsPage(props: CategoriesPageProps
   
   const customFrom = searchParams.from;
   const customTo = searchParams.to;
-  
-  const dates = parseDateRange(period, compare, customFrom, customTo);
+
+  const timezone = await getStoreTimezone();
+  const dates = parseDateRange(period, compare, customFrom, customTo, timezone);
   const isComparing = compare !== "none";
 
   // Fetch data specifically for Categories Tab
-  const [data, timezone] = await Promise.all([
-    getCategoriesAnalyticsData(dates.current, dates.previous),
-    getStoreTimezone(),
-  ]);
+  const data = await getCategoriesAnalyticsData(dates.current, dates.previous, timezone);
 
   const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime()
       ? formatTz(dates.current.from, timezone, "MMM d, yyyy")

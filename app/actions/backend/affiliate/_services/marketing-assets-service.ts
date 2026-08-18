@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auditService } from "@/lib/audit-service";
 import { ActionResponse } from "../types";
 import { z } from "zod";
@@ -161,6 +161,7 @@ export async function upsertAnnouncementAction(data: AnnouncementInput): Promise
       newData: payload
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate/announcements");
     return { success: true, message: payload.id ? "Announcement updated." : "Announcement published." };
   } catch (error: any) {
@@ -190,6 +191,7 @@ export async function deleteAnnouncementAction(id: string): Promise<ActionRespon
       entityId: id
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate/announcements");
     return { success: true, message: "Deleted successfully." };
   } catch (error: any) {
@@ -222,6 +224,7 @@ export async function toggleAnnouncementStatusAction(id: string, isActive: boole
         entityId: id,
         newData: { isActive }
     });
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate/announcements");
     return { success: true, message: "Status updated." };
   } catch (error: any) {
@@ -263,6 +266,7 @@ export async function upsertCreativeAction(data: CreativeInput): Promise<ActionR
       newData: payload
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate/creatives");
     return { success: true, message: "Creative asset saved successfully." };
 
@@ -293,6 +297,7 @@ export async function deleteCreativeAction(id: string): Promise<ActionResponse> 
       entityId: id
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate/creatives");
     return { success: true, message: "Asset deleted successfully." };
   } catch (error) {

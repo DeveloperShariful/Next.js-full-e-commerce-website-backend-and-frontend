@@ -9,6 +9,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { SUCCESS_STATUSES } from "@/app/actions/backend/analytics/shared.utils";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
+import { storeDayStart } from "@/lib/store-time";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { format, addDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -50,22 +54,6 @@ interface ProductDailyStats {
 }
 
 // ============================================================
-// HELPER: Date → "YYYY-MM-DD" string (UTC)
-// ============================================================
-const toDateStr = (d: Date): string => {
-  const year  = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day   = String(d.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-/** "YYYY-MM-DD" → UTC midnight Date */
-const fromDateStr = (s: string): Date => {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
-};
-
-// ============================================================
 // CRON HANDLER
 // ============================================================
 
@@ -84,6 +72,14 @@ export async function GET(request: Request) {
     // Optional: নির্দিষ্ট date range sync করার option
     const fromParam = url.searchParams.get("from"); // e.g. "2024-01-01"
     const toParam   = url.searchParams.get("to");   // e.g. "2024-12-31"
+
+    // Date <-> "yyyy-MM-dd" round-trip, in the store's timezone (not UTC) —
+    // must match the real-time write sites (see lib/store-time.ts's
+    // storeDayStart) or this reconciliation job re-buckets orders under the
+    // wrong day instead of fixing them.
+    const timezone = await getStoreTimezone();
+    const toDateStr = (d: Date): string => format(toZonedTime(d, timezone), "yyyy-MM-dd");
+    const fromDateStr = (s: string): Date => fromZonedTime(new Date(`${s}T00:00:00`), timezone);
 
     console.log("🚀 Analytics Sync Started...");
 
@@ -217,19 +213,25 @@ export async function GET(request: Request) {
       rangeEnd = new Date();
     }
 
-    // UTC midnight normalize
-    rangeStart.setUTCHours(0, 0, 0, 0);
-    rangeEnd.setUTCHours(0, 0, 0, 0);
+    // Store-local midnight normalize (not UTC — see storeDayStart)
+    rangeStart = storeDayStart(rangeStart, timezone);
+    rangeEnd = storeDayStart(rangeEnd, timezone);
 
     // Date map initialize (প্রতিদিন ০ দিয়ে শুরু)
     const dailyMap: Record<string, DailyStats>        = {};
     const productMap: Record<string, ProductDailyStats> = {};
 
-    const cursor = new Date(rangeStart);
-    while (cursor <= rangeEnd) {
-      const key = toDateStr(cursor);
+    // Walk the range one store-local calendar day at a time (zoned
+    // arithmetic, not raw UTC increments — DST would otherwise skip/repeat
+    // a bucket).
+    let zonedCursor = toZonedTime(rangeStart, timezone);
+    const zonedRangeEnd = toZonedTime(rangeEnd, timezone);
+    while (zonedCursor <= zonedRangeEnd) {
+      const key = format(zonedCursor, "yyyy-MM-dd");
       dailyMap[key] = {
-        date:               new Date(cursor),
+        // @db.Date column — UTC-midnight-of-this-calendar-date, not a real
+        // instant (see storeDateKey's doc comment in lib/store-time.ts).
+        date:               new Date(`${key}T00:00:00.000Z`),
         grossSales:         0,
         netSales:           0,
         totalTax:           0,
@@ -244,7 +246,7 @@ export async function GET(request: Request) {
         abandonedCheckouts: 0,
         recoveredCheckouts: 0,
       };
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      zonedCursor = addDays(zonedCursor, 1);
     }
 
     // ============================================================
@@ -305,7 +307,8 @@ export async function GET(request: Request) {
         const prodKey = `${key}__${item.productId}`;
         if (!productMap[prodKey]) {
           productMap[prodKey] = {
-            date:       fromDateStr(key),
+            // @db.Date column — same date-key style as dailyMap above, not fromDateStr's real instant.
+            date:       new Date(`${key}T00:00:00.000Z`),
             productId:  item.productId,
             categoryId: productCategoryMap[item.productId] ?? null,
             itemsSold:  0,

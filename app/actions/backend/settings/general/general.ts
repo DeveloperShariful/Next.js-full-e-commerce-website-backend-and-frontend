@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { logActivity } from "@/lib/activity-logger";
 
 // Helper to extract symbol from code (e.g., USD -> $)
@@ -152,6 +152,11 @@ export async function updateGeneralSettings(formData: FormData) {
       details: { storeName, storeEmail, currency: currencyCode },
     });
 
+    // Bust the cached store settings (getCachedStoreSettings/getStoreTimezone)
+    // immediately — otherwise timezone/currency/etc. changes here silently
+    // don't apply anywhere else (Dashboard, Analytics, crons, checkout) for
+    // up to 24h (the cache's revalidate window).
+    updateTag("store-settings");
     revalidatePath("/admin/settings/general");
     return { success: true, message: "Settings saved successfully!" };
 

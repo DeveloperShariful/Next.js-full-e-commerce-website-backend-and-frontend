@@ -8,6 +8,8 @@ import { safeDecrypt } from '@/app/actions/backend/settings/payments/crypto';
 import { queueAndSyncTransdirect } from '@/app/actions/backend/order/transdirect-sync-order';
 import { sendNotification } from '@/app/api/email/send-notification';
 import { auditService } from '@/lib/audit-service';
+import { getStoreTimezone } from '@/lib/get-store-timezone';
+import { storeDateKey } from '@/lib/store-time';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -199,8 +201,8 @@ export async function POST(request: Request) {
                     select: { productId: true, quantity: true, total: true },
                 });
 
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
+                const rescueAnalyticsTimezone = await getStoreTimezone();
+                const today = storeDateKey(new Date(), rescueAnalyticsTimezone);
 
                 const rescueSideEffects: Promise<unknown>[] = [
                     sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId: wcOrderId }),
@@ -303,8 +305,8 @@ export async function POST(request: Request) {
                         select: { productId: true, quantity: true, total: true },
                     });
 
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
+                    const syncAnalyticsTimezone = await getStoreTimezone();
+                    const today = storeDateKey(new Date(), syncAnalyticsTimezone);
 
                     const syncSideEffects: Promise<unknown>[] = [
                         sendNotification({ trigger: 'ORDER_CREATED_ADMIN', recipient: '', orderId: wcOrderId }),

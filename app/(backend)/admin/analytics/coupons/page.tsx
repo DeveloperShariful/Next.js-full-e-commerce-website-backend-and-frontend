@@ -27,15 +27,13 @@ export default async function CouponsAnalyticsPage(props: CouponsPageProps) {
   
   const customFrom = searchParams.from;
   const customTo = searchParams.to;
-  
-  const dates = parseDateRange(period, compare, customFrom, customTo);
+
+  const timezone = await getStoreTimezone();
+  const dates = parseDateRange(period, compare, customFrom, customTo, timezone);
   const isComparing = compare !== "none";
 
   // Fetch data specifically for Coupons Tab
-  const [data, timezone] = await Promise.all([
-    getCouponsAnalyticsData(dates.current, dates.previous),
-    getStoreTimezone(),
-  ]);
+  const data = await getCouponsAnalyticsData(dates.current, dates.previous, timezone);
 
   // Formatting dates for the Chart Legend
   const currentDateLabel = dates.current.from.getTime() === dates.current.to.getTime()

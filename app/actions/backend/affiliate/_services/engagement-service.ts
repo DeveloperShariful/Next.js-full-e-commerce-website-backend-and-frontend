@@ -3,7 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { revalidatePath, unstable_cache } from "next/cache";
+import { revalidatePath, updateTag, unstable_cache } from "next/cache";
 import { DecimalMath } from "@/lib/decimal-math";
 import { ActionResponse } from "../types";
 import { z } from "zod";
@@ -172,6 +172,7 @@ export async function upsertContestAction(data: ContestInput): Promise<ActionRes
         newData: payload
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate/contests");
     return { success: true, message: "Contest saved successfully." };
   } catch (error: any) {
@@ -198,6 +199,7 @@ export async function deleteContestAction(id: string): Promise<ActionResponse> {
         entityId: id
     });
 
+    updateTag("store-settings");
     revalidatePath("/admin/affiliate/contests");
     return { success: true, message: "Contest deleted." };
   } catch (error) {

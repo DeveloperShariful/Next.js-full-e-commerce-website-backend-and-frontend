@@ -3,7 +3,8 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { DateRange, SerializedAnalytics, serializeAnalyticsData } from "./shared.utils";
+import { DateRange, SerializedAnalytics, serializeAnalyticsData, SUCCESS_STATUSES } from "./shared.utils";
+import { storeDateKey } from "@/lib/store-time";
 
 export interface CategoryTableRow {
   id: string;
@@ -32,22 +33,33 @@ export interface CategoriesAnalyticsResponse {
 
 export async function getCategoriesAnalyticsData(
   currentRange: DateRange,
-  previousRange: DateRange
+  previousRange: DateRange,
+  timezone: string
 ): Promise<CategoriesAnalyticsResponse> {
+
+  // Analytics.date/ProductAnalytics.date are @db.Date columns — need the
+  // date-key form, not the real-instant range boundaries (see storeDateKey's
+  // doc comment in lib/store-time.ts). The orderItem.groupBy query further
+  // below filters Order.orderDate (a real timestamp) and correctly keeps
+  // using currentRange as-is.
+  const currentFromKey = storeDateKey(currentRange.from, timezone);
+  const currentToKey = storeDateKey(currentRange.to, timezone);
+  const previousFromKey = storeDateKey(previousRange.from, timezone);
+  const previousToKey = storeDateKey(previousRange.to, timezone);
 
   const [currentDataRaw, previousDataRaw, categoryGroups] = await Promise.all([
     db.analytics.findMany({
-      where: { date: { gte: currentRange.from, lte: currentRange.to } },
+      where: { date: { gte: currentFromKey, lte: currentToKey } },
       orderBy: { date: "asc" },
     }),
     db.analytics.findMany({
-      where: { date: { gte: previousRange.from, lte: previousRange.to } },
+      where: { date: { gte: previousFromKey, lte: previousToKey } },
       orderBy: { date: "asc" },
     }),
     db.productAnalytics.groupBy({
       by: ["categoryId"],
       where: {
-        date: { gte: currentRange.from, lte: currentRange.to },
+        date: { gte: currentFromKey, lte: currentToKey },
         categoryId: { not: null },
       },
       _sum: { itemsSold: true, netSales: true },
@@ -86,7 +98,10 @@ export async function getCategoriesAnalyticsData(
       by: ["productId"],
       where: {
         product: { categories: { some: { id: { in: categoryIds } } } },
-        order: { orderDate: { gte: currentRange.from, lte: currentRange.to } },
+        order: {
+          orderDate: { gte: currentRange.from, lte: currentRange.to },
+          status: { in: SUCCESS_STATUSES },
+        },
       },
       _count: { id: true },
     }),
@@ -97,7 +112,7 @@ export async function getCategoriesAnalyticsData(
   // We use the productAnalytics categoryId to link back
   const productAnalyticsRows = await db.productAnalytics.findMany({
     where: {
-      date: { gte: currentRange.from, lte: currentRange.to },
+      date: { gte: currentFromKey, lte: currentToKey },
       categoryId: { in: categoryIds },
     },
     select: { productId: true, categoryId: true },

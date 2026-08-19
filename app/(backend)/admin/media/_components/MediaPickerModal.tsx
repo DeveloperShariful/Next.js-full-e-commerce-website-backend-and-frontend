@@ -77,13 +77,18 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return mediaList.filter(m => {
+      // Warranty-claim media is customer support evidence, not reusable
+      // content — hide it from every picker except the warranty flow
+      // itself (source === WARRANTY), so it never shows up when picking a
+      // blog/product/etc. image or video.
+      if (m.source === MediaSource.WARRANTY && source !== MediaSource.WARRANTY) return false;
       const matchSearch = !q
         || m.filename.toLowerCase().includes(q)
         || (m.originalName?.toLowerCase().includes(q) ?? false);
       const matchType = typeFilter === 'ALL' || m.type === typeFilter;
       return matchSearch && matchType;
     });
-  }, [mediaList, search, typeFilter]);
+  }, [mediaList, search, typeFilter, source]);
 
   const visibleItems = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;

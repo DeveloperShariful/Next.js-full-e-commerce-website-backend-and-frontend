@@ -79,6 +79,7 @@ const navItems: NavItem[] = [
   },
   { path: '/apparel', label: 'Apparel' },
   { path: '/shop', label: 'Shop' },
+  { path: '/community', label: 'Community' },
   { path: '/about', label: 'About' },
   { path: '/contact', label: 'Contact' },
   { path: '/faq', label: 'FAQ' },
@@ -221,7 +222,7 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
       <header className="bg-white border-b border-[#eaeaea] sticky top-[55px] z-50 transition-[top] duration-300 ease-in-out md:top-[48px] shadow-md">
         
         {/* Top Main Bar (Logo, Nav, Icons) */}
-        <div className="max-w-[1400px] mx-auto px-6 flex pb-2 pt-3 lg:grid lg:grid-cols-3 items-center justify-between relative ">
+        <div className="max-w-[1600px] mx-auto px-6 flex pb-2 pt-3 lg:grid lg:grid-cols-[auto_1fr_auto] lg:gap-4 items-center justify-between relative ">
           
           <div className="flex flex-1 lg:flex-none items-center justify-start">
             <button 
@@ -578,7 +579,7 @@ export default function HeaderClient({ isAffiliate, userRole, initialUser }: Hea
         </div>
 
         {/* Search Bar — desktop only; mobile search is inside the sidebar drawer */}
-        <div className="hidden lg:flex w-full max-w-[1400px] mx-auto px-6 pb-3 pt-1 relative" ref={searchRef}>
+        <div className="hidden lg:flex w-full max-w-[1600px] mx-auto px-6 pb-3 pt-1 relative" ref={searchRef}>
           <div className="w-full lg:max-w-[680px] lg:mx-auto relative">
             <div className="w-full flex items-center gap-2.5 bg-[#f4f4f5] border border-transparent rounded-full px-4 py-2.5 focus-within:bg-white focus-within:border-[#d1d5db] focus-within:shadow-[0_2px_16px_rgba(0,0,0,0.08)] transition-all duration-200">
               <IoSearch size={17} className="text-gray-400 shrink-0" aria-hidden="true" />

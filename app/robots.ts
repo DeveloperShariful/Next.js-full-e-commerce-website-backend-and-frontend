@@ -29,6 +29,13 @@ export default function robots(): MetadataRoute.Robots {
           '/search?',
           '/*?*sort=',
           '/*?*filter=',
+          // Community utility pages — personalized/empty-without-a-query, no
+          // standalone SEO value (the actual content lives at its own canonical
+          // /community/[slug], /community/tag/[tag], /community/profile/[id] URLs,
+          // which stay indexable and are listed in sitemap.xml).
+          '/community/search',
+          '/community/saved',
+          '/community/notifications',
         ],
       },
       // AI bots: allowed (fall through to the '*' rule above — same access as

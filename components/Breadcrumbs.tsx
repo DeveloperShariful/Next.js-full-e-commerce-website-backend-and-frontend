@@ -13,19 +13,20 @@ interface BreadcrumbItem {
 interface BreadcrumbsProps {
   pageTitle?: string;
   items?: BreadcrumbItem[];
+  className?: string;
 }
 
 const formatBreadcrumb = (str: string) => {
   return str.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
-export default function Breadcrumbs({ pageTitle, items }: BreadcrumbsProps) {
+export default function Breadcrumbs({ pageTitle, items, className }: BreadcrumbsProps) {
   const pathname = usePathname();
   if (pathname === '/') return null;
 
   if (items && items.length > 0) {
     return (
-      <nav aria-label="Breadcrumb" className="max-w-[1300px] mx-auto mt-2 mb-4 px-1.5 font-sans">
+      <nav aria-label="Breadcrumb" className={className || "max-w-[1300px] mx-auto mt-2 mb-4 px-1.5 font-sans"}>
         <ol className="flex items-center list-none p-0 m-0 text-[0.9rem] lg:text-[1.2rem] text-black overflow-hidden text-ellipsis whitespace-nowrap">
           {items.map((item, index) => {
             const isLast = index === items.length - 1;
@@ -55,7 +56,7 @@ export default function Breadcrumbs({ pageTitle, items }: BreadcrumbsProps) {
   const pathSegments = pathname.split('/').filter(segment => segment);
 
   return (
-    <nav aria-label="Breadcrumb" className="max-w-[1300px] mx-auto mt-2 mb-4 px-1.5 font-sans">
+    <nav aria-label="Breadcrumb" className={className || "max-w-[1300px] mx-auto mt-2 mb-4 px-1.5 font-sans"}>
       <ol className="flex items-center list-none p-0 m-0 text-[0.9rem] lg:text-[1.2rem] text-black overflow-hidden text-ellipsis whitespace-nowrap">
         <li className="flex items-center">
           <Link

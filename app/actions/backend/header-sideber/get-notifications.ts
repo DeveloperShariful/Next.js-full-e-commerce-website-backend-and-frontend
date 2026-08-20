@@ -5,6 +5,12 @@
 import { db } from "@/lib/prisma";
 import { OrderStatus, ReviewStatus } from "@prisma/client";
 import { auth } from "@/auth";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
+
+/** Lets the client-side notification scheduler know which timezone's 10am/6pm to fire on. */
+export async function getNotificationTimezone(): Promise<string> {
+  return getStoreTimezone();
+}
 
 export type NotificationType = "ORDER" | "STOCK" | "REVIEW" | "SUPPORT" | "WARRANTY" | "USER";
 

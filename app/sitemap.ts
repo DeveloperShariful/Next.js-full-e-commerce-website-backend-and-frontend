@@ -199,6 +199,60 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.65,
   }));
 
+  // ── 7. Community — feed, posts, tags, and author profile pages ────────────
+  let communityPages: MetadataRoute.Sitemap = [];
+  try {
+    const posts = await db.communityPost.findMany({
+      where: { status: 'PUBLISHED', deletedAt: null },
+      select: { slug: true, updatedAt: true, ogImage: true, tags: true, authorId: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const postPages: MetadataRoute.Sitemap = posts
+      .filter(p => p.slug)
+      .map(p => ({
+        url: `${BASE_URL}/community/${p.slug}`,
+        lastModified: p.updatedAt,
+        changeFrequency: 'weekly' as const,
+        priority: 0.5,
+        ...(p.ogImage && { images: [p.ogImage] }),
+      }));
+
+    const tagSet = new Set<string>();
+    const authorIds = new Set<string>();
+    posts.forEach(p => {
+      p.tags.forEach(t => tagSet.add(t));
+      authorIds.add(p.authorId);
+    });
+
+    const tagPages: MetadataRoute.Sitemap = Array.from(tagSet).map(tag => ({
+      url: `${BASE_URL}/community/tag/${encodeURIComponent(tag)}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.45,
+    }));
+
+    const authors = await db.user.findMany({
+      where: { id: { in: Array.from(authorIds) } },
+      select: { id: true, updatedAt: true },
+    });
+    const profilePages: MetadataRoute.Sitemap = authors.map(a => ({
+      url: `${BASE_URL}/community/profile/${a.id}`,
+      lastModified: a.updatedAt,
+      changeFrequency: 'weekly' as const,
+      priority: 0.4,
+    }));
+
+    communityPages = [
+      { url: `${BASE_URL}/community`, lastModified: new Date(), changeFrequency: 'daily' as const, priority: 0.6 },
+      ...postPages,
+      ...tagPages,
+      ...profilePages,
+    ];
+  } catch (err) {
+    console.error('[sitemap] community query failed:', err);
+  }
+
   return [
     ...staticPages,
     ...productPages,
@@ -206,5 +260,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...blogPages,
     ...hubPages,
     ...hubCategoryPages,
+    ...communityPages,
   ];
 }

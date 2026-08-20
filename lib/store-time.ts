@@ -40,3 +40,27 @@ export function formatOrderDate(date: Date | string, timezone: string): string {
   }
   return formatTz(d, timezone, "dd MMM yyyy");
 }
+
+// Milliseconds until the next occurrence of any of the given hours (0-23), in the
+// store's timezone — e.g. msUntilNextDailyFire("Australia/Sydney", [10, 18]) for a
+// twice-a-day check. Client-safe (no server-only imports), meant for scheduling a
+// single setTimeout instead of a recurring setInterval, so a background badge/count
+// only ever re-fetches at those fixed daily moments rather than on a tight loop.
+export function msUntilNextDailyFire(timezone: string, hours: number[]): number {
+  const now = new Date();
+  const zonedNow = toZonedTime(now, timezone);
+
+  let soonest: number | null = null;
+  for (const hour of hours) {
+    const candidateZoned = new Date(zonedNow);
+    candidateZoned.setHours(hour, 0, 0, 0);
+    let candidateUtc = fromZonedTime(candidateZoned, timezone).getTime();
+    if (candidateUtc <= now.getTime()) {
+      candidateZoned.setDate(candidateZoned.getDate() + 1);
+      candidateUtc = fromZonedTime(candidateZoned, timezone).getTime();
+    }
+    if (soonest === null || candidateUtc < soonest) soonest = candidateUtc;
+  }
+
+  return Math.max(0, (soonest as number) - now.getTime());
+}

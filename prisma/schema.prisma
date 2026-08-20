@@ -400,6 +400,18 @@ model User {
   referredByAffiliateId String?
   referredByAffiliate   AffiliateAccount? @relation("CustomerReferral", fields: [referredByAffiliateId], references: [id], onDelete: SetNull)
 
+  communityPosts     CommunityPost[]
+  postReactions      PostReaction[]
+  postComments       PostComment[]
+  postReports        PostReport[]
+  savedPosts         SavedPost[]
+
+  notificationsReceived CommunityNotification[] @relation("NotificationRecipient")
+  notificationsSent     CommunityNotification[] @relation("NotificationActor")
+
+  following Follow[] @relation("Follower")
+  followers Follow[] @relation("Following")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1593,6 +1605,209 @@ model QuestionAnswer {
 
   @@index([productId])
   @@index([isApproved])
+}
+
+// ==========================================
+// 10a. COMMUNITY FEED (public, customer-posted)
+// ==========================================
+
+enum CommunityPostStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  HAHA
+  WOW
+  SAD
+  ANGRY
+}
+
+enum CommentStatus {
+  VISIBLE
+  HIDDEN
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  DISMISSED
+}
+
+model CommunityPost {
+  id      String              @id @default(uuid())
+  slug    String              @unique
+  caption String?             @db.Text
+  tags    String[]
+  status  CommunityPostStatus @default(PUBLISHED)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // SEO — auto-filled from caption/media at creation time, no manual entry required
+  metaTitle String?
+  metaDesc  String? @db.Text
+  ogImage   String?
+
+  viewCount     Int @default(0)
+  reactionCount Int @default(0)
+  commentCount  Int @default(0)
+  shareCount    Int @default(0)
+
+  media         PostMedia[]
+  reactions     PostReaction[]
+  comments      PostComment[]
+  reports       PostReport[]
+  notifications CommunityNotification[]
+  savedBy       SavedPost[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([authorId])
+}
+
+model PostMedia {
+  id        String        @id @default(uuid())
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  url       String
+  mediaType MediaType
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+
+  @@index([postId, order])
+}
+
+model PostReaction {
+  id     String        @id @default(uuid())
+  postId String
+  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   ReactionType
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model PostComment {
+  id       String        @id @default(uuid())
+  postId   String
+  post     CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content  String        @db.Text
+  status   CommentStatus @default(VISIBLE)
+
+  // One level of threading — a reply's parentId points at a top-level
+  // comment. Replies to replies collapse under the same top-level parent
+  // (kept flat past that, matching most "Facebook-lite" comment UIs).
+  parentId String?
+  parent   PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  PostComment[] @relation("CommentReplies")
+
+  reports       PostReport[]
+  notifications CommunityNotification[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+enum NotificationType {
+  REACTION
+  COMMENT
+  REPLY
+  MENTION
+  FOLLOW
+}
+
+model CommunityNotification {
+  id String @id @default(uuid())
+
+  recipientId String
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actorId     String
+  actor       User   @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  type        NotificationType
+
+  postId    String?
+  post      CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId String?
+  comment   PostComment?   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([recipientId, isRead, createdAt(sort: Desc)])
+}
+
+model Follow {
+  id          String @id @default(uuid())
+  followerId  String
+  follower    User   @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User   @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+// Cache of fetched Open Graph metadata for external links shared in Community
+// posts (currently just Facebook), so we never re-fetch the same URL twice.
+model LinkPreview {
+  id          String   @id @default(uuid())
+  url         String   @unique
+  title       String?
+  description String?  @db.Text
+  image       String?
+  fetchedAt   DateTime @default(now())
+}
+
+model SavedPost {
+  id     String        @id @default(uuid())
+  userId String
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId String
+  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model PostReport {
+  id String @id @default(uuid())
+
+  postId String?
+  post   CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  commentId String?
+  comment   PostComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  reporterId String
+  reporter   User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     String?
+  status     ReportStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([postId])
+  @@index([commentId])
 }
 
 model SupportTicket {

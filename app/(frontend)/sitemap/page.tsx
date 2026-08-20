@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import type { Metadata } from 'next';
-import { Home, Bike, Wrench, Shirt, BookOpen, Shield, ChevronRight, ShieldCheck, Store, Tv2 } from 'lucide-react';
+import { Home, Bike, Wrench, Shirt, BookOpen, Shield, ChevronRight, ShieldCheck, Store, Tv2, Users } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'HTML Sitemap | GoBike Australia',
@@ -221,12 +221,19 @@ export default function SitemapPage() {
             </ul>
           </Section>
 
+          {/* 8. Community */}
+          <Section icon={<Users size={17} />} title="GoBike Community" count={1}>
+            <ul>
+              <SitemapLink href="/community" label="GoBike Community — Rider Photos & Videos" />
+            </ul>
+          </Section>
+
         </div>
 
         {/* Bottom summary bar */}
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 bg-white border border-[#e5e7eb] rounded-2xl px-6 py-4">
           <p className="text-[13px] text-[#6b7280]">
-            <span className="font-bold text-[#111827]">56 pages</span> across 7 categories &nbsp;·&nbsp; Last updated July 2026
+            <span className="font-bold text-[#111827]">57 pages</span> across 8 categories &nbsp;·&nbsp; Last updated July 2026
           </p>
           <Link href="/" className="text-[13px] font-semibold text-black hover:text-[#555] flex items-center gap-1 transition-colors">
             ← Back to GoBike Home

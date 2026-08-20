@@ -8,7 +8,10 @@ import {
   ShoppingBag, AlertTriangle, Star, MessageSquare, ShieldCheck, UserPlus,
 } from "lucide-react";
 import Link from "next/link";
-import { getSystemNotifications, SystemNotification, NotificationType } from "@/app/actions/backend/header-sideber/get-notifications";
+import { getSystemNotifications, getNotificationTimezone, SystemNotification, NotificationType } from "@/app/actions/backend/header-sideber/get-notifications";
+import { msUntilNextDailyFire } from "@/lib/store-time";
+
+const DAILY_FIRE_HOURS = [10, 18]; // 10am and 6pm, in the store's timezone
 
 // --- Relative time helper ---
 function timeAgo(isoString: string): string {
@@ -64,13 +67,27 @@ export function Notifications() {
     );
   }, []);
 
-  // Initial load
-  useEffect(() => { loadNotifications(); }, [loadNotifications]);
-
-  // Auto-refresh every 2 hours
+  // Initial load, then only two fixed daily checks (10am/6pm store time) — no
+  // recurring interval, so this doesn't keep hitting the database in a loop.
   useEffect(() => {
-    const interval = setInterval(loadNotifications, 7_200_000);
-    return () => clearInterval(interval);
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    const scheduleNext = (timezone: string) => {
+      timeoutId = setTimeout(() => {
+        if (cancelled) return;
+        loadNotifications();
+        scheduleNext(timezone);
+      }, msUntilNextDailyFire(timezone, DAILY_FIRE_HOURS));
+    };
+
+    loadNotifications();
+    getNotificationTimezone().then(tz => { if (!cancelled) scheduleNext(tz); });
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [loadNotifications]);
 
   // Close on outside click

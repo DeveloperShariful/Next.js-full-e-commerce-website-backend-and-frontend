@@ -67,6 +67,7 @@ export const sidebarConfig: SidebarGroup[] = [
       { name: "Shipments", href: "/admin/shipments", icon: Truck },
       { name: "Support Ticket", href: "/admin/support", icon: MessageSquare },
       { name: "Warranty-Cliem", href: "/admin/warranty-claims", icon: Megaphone },
+      { name: "Community", href: "/admin/community", icon: MessageCircle },
       { name: "Daily Reports", href: "/admin/reports", icon: ClipboardList },
       {
         name: "Finance",

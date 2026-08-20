@@ -1,7 +1,7 @@
 // components/Footer.tsx
 
 'use client';
-import { FaFacebookF, FaInstagram, FaYoutube, FaTiktok , FaLinkedinIn, FaPinterestP} from 'react-icons/fa';
+import { FaFacebookF, FaInstagram, FaYoutube, FaTiktok , FaLinkedinIn, FaPinterestP, FaUsers} from 'react-icons/fa';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -172,6 +172,12 @@ export default function Footer() {
                         <FaPinterestP className="w-6 h-6 text-white bg-[#E60023] rounded-full p-1" />
                         <span>Pinterest</span>
                       </a>
+                    </li>
+                    <li>
+                      <Link href="/community" className="text-[#555] flex items-center gap-3 hover:text-black font-medium transition-colors">
+                        <FaUsers className="w-6 h-6 text-white bg-[#1877F2] rounded-full p-1" />
+                        <span>Community</span>
+                      </Link>
                     </li>
                 </ul>
               </div>

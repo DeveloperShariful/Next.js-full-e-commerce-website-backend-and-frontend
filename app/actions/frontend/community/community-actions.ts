@@ -1,6 +1,7 @@
 // app/actions/frontend/community/community-actions.ts
 "use server";
 
+import { cache } from "react";
 import { db } from "@/lib/prisma";
 import { syncUser } from "@/lib/auth-sync";
 import { stripHtml } from "@/lib/sanitize";
@@ -389,7 +390,11 @@ export async function getCommunityFeedByTag(tag: string, cursor?: string) {
   }
 }
 
-export async function getCommunityPostBySlug(slug: string) {
+// Wrapped in React's cache() because both generateMetadata() and the page component
+// call this with the same slug in the same request — without memoizing, that meant
+// two separate DB round-trips AND two separate viewCount increments per single page
+// load (the bug behind the inflated-looking view counts).
+export const getCommunityPostBySlug = cache(async (slug: string) => {
   try {
     const currentUser = await syncUser();
     const post = await db.communityPost.findFirst({
@@ -417,6 +422,23 @@ export async function getCommunityPostBySlug(slug: string) {
     return { success: true, post: { ...post, linkPreview } };
   } catch {
     return { success: false, post: null };
+  }
+});
+
+// Internal links from a post to a few more posts by the same author — gives
+// crawlers a path to more of the long tail of posts beyond what's directly
+// linked from the feed/sitemap, and keeps readers on the site longer.
+export async function getMorePostsByAuthor(authorId: string, excludePostId: string, limit = 4) {
+  try {
+    const posts = await db.communityPost.findMany({
+      where: { authorId, status: "PUBLISHED", deletedAt: null, id: { not: excludePostId } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: { slug: true, caption: true, metaTitle: true, ogImage: true, createdAt: true },
+    });
+    return { success: true, posts };
+  } catch {
+    return { success: false, posts: [] };
   }
 }
 

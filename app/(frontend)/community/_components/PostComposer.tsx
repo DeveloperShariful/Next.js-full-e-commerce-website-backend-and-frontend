@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { Role } from "@prisma/client";
 import { toast } from "sonner";
@@ -147,6 +146,7 @@ export default function PostComposer({ onPosted }: { onPosted: (post: CommunityP
           reactionCount: 0,
           commentCount: 0,
           shareCount: 0,
+          viewCount: 0,
           createdAt: new Date().toISOString(),
           author: {
             id: (session!.user as { id?: string }).id || "",

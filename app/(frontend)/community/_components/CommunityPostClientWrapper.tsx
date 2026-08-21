@@ -8,5 +8,5 @@ export default function CommunityPostClientWrapper({ post }: { post: CommunityPo
   const currentUserId = (session?.user as { id?: string } | undefined)?.id;
   const isLoggedIn = !!session?.user;
 
-  return <PostCard post={post} currentUserId={currentUserId} isLoggedIn={isLoggedIn} />;
+  return <PostCard post={post} currentUserId={currentUserId} isLoggedIn={isLoggedIn} priorityMedia />;
 }

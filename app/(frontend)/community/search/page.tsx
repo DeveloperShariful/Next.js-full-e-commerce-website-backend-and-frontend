@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import CommunityTopNav from "../_components/CommunityTopNav";
 import SearchResultsClient from "../_components/SearchResultsClient";

@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import CommunityModerationClient from "./_components/CommunityModerationClient";
-import { getPendingReports, getAllCommunityPostsAdmin } from "@/app/actions/backend/community/community-moderation";
+import {
+  getPendingReports,
+  getAllCommunityPostsAdmin,
+  type CommunityPostSort,
+  type CommunityPostStatusFilter,
+} from "@/app/actions/backend/community/community-moderation";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +13,20 @@ export const metadata: Metadata = {
   title: "Community Moderation ‹ GoBike Admin",
 };
 
-export default async function AdminCommunityPage() {
+interface Props {
+  searchParams: Promise<{ tab?: string; page?: string; q?: string; status?: string; sort?: string }>;
+}
+
+export default async function AdminCommunityPage({ searchParams }: Props) {
+  const sp = await searchParams;
+  const page = Number(sp.page) || 1;
+  const query = sp.q || "";
+  const status = (sp.status as CommunityPostStatusFilter) || "ALL";
+  const sort = (sp.sort as CommunityPostSort) || "newest";
+
   const [reportsRes, postsRes] = await Promise.all([
     getPendingReports(),
-    getAllCommunityPostsAdmin(1),
+    getAllCommunityPostsAdmin({ page, query, status, sort }),
   ]);
 
   return (
@@ -24,6 +39,13 @@ export default async function AdminCommunityPage() {
       <CommunityModerationClient
         reports={reportsRes.success ? reportsRes.reports : []}
         posts={postsRes.success ? postsRes.posts : []}
+        total={postsRes.total}
+        pages={postsRes.pages}
+        initialTab={sp.tab === "posts" ? "posts" : sp.tab === "reports" ? "reports" : undefined}
+        initialQuery={query}
+        initialStatus={status}
+        initialSort={sort}
+        currentPage={page}
       />
     </div>
   );

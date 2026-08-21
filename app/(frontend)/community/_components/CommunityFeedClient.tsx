@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 import PostComposer from "./PostComposer";
 import PostCard, { type CommunityPostData } from "./PostCard";
+import CommunityFeedFooter from "./CommunityFeedFooter";
 
 interface FeedResult {
   success: boolean;
@@ -62,7 +63,7 @@ export default function CommunityFeedClient({
         </div>
       )}
 
-      {cursor && (
+      {cursor ? (
         <div className="text-center py-5">
           <button
             onClick={handleLoadMore}
@@ -72,6 +73,8 @@ export default function CommunityFeedClient({
             {isPending ? "Loading..." : "Load more"}
           </button>
         </div>
+      ) : (
+        posts.length > 0 && <CommunityFeedFooter />
       )}
     </div>
   );

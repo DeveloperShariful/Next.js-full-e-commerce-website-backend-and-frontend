@@ -69,7 +69,7 @@ export default function NotificationsClient({
     return (
       <div className="text-center py-20 bg-white rounded-lg border border-[#DADDE1] max-w-[680px] mx-auto">
         <p className="text-[17px] font-semibold text-[#050505] mb-1">No notifications yet</p>
-        <p className="text-[15px] text-[#65676B]">When someone reacts, comments, or follows you, it'll show up here.</p>
+        <p className="text-[15px] text-[#65676B]">When someone reacts, comments, or follows you, it&apos;ll show up here.</p>
       </div>
     );
   }

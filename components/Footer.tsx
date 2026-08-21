@@ -56,8 +56,8 @@ export default function Footer() {
     <footer id="colophon" className="font-sans bg-white">
       
       {/* Subscription Section */}
-      <div className="bg-[#fdf5f5] px-5 py-10 items-center">
-          <div className="max-w-[1500px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+      <div className="bg-[#fdf5f5] px-5 py-4 md:py-10 items-center">
+          <div className="max-w-[1500px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-8 items-center">
               <div>
                   <h3 className="text-lg md:text-xl font-bold mb-2 uppercase tracking-widest">SIGN UP FOR YOUR CHANCE TO WIN A GOBIKE!</h3>
                   <p className="text-[#555] leading-relaxed">We are giving away a new Gobike to one of our subscribers. All you need to do is subscribe, and you could be our winner! Good luck 👍</p>
@@ -98,20 +98,20 @@ export default function Footer() {
       </div>
 
       {/* Main Footer Content */}
-      <div className="bg-white text-[#1a1a1a] py-12 px-4 border-t border-[#e9e9e9]">
-          
-          <div className="grid max-w-[1500px] mx-auto gap-x-8 gap-y-10 grid-cols-2 lg:grid-cols-5">
-              
+      <div className="bg-white text-[#1a1a1a] py-4 md:py-12 px-4 border-t border-[#e9e9e9]">
+
+          <div className="grid max-w-[1500px] mx-auto gap-x-8 gap-y-3 md:gap-y-10 grid-cols-2 lg:grid-cols-5">
+
               {/* --- Logo & Trustpilot Column --- */}
-              <div className="col-span-2 lg:col-span-1 flex flex-col justify-center items-center lg:justify-start lg:items-start gap-5 mb-2 lg:mb-0 border-b lg:border-none pb-6 lg:pb-0 border-[#f0f0f0]">
-                 
+              <div className="col-span-2 lg:col-span-1 flex flex-col justify-center items-center lg:justify-start lg:items-start gap-2 md:gap-5 mb-1 lg:mb-0 border-b lg:border-none pb-2 md:pb-6 lg:pb-0 border-[#f0f0f0]">
+
                  <Link href="/">
-                  <Image 
-                    src="https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids.webp" 
-                    alt="GoBike Australia Logo"  
-                    width={1861} 
-                    height={430} 
-                    className="w-[200px] md:w-[250px] h-auto" 
+                  <Image
+                    src="https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids.webp"
+                    alt="GoBike Australia Logo"
+                    width={1861}
+                    height={430}
+                    className="w-[200px] md:w-[250px] h-auto"
                   />
                  </Link>
 

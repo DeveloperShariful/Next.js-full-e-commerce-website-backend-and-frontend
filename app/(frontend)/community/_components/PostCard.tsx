@@ -38,6 +38,7 @@ export interface CommunityPostData {
   reactionCount: number;
   commentCount: number;
   shareCount: number;
+  viewCount: number;
   createdAt: string | Date;
   author: { id: string; name: string | null; image: string | null; role: Role; followers?: { id: string }[] };
   reactions?: { type: ReactionType }[];
@@ -255,10 +256,15 @@ export default function PostCard({
   post,
   currentUserId,
   isLoggedIn,
+  priorityMedia,
 }: {
   post: CommunityPostData;
   currentUserId?: string;
   isLoggedIn: boolean;
+  /** Eager/priority-load the media instead of lazy — set true on the post's own
+   * detail page, where it's the page's main (above-the-fold) content and affects LCP.
+   * Leave false in feeds, where most cards are below the fold. */
+  priorityMedia?: boolean;
 }) {
   const [reaction, setReaction] = useState<ReactionType | null>(post.reactions?.[0]?.type ?? null);
   const [reactionCount, setReactionCount] = useState(post.reactionCount);
@@ -508,6 +514,12 @@ export default function PostCard({
                 >
                   <span className="text-lg leading-none">{isSaved ? "🔖" : "📑"}</span> {isSaved ? "Unsave post" : "Save post"}
                 </button>
+                <button
+                  onClick={() => { setShowMenu(false); copyShareLink(); }}
+                  className="w-full text-left px-3 py-2 text-[14px] font-semibold text-[#050505] hover:bg-[#F2F2F2] flex items-center gap-2.5"
+                >
+                  <span className="text-lg leading-none">🔗</span> Copy link to post
+                </button>
                 {currentUserId === post.author.id && (
                   <>
                     <button
@@ -516,6 +528,12 @@ export default function PostCard({
                       className="w-full text-left px-3 py-2 text-[14px] font-semibold text-[#050505] hover:bg-[#F2F2F2] flex items-center gap-2.5"
                     >
                       <span className="text-lg leading-none">✏️</span> Edit post
+                    </button>
+                    <button
+                      onClick={() => { setShowMenu(false); toast.info(`👁️ ${post.viewCount} view${post.viewCount === 1 ? "" : "s"} on this post`); }}
+                      className="w-full text-left px-3 py-2 text-[14px] font-semibold text-[#050505] hover:bg-[#F2F2F2] flex items-center gap-2.5"
+                    >
+                      <span className="text-lg leading-none">📊</span> View post insights
                     </button>
                     <button
                       onClick={() => { setShowMenu(false); handleDeletePost(); }}
@@ -572,7 +590,12 @@ export default function PostCard({
         >
           {post.linkPreview.image && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.linkPreview.image} alt="" className="w-full aspect-[1.91/1] object-cover bg-black" />
+            <img
+              src={post.linkPreview.image}
+              alt={post.linkPreview.title || "Facebook post preview"}
+              loading="lazy"
+              className="w-full aspect-[1.91/1] object-cover bg-black"
+            />
           )}
           <div className="p-3">
             <p className="text-[11px] uppercase text-[#65676B] tracking-wide">facebook.com</p>
@@ -596,7 +619,13 @@ export default function PostCard({
       )}
 
       {/* Media */}
-      {post.media.length > 0 && <MediaCarousel media={post.media} caption={caption} />}
+      {post.media.length > 0 && (
+        <MediaCarousel
+          media={post.media}
+          caption={caption || (post.tags.length > 0 ? `GoBike rider photo — #${post.tags[0]}` : `Photo shared by ${post.author.name || "a GoBike rider"} on GoBike Community`)}
+          priority={priorityMedia}
+        />
+      )}
 
       {/* Reaction / comment / share counts */}
       {(reactionCount > 0 || commentCount > 0 || shareCount > 0) && (

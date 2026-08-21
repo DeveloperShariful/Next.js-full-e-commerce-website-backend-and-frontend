@@ -204,19 +204,48 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const posts = await db.communityPost.findMany({
       where: { status: 'PUBLISHED', deletedAt: null },
-      select: { slug: true, updatedAt: true, ogImage: true, tags: true, authorId: true },
+      select: {
+        slug: true,
+        caption: true,
+        metaTitle: true,
+        metaDesc: true,
+        updatedAt: true,
+        ogImage: true,
+        tags: true,
+        authorId: true,
+        media: { select: { url: true, mediaType: true }, orderBy: { order: 'asc' } },
+      },
       orderBy: { updatedAt: 'desc' },
     });
 
     const postPages: MetadataRoute.Sitemap = posts
       .filter(p => p.slug)
-      .map(p => ({
-        url: `${BASE_URL}/community/${p.slug}`,
-        lastModified: p.updatedAt,
-        changeFrequency: 'weekly' as const,
-        priority: 0.5,
-        ...(p.ogImage && { images: [p.ogImage] }),
-      }));
+      .map(p => {
+        const images = p.media.filter(m => m.mediaType === 'IMAGE').map(m => m.url);
+        const videos = p.media.filter(m => m.mediaType === 'VIDEO');
+
+        const entry: MetadataRoute.Sitemap[number] = {
+          url: `${BASE_URL}/community/${p.slug}`,
+          lastModified: p.updatedAt,
+          changeFrequency: 'weekly',
+          priority: 0.5,
+        };
+
+        if (images.length > 0) entry.images = images;
+        else if (p.ogImage) entry.images = [p.ogImage];
+
+        if (videos.length > 0) {
+          const title = p.metaTitle || 'GoBike Community Post';
+          entry.videos = videos.map(v => ({
+            title,
+            thumbnail_loc: v.url.replace(/\.[a-zA-Z0-9]+$/, '.jpg'),
+            description: p.metaDesc || p.caption || title,
+            content_loc: v.url,
+          }));
+        }
+
+        return entry;
+      });
 
     const tagSet = new Set<string>();
     const authorIds = new Set<string>();

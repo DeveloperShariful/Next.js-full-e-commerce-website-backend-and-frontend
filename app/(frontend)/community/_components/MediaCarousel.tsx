@@ -10,7 +10,7 @@ interface MediaItem {
   mediaType: MediaType;
 }
 
-export default function MediaCarousel({ media, caption }: { media: MediaItem[]; caption: string | null }) {
+export default function MediaCarousel({ media, caption, priority }: { media: MediaItem[]; caption: string | null; priority?: boolean }) {
   const [index, setIndex] = useState(0);
   if (media.length === 0) return null;
 
@@ -21,10 +21,20 @@ export default function MediaCarousel({ media, caption }: { media: MediaItem[]; 
   return (
     <div className="relative bg-black w-full">
       {current.mediaType === "VIDEO" ? (
-        <video key={current.id} src={current.url} controls playsInline preload="metadata" className="w-full max-h-[600px] mx-auto" />
+        <div className="relative w-full max-h-[600px] aspect-square sm:aspect-video">
+          <video
+            key={current.id}
+            src={current.url}
+            poster={current.url.replace(/\.[a-zA-Z0-9]+$/, ".jpg")}
+            controls
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 w-full h-full object-contain"
+          />
+        </div>
       ) : (
         <div className="relative w-full max-h-[600px] aspect-square sm:aspect-video">
-          <Image src={current.url} alt={caption || "Community post"} fill unoptimized className="object-contain" />
+          <Image src={current.url} alt={caption || "Community post"} fill unoptimized priority={priority} className="object-contain" />
         </div>
       )}
 

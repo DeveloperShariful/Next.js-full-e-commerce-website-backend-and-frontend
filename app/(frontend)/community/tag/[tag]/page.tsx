@@ -14,10 +14,16 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { tag } = await params;
+  const title = `#${tag} | GoBike Community`;
+  const description = `Posts tagged #${tag} on the GoBike Community.`;
+  const url = `https://gobike.au/community/tag/${tag}`;
   return {
-    title: `#${tag} | GoBike Community`,
-    description: `Posts tagged #${tag} on the GoBike Community.`,
-    alternates: { canonical: `https://gobike.au/community/tag/${tag}` },
+    title,
+    description,
+    keywords: [tag, "GoBike community", "GoBike riders"],
+    alternates: { canonical: url },
+    openGraph: { title, description, url, siteName: "GoBike Australia", type: "website", locale: "en_AU" },
+    twitter: { card: "summary", title, description },
   };
 }
 
@@ -25,9 +31,29 @@ export default async function CommunityTagPage({ params }: Props) {
   const { tag } = await params;
   const feed = await getCommunityFeedByTag(tag);
   const posts: CommunityPostData[] = feed.success ? feed.posts : [];
+  const url = `https://gobike.au/community/tag/${tag}`;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: `#${tag} | GoBike Community`,
+    description: `Posts tagged #${tag} on the GoBike Community.`,
+    url,
+    isPartOf: { "@type": "WebSite", name: "GoBike Australia", url: "https://gobike.au" },
+  };
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://gobike.au" },
+      { "@type": "ListItem", position: 2, name: "Community", item: "https://gobike.au/community" },
+      { "@type": "ListItem", position: 3, name: `#${tag}`, item: url },
+    ],
+  };
 
   return (
     <div className="min-h-screen pb-[54px] md:pb-0" style={{ backgroundColor: "#F0F2F5", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       <Breadcrumbs className="max-w-[1600px] mx-auto mt-1.5 mb-1.5 px-6 font-sans" />
       <CommunityTopNav />
 

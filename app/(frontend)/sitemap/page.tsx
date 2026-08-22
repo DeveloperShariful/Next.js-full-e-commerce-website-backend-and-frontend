@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import type { Metadata } from 'next';
-import { Home, Bike, Wrench, Shirt, BookOpen, Shield, ChevronRight, ShieldCheck, Store, Tv2, Users } from 'lucide-react';
+import { Home, Bike, Wrench, Shirt, BookOpen, Shield, ChevronRight, ShieldCheck, Store, Users } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'HTML Sitemap | GoBike Australia',
@@ -191,14 +191,6 @@ export default function SitemapPage() {
               <SitemapLink href="/blog/psychology-of-balance" label="The Psychology of Balance" indent />
               <SitemapLink href="/blog/riding-with-friends-social-benefits" label="How Biking with Mates Boosts Social Skills" indent />
               <SitemapLink href="/blog/green-time-antidote" label="Why 'Green Time' Beats Digital Fatigue" indent />
-            </ul>
-          </Section>
-
-          {/* 5. Kids eBike Hub */}
-          <Section icon={<Tv2 size={17} />} title="Kids eBike Hub" count={2}>
-            <ul>
-              <SitemapLink href="/kids-ebike-hub" label="GoBike Hub — Videos, News & Tips" />
-              <SitemapLink href="/kids-ebike-hub/category/team-riders" label="Category: Team Riders" indent />
             </ul>
           </Section>
 

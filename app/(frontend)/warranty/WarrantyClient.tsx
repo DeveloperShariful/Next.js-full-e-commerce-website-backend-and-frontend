@@ -30,7 +30,7 @@ const SHOP_OPTIONS = [
   {
     group: 'Victoria Retailers',
     options: [
-      { value: '', label: 'Seeking Applicants — Starting January 2027', address: '', disabled: true },
+      { value: 'A&M Colour', label: 'A&M Colour', address: 'Office 4/77 Magna Vista Rise, Narre Warren VIC 3805' },
     ],
   },
   {
@@ -233,9 +233,9 @@ export default function WarrantyClient() {
       <section className="max-w-[1100px] mx-auto px-2 sm:px-6 pb-16">
         <div className="space-y-8">
           <div>
-            <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
+            <h2 className="text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
               Warranty <span className="text-blue-600">Claim</span>
-            </h1>
+            </h2>
             <p className="text-lg text-gray-600 leading-relaxed">
               At <strong>GoBike Australia</strong>, we build high-quality electric balance bikes for kids.
               If you experience any issues, our dedicated Australian support team is here to help you

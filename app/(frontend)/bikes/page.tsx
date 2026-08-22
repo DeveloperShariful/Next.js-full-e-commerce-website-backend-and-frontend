@@ -7,6 +7,35 @@ import ProductCard from '@/components/ProductCard';
 import PaginationControls from '../shop/_components/PaginationControls';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { getProductsAndCategoriesAction } from '@/app/actions/frontend/shop/get-shop-products';
+import BikeComparisonTable from './_components/BikeComparisonTable';
+import FaqAccordion from '@/components/FaqAccordion';
+
+const bikesFaqs = [
+  {
+    question: 'How do I know which GoBike is right for my child?',
+    answer: "Start with age as your guide: GoBike 12 (ages 2–5), GoBike 16 (ages 5–9), GoBike 20 (ages 9–16), and GoBike 24 (ages 13+ to adults). Within that range, your child should be able to sit on the seat with feet flat on the ground — see the comparison table above for exact seat-height ranges.",
+  },
+  {
+    question: 'Are GoBike electric bikes legal to ride in Australia?',
+    answer: 'Yes. GoBikes are classed as power-assisted pedal cycles with low power output, making them legal for kids to ride on private property Australia-wide. Rules for public roads and paths vary by state, so always check your local regulations.',
+  },
+  {
+    question: 'Do GoBike electric bikes come with a warranty?',
+    answer: 'Yes, every GoBike model is backed by a 1-year Australian warranty covering the frame, motor, and battery, with local support if anything needs attention.',
+  },
+  {
+    question: 'Can I upgrade to a bigger GoBike as my child grows?',
+    answer: 'Absolutely. Most GoBike families start with the GoBike 12 or 16 and move up to the GoBike 20 or 24 as their child gets older and more confident. Each model is designed as the next step up in size, power, and speed.',
+  },
+  {
+    question: 'How long does delivery take for a GoBike electric bike?',
+    answer: 'We ship Australia-wide from our local warehouse, with most metro areas receiving their GoBike within 2-4 business days.',
+  },
+  {
+    question: "What's included in the box when I order a GoBike?",
+    answer: "Every GoBike arrives around 80-90% pre-assembled, along with its dedicated battery charger and a basic toolkit — you'll just need to attach the handlebar and front wheel, which takes about 15 minutes.",
+  },
+];
 
 const PRODUCTS_PER_PAGE = 12;
 
@@ -132,7 +161,7 @@ export default async function BikesPage({ searchParams }: {
           ...(product.reviewCount > 0 && {
             'aggregateRating': {
               '@type': 'AggregateRating',
-              'ratingValue': product.averageRating || 5,
+              'ratingValue': product.averageRating,
               'reviewCount': product.reviewCount
             }
           }),
@@ -151,11 +180,22 @@ export default async function BikesPage({ searchParams }: {
     }
   };
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    'mainEntity': bikesFaqs.map((faq) => ({
+      '@type': 'Question',
+      'name': faq.question,
+      'acceptedAnswer': { '@type': 'Answer', 'text': faq.answer },
+    })),
+  };
+
   return (
     <div>
       {/* ★★★ Schema Injection ★★★ */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
 
       <Breadcrumbs pageTitle="All Bikes" />
       <div className="max-w-[1300px] mx-auto px-1.5 font-sans">
@@ -181,6 +221,9 @@ export default async function BikesPage({ searchParams }: {
             />
           </div>
         </header>
+
+        {/* --- Comparison Table: front-loaded for AI Overview / featured-snippet extraction --- */}
+        <BikeComparisonTable />
 
         {/* --- Products Grid (Original UI) --- */}
         <main className="mb-16">
@@ -285,6 +328,7 @@ export default async function BikesPage({ searchParams }: {
                         <li><strong>GoBike 12:</strong> Perfect for toddlers (Ages 2-5). Low seat height, lightweight, and the ideal <strong>balance bike electric</strong> starter.</li>
                         <li><strong>GoBike 16:</strong> The best <strong>kids electric bike</strong> for ages 5-9. More power, suspension forks, and true dirt bike styling.</li>
                         <li><strong>GoBike 20:</strong> For the serious young rider. Ideal for <strong>electric bikes for 10 year olds</strong> and up, capable of handling rougher off-road terrain.</li>
+                        <li><strong>GoBike 24:</strong> Our most powerful model, built for teens (Ages 13+) and adults. Full-size fat tyres and high-speed performance for serious off-road adventure.</li>
                      </ul>
                      <p className="mt-4 text-sm text-gray-600">
                         Whether you are looking for an <strong>australia electric bike</strong> for your toddler or a powerful ride for your teen, GoBike has the perfect model to start their adventure.
@@ -326,6 +370,8 @@ export default async function BikesPage({ searchParams }: {
             </Link>
           </div>
         </section>
+
+        <FaqAccordion title="GoBike Electric Bikes: Frequently Asked Questions" items={bikesFaqs} />
 
       </div>
     </div>

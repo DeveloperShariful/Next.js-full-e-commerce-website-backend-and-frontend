@@ -64,7 +64,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/shop`,                      lastModified: new Date(), changeFrequency: 'daily',   priority: 0.9 },
     { url: `${BASE_URL}/bikes`,                     lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.9 },
     { url: `${BASE_URL}/electric-bike-parts`,       lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
-    { url: `${BASE_URL}/kids-ebike-hub`,            lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${BASE_URL}/apparel`,                   lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.7 },
     { url: `${BASE_URL}/blog`,                      lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.7 },
     { url: `${BASE_URL}/discount`,                  lastModified: new Date(), changeFrequency: 'weekly',  priority: 0.6 },
@@ -143,8 +142,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       orderBy: { menuOrder: 'asc' },
     });
 
+    // ★ 'bikes', 'apparel', 'spare-parts' already have dedicated top-level pages
+    // (/bikes, /apparel, /electric-bike-parts) showing the exact same products —
+    // submitting both URLs to Google causes keyword cannibalization, so the
+    // /electric-bike-parts/[slug] duplicate is excluded from the sitemap here.
+    const DUPLICATE_CATEGORY_SLUGS = new Set(['bikes', 'apparel', 'spare-parts']);
+
     categoryPages = categories
-      .filter(c => c.slug)
+      .filter(c => c.slug && !DUPLICATE_CATEGORY_SLUGS.has(c.slug))
       .map(c => ({
         url: `${BASE_URL}/electric-bike-parts/${c.slug}`,
         lastModified: c.updatedAt,

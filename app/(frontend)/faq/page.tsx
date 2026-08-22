@@ -44,8 +44,8 @@ const jsonLdData = {
   "@type": "FAQPage",
   "mainEntity": [
     {"@type": "Question","name": "Why choose an electric balance bike over a pedal bike?","acceptedAnswer": {"@type": "Answer","text": "An electric balance bike teaches the most crucial skill—balance—but adds a low-speed throttle to build confidence and make riding incredibly fun, helping kids learn faster."}},
-    {"@type": "Question","name": "How do I choose the right size bike for my child?","acceptedAnswer": {"@type": "Answer","text": "The best measure is inseam. Your child should be able to sit on the seat with their feet flat on the ground. Check our product pages for detailed size guides."}},
-    {"@type": "Question","name": "What is the weight limit for GoBikes?","acceptedAnswer": {"@type": "Answer","text": "Our bikes are built tough! Please refer to the specific product page for the exact weight limit of each model."}},
+    {"@type": "Question","name": "How do I choose the right size bike for my child?","acceptedAnswer": {"@type": "Answer","text": "Match your child's age to the right model: GoBike 12 for ages 2-5, GoBike 16 for ages 5-9, GoBike 20 for ages 9-16, and GoBike 24 for ages 13+ to adults. Within that, your child should be able to sit on the seat with their feet flat on the ground — see our full model comparison table for exact seat-height ranges."}},
+    {"@type": "Question","name": "What is the weight limit for GoBikes?","acceptedAnswer": {"@type": "Answer","text": "Weight limits vary by model: GoBike 12 and GoBike 16 support riders up to 65kg, GoBike 20 supports up to 100kg, and GoBike 24 supports up to 120kg."}},
     {"@type": "Question","name": "Do you assemble the bikes?","acceptedAnswer": {"@type": "Answer","text": "GoBikes are delivered 80% pre-assembled. Attaching the handlebar and front wheel takes about 15 minutes. A basic toolkit is provided."}},
     {"@type": "Question","name": "How long will my GoBike battery last?","acceptedAnswer": {"@type": "Answer","text": "The GoBike battery provides up to 75 minutes of riding time on a single full charge."}},
     {"@type": "Question","name": "How long does it take to charge?","acceptedAnswer": {"@type": "Answer","text": "A full charge takes approximately 60 minutes."}},
@@ -150,7 +150,7 @@ export default function FaqPage() {
                 <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
               </summary>
               <div className="px-6 pb-6 text-base leading-[1.7]">
-                <p>The best measure is inseam. Your child should be able to sit on the seat with their feet flat on the ground. Check our product pages or our dedicated <a href="https://www.evanscycles.com/help/bike-sizing-kids" target="_blank" rel="noopener noreferrer" className="text-[#007bff] no-underline font-medium hover:underline">Sizing Guide</a> for detailed charts.</p>
+                <p>Match your child&apos;s age to the right model: <strong>GoBike 12</strong> for ages 2–5, <strong>GoBike 16</strong> for ages 5–9, <strong>GoBike 20</strong> for ages 9–16, and <strong>GoBike 24</strong> for ages 13+ to adults. Within that, your child should be able to sit on the seat with their feet flat on the ground — see our full <Link href="/bikes#compare-models" className="text-[#007bff] no-underline font-medium hover:underline">model comparison table</Link> for exact seat-height ranges.</p>
               </div>
           </details>
 
@@ -160,7 +160,7 @@ export default function FaqPage() {
                 <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
               </summary>
               <div className="px-6 pb-6 text-base leading-[1.7]">
-                <p>Our bikes are built tough! Please refer to the specific product page for the exact <strong>weight limit</strong> of each model, as it varies slightly between the GOBIKE 12 and GOBIKE 16.</p>
+                <p>Weight limits vary by model: <strong>GoBike 12</strong> and <strong>GoBike 16</strong> support riders up to <strong>65kg</strong>, <strong>GoBike 20</strong> supports up to <strong>100kg</strong>, and <strong>GoBike 24</strong> supports up to <strong>120kg</strong>. See the full <Link href="/bikes#compare-models" className="text-[#007bff] no-underline font-medium hover:underline">comparison table</Link> for every spec side-by-side.</p>
               </div>
           </details>
           
@@ -295,7 +295,7 @@ export default function FaqPage() {
                 <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
               </summary>
               <div className="px-6 pb-6 text-base leading-[1.7]">
-                <p>We use standard parts for items like brakes, grips, and tyres, which are available at your <strong>local bike shop</strong>. For specific GoBike parts, <Link href="/contact" className="text-[#007bff] no-underline font-medium hover:underline"> Contect us </Link> directly.</p>
+                <p>We use standard parts for items like brakes, grips, and tyres, which are available at your <strong>local bike shop</strong>. For specific GoBike parts, <Link href="/contact" className="text-[#007bff] no-underline font-medium hover:underline"> contact us </Link> directly.</p>
               </div>
           </details>
           
@@ -361,7 +361,7 @@ export default function FaqPage() {
                 href="/contact" 
                 className="inline-block px-7 py-3 bg-black text-white text-center font-semibold rounded-lg border border-transparent cursor-pointer transition-all duration-300 ease-out hover:bg-[#333] hover:-translate-y-0.5"
               >
-                 Contect Us 
+                 Contact Us
               </Link>
           </div>
 

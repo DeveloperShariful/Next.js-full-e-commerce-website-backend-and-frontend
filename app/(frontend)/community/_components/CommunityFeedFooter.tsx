@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 const QUICK_LINKS = [
-  { href: "/bikes", label: "Electric Bikes", emoji: "🚴" },
   { href: "/electric-bike-parts", label: "Spare Parts", emoji: "🔧" },
+  { href: "/apparel", label: "Apparel", emoji: "👕" },
   { href: "/blog", label: "Blog & Guides", emoji: "📖" },
   { href: "/contact", label: "Contact Us", emoji: "💬" },
 ];
@@ -19,9 +19,16 @@ export default function CommunityFeedFooter() {
         <p className="text-[26px] leading-none mb-1">🎉</p>
         <p className="text-[15px] font-bold text-[#050505]">You&apos;re all caught up</p>
         <p className="text-[13px] text-[#65676B] mt-0.5">That&apos;s every post for now — check back soon for more rider stories.</p>
+        <p className="text-[13px] text-[#65676B] leading-relaxed mt-3 max-w-[520px] mx-auto">
+          GoBike Community is where Aussie parents and young riders share real ride photos, tips, and stories from the GoBike 12, 16, 20 and 24. Explore our full range of{" "}
+          <Link href="/bikes" className="text-[#1877F2] font-semibold hover:underline">
+            kids electric bikes
+          </Link>{" "}
+          to start your own adventure, or check back soon for fresh posts from riders across Australia.
+        </p>
       </div>
 
-      <div className="flex justify-center sm:grid sm:grid-cols-5 gap-1 px-2 sm:px-4 pb-3 sm:pb-4 overflow-x-auto sm:overflow-visible">
+      <div className="flex justify-center sm:grid sm:grid-cols-4 gap-1 px-2 sm:px-4 pb-3 sm:pb-4 overflow-x-auto sm:overflow-visible">
         {QUICK_LINKS.map(l => (
           <Link
             key={l.href}

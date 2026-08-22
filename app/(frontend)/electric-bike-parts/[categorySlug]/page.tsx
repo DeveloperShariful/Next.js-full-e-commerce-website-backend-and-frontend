@@ -6,14 +6,24 @@ import { Metadata } from 'next';
 import Breadcrumbs from '@/components/Breadcrumbs'; 
 import ProductsGrid from '@/components/ProductsGrid'; 
 import CategorySeoContent from './_components/CategorySeoContent'; 
-import { seoContentMap } from './seoContent'; 
+import { seoContentMap } from './seoContent';
 import { getProductsAndCategoriesAction } from '@/app/actions/frontend/shop/get-shop-products';
+
+// ★ 'bikes', 'apparel', 'spare-parts' show the exact same products as the
+// dedicated /bikes, /apparel and /electric-bike-parts pages — canonical here
+// points to the real page so Google consolidates ranking signals there
+// instead of treating these as separate, competing pages.
+const DUPLICATE_CANONICAL_MAP: Record<string, string> = {
+  bikes: '/bikes',
+  apparel: '/apparel',
+  'spare-parts': '/electric-bike-parts',
+};
 
 // ★★★ ADVANCED METADATA GENERATION ★★★
 export async function generateMetadata({ params }: { params: Promise<{ categorySlug: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
   const categorySlug = resolvedParams.categorySlug;
-  
+
   // ক্যাটাগরির নাম তৈরি করা
   const categoryName = categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
@@ -21,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ categoryS
   const h1Title = seoData?.h1 || categoryName;
   const plainTextDesc = `Shop the best ${h1Title} for kids electric bikes at GoBike Australia.`;
 
-  const canonicalUrl = `/electric-bike-parts/${categorySlug}`;
+  const canonicalUrl = DUPLICATE_CANONICAL_MAP[categorySlug] || `/electric-bike-parts/${categorySlug}`;
   const currentDate = new Date().toISOString(); 
   const ogImageUrl = 'https://gobikes.au/wp-content/uploads/default-gobike-share.jpg';
 
@@ -120,7 +130,7 @@ export default async function ElectricBikePartsCategoryPage({
           ...(product.reviewCount > 0 && {
             'aggregateRating': {
               '@type': 'AggregateRating',
-              'ratingValue': product.averageRating || 5,
+              'ratingValue': product.averageRating,
               'reviewCount': product.reviewCount
             }
           }),

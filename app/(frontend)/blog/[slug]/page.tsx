@@ -180,6 +180,16 @@ export default async function NewBlogPostPage({ params }: Props) {
   const publishDate = post.publishedAt?.toISOString() ?? new Date().toISOString();
   const modifiedDate = post.updatedAt?.toISOString() ?? publishDate;
 
+  // Freshness is a real, visible ranking/citation signal for AI Overviews — this
+  // was already in the JSON-LD/OG meta (machine-readable), but human/AI readers
+  // scanning the rendered page also look for a visible "Updated" byline, which
+  // was missing. Only show it once the edit is meaningfully after publish (not
+  // for same-day drafting edits).
+  const wasMeaningfullyUpdated =
+    post.publishedAt &&
+    post.updatedAt &&
+    post.updatedAt.getTime() - post.publishedAt.getTime() > 24 * 60 * 60 * 1000;
+
   const authorName = post.author?.name ?? "GoBike Team";
   const authorImage = post.author?.image ?? null;
   const authorInitials = authorName
@@ -303,6 +313,16 @@ export default async function NewBlogPostPage({ params }: Props) {
                   year: "numeric",
                 })}
               </>
+            )}
+            {wasMeaningfullyUpdated && (
+              <span className="ml-2 text-gray-600">
+                · Updated{" "}
+                {new Date(post.updatedAt).toLocaleDateString("en-AU", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
             )}
             {post.readTimeMinutes && (
               <span className="ml-2 text-gray-600">· {post.readTimeMinutes} min read</span>

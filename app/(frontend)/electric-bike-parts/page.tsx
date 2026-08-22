@@ -7,8 +7,32 @@ import ProductCard from '@/components/ProductCard';
 import PaginationControls from '../shop/_components/PaginationControls'; 
 import Breadcrumbs from '@/components/Breadcrumbs'; 
 import { getProductsAndCategoriesAction } from '@/app/actions/frontend/shop/get-shop-products';
+import FaqAccordion from '@/components/FaqAccordion';
 
 const PRODUCTS_PER_PAGE = 12;
+
+const sparePartsFaqs = [
+  {
+    question: 'How do I find the right spare part for my GoBike?',
+    answer: "Check your bike's model number on the frame label, then browse our parts catalogue by model. If you're unsure which part fits, contact our support team with your model and they'll confirm compatibility before you order.",
+  },
+  {
+    question: 'Are GoBike spare parts covered by warranty?',
+    answer: 'Yes. Eligible spare parts purchased from GoBike Australia are backed by a warranty. Terms vary by component — contact our support team for the specifics on the part you need.',
+  },
+  {
+    question: 'How quickly are spare parts shipped?',
+    answer: 'Most spare parts ship within 1-3 business days from our Australian warehouse, with delivery times varying by location.',
+  },
+  {
+    question: 'Can I fit GoBike spare parts myself?',
+    answer: 'Many parts — tyres, brake pads, grips, and batteries — are straightforward to fit at home with basic tools. For motor or controller replacements, we recommend professional installation to keep your warranty valid.',
+  },
+  {
+    question: 'Will a spare part from a different GoBike model fit my bike?',
+    answer: "Not always. Parts like motors, batteries and controllers are model-specific, so always match the part to your exact GoBike model (12, 16, 20, or 24) rather than assuming parts are interchangeable across sizes.",
+  },
+];
 
 // --- METADATA GENERATION (Fixed Canonical Issue for Ahrefs) ---
 export async function generateMetadata({ searchParams }: { 
@@ -118,12 +142,23 @@ export default async function SparePartsPage({ searchParams }: {
     }))
   };
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    'mainEntity': sparePartsFaqs.map((faq) => ({
+      '@type': 'Question',
+      'name': faq.question,
+      'acceptedAnswer': { '@type': 'Answer', 'text': faq.answer },
+    })),
+  };
+
   return (
     <div>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <Breadcrumbs pageTitle="Spare Parts" />
       <div className="max-w-[1300px] mx-auto px-1.5 font-sans">
         
@@ -228,6 +263,8 @@ export default async function SparePartsPage({ searchParams }: {
             </Link>
           </div>
         </section>
+
+        <FaqAccordion title="GoBike Spare Parts: Frequently Asked Questions" items={sparePartsFaqs} />
       </div>
     </div>
   );

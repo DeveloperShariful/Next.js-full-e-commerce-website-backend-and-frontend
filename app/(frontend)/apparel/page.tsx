@@ -7,8 +7,32 @@ import ProductCard from '@/components/ProductCard';
 import PaginationControls from '../shop/_components/PaginationControls';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { getProductsAndCategoriesAction } from '@/app/actions/frontend/shop/get-shop-products';
+import FaqAccordion from '@/components/FaqAccordion';
 
 const PRODUCTS_PER_PAGE = 12;
+
+const apparelFaqs = [
+  {
+    question: 'What sizes are available in the GoBike apparel range?',
+    answer: "Our kids' T-shirts run from toddler through to teen sizing. Check the size chart on each product page for exact measurements before ordering.",
+  },
+  {
+    question: 'What material are GoBike T-shirts made from?',
+    answer: 'GoBike T-shirts are made from a premium, breathable cotton blend — soft on the skin, durable through daily play, and comfortable for all-day wear while riding.',
+  },
+  {
+    question: 'How should I wash and care for GoBike apparel?',
+    answer: 'GoBike apparel is machine washable. Wash in cold water and avoid high heat when drying to keep the print and fabric looking new for longer.',
+  },
+  {
+    question: 'Is GoBike apparel official merchandise?',
+    answer: 'Yes, every item in our apparel range is official GoBike-branded merchandise, designed in-house and sold exclusively through GoBike Australia.',
+  },
+  {
+    question: 'Can I buy GoBike apparel without buying a bike?',
+    answer: 'Yes. Our T-shirts and riding gear are available to purchase separately — you do not need to own a GoBike to shop the apparel range.',
+  },
+];
 
 // --- SEO: Dynamic Metadata Function ---
 export async function generateMetadata({ searchParams }: { 
@@ -125,6 +149,16 @@ export default async function ApparelPage({ searchParams }: {
     }))
   };
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    'mainEntity': apparelFaqs.map((faq) => ({
+      '@type': 'Question',
+      'name': faq.question,
+      'acceptedAnswer': { '@type': 'Answer', 'text': faq.answer },
+    })),
+  };
+
   return (
     <div>
       {/* ★★★ Schema Injection ★★★ */}
@@ -132,6 +166,7 @@ export default async function ApparelPage({ searchParams }: {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <Breadcrumbs pageTitle="GoBike T-Shirts & Apparel" />
       <div className="max-w-[1300px] mx-auto px-1.5 font-sans">
         
@@ -237,6 +272,8 @@ export default async function ApparelPage({ searchParams }: {
             </Link>
           </div>
         </section>
+
+        <FaqAccordion title="GoBike Apparel: Frequently Asked Questions" items={apparelFaqs} />
       </div>
     </div>
   );

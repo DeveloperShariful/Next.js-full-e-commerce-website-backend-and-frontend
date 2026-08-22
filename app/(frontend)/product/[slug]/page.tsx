@@ -113,27 +113,26 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
       itemCondition: 'https://schema.org/NewCondition',
       availability: availability,
       seller: { '@type': 'Organization', name: 'GoBike Australia' },
-      shippingDetails: { 
+      // shippingRate is deliberately omitted — real shipping is 100% carrier-calculated
+      // (live Transdirect quote per destination/weight), so no single flat price is
+      // accurate. destination + delivery timeframes below are real and match
+      // /shipping-policy exactly.
+      shippingDetails: {
         '@type': 'OfferShippingDetails',
-        shippingRate: { 
-          '@type': 'MonetaryAmount', 
-          value: currentPrice > 1000 ? 0 : 25, 
-          currency: 'AUD' 
-        },
         shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'AU' },
         deliveryTime: {
           '@type': 'ShippingDeliveryTime',
-          handlingTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 2, unitCode: 'd' }, 
-          transitTime: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 7, unitCode: 'd' }   
+          handlingTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 2, unitCode: 'd' },
+          transitTime: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 7, unitCode: 'd' }
         }
       },
-      hasMerchantReturnPolicy: { 
+      hasMerchantReturnPolicy: {
         '@type': 'MerchantReturnPolicy',
         applicableCountry: 'AU',
         returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-        merchantReturnDays: 30,
+        merchantReturnDays: 14,
         returnMethod: 'https://schema.org/ReturnByMail',
-        returnFees: 'https://schema.org/RestockingFees' 
+        returnFees: 'https://schema.org/RestockingFees'
       }
     },
     aggregateRating: product.reviewCount > 0 ? {

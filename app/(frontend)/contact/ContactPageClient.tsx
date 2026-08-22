@@ -152,11 +152,9 @@ export default function ContactPageClient() {
                     <h5 className="font-bold text-green-600 uppercase tracking-widest text-[10px] mb-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span> Victoria
                     </h5>
-                    <div className="bg-white p-2.5 rounded-lg border border-amber-100 shadow-sm flex flex-col gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded self-start leading-tight">
-                        Seeking Applicants
-                      </span>
-                      <p className="text-[10px] text-gray-400 leading-snug">Starting January 2027</p>
+                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm h-full flex flex-col justify-center">
+                      <p className="font-bold text-gray-900 text-xs md:text-sm leading-tight">A&M Colour</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">Office 4/77 Magna Vista Rise, Narre Warren VIC 3805</p>
                     </div>
                   </div>
 
@@ -164,7 +162,7 @@ export default function ContactPageClient() {
                     <h5 className="font-bold text-orange-600 uppercase tracking-widest text-[10px] mb-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-orange-600"></span> Queensland
                     </h5>
-                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm">
+                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm h-full flex flex-col justify-center">
                       <p className="font-bold text-gray-900 text-xs md:text-sm leading-tight">Cooroy Motorcycles</p>
                       <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">Shed 4, 5 Taylor Ct, Cooroy</p>
                     </div>
@@ -174,7 +172,7 @@ export default function ContactPageClient() {
                     <h5 className="font-bold text-purple-600 uppercase tracking-widest text-[10px] mb-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span> Western Australia
                     </h5>
-                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm">
+                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm h-full flex flex-col justify-center">
                       <p className="font-bold text-gray-900 text-xs md:text-sm leading-tight">Eazy Bikes</p>
                       <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">Unit 1/12 Farral Road, Midvale WA 6056</p>
                     </div>

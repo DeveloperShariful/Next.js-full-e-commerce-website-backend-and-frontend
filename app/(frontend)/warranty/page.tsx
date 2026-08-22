@@ -21,6 +21,12 @@ export const metadata: Metadata = {
     siteName: 'GoBike Australia',
     locale: 'en_AU',
     type: 'website',
+    images: [{ url: 'https://gobike.au/wp-content/uploads/2025/11/gobike-ebike-safe-speed-modes.jpg', width: 1200, height: 630, alt: 'GoBike Warranty Claim' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Submit a Warranty Claim | GoBike Australia',
+    description: 'Fast and easy warranty claims for your GoBike electric balance bike. Upload a video and get back to riding.',
   },
   robots: {
     index: true,
@@ -43,14 +49,8 @@ export default function WarrantyClaimPage() {
       {
         "@type": "ListItem",
         "position": 2,
-        "name": "Warranty Policy",
+        "name": "Warranty Claim",
         "item": "https://gobike.au/warranty"
-      },
-      {
-        "@type": "ListItem",
-        "position": 3,
-        "name": "Submit Claim",
-        "item": "https://gobike.au/warranty-claim"
       }
     ]
   };

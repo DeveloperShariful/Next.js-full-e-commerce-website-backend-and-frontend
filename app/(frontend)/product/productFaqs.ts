@@ -10,7 +10,7 @@ export const productFaqMap: { [key: string]: FaqItem[] } = {
   'ebike-for-kids-12-inch-electric-bike-ages-2-5': [
     { question: "Is the GoBike 12 safe for a 3-year-old?", answer: "Absolutely. The GoBike 12 is designed with safety as a priority, featuring a lightweight frame, a low-power mode for gentle starts, and a low seat height so your child's feet can always touch the ground." },
     { question: "How does this e-bike help my toddler learn to ride?", answer: "It teaches the core skill of balancing first. The gentle motor assist helps with momentum, allowing your child to focus purely on balance and steering." },
-    { question: "Is it easy to assemble?", answer: "Yes! It comes 90% assembled. You just need to attach the handlebars and front wheel. Tools are included." },
+    { question: "What is the maximum weight limit for the GoBike 12?", answer: "The GoBike 12 supports riders up to 65kg. Its own frame weighs just 10.5kg with the battery installed, so it stays light and easy for a toddler to handle — and easy for parents to carry too." },
     { question: "How long does the battery last on a single charge?", answer: "A full charge typically provides up to 2 hours of continuous fun, which is plenty of time for multiple backyard adventures for a toddler." },
     { question: "Is the GoBike 12 difficult to assemble?", answer: "Not at all! The bike comes mostly pre-assembled. You just need to attach the handlebars and front wheel, which takes only a few minutes with the included tools." },
     { question: "Can this electric balance bike be ridden on grass?", answer: "Yes, its durable, puncture-proof tires are designed to handle various common surfaces, including grass, pavement, and dirt paths, making it a versatile outdoor toy." },

@@ -9,8 +9,32 @@ import { getProductsAndCategoriesAction } from '@/app/actions/frontend/shop/get-
 // আপনার গ্লোবাল ProductCard ব্যবহার করে তৈরি ProductsGrid ইম্পোর্ট করছি
 import ProductsGrid from '@/components/ProductsGrid';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import FaqAccordion from '@/components/FaqAccordion';
 
 const PRODUCTS_PER_PAGE = 12;
+
+const shopFaqs = [
+  {
+    question: 'Do I need an account to place an order?',
+    answer: "No, you can check out as a guest. Creating a free account just lets you track orders and view your order history faster next time.",
+  },
+  {
+    question: 'What payment methods does GoBike accept?',
+    answer: 'We accept major credit and debit cards and PayPal at checkout, plus bank transfer for eligible orders.',
+  },
+  {
+    question: 'Can I filter products by category on the shop page?',
+    answer: 'Yes, use the category filters at the top of this page to narrow results down to bikes, spare parts, apparel, or any other product type.',
+  },
+  {
+    question: 'Is the stock status shown on this page up to date?',
+    answer: 'Yes. Stock levels shown on each product are live, so what you see reflects current availability rather than a cached snapshot.',
+  },
+  {
+    question: 'Can I order a bike, spare parts, and apparel together in one order?',
+    answer: "Yes, you can add products from any category to the same cart and check out in a single order.",
+  },
+];
 
 interface Category {
   id: string;
@@ -169,7 +193,7 @@ export default async function ProductsPage({ searchParams }: {
           ...(product.reviewCount && product.reviewCount > 0 && {
             'aggregateRating': {
               '@type': 'AggregateRating',
-              'ratingValue': product.averageRating || 5,
+              'ratingValue': product.averageRating,
               'reviewCount': product.reviewCount
             }
           }),
@@ -185,10 +209,21 @@ export default async function ProductsPage({ searchParams }: {
     }
   };
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    'mainEntity': shopFaqs.map((faq) => ({
+      '@type': 'Question',
+      'name': faq.question,
+      'acceptedAnswer': { '@type': 'Answer', 'text': faq.answer },
+    })),
+  };
+
   return (
     <div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
 
       <Breadcrumbs pageTitle={currentCategoryName} />
       
@@ -235,6 +270,8 @@ export default async function ProductsPage({ searchParams }: {
             <Link href="/bikes" className="inline-block px-6 py-3 bg-gray-50 text-gray-800 border border-gray-200 rounded-full font-medium transition-all duration-200 hover:bg-black hover:text-white hover:border-black">Shop All Bikes</Link>
             <Link href="/about" className="inline-block px-6 py-3 bg-gray-50 text-gray-800 border border-gray-200 rounded-full font-medium transition-all duration-200 hover:bg-black hover:text-white hover:border-black">About Us</Link>
           </div>
+
+        <FaqAccordion title="Shopping at GoBike: Frequently Asked Questions" items={shopFaqs} />
       </div>
     </div>
   );

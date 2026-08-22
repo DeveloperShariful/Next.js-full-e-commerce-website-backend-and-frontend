@@ -77,8 +77,13 @@ const OTHER_STATES = [
     dot: "bg-green-600",
     label: "text-green-700",
     badge: "bg-green-50 border-green-100",
-    seeking: true,
-    retailer: null,
+    seeking: false,
+    retailer: {
+      name: "A&M Colour",
+      address: "Office 4/77 Magna Vista Rise",
+      suburb: "Narre Warren VIC 3805",
+      mapQuery: "Office+4/77+Magna+Vista+Rise,+Narre+Warren+VIC+3805",
+    },
   },
   {
     state: "Queensland",
@@ -143,12 +148,30 @@ const breadcrumbJsonLd = {
   ],
 };
 
+// Google's Store/LocalBusiness guidance treats streetAddress, addressLocality,
+// addressRegion (state) and postalCode as separate required sub-properties of
+// PostalAddress — our suburb strings are all "{City} {STATE} {postcode}", so we
+// split them out here rather than dumping the whole string into addressLocality.
+function buildStoreAddress(streetAddress: string, suburb: string) {
+  const match = suburb.match(/^(.+?)\s+(NSW|VIC|QLD|WA|SA|TAS|NT|ACT)\s+(\d{4})$/);
+  return {
+    "@type": "PostalAddress",
+    streetAddress,
+    addressLocality: match ? match[1] : suburb,
+    addressRegion: match ? match[2] : undefined,
+    postalCode: match ? match[3] : undefined,
+    addressCountry: "AU",
+  };
+}
+
+const GOBIKE_PARENT_ORG = { "@type": "Organization", name: "GoBike Australia", url: "https://gobike.au" };
+
 const retailerListJsonLd = {
   "@context": "https://schema.org",
   "@type": "ItemList",
   name: "Authorised GoBike Retailers Australia",
   description: "All authorised GoBike electric bike retailers across Australia",
-  numberOfItems: NSW_RETAILERS.length + 2,
+  numberOfItems: NSW_RETAILERS.length + 3,
   itemListElement: [
     ...NSW_RETAILERS.map((r, i) => ({
       "@type": "ListItem",
@@ -156,12 +179,14 @@ const retailerListJsonLd = {
       item: {
         "@type": "Store",
         name: r.name,
-        address: { "@type": "PostalAddress", streetAddress: r.address, addressLocality: r.suburb, addressCountry: "AU" },
+        address: buildStoreAddress(r.address, r.suburb),
         url: `https://www.google.com/maps/search/?api=1&query=${r.mapQuery}`,
+        parentOrganization: GOBIKE_PARENT_ORG,
       },
     })),
-    { "@type": "ListItem", position: NSW_RETAILERS.length + 1, item: { "@type": "Store", name: "Cooroy Motorcycles", address: { "@type": "PostalAddress", streetAddress: "Shed 4, 5 Taylor Ct", addressLocality: "Cooroy QLD 4563", addressCountry: "AU" } } },
-    { "@type": "ListItem", position: NSW_RETAILERS.length + 2, item: { "@type": "Store", name: "Eazy Bikes", address: { "@type": "PostalAddress", streetAddress: "Unit 1/12 Farral Road", addressLocality: "Midvale WA 6056", addressCountry: "AU" } } },
+    { "@type": "ListItem", position: NSW_RETAILERS.length + 1, item: { "@type": "Store", name: "A&M Colour", address: buildStoreAddress("Office 4/77 Magna Vista Rise", "Narre Warren VIC 3805"), parentOrganization: GOBIKE_PARENT_ORG } },
+    { "@type": "ListItem", position: NSW_RETAILERS.length + 2, item: { "@type": "Store", name: "Cooroy Motorcycles", address: buildStoreAddress("Shed 4, 5 Taylor Ct", "Cooroy QLD 4563"), parentOrganization: GOBIKE_PARENT_ORG } },
+    { "@type": "ListItem", position: NSW_RETAILERS.length + 3, item: { "@type": "Store", name: "Eazy Bikes", address: buildStoreAddress("Unit 1/12 Farral Road", "Midvale WA 6056"), parentOrganization: GOBIKE_PARENT_ORG } },
   ],
 };
 

@@ -102,6 +102,14 @@ const faqSchema = {
     },
     {
       '@type': 'Question',
+      name: "What's the difference between a kids e-bike and a kids motorbike?",
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: "A kids ebike is essentially an electric-powered balance bike designed for learning — light and easy to handle. A traditional petrol kids motorbike is often heavier and more complex. Our e-bikes deliver the \"motorbike\" thrill with the safety and simplicity young riders need.",
+      },
+    },
+    {
+      '@type': 'Question',
       name: 'What age are these childrens electric bikes for?',
       acceptedAnswer: {
         '@type': 'Answer',
@@ -113,7 +121,7 @@ const faqSchema = {
       name: "What's the speed and battery life like on an ebike for kids?",
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Most models feature two speed modes: a slow learning mode (around 8-10 km/h) and a faster mode (up to 18 km/h). The high-quality battery is built to last for hours of riding on a single charge.',
+        text: 'Every GoBike has 3 selectable speed modes, from a gentle Low mode as slow as 6 km/h for beginners up to a High mode of 25-61 km/h depending on the model, plus a battery good for up to 2-3 hours of ride time per charge.',
       },
     },
   ],

@@ -7,13 +7,13 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Return and Refund Policy | GoBike Australia',
-  description: 'Learn about our 30-day return policy and process for refunds and exchanges at GoBike Australia. We are committed to ensuring your complete satisfaction.',
+  description: 'Learn about our 14-day return policy and process for refunds and exchanges at GoBike Australia. We are committed to ensuring your complete satisfaction.',
   alternates: {
     canonical: '/refund-and-returns-policy',
   },
   openGraph: {
     title: 'Return and Refund Policy | GoBike Australia',
-    description: 'Learn about our 30-day return policy and process for refunds and exchanges at GoBike Australia.',
+    description: 'Learn about our 14-day return policy and process for refunds and exchanges at GoBike Australia.',
     url: 'https://gobike.au/refund-and-returns-policy',
     siteName: 'GoBike Australia',
     images: [
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     site: '@GoBikeAU',
     title: 'Return and Refund Policy | GoBike Australia',
-    description: 'Learn about our 30-day return policy and process for refunds and exchanges at GoBike Australia.',
+    description: 'Learn about our 14-day return policy and process for refunds and exchanges at GoBike Australia.',
     images: ['https://gobikes.au/wp-content/uploads/2025/11/gobike-au-1-year-warranty-kids-ebikes.jpg'],
   },
   keywords: ['gobike return policy', 'kids electric bike refund australia', 'gobike refund and returns', 'electric bike return policy australia'],
@@ -70,8 +70,8 @@ const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
   "name": "GoBike.au",
-  "url": "https:gobike.au",
-  "logo": "URL_TO_YOUR_LOGO.png",
+  "url": "https://gobike.au",
+  "logo": "https://gobikes.au/wp-content/uploads/2025/06/cropped-GOBIKE-Electric-Bike-for-kids-1.webp",
   "contactPoint": {
     "@type": "ContactPoint",
     "telephone": "+61-426-067-277",

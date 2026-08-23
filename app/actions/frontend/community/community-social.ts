@@ -13,6 +13,42 @@ async function getAuthCustomer() {
   return user;
 }
 
+const BIO_MAX_LENGTH = 160;
+const NICKNAME_MAX_LENGTH = 40;
+const MAX_SOCIAL_LINKS = 3;
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export async function updateProfileDetails(data: { bio: string; nickname: string; socialLinks: string[] }) {
+  try {
+    const user = await getAuthCustomer();
+
+    const bio = data.bio.trim().slice(0, BIO_MAX_LENGTH);
+    const nickname = data.nickname.trim().slice(0, NICKNAME_MAX_LENGTH);
+    const socialLinks = data.socialLinks
+      .map(link => link.trim())
+      .filter(link => link && isValidHttpUrl(link))
+      .slice(0, MAX_SOCIAL_LINKS);
+
+    await db.user.update({
+      where: { id: user.id },
+      data: { bio: bio || null, nickname: nickname || null, socialLinks },
+    });
+    revalidatePath(`/community/profile/${user.id}`);
+    return { success: true };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to update profile.";
+    return { success: false, message };
+  }
+}
+
 export async function toggleFollow(targetUserId: string) {
   try {
     const user = await getAuthCustomer();
@@ -109,10 +145,11 @@ export async function getUserCommunityProfile(userId: string, cursor?: string) {
   try {
     const currentUser = await syncUser();
 
-    const [profileUser, followerCount, followingCount, isFollowing, posts] = await Promise.all([
-      db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, image: true, createdAt: true } }),
+    const [profileUser, followerCount, followingCount, postCount, isFollowing, posts] = await Promise.all([
+      db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, image: true, bio: true, nickname: true, socialLinks: true, createdAt: true, updatedAt: true } }),
       db.follow.count({ where: { followingId: userId } }),
       db.follow.count({ where: { followerId: userId } }),
+      db.communityPost.count({ where: { authorId: userId, status: "PUBLISHED", deletedAt: null } }),
       currentUser
         ? db.follow.findUnique({ where: { followerId_followingId: { followerId: currentUser.id, followingId: userId } } })
         : null,
@@ -158,6 +195,7 @@ export async function getUserCommunityProfile(userId: string, cursor?: string) {
         user: profileUser,
         followerCount,
         followingCount,
+        postCount,
         isFollowing: !!isFollowing,
         isOwnProfile: currentUser?.id === userId,
       },

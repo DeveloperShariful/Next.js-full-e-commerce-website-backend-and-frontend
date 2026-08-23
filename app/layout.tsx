@@ -7,6 +7,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import NextAuthSessionProvider from "@/app/providers/session-provider";
 import NextTopLoader from 'nextjs-toploader';
+import Script from 'next/script';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://gobike.au'),
@@ -111,6 +112,27 @@ export default async function RootLayout({
           suppressHydrationWarning={true}
           className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
         >
+          {/* Third-party widget scripts (Trustpilot, etc.) sometimes reject their
+              own internal XHR promises with the raw ProgressEvent instead of an
+              Error when a request is aborted by page navigation/refresh — this
+              surfaces as a non-actionable "[object ProgressEvent]" unhandled
+              rejection. `beforeInteractive` guarantees this listener registers
+              before Next's own runtime (and its dev error overlay) attaches
+              theirs, so stopImmediatePropagation actually keeps the overlay from
+              firing on it. Only that specific, non-descriptive shape is
+              silenced — real Error-based rejections from our own code still
+              propagate and get reported normally. */}
+          <Script id="suppress-third-party-progressevent-rejections" strategy="beforeInteractive">
+            {`
+              window.addEventListener('unhandledrejection', function (event) {
+                if (typeof ProgressEvent !== 'undefined' && event.reason instanceof ProgressEvent) {
+                  event.preventDefault();
+                  if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+                  console.warn('[suppressed] Third-party script rejected with a raw ProgressEvent (network request likely aborted by navigation):', event.reason);
+                }
+              });
+            `}
+          </Script>
           {/* Global structured data — Organization + WebSite + SearchAction */}
           <script
             type="application/ld+json"

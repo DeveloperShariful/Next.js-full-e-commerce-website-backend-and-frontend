@@ -21,7 +21,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const name = profile.user.name || "GoBike Rider";
   const title = `${name} | GoBike Community`;
-  const description = `See ${name}'s photos and videos on the GoBike Community — ${profile.followerCount} followers, ${profile.followingCount} following.`;
+  const description = profile.user.bio
+    ? `${profile.user.bio} — See ${name}'s photos and videos on the GoBike Community.`
+    : `See ${name}'s photos and videos on the GoBike Community — ${profile.followerCount} followers, ${profile.followingCount} following.`;
   const url = `https://gobike.au/community/profile/${userId}`;
 
   return {
@@ -55,13 +57,20 @@ export default async function CommunityProfilePage({ params }: Props) {
     "@context": "https://schema.org",
     "@type": "ProfilePage",
     dateCreated: result.profile.user.createdAt,
+    dateModified: result.profile.user.updatedAt,
     mainEntity: {
       "@type": "Person",
       name,
+      alternateName: result.profile.user.nickname || undefined,
+      description: result.profile.user.bio || undefined,
       image: result.profile.user.image || undefined,
       url: `https://gobike.au/community/profile/${userId}`,
+      sameAs: result.profile.user.socialLinks?.length ? result.profile.user.socialLinks : undefined,
       interactionStatistic: [
         { "@type": "InteractionCounter", interactionType: "https://schema.org/FollowAction", userInteractionCount: result.profile.followerCount },
+      ],
+      agentInteractionStatistic: [
+        { "@type": "InteractionCounter", interactionType: "https://schema.org/WriteAction", userInteractionCount: result.profile.postCount },
       ],
     },
   };

@@ -367,6 +367,9 @@ model User {
   isActive           Boolean             @default(true)
   dateOfBirth        DateTime?
   gender             String?
+  bio                String?
+  nickname           String?
+  socialLinks        String[]            @default([])
   notes              String?
   metafields         Json?
   deletedAt          DateTime?

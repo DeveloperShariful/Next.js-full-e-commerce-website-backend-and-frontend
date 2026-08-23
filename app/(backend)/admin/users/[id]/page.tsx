@@ -49,6 +49,9 @@ export default async function UserEditPage({ params }: { params: Promise<{ id: s
     email: user.email,
     role: user.role,
     isActive: user.isActive,
+    metafields: (user.metafields && typeof user.metafields === 'object' && !Array.isArray(user.metafields)
+      ? user.metafields
+      : {}) as Record<string, string>,
     billingAddress: user.addresses.find((addr) => addr.type === 'BILLING') || null,
     shippingAddress: user.addresses.find((addr) => addr.type === 'SHIPPING') || null,
   } : null;

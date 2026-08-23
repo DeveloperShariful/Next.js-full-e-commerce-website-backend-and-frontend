@@ -22,6 +22,16 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
+      {
+        // Auth.js session/sign-in/sign-out responses must never be cached —
+        // otherwise Vercel's edge (or the browser) can serve a stale "still
+        // logged in" session check after sign-out on the live site (this
+        // doesn't show up locally since dev has no CDN layer in front of it).
+        source: '/api/auth/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, max-age=0' },
+        ],
+      },
     ];
   },
 

@@ -53,6 +53,7 @@ export default async function VisitorDetailPage({ params }: PageProps) {
         <div className="p-4 border-b border-[#c3c4c7] bg-[#f8f9f9]">
           <span className="text-[13px] font-semibold text-[#1d2327]">Raw Proof (exactly what the browser/platform sent)</span>
         </div>
+        <ProofRow label="IP Address" value={visit.ipAddress || "Unknown (no IP header — normal on localhost)"} mono />
         <ProofRow label="Landing Page" value={visit.landingPage} mono />
         <ProofRow label="Referrer" value={visit.referrer || "None sent (email client / private browsing / typed directly)"} mono />
         <ProofRow

@@ -43,6 +43,15 @@ function classifyChannel(params: {
 }): { channel: string; clickId: string | null } {
   const isPaidMedium = params.utmMedium ? PAID_MEDIUM_HINTS.has(params.utmMedium.toLowerCase()) : false;
 
+  // srsltid = Google Merchant Center-এর নিজস্ব click ID, শুধু Google Shopping-এর
+  // FREE/organic listing-এ ক্লিক করলেই যোগ হয় (gclid-এর মতো paid Ads-এ না) —
+  // তাই এটা সবসময় organic, কখনো "_ads" হবে না। সাধারণ google_organic (নিয়মিত
+  // web search result) থেকে আলাদা রাখা হচ্ছে, কারণ এটা Shopping tab-এর ক্লিক।
+  const srsltid = params.searchParams.get("srsltid");
+  if (srsltid) {
+    return { channel: "google_shopping", clickId: `srsltid=${srsltid}` };
+  }
+
   // ১. Ad/click platform ID — সবচেয়ে শক্তিশালী প্রমাণ
   for (const [param, platform] of Object.entries(CLICK_ID_PLATFORMS)) {
     const value = params.searchParams.get(param);
@@ -133,6 +142,12 @@ export async function logSiteVisit(data: {
     }
     const country = headerList.get("x-vercel-ip-country") || null;
 
+    // Vercel নিজেই এই header বাইরে থেকে আসা মান বাতিল করে overwrite করে দেয়
+    // (spoof-proof) — client নিজে fake IP পাঠাতে পারবে না। একাধিক মান কমা
+    // দিয়ে থাকলে প্রথমটাই আসল client IP (বাকিগুলো proxy chain হলে)।
+    const rawForwardedFor = headerList.get("x-forwarded-for");
+    const ipAddress = rawForwardedFor ? rawForwardedFor.split(",")[0].trim() || null : null;
+
     let searchParams: URLSearchParams;
     try {
       searchParams = new URL(data.url).searchParams;
@@ -157,6 +172,7 @@ export async function logSiteVisit(data: {
         utmCampaign: data.utmCampaign || null,
         utmContent: data.utmContent || null,
         utmTerm: data.utmTerm || null,
+        ipAddress,
         channel,
         clickId,
         country,

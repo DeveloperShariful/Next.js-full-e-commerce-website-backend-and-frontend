@@ -49,6 +49,13 @@ const AUTO_ITEMS: { title: T; desc: T }[] = [
     },
   },
   {
+    title: { en: "Google Shopping (free/organic listing, via Merchant Center)", bn: "Google Shopping (free/organic listing, Merchant Center-এর মাধ্যমে)" },
+    desc: {
+      en: "Google attaches srsltid to free product-listing clicks — shown as its own “google_shopping” channel, separate from regular organic search.",
+      bn: "Free product-listing click-এ Google নিজেই srsltid জুড়ে দেয় — নিয়মিত organic search থেকে আলাদা করে “google_shopping” নামে দেখানো হয়।",
+    },
+  },
+  {
     title: { en: "Country / City", bn: "Country / City" },
     desc: {
       en: "Read directly from Vercel’s x-vercel-ip-country / x-vercel-ip-city headers on the live (production) site — no extra lookup. Two caveats: it only appears on a real Vercel deployment (always blank on localhost), and it stops working if a proxy/CDN (e.g. Cloudflare) sits in front of Vercel.",

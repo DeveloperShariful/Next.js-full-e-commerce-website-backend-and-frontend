@@ -19,6 +19,23 @@ interface StoredUTM {
   savedAt: number;
 }
 
+// কিছু বিজ্ঞাপন প্ল্যাটফর্মে (ভুল Tracking Template/Final URL suffix সেটআপে)
+// একই লিংকে একই utm প্যারামিটার দুইবার থাকতে পারে — একবার un-substituted
+// placeholder (যেমন Google Ads-এর ভুল "{campaignname}", যেটা আসলে কোনো বৈধ
+// ValueTrack প্যারামিটার না, তাই Google তা replace না করেই লিটারেল রেখে দেয়)
+// আর একবার আসল সঠিক মান (যেমন utm_campaign=23661992587)। URLSearchParams.get()
+// শুধু প্রথমটাই রিটার্ন করে — যেটা এক্ষেত্রে ভুল হতে পারে। তাই getAll() দিয়ে
+// সবগুলো মান দেখে, খালি আর placeholder-আকৃতির (যেমন {xyz} বা {{xyz}}) মান বাদ
+// দিয়ে প্রথম আসল মানটা নেওয়া হচ্ছে।
+const PLACEHOLDER_PATTERN = /^\{+[^{}]*\}+$/;
+function getCleanParam(searchParams: URLSearchParams, key: string): string | null {
+  for (const value of searchParams.getAll(key)) {
+    const trimmed = value.trim();
+    if (trimmed && !PLACEHOLDER_PATTERN.test(trimmed)) return trimmed;
+  }
+  return null;
+}
+
 const SourceTracker = () => {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -26,11 +43,11 @@ const SourceTracker = () => {
 
   useEffect(() => {
     const affiliateId = searchParams.get('sld');
-    const utmSource   = searchParams.get('utm_source');
-    const utmMedium   = searchParams.get('utm_medium');
-    const utmCampaign = searchParams.get('utm_campaign');
-    const utmContent  = searchParams.get('utm_content');
-    const utmTerm     = searchParams.get('utm_term');
+    const utmSource   = getCleanParam(searchParams, 'utm_source');
+    const utmMedium   = getCleanParam(searchParams, 'utm_medium');
+    const utmCampaign = getCleanParam(searchParams, 'utm_campaign');
+    const utmContent  = getCleanParam(searchParams, 'utm_content');
+    const utmTerm     = getCleanParam(searchParams, 'utm_term');
     const referrer    = document.referrer || '';
 
     // First-touch attribution: প্রথম যেখান থেকে আসছে সেটাই রাখব, পরের internal

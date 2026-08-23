@@ -2668,6 +2668,7 @@ model SiteVisit {
   utmTerm     String? // e.g. "kids electric bike" -- paid search keyword
   channel     String // "facebook" | "facebook_ads" | "google_organic" | "google_ads" | "tiktok" | "tiktok_ads" | "bing_organic" | "bing_ads" | "linkedin_ads" | "pinterest_ads" | "twitter_ads" | "snapchat_ads" | "email" | "instagram" | "direct" | "{host}_referral"
   clickId     String? // gclid/fbclid/msclkid/ttclid/li_fat_id/epik/twclid/ScCid — যে প্ল্যাটফর্ম যেটা পাঠিয়েছে, সেটাই (raw প্রমাণ হিসেবে সংরক্ষিত)
+  ipAddress   String? // x-forwarded-for থেকে — Vercel নিজেই এই header overwrite করে (spoof-proof), সামনে proxy/CDN থাকলে ভুল হতে পারে
   country     String?
   city        String?
   deviceType  String?

@@ -88,6 +88,11 @@ const nextConfig: NextConfig = {
         hostname: '*.public.blob.vercel-storage.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com', // Google Sign-In profile pictures
+        pathname: '/**',
+      },
     ],
   },
 };

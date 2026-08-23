@@ -1,8 +1,10 @@
 // auth.ts
 
 import NextAuth from "next-auth";
+import { Prisma } from "@prisma/client";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/prisma";
 import { authConfig } from "./auth.config";
@@ -105,8 +107,70 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
+    GoogleProvider({
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      // Google verifies email ownership, so it's safe to link a Google sign-in
+      // to an existing email/password account sharing the same email — without
+      // this, a customer with a password account would hit an error trying to
+      // sign in with Google using that same email instead of getting linked in.
+      allowDangerousEmailAccountLinking: true,
+    }),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      // Credentials login already blocks banned/deleted users inside authorize()
+      // above. OAuth (Google) sign-in skips that function entirely, so without
+      // this check a banned/deleted user could still get a valid session for up
+      // to SYNC_INTERVAL before the periodic check in the jwt callback below
+      // catches it.
+      if (user?.id) {
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: { isActive: true, deletedAt: true, image: true, name: true, metafields: true },
+        });
+        if (dbUser && (!dbUser.isActive || dbUser.deletedAt !== null)) return false;
+
+        // Linking Google to an existing email/password account (via
+        // allowDangerousEmailAccountLinking) does NOT copy the Google profile
+        // photo/name onto the User row by default — only fills in gaps here,
+        // never overwrites a name/photo the customer already has. (The
+        // currently-active session's own display picture still follows the
+        // existing 5-minute jwt sync throttle below, so this may take up to
+        // that long — or a fresh sign-in — to visibly refresh.)
+        if (dbUser && account?.provider === "google") {
+          const googleProfile = profile as
+            | { picture?: string; name?: string; given_name?: string; family_name?: string }
+            | undefined;
+          const updates: Prisma.UserUpdateInput = {};
+          if (!dbUser.image && googleProfile?.picture) updates.image = googleProfile.picture;
+          if (!dbUser.name && googleProfile?.name) updates.name = googleProfile.name;
+
+          // First/last name live in the flexible `metafields` JSON blob (the
+          // Account Details page reads them from there, not dedicated User
+          // columns — see profile-service.ts), so merge in rather than replace.
+          const currentMetafields: Prisma.JsonObject =
+            dbUser.metafields && typeof dbUser.metafields === "object" && !Array.isArray(dbUser.metafields)
+              ? (dbUser.metafields as Prisma.JsonObject)
+              : {};
+          const metafieldUpdates: Prisma.JsonObject = {};
+          if (!currentMetafields.firstName && googleProfile?.given_name) {
+            metafieldUpdates.firstName = googleProfile.given_name;
+          }
+          if (!currentMetafields.lastName && googleProfile?.family_name) {
+            metafieldUpdates.lastName = googleProfile.family_name;
+          }
+          if (Object.keys(metafieldUpdates).length > 0) {
+            updates.metafields = { ...currentMetafields, ...metafieldUpdates };
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await db.user.update({ where: { id: user.id }, data: updates });
+          }
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       // First sign-in: populate token directly from credentials result
       if (user) {

@@ -1,5 +1,5 @@
 import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
-import { isToday, formatDistanceToNow, startOfDay } from "date-fns";
+import { isToday, formatDistanceToNow, startOfDay, endOfDay } from "date-fns";
 
 export function formatTz(date: Date | string, timezone: string, fmt: string): string {
   try {
@@ -18,6 +18,14 @@ export function formatTz(date: Date | string, timezone: string, fmt: string): st
 // match Sydney's until mid-morning local time).
 export function storeDayStart(date: Date | string, timezone: string): Date {
   return fromZonedTime(startOfDay(toZonedTime(new Date(date), timezone)), timezone);
+}
+
+// storeDayStart-এর সমকক্ষ — দিনের শেষ মুহূর্ত (23:59:59.999) store-এর
+// timezone-এ, real UTC instant হিসেবে। একই কারণে দরকার: server-এর
+// .setHours(23,59,59,999) সরাসরি ব্যবহার করলে server-এর নিজের (সাধারণত UTC)
+// সময় ধরে হিসাব করে, store-এর local দিনের শেষ না।
+export function storeDayEnd(date: Date | string, timezone: string): Date {
+  return fromZonedTime(endOfDay(toZonedTime(new Date(date), timezone)), timezone);
 }
 
 // Given any instant, returns a Date representing that instant's calendar

@@ -7,7 +7,7 @@ import {
   Undo2, Megaphone, Truck, MedalIcon, MessageCircle,
   Handshake, Link, Network, UserPlus, Facebook, Wallet, RefreshCw, Heart,
   BadgeDollarSign, LayoutGrid, Award, SlidersHorizontal, Tag, Star, Boxes,
-  Code2, Search, Plug, Newspaper, FolderOpen, ClipboardList,
+  Code2, Search, Plug, Newspaper, FolderOpen, ClipboardList, Globe,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -110,6 +110,7 @@ export const sidebarConfig: SidebarGroup[] = [
       },
       { name: "Coupons", href: "/admin/coupons", icon: TicketPercent , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]},
       { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { name: "Visitors", href: "/admin/visitors", icon: Globe, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { name: "Wishlist Report", href: "/admin/wishlist-report", icon: Heart, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
     ] 

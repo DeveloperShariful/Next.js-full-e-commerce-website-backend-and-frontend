@@ -338,7 +338,7 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                 </div>
 
                 {/* UTM / Traffic Source */}
-                {(order.utmSource || order.utmMedium || order.utmCampaign || order.referringSite) && (
+                {(order.utmSource || order.utmMedium || order.utmCampaign || order.utmContent || order.utmTerm || order.referringSite) && (
                     <div className="pt-3 mt-3 border-t border-[#f0f0f1]">
                         <p className="text-[11px] font-semibold text-[#1d2327] uppercase tracking-wide mb-2">Traffic Source</p>
                         <div className="space-y-1 text-[12px] text-[#646970]">
@@ -358,6 +358,18 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                                 <div className="flex items-center gap-2">
                                     <span className="w-[70px] shrink-0">Campaign:</span>
                                     <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a]">{order.utmCampaign}</span>
+                                </div>
+                            )}
+                            {order.utmContent && (
+                                <div className="flex items-center gap-2">
+                                    <span className="w-[70px] shrink-0">Content:</span>
+                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a]">{order.utmContent}</span>
+                                </div>
+                            )}
+                            {order.utmTerm && (
+                                <div className="flex items-center gap-2">
+                                    <span className="w-[70px] shrink-0">Term:</span>
+                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a]">{order.utmTerm}</span>
                                 </div>
                             )}
                             {order.referringSite && (

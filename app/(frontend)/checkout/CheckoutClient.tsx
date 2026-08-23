@@ -553,6 +553,8 @@ function CheckoutClientComponent({ paymentGateways, enableCoupons }: { paymentGa
         utmSource:     utmData.utmSource,
         utmMedium:     utmData.utmMedium,
         utmCampaign:   utmData.utmCampaign,
+        utmContent:    utmData.utmContent,
+        utmTerm:       utmData.utmTerm,
         referringSite: utmData.referringSite,
       };
 

@@ -1092,6 +1092,8 @@ model Order {
   utmSource         String? // e.g. "facebook", "google", "newsletter"
   utmMedium         String? // e.g. "cpc", "social", "email"
   utmCampaign       String? // e.g. "summer_sale_2025"
+  utmContent        String? // e.g. "blue_banner" -- A/B test creative/placement
+  utmTerm           String? // e.g. "kids electric bike" -- paid search keyword
   recoveredFromAbandonedCart Boolean @default(false) // abandoned-cart drip email theke ei order eseche kina
   referringSite     String? //কোন ওয়েবসাইট থেকে আসল
   status            OrderStatus       @default(PENDING)
@@ -2648,6 +2650,33 @@ model AffiliateClick {
   @@index([createdAt])
   @@index([deviceFingerprint])
   @@index([converted])
+}
+
+// General sitewide traffic (not just affiliate-referred) — one row per browsing
+// session (deduped via a short-lived cookie, not one row per page view), for
+// the admin "Traffic Insights" dashboard: daily visitor counts, channel
+// (facebook/google_organic/google_ads/email/direct/etc.), and country.
+model SiteVisit {
+  id          String   @id @default(uuid())
+  visitorId   String // দীর্ঘমেয়াদী anonymous cookie ID, কোনো User-এর সাথে যুক্ত না
+  landingPage String
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String? // e.g. "blue_banner" -- A/B test creative/placement
+  utmTerm     String? // e.g. "kids electric bike" -- paid search keyword
+  channel     String // "facebook" | "facebook_ads" | "google_organic" | "google_ads" | "tiktok" | "tiktok_ads" | "bing_organic" | "bing_ads" | "linkedin_ads" | "pinterest_ads" | "twitter_ads" | "snapchat_ads" | "email" | "instagram" | "direct" | "{host}_referral"
+  clickId     String? // gclid/fbclid/msclkid/ttclid/li_fat_id/epik/twclid/ScCid — যে প্ল্যাটফর্ম যেটা পাঠিয়েছে, সেটাই (raw প্রমাণ হিসেবে সংরক্ষিত)
+  country     String?
+  city        String?
+  deviceType  String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([channel])
+  @@index([country])
+  @@index([visitorId])
 }
 
 model Referral {

@@ -4,6 +4,20 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { trackVisitAction } from '@/app/actions/frontend/affiliate/trackVisitAction';
+import { logSiteVisit } from '@/app/actions/frontend/analytics/logSiteVisit';
+
+const UTM_STORAGE_KEY = 'utm_data';
+const UTM_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 দিন — AffiliateClick cookie-র সাথে মেলানো
+
+interface StoredUTM {
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  referringSite?: string;
+  savedAt: number;
+}
 
 const SourceTracker = () => {
   const searchParams = useSearchParams();
@@ -15,39 +29,62 @@ const SourceTracker = () => {
     const utmSource   = searchParams.get('utm_source');
     const utmMedium   = searchParams.get('utm_medium');
     const utmCampaign = searchParams.get('utm_campaign');
+    const utmContent  = searchParams.get('utm_content');
+    const utmTerm     = searchParams.get('utm_term');
     const referrer    = document.referrer || '';
 
-    // UTM params থাকলে sessionStorage-এ সেভ করি — checkout-এ order-এর সাথে পাঠানো হবে
-    if (utmSource || utmMedium || utmCampaign) {
-      sessionStorage.setItem('utm_data', JSON.stringify({
+    // First-touch attribution: প্রথম যেখান থেকে আসছে সেটাই রাখব, পরের internal
+    // navigation (checkout-এর দিকে যাওয়া) দিয়ে overwrite হবে না।
+    const existing = getStoredUTM();
+    const hasFreshExisting = existing.savedAt !== undefined;
+
+    if ((utmSource || utmMedium || utmCampaign || utmContent || utmTerm) && !hasFreshExisting) {
+      const data: StoredUTM = {
         utmSource:     utmSource    ?? undefined,
         utmMedium:     utmMedium    ?? undefined,
         utmCampaign:   utmCampaign  ?? undefined,
+        utmContent:    utmContent   ?? undefined,
+        utmTerm:       utmTerm      ?? undefined,
         referringSite: referrer     || undefined,
-      }));
-    } else if (!sessionStorage.getItem('utm_data') && referrer) {
-      // UTM নেই কিন্তু বাইরে থেকে এসেছে (organic) — শুধু প্রথমবার সেভ করব
-      sessionStorage.setItem('utm_data', JSON.stringify({ referringSite: referrer }));
+        savedAt: Date.now(),
+      };
+      try { localStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(data)); } catch {}
+    } else if (!hasFreshExisting && referrer) {
+      // UTM নেই কিন্তু বাইরে থেকে এসেছে (organic/social referral) — প্রথমবার সেভ করব
+      try {
+        localStorage.setItem(UTM_STORAGE_KEY, JSON.stringify({ referringSite: referrer, savedAt: Date.now() }));
+      } catch {}
     }
 
     if (!visitTracked.current || affiliateId) {
       const track = async () => {
         try {
-          await trackVisitAction({
-            affiliateSlug: affiliateId,
-            url: window.location.href,
-            referrer,
-            utmSource,
-            utmMedium,
-            utmCampaign,
-          });
-
-          if (affiliateId) {
-            console.log('%c[Enterprise-Tracker] Secure Affiliate Visit Logged', 'color: #00ff00; font-weight: bold;');
-          }
+          // দুটো আলাদা কাজ — affiliate-specific tracking আর general site-wide
+          // visit logging — একসাথে, non-blocking ভাবে চালানো হচ্ছে (কোনোটাই
+          // পেজ রেন্ডার আটকায় না)। logSiteVisit-এর নিজস্ব session-cookie
+          // dedup আছে, তাই বারবার call হলেও duplicate row তৈরি হবে না।
+          await Promise.all([
+            trackVisitAction({
+              affiliateSlug: affiliateId,
+              url: window.location.href,
+              referrer,
+              utmSource,
+              utmMedium,
+              utmCampaign,
+            }),
+            logSiteVisit({
+              url: window.location.href,
+              referrer,
+              utmSource,
+              utmMedium,
+              utmCampaign,
+              utmContent,
+              utmTerm,
+            }),
+          ]);
           visitTracked.current = true;
         } catch (error) {
-          console.error('[Enterprise-Tracker] Critical Error:', error);
+          console.error('[SourceTracker] Visit tracking failed:', error);
         }
       };
 
@@ -60,16 +97,26 @@ const SourceTracker = () => {
 
 export default SourceTracker;
 
-// checkout-এ sessionStorage থেকে UTM data পড়ার helper — CheckoutClient ও PayPal-এ ব্যবহার হবে
+// checkout-এ localStorage থেকে UTM data পড়ার helper — CheckoutClient ও PayPal-এ ব্যবহার হবে।
+// ৩০ দিনের বেশি পুরনো হলে (মেয়াদোত্তীর্ণ) খালি অবজেক্ট রিটার্ন করে।
 export function getStoredUTM(): {
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
   referringSite?: string;
+  savedAt?: number;
 } {
   try {
-    const raw = sessionStorage.getItem('utm_data');
-    return raw ? JSON.parse(raw) : {};
+    const raw = localStorage.getItem(UTM_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as StoredUTM;
+    if (!parsed.savedAt || Date.now() - parsed.savedAt > UTM_MAX_AGE_MS) {
+      localStorage.removeItem(UTM_STORAGE_KEY);
+      return {};
+    }
+    return parsed;
   } catch {
     return {};
   }

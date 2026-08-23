@@ -6,6 +6,9 @@ import { sendNotification } from '@/app/api/email/send-notification';
 import { revalidatePath } from 'next/cache';
 import { stripHtml } from '@/lib/sanitize';
 import { Prisma } from '@prisma/client';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { storeDayStart, formatTz } from '@/lib/store-time';
+import { getStoreTimezone } from '@/lib/get-store-timezone';
 
 const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN'];
 
@@ -48,15 +51,23 @@ export interface ReportFilters {
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 export async function getReportStats(userId?: string): Promise<ReportStats> {
-  const now = new Date();
+  // Store-এর local timezone অনুযায়ী হিসাব — server-এর নিজের (সাধারণত UTC) ঘড়ি
+  // ধরে .setHours() করলে Sydney-তে সকাল ১০টার আগে "এই সপ্তাহ"/"এই মাস"/"আজ"
+  // ভুল bucket-এ পড়ে যেত।
+  const timezone = await getStoreTimezone();
+  const nowZoned = toZonedTime(new Date(), timezone);
 
-  const dayOfWeek = now.getDay();
+  const dayOfWeek = nowZoned.getDay();
   const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() + diffToMonday);
-  startOfWeek.setHours(0, 0, 0, 0);
+  const mondayZoned = new Date(nowZoned);
+  mondayZoned.setDate(nowZoned.getDate() + diffToMonday);
+  mondayZoned.setHours(0, 0, 0, 0);
+  const startOfWeek = fromZonedTime(mondayZoned, timezone);
 
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStartZoned = new Date(nowZoned);
+  monthStartZoned.setDate(1);
+  monthStartZoned.setHours(0, 0, 0, 0);
+  const startOfMonth = fromZonedTime(monthStartZoned, timezone);
 
   const [thisWeek, thisMonth, total] = await Promise.all([
     db.systemLog.count({ where: { source: 'DAILY_REPORT', createdAt: { gte: startOfWeek } } }),
@@ -66,8 +77,8 @@ export async function getReportStats(userId?: string): Promise<ReportStats> {
 
   let todaySubmitted = false;
   if (userId) {
-    const today = now.toISOString().split('T')[0];
-    const todayStart = new Date(today + 'T00:00:00.000Z');
+    const today = formatTz(new Date(), timezone, 'yyyy-MM-dd');
+    const todayStart = storeDayStart(new Date(), timezone);
     const recentLogs = await db.systemLog.findMany({
       where: { source: 'DAILY_REPORT', createdAt: { gte: todayStart } },
       select: { context: true },
@@ -96,7 +107,7 @@ export async function submitDailyReport(formData: FormData) {
   const tasks      = stripHtml((formData.get('tasks')      as string) ?? '').trim();
   const notes      = stripHtml((formData.get('notes')      as string) ?? '').trim();
   const reportDate = ((formData.get('reportDate') as string) ?? '').trim()
-    || new Date().toISOString().split('T')[0];
+    || formatTz(new Date(), await getStoreTimezone(), 'yyyy-MM-dd');
   const forceSubmit = formData.get('forceSubmit') === 'true';
 
   let images: string[] = [];

@@ -4,6 +4,8 @@
 
 import { db } from "@/lib/prisma";
 import { OrderStatus, Prisma } from "@prisma/client";
+import { storeDayStart, storeDayEnd } from "@/lib/store-time";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
 
 export async function getOrders(
   page: number = 1, 
@@ -18,18 +20,20 @@ export async function getOrders(
     const skip = (page - 1) * limit;
     const isTrashMode = status === 'trash';
 
-    // Accurate Timezone Calculation for Full Day
+    // Accurate Timezone Calculation for Full Day — store-এর local timezone
+    // অনুযায়ী (server-এর নিজের UTC ঘড়ি অনুযায়ী না, যেটা আগে .setHours()
+    // ব্যবহার করে ভুলভাবে করা হচ্ছিল — Sydney-তে সকাল ১০টার আগে "আজ"-এর
+    // অর্ডার "গতকাল"-এর bucket-এ পড়ে যেত)।
+    const timezone = await getStoreTimezone();
     let parsedStartDate: Date | undefined;
     let parsedEndDate: Date | undefined;
 
     if (startDate) {
-      parsedStartDate = new Date(startDate);
-      parsedStartDate.setHours(0, 0, 0, 0); // Start of the day
+      parsedStartDate = storeDayStart(startDate, timezone);
     }
 
     if (endDate) {
-      parsedEndDate = new Date(endDate);
-      parsedEndDate.setHours(23, 59, 59, 999); // End of the day
+      parsedEndDate = storeDayEnd(endDate, timezone);
     }
 
     // 🔥 FIXED: Separate Base Filter array created

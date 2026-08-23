@@ -198,6 +198,8 @@ export interface OrderDetailsType {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  utmContent: string | null;
+  utmTerm: string | null;
   referringSite: string | null;
   recoveredFromAbandonedCart: boolean;
 

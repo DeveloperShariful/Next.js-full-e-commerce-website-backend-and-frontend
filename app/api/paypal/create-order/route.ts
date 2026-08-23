@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
       utmSource,
       utmMedium,
       utmCampaign,
+      utmContent,
+      utmTerm,
       referringSite,
     } = body as {
       cartItems: CartItemDTO[];
@@ -118,6 +120,8 @@ export async function POST(request: NextRequest) {
       utmSource?: string;
       utmMedium?: string;
       utmCampaign?: string;
+      utmContent?: string;
+      utmTerm?: string;
       referringSite?: string;
     };
 
@@ -337,6 +341,8 @@ export async function POST(request: NextRequest) {
       utmSource:     utmSource     || null,
       utmMedium:     utmMedium     || null,
       utmCampaign:   utmCampaign   || null,
+      utmContent:    utmContent    || null,
+      utmTerm:       utmTerm       || null,
       referringSite: referringSite || null,
       ...(isLocalPickup && { shippingType: ShippingMethodType.LOCAL_PICKUP }),
       transdirectQuoteId: tdBookingId ?? null,

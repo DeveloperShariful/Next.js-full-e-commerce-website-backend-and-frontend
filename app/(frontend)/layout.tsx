@@ -12,6 +12,7 @@ import { CompareProvider } from '@/context/CompareContext';
 
 import AffiliateTracker from "./_components/affiliate-tracker";
 import { AffiliateTrackerProvider } from "@/app/providers/affiliate-tracker-provider";
+import SourceTracker from "@/components/SourceTracker";
 import DelayedScripts from "@/components/DelayedScripts";
 import KlaviyoIdentifier from "@/components/KlaviyoIdentifier";
 import { getCachedStoreSettings, getCachedMarketingConfig } from "@/lib/global-settings-cache";
@@ -38,6 +39,12 @@ export default async function FrontLayout({ children }: { children: React.ReactN
           {/* Affiliate click tracking — URL এ ?ref=xxx থাকলে track করে */}
           <Suspense fallback={null}>
             <AffiliateTracker affiliateParam={affiliateParam} />
+          </Suspense>
+
+          {/* সাধারণ ট্রাফিক সোর্স (UTM/referrer) ক্যাপচার — Order.utmSource ইত্যাদির
+              জন্য দরকার, আগে এটা কোথাও mount-ই করা ছিল না */}
+          <Suspense fallback={null}>
+            <SourceTracker />
           </Suspense>
 
           {/* Affiliate session tracking — root layout থেকে এখানে move করা হয়েছে */}

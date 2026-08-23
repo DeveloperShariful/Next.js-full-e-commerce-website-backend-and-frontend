@@ -10,6 +10,13 @@ import {
 } from "./shared.utils";
 import { storeDateKey } from "@/lib/store-time";
 
+// Analytics.totalVisitors/totalPageViews rollup রো-গুলো সবসময় ০ লেখা হয় (কোথাও
+// increment হয় না) — তাই সত্যিকারের visitor count SiteVisit থেকে সরাসরি
+// গোনা হচ্ছে, নিচে। totalPageViews ইচ্ছাকৃতভাবে ছুঁয়ে দেখা হয়নি: SiteVisit
+// এক সেশনে একবারই সেভ হয় (performance-এর জন্য), প্রতিটা page view আলাদা করে
+// ট্র্যাক করা হয় না — তাই "Views"-এর জন্য কোনো real সংখ্যা নেই, বানিয়ে
+// দেখানো হবে না।
+
 // রিটার্ন টাইপের স্ট্রিক্ট ইন্টারফেস
 export interface OverviewSummaryData {
   totalSales: number;
@@ -72,6 +79,13 @@ export async function getOverviewData(
     orderBy: { date: "asc" },
   });
 
+  // real visitor count — SiteVisit থেকে সরাসরি, DateRange ইতিমধ্যেই সঠিক UTC
+  // instant boundary (parseDateRange-এর আউটপুট), আলাদা timezone conversion লাগবে না
+  const [currentVisitorCount, previousVisitorCount] = await Promise.all([
+    db.siteVisit.count({ where: { createdAt: { gte: currentRange.from, lte: currentRange.to } } }),
+    db.siteVisit.count({ where: { createdAt: { gte: previousRange.from, lte: previousRange.to } } }),
+  ]);
+
   // ৩. Prisma Decimal থেকে Serialized Number এ রূপান্তর (No 'any' type used)
   const currentPeriod = currentDataRaw.map(serializeAnalyticsData);
   const previousPeriod = previousDataRaw.map(serializeAnalyticsData);
@@ -92,6 +106,7 @@ export async function getOverviewData(
     currentSummary.totalOrders > 0
       ? currentSummary.totalSales / currentSummary.totalOrders
       : 0;
+  currentSummary.totalVisitors = currentVisitorCount;
 
   // ৫. Previous Summary Calculation
   const previousSummary = previousPeriod.reduce((acc, curr) => {
@@ -109,6 +124,7 @@ export async function getOverviewData(
     previousSummary.totalOrders > 0
       ? previousSummary.totalSales / previousSummary.totalOrders
       : 0;
+  previousSummary.totalVisitors = previousVisitorCount;
 
   return {
     currentPeriod,

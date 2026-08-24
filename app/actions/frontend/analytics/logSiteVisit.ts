@@ -72,16 +72,27 @@ function classifyChannel(params: {
   const normalizedMedium = params.utmMedium?.trim().toLowerCase();
   const normalizedSource = params.utmSource?.trim().toLowerCase();
 
-  // srsltid = Google Merchant Center-এর নিজস্ব click ID, শুধু Google Shopping-এর
-  // FREE/organic listing-এ ক্লিক করলেই যোগ হয় (gclid-এর মতো paid Ads-এ না) —
-  // তাই এটা সবসময় organic, কখনো "_ads" হবে না। সাধারণ google_organic (নিয়মিত
-  // web search result) থেকে আলাদা রাখা হচ্ছে, কারণ এটা Shopping tab-এর ক্লিক।
-  const srsltid = params.searchParams.get("srsltid");
-  if (srsltid) {
-    return { channel: "google_shopping", clickId: `srsltid=${srsltid}` };
+  // gclid/dclid (Google Ads paid click) সবসময় srsltid-এর আগে চেক করতে হবে।
+  // কোনো source-ই ১০০% নিশ্চিত করে বলে না যে একই ক্লিকে দুটো কখনো একসাথে আসে
+  // না — তাই ঝুঁকি এড়াতে gclid-কে আগে প্রাধান্য দেওয়া হচ্ছে, যাতে ভুলবশত কোনো
+  // paid Google Shopping ad click ভুলভাবে "google_organic_shopping" হয়ে না যায়।
+  const gclid = params.searchParams.get("gclid") || params.searchParams.get("dclid");
+  if (gclid) {
+    return { channel: "google_ads", clickId: `gclid=${gclid}` };
   }
 
-  // ১. Ad/click platform ID — সবচেয়ে শক্তিশালী প্রমাণ
+  // srsltid = Google Merchant Center-এর নিজস্ব click ID, free/organic listing-এ
+  // ক্লিক করলেই যোগ হয় (gclid-এর মতো paid Ads-এ না) — তাই এটা সবসময় organic।
+  // আগস্ট ২০২৪ থেকে Google নিজেই "Shopping tab" আর সাধারণ "organic search"-এর
+  // সীমারেখা ঝাপসা করে দিয়েছে (দুটোতেই এই একই ট্যাগ ব্যবহার করে) — তাই একটাই
+  // চ্যানেল নামে দুটো তথ্যই রাখা হচ্ছে: এটা organic (paid না), আর Merchant
+  // Center/Shopping feed থেকেই এসেছে।
+  const srsltid = params.searchParams.get("srsltid");
+  if (srsltid) {
+    return { channel: "google_organic_shopping", clickId: `srsltid=${srsltid}` };
+  }
+
+  // ১. বাকি Ad/click platform ID (gclid/dclid ইতিমধ্যে উপরে হ্যান্ডেল হয়ে গেছে)
   for (const [param, platform] of Object.entries(CLICK_ID_PLATFORMS)) {
     const value = params.searchParams.get(param);
     if (value) {

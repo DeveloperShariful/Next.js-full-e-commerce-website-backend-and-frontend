@@ -51,8 +51,8 @@ const AUTO_ITEMS: { title: T; desc: T }[] = [
   {
     title: { en: "Google Shopping (free/organic listing, via Merchant Center)", bn: "Google Shopping (free/organic listing, Merchant Center-এর মাধ্যমে)" },
     desc: {
-      en: "Google attaches srsltid to free product-listing clicks — shown as its own “google_shopping” channel, separate from regular organic search.",
-      bn: "Free product-listing click-এ Google নিজেই srsltid জুড়ে দেয় — নিয়মিত organic search থেকে আলাদা করে “google_shopping” নামে দেখানো হয়।",
+      en: "Google attaches srsltid to free product-listing clicks — shown as “google_organic_shopping” (still organic, never paid — the srsltid proof is kept in Ad Click ID).",
+      bn: "Free product-listing click-এ Google নিজেই srsltid জুড়ে দেয় — “google_organic_shopping” নামে দেখানো হয় (এখনো organic, কখনো paid না — srsltid প্রমাণ Ad Click ID-তে থেকেই যায়)।",
     },
   },
   {

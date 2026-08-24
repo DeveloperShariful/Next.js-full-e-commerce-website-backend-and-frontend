@@ -33,19 +33,19 @@ export default function VisitorSearchBar() {
   };
 
   return (
-    <form onSubmit={handleSearch} className="flex items-center gap-1">
+    <form onSubmit={handleSearch} className="flex items-center gap-1 w-full sm:w-auto">
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         disabled={isPending}
         placeholder="Search by IP address or channel..."
-        className="border border-[#8c8f94] bg-white h-[30px] px-2 text-[13px] text-[#32373c] focus:ring-1 focus:border-[#2271b1] focus:ring-[#2271b1] outline-none w-[240px] disabled:bg-gray-100"
+        className="border border-[#8c8f94] bg-white h-[34px] sm:h-[30px] px-2 text-[13px] text-[#32373c] focus:ring-1 focus:border-[#2271b1] focus:ring-[#2271b1] outline-none w-full sm:w-[240px] disabled:bg-gray-100"
       />
       <button
         type="submit"
         disabled={isPending}
-        className="border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors whitespace-nowrap disabled:opacity-70 flex items-center gap-1.5"
+        className="border border-[#8c8f94] bg-[#f6f7f7] text-[#2271b1] hover:bg-[#f0f0f1] hover:text-[#135e96] h-[34px] sm:h-[30px] px-3 text-[13px] rounded-[3px] font-medium transition-colors whitespace-nowrap disabled:opacity-70 flex items-center gap-1.5 shrink-0"
       >
         {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
         Search

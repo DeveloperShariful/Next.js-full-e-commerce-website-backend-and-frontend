@@ -68,7 +68,7 @@ export default async function VisitorsPage(props: PageProps) {
   return (
     <div className="w-full">
       {activeTab !== "guide" ? (
-        <div className="bg-white border border-[#c3c4c7] shadow-sm p-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 rounded-sm">
+        <div className="bg-white border border-[#c3c4c7] shadow-sm p-4 mb-3 sm:mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 rounded-sm">
           <div className="w-full sm:w-auto">
             <h2 className="text-[13px] font-semibold text-[#50575e] mb-2 uppercase tracking-wide">Date range:</h2>
             <DateRangePicker />
@@ -76,13 +76,13 @@ export default async function VisitorsPage(props: PageProps) {
         </div>
       ) : null}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#c3c4c7] mb-6 pb-2 sm:pb-0">
-        <div className="flex gap-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#c3c4c7] mb-6 pb-3 sm:pb-0">
+        <div className="flex gap-1 overflow-x-auto overflow-y-hidden">
           {TABS.map((t) => (
             <Link
               key={t.value}
               href={`/admin/visitors?${baseFilterQuery}&tab=${t.value}`}
-              className={`px-4 py-2.5 text-[14px] font-medium -mb-px border-b-2 transition-colors ${
+              className={`px-3 sm:px-4 py-2.5 text-[13px] sm:text-[14px] font-medium -mb-px border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === t.value
                   ? "border-[#2271b1] text-[#2271b1]"
                   : "border-transparent text-[#646970] hover:text-[#2c3338]"

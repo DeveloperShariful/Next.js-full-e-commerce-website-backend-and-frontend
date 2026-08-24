@@ -32,9 +32,17 @@ export default function DateRangePicker() {
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [selectedPeriod, setSelectedPeriod] = useState<string>("month_to_date");
-  const [comparePeriod, setComparePeriod] = useState<string>("previous_year"); 
+  const [comparePeriod, setComparePeriod] = useState<string>("previous_year");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  
+  // mobile-এ popup যেখানে শুরু হয় (trigger যত নিচেই থাকুক), viewport-এর সেই
+  // পয়েন্ট থেকে সত্যিকারের অবশিষ্ট জায়গা মেপে বসানো হয় — নাহলে fixed vh
+  // ধরে নিলে trigger নিচের দিকে থাকলে popup-এর নিচের অংশ (Update বাটন) কেটে যায়।
+  const [mobilePopupMaxHeight, setMobilePopupMaxHeight] = useState<number | null>(null);
+  // backdrop blur trigger-এর ঠিক নিচ থেকে শুরু হবে, viewport-এর একদম উপর থেকে না —
+  // তাই "Date range:" label আর trigger button নিজে কখনো blur হবে না, শুধু নিচের
+  // বাকি পেজ blur হবে।
+  const [backdropTop, setBackdropTop] = useState(0);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +67,20 @@ export default function DateRangePicker() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen || typeof window === "undefined") return;
+    const triggerBottom = dropdownRef.current?.getBoundingClientRect().bottom ?? 0;
+    setBackdropTop(triggerBottom);
+
+    if (window.innerWidth >= 640) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMobilePopupMaxHeight(null); // sm:-এর ওপরে Tailwind class-ই যথেষ্ট
+      return;
+    }
+    const available = window.innerHeight - triggerBottom - 24; // নিচে ২৪px breathing room
+    setMobilePopupMaxHeight(Math.max(available, 220)); // খুব ছোট viewport-এও ন্যূনতম ব্যবহারযোগ্য উচ্চতা
+  }, [isOpen]);
 
   const handleCompareChange = (value: string) => {
     if (comparePeriod === value) {
@@ -116,30 +138,44 @@ export default function DateRangePicker() {
         </svg>
       </div>
 
+      {/* Popup খোলা থাকলে trigger-এর নিচ থেকে বাকি পেজ হালকা blur — "Date range:"
+          label আর trigger নিজে কখনো ঢাকা পড়বে না। বাইরে ক্লিক করলে বন্ধও হয়ে যাবে। */}
+      {isOpen && (
+        <div
+          className="fixed left-0 right-0 bottom-0 bg-black/10 backdrop-blur-[2px] z-40"
+          style={{ top: backdropTop }}
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Dropdown Popover */}
       {isOpen && (
-        <div className="absolute top-full left-0 sm:left-auto mt-1 w-[95vw] sm:w-auto max-w-[600px] bg-white border border-[#c3c4c7] shadow-lg z-50 rounded-sm overflow-hidden flex flex-col max-h-[85vh] sm:max-h-none">
+        <div
+          className="absolute top-full left-0 mt-1 w-full sm:w-fit sm:max-w-[600px] bg-white border border-[#c3c4c7] shadow-lg z-50 rounded-sm overflow-hidden flex flex-col max-h-[85vh] sm:max-h-none"
+          style={mobilePopupMaxHeight !== null ? { maxHeight: `${mobilePopupMaxHeight}px` } : undefined}
+        >
           
           {/* Top Section: Presets & Calendar (Stacked on Mobile, Row on Desktop) */}
-          <div className="flex flex-col sm:flex-row overflow-y-auto sm:overflow-visible">
+          <div className="flex flex-col sm:flex-row overflow-y-auto sm:overflow-visible min-h-0">
             
             {/* Presets Column */}
             <div className="w-full sm:w-[180px] border-b sm:border-b-0 sm:border-r border-[#c3c4c7]">
-              <div className="px-4 py-2 text-[11px] font-semibold text-[#646970] uppercase tracking-wide border-b border-[#c3c4c7] bg-[#f8f9f9] sticky top-0 z-10">
+              <div className="px-4 py-1.5 sm:py-2 text-[11px] font-semibold text-[#646970] uppercase tracking-wide border-b border-[#c3c4c7] bg-[#f8f9f9] sticky top-0 z-10">
                 Presets
               </div>
-              <ul className="py-2 text-[13px] text-[#2c3338] sm:h-[320px] overflow-y-auto grid grid-cols-2 sm:block">
+              <ul className="py-1 sm:py-2 text-[13px] text-[#2c3338] sm:h-[320px] overflow-y-auto grid grid-cols-2 sm:block">
                 {PRESETS.map((preset) => (
-                  <li 
+                  <li
                     key={preset.value}
                     onClick={() => { setSelectedPeriod(preset.value); setDateRange(undefined); }}
-                    className={`px-4 py-1.5 cursor-pointer hover:bg-[#f0f0f1] hover:text-[#2271b1] ${selectedPeriod === preset.value ? "text-[#2271b1] font-semibold" : ""}`}
+                    className={`px-4 py-1 sm:py-1.5 cursor-pointer hover:bg-[#f0f0f1] hover:text-[#2271b1] ${selectedPeriod === preset.value ? "text-[#2271b1] font-semibold" : ""}`}
                   >
                     {preset.label}
                   </li>
                 ))}
-                <li 
-                  className={`px-4 py-1.5 cursor-pointer hover:bg-[#f0f0f1] hover:text-[#2271b1] ${selectedPeriod === "custom" ? "text-[#2271b1] font-semibold" : ""}`}
+                <li
+                  className={`px-4 py-1 sm:py-1.5 cursor-pointer hover:bg-[#f0f0f1] hover:text-[#2271b1] ${selectedPeriod === "custom" ? "text-[#2271b1] font-semibold" : ""}`}
                   onClick={() => setSelectedPeriod("custom")}
                 >
                   Custom
@@ -150,10 +186,40 @@ export default function DateRangePicker() {
             {/* Calendar Column */}
             <div className="p-2 sm:p-4 bg-white flex justify-center w-full sm:w-auto">
                <style>{`
-                 .rdp { --rdp-cell-size: 32px; --rdp-accent-color: #2271b1; --rdp-background-color: #f0f0f1; margin: 0;} 
-                 .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { background-color: #2271b1; color: white; } 
-                 .rdp-day_range_middle { background-color: #f0f0f1 !important; color: #2c3338 !important; }
-                 @media (min-width: 640px) { .rdp { --rdp-cell-size: 35px; } }
+                 .rdp-root {
+                   width: 100%;
+                   --rdp-accent-color: #2271b1;
+                   --rdp-accent-background-color: #f0f0f1;
+                   --rdp-day-height: 38px;
+                   --rdp-day_button-height: 34px;
+                   --rdp-nav-height: 2rem;
+                   --rdp-nav_button-height: 1.75rem;
+                   --rdp-nav_button-width: 1.75rem;
+                   --rdp-weekday-padding: 0.15rem 0rem;
+                   margin: 0;
+                 }
+                 /* Mobile-এ calendar table popup-এর সম্পূর্ণ width জুড়ে থাকবে (fluid
+                    columns) — নাহলে fixed px cell size popup-এর width-এর সাথে না
+                    মিললে দুইপাশে অদরকারি ফাঁকা জায়গা তৈরি হয়। */
+                 .rdp-months, .rdp-month { width: 100%; max-width: none; }
+                 .rdp-month_grid { width: 100%; table-layout: fixed; }
+                 .rdp-day { width: auto !important; }
+                 .rdp-day_button { width: 100% !important; }
+                 .rdp-selected .rdp-day_button,
+                 .rdp-selected .rdp-day_button:focus-visible,
+                 .rdp-selected .rdp-day_button:hover { background-color: #2271b1; color: white; }
+                 .rdp-range_middle .rdp-day_button { background-color: #f0f0f1 !important; color: #2c3338 !important; }
+                 @media (min-width: 640px) {
+                   .rdp-root {
+                     width: auto;
+                     --rdp-day-height: 34px;
+                     --rdp-day_button-height: 32px;
+                   }
+                   .rdp-months, .rdp-month { width: auto; max-width: fit-content; }
+                   .rdp-month_grid { width: auto; table-layout: auto; }
+                   .rdp-day { width: 34px !important; }
+                   .rdp-day_button { width: 32px !important; }
+                 }
                `}</style>
                <div className="overflow-x-auto w-full flex justify-center">
                  <DayPicker 
@@ -167,11 +233,11 @@ export default function DateRangePicker() {
           </div>
 
           {/* Bottom Section: Compare & Update Button (Stacked on Mobile) */}
-          <div className="border-t border-[#c3c4c7] p-4 bg-[#f8f9f9] flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 sm:gap-0 mt-auto">
-              
+          <div className="border-t border-[#c3c4c7] p-3 sm:p-4 bg-[#f8f9f9] flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 sm:gap-0 mt-auto">
+
               <div className="w-full sm:w-auto">
-                <div className="text-[11px] font-semibold text-[#646970] uppercase tracking-wide mb-2">Compare To</div>
-                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-5 text-[13px] text-[#2c3338]">
+                <div className="text-[11px] font-semibold text-[#646970] uppercase tracking-wide mb-1 sm:mb-2">Compare To</div>
+                <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-5 text-[13px] text-[#2c3338]">
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input 
                       type="checkbox" 
@@ -196,7 +262,7 @@ export default function DateRangePicker() {
 
               <button 
                 onClick={handleUpdate} 
-                className="bg-[#2271b1] hover:bg-[#135e96] text-white text-[13px] font-medium px-5 py-2 sm:py-1.5 rounded-[3px] transition-colors shadow-sm w-full sm:w-auto mt-2 sm:mt-0"
+                className="bg-[#2271b1] hover:bg-[#135e96] text-white text-[13px] font-medium px-5 py-2 sm:py-1.5 rounded-[3px] transition-colors shadow-sm w-full sm:w-auto mt-1 sm:mt-0"
               >
                 Update
               </button>

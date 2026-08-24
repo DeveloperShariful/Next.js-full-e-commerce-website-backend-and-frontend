@@ -1,4 +1,8 @@
 //File Path: app/actions/backend/marketing/gmc-onboarding.actions.ts
+//
+// Merchant API (v1)-এ migrate করা হয়েছে — accounts.authinfo() → accounts.list(),
+// accounts.update()+accounts.claimwebsite() → accounts.homepage.updateHomepage()+claim().
+// googleapis@169.0.0-এর bundled .d.ts টাইপ ডেফিনিশন সরাসরি পড়ে যাচাই করা।
 
 "use server";
 
@@ -34,17 +38,16 @@ export async function fetchAvailableMerchantAccounts() {
   await security.assertAdmin();
   try {
     const { auth } = await getAuthenticatedClient();
-    const shoppingContent = google.content({ version: "v2.1", auth });
+    const merchantapi = google.merchantapi({ version: "accounts_v1", auth });
 
-    const response = await shoppingContent.accounts.authinfo();
-    const accounts = response.data.accountIdentifiers || [];
+    const response = await merchantapi.accounts.list({});
+    const accounts = response.data.accounts || [];
 
     const formattedAccounts = accounts
-      .filter((acc) => acc.merchantId != null)
+      .filter((acc) => acc.accountId != null)
       .map((acc) => ({
-        id: String(acc.merchantId),
-        // accountName is not on the type but may exist at runtime — safe access via unknown
-        name: String((acc as unknown as Record<string, unknown>).accountName ?? `Merchant ID: ${acc.merchantId}`),
+        id: String(acc.accountId),
+        name: acc.accountName ?? `Merchant ID: ${acc.accountId}`,
       }));
 
     return { success: true, accounts: formattedAccounts };
@@ -101,18 +104,18 @@ export async function autoClaimWebsiteDomain() {
     const { auth, config } = await getAuthenticatedClient();
     if (!config?.gmcMerchantId) return { success: false, error: "No Merchant Center account selected." };
 
-    const shoppingContent = google.content({ version: "v2.1", auth });
+    const merchantapi = google.merchantapi({ version: "accounts_v1", auth });
+    const homepageName = `accounts/${config.gmcMerchantId}/homepage`;
 
-    await shoppingContent.accounts.update({
-      merchantId: config.gmcMerchantId,
-      accountId: config.gmcMerchantId,
-      requestBody: { websiteUrl: SITE_URL },
+    // প্রথমে homepage URI সেট করা (v2.1-এর accounts.update({websiteUrl}) এর সমতুল্য)
+    await merchantapi.accounts.homepage.updateHomepage({
+      name: homepageName,
+      updateMask: "uri",
+      requestBody: { uri: SITE_URL },
     });
 
-    await shoppingContent.accounts.claimwebsite({
-      merchantId: config.gmcMerchantId,
-      accountId: config.gmcMerchantId,
-    });
+    // তারপর claim করা (v2.1-এর accounts.claimwebsite() এর সমতুল্য)
+    await merchantapi.accounts.homepage.claim({ name: homepageName });
 
     await db.marketingIntegration.update({
       where: { id: "marketing_config" },

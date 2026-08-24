@@ -1,4 +1,8 @@
 //app/actions/backend/marketing/gmc-reports.actions.ts
+//
+// fetchGmcReportsData() Merchant API (v1, reports_v1) দিয়ে migrate করা হয়েছে;
+// fetchGoogleAdsMetrics() অপরিবর্তিত — এটা Google Ads API ব্যবহার করে
+// (raw REST fetch), Content API/Merchant API-র সাথে সম্পর্কহীন।
 
 "use server";
 
@@ -60,21 +64,14 @@ interface AdsApiResponse {
   results?: AdsRow[];
 }
 
-// Internal types for GMC Content API responses
-interface GmcMetrics {
-  clicks?: string | number;
-  impressions?: string | number;
-}
-
-interface GmcSegments {
+// Internal type for Merchant API's product_performance_view report rows
+// (v2.1-এর segments/metrics split এখন একটাই flat productPerformanceView অবজেক্ট)
+interface GmcPerformanceRow {
   date?: { year?: number; month?: number; day?: number };
-  offerId?: string;
-  title?: string;
-}
-
-interface GmcRow {
-  metrics?: GmcMetrics;
-  segments?: GmcSegments;
+  offerId?: string | null;
+  title?: string | null;
+  clicks?: string | number | null;
+  impressions?: string | number | null;
 }
 
 // ============================================================================
@@ -228,14 +225,26 @@ export async function fetchGmcReportsData(): Promise<{ success: boolean; data?: 
     const oauth2Client = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
     oauth2Client.setCredentials({ refresh_token: config.googleRefreshToken });
 
-    const shoppingContent = google.content({ version: "v2.1", auth: oauth2Client });
+    const merchantapi = google.merchantapi({ version: "reports_v1", auth: oauth2Client });
+    const parent = `accounts/${config.gmcMerchantId}`;
 
-    const dailyQuery = `SELECT segments.date, metrics.clicks, metrics.impressions FROM MerchantPerformanceView WHERE segments.date DURING LAST_30_DAYS ORDER BY segments.date ASC`;
-    const productQuery = `SELECT segments.offer_id, segments.title, metrics.clicks, metrics.impressions FROM MerchantPerformanceView WHERE segments.date DURING LAST_30_DAYS ORDER BY metrics.clicks DESC LIMIT 50`;
+    // Merchant API-র GoQL-এ DURING LAST_30_DAYS নেই — সরাসরি তারিখ লিখতে হয়
+    // (Google-এর অফিসিয়াল ডকুমেন্টেশনে যাচাই করা: `WHERE date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'`)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    const fmt = (d: Date) => d.toISOString().split("T")[0];
+    const dateRange = `date BETWEEN '${fmt(startDate)}' AND '${fmt(endDate)}'`;
+
+    // segments./metrics. prefix বাদ, table নাম MerchantPerformanceView থেকে
+    // product_performance_view (snake_case) — v2.1-এর REST reports API থেকে
+    // ভিন্ন GoQL ডায়ালেক্ট, Google-এর অফিসিয়াল guide অনুযায়ী
+    const dailyQuery = `SELECT date, clicks, impressions FROM product_performance_view WHERE ${dateRange} ORDER BY date ASC`;
+    const productQuery = `SELECT offer_id, title, clicks, impressions FROM product_performance_view WHERE ${dateRange} ORDER BY clicks DESC LIMIT 50`;
 
     const [dailyRes, productRes] = await Promise.all([
-      shoppingContent.reports.search({ merchantId: config.gmcMerchantId, requestBody: { query: dailyQuery } }).catch(() => null),
-      shoppingContent.reports.search({ merchantId: config.gmcMerchantId, requestBody: { query: productQuery } }).catch(() => null),
+      merchantapi.accounts.reports.search({ parent, requestBody: { query: dailyQuery } }).catch(() => null),
+      merchantapi.accounts.reports.search({ parent, requestBody: { query: productQuery } }).catch(() => null),
     ]);
 
     let totalClicks = 0;
@@ -244,13 +253,13 @@ export async function fetchGmcReportsData(): Promise<{ success: boolean; data?: 
     const productData: GmcReportData["productData"] = [];
 
     if (dailyRes?.data?.results) {
-      (dailyRes.data.results as GmcRow[]).forEach((row) => {
-        const m = row.metrics ?? {};
-        const d = row.segments?.date ?? {};
+      (dailyRes.data.results as { productPerformanceView?: GmcPerformanceRow }[]).forEach((row) => {
+        const v = row.productPerformanceView;
+        const d = v?.date ?? {};
         if (d.year && d.month && d.day) {
           const dateStr = `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
-          const clicks = Number(m.clicks ?? 0);
-          const impressions = Number(m.impressions ?? 0);
+          const clicks = Number(v?.clicks ?? 0);
+          const impressions = Number(v?.impressions ?? 0);
           totalClicks += clicks;
           totalImpressions += impressions;
           chartData.push({
@@ -263,14 +272,13 @@ export async function fetchGmcReportsData(): Promise<{ success: boolean; data?: 
     }
 
     if (productRes?.data?.results) {
-      (productRes.data.results as GmcRow[]).forEach((row) => {
-        const m = row.metrics ?? {};
-        const s = row.segments ?? {};
+      (productRes.data.results as { productPerformanceView?: GmcPerformanceRow }[]).forEach((row) => {
+        const v = row.productPerformanceView;
         productData.push({
-          id: s.offerId ?? "Unknown ID",
-          title: s.title ?? "Unknown Product",
-          clicks: Number(m.clicks ?? 0),
-          impressions: Number(m.impressions ?? 0),
+          id: v?.offerId ?? "Unknown ID",
+          title: v?.title ?? "Unknown Product",
+          clicks: Number(v?.clicks ?? 0),
+          impressions: Number(v?.impressions ?? 0),
         });
       });
     }

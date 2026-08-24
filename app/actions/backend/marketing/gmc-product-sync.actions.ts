@@ -1,4 +1,36 @@
 //File Path: app/actions/backend/marketing/gmc-product-sync.actions.ts
+//
+// ★★★ MERCHANT API (v1) — Content API for Shopping v2.1 এখান থেকে পুরোপুরি সরানো হয়েছে ★★★
+// Content API for Shopping অফিসিয়ালি sunset হয়ে গেছে (Aug 18, 2026); এই
+// ফাইল এখন সম্পূর্ণ Google Merchant API (v1)-এর মাধ্যমে চলে। লাইভ টেস্ট করে
+// (একটা real product দিয়ে, admin UI-এর সাময়িক "Test V2" বাটন দিয়ে) নিশ্চিত
+// হওয়ার পরই এই কাটওভার করা হয়েছে — পুরনো offerId/contentLanguage/feedLabel
+// scheme হুবহু বজায় রাখা হয়েছে, তাই Google Merchant Center-এ এটা duplicate
+// entry তৈরি না করে বিদ্যমান product-গুলোকেই আপডেট করে (যাচাই করা হয়েছে:
+// টেস্ট product-এর creationDate অপরিবর্তিত থেকেছে, শুধু lastUpdateDate বদলেছে)।
+//
+// পুরনো v2.1 ও Merchant API-র মূল পার্থক্য (googleapis@169.0.0-এর bundled
+// .d.ts টাইপ ডেফিনিশন + লাইভ API কল সরাসরি যাচাই করে, guess না):
+//   - merchantId প্যারামিটার নেই, বরং parent: "accounts/{id}" + একটা
+//     আবশ্যিক dataSource: "accounts/{id}/dataSources/{id}" লাগে
+//     (MarketingIntegration.gmcDataSourceName-এ সংরক্ষিত, একবার তৈরি করা হয়)।
+//   - title/price/gtin ইত্যাদি flat field না, সব productAttributes অবজেক্টের
+//     ভেতরে নেস্টেড।
+//   - price/salePrice: { value, currency } থেকে { amountMicros, currencyCode }।
+//   - gtin (single string) → gtins (string array)। sizes (array) → size
+//     (single string)। sizeType (single) → sizeTypes (array)। multipack
+//     number → multipack string।
+//   - availability/condition/gender/ageGroup এখন protobuf enum (UPPER_SNAKE_CASE,
+//     যেমন "IN_STOCK", "NEW") — v2.1-এর lowercase ("in stock", "new") আর
+//     গ্রহণযোগ্য না, একটা লাইভ টেস্ট কলে Google-এর প্রকৃত error message থেকে
+//     এটা নিশ্চিত হওয়া হয়েছে।
+//   - productstatuses.get/list বাদ, এখন accounts.products.get/list-এর
+//     productStatus ফিল্ডে থাকে। destinationStatuses-এ আর "status" নেই,
+//     বরং approvedCountries/disapprovedCountries/pendingCountries array।
+//   - countryOfOrigin নামে কোনো strongly-typed field নেই এই API-তে (যাচাই
+//     করা হয়েছে) — তাই customAttributes দিয়ে generic ভাবে পাঠানো হচ্ছে,
+//     যেটা Google নিজেই এই ধরনের gap-এর জন্য documented fallback হিসেবে
+//     রেখেছে।
 
 "use server";
 
@@ -7,6 +39,7 @@ import { db } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { security } from "@/lib/security";
+import type { merchantapi_products_v1 } from "googleapis/build/src/apis/merchantapi/products_v1";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
@@ -22,6 +55,7 @@ interface GmcConfig {
   gmcTargetCountry: string | null;
   gmcContentApiEnabled: boolean;
   gmcAttributeMapping: Prisma.JsonValue;
+  gmcDataSourceName: string | null;
 }
 
 interface ProductAttribute {
@@ -78,15 +112,32 @@ interface ProductForSync {
 }
 
 // ============================================================================
-// 1. GET GOOGLE CLIENT
+// 1. GET GOOGLE MERCHANT API CLIENT
 // ============================================================================
-async function getGoogleContentClient(config: GmcConfig) {
+async function getGoogleMerchantClient(config: GmcConfig) {
   if (!config.googleRefreshToken || !config.gmcMerchantId) {
     throw new Error("Google account is not fully connected or Merchant ID is missing.");
   }
   const oauth2Client = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
   oauth2Client.setCredentials({ refresh_token: config.googleRefreshToken });
-  return google.content({ version: "v2.1", auth: oauth2Client });
+  // Content API v2.1 আর Merchant API একই OAuth scope
+  // (https://www.googleapis.com/auth/content) শেয়ার করে বলে refresh token
+  // পুনরায় consent ছাড়াই কাজ করে — Google-এর অফিসিয়াল ডকুমেন্টেশনে যাচাই করা।
+  return google.merchantapi({ version: "products_v1", auth: oauth2Client });
+}
+
+function getAccountName(config: GmcConfig): string {
+  return `accounts/${config.gmcMerchantId}`;
+}
+
+// productInput-এর id অংশ বানায়: "{contentLanguage}~{feedLabel}~{offerId}"।
+// GoBike-এর offerId (product.id) Prisma cuid/uuid — তাতে ~, /, % কখনো থাকে
+// না, তাই plain (tilde) format যথেষ্ট। Google base64url encoding recommend
+// করে শুধু তখনই যখন offerId-তে এসব special character থাকার সম্ভাবনা থাকে।
+function buildProductSegment(config: GmcConfig, offerId: string): string {
+  const contentLanguage = (config.gmcLanguage || "en").toLowerCase().trim();
+  const feedLabel = (config.gmcTargetCountry || "AU").toUpperCase().trim();
+  return `${contentLanguage}~${feedLabel}~${offerId}`;
 }
 
 // ============================================================================
@@ -121,7 +172,6 @@ function extractMappedValue(mappedKeys: string[], product: ProductForSync): stri
 // ============================================================================
 function formatGmcUrl(url: string | null | undefined): string {
   if (!url) return "";
-  // Replace any localhost or staging origin with the real production SITE_URL
   return url.replace(/^https?:\/\/(localhost:\d+|[^/]*gobike\.au)/, SITE_URL);
 }
 
@@ -135,22 +185,24 @@ function stripHtmlTags(html: string): string {
 
 // ============================================================================
 // 4b. HELPER: PARSE GOOGLE TAXONOMY ID
-// Google's taxonomy file format: "3951 - Vehicles & Parts > Vehicles > Cycles > Electric Bikes"
-// Content API only accepts: "3951" (ID) or "Vehicles & Parts > ..." (path) — NOT the combined format
-// This extracts the numeric ID which is the most reliable format
 // ============================================================================
 function parseTaxonomyId(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
   const trimmed = raw.trim();
-  // e.g. "3951 - Vehicles & Parts > ..." → "3951"
   const match = trimmed.match(/^(\d+)\s*-/);
   if (match) return match[1];
-  // If it's already a pure number or pure path, return as-is
   return trimmed || undefined;
 }
 
 // ============================================================================
-// 5. MAIN PRODUCT SYNC ENGINE
+// 4c. HELPER: ISO 8601 (RFC3339) ফরম্যাটে, মিলিসেকেন্ড ছাড়া
+// ============================================================================
+function toRfc3339(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+// ============================================================================
+// 5. MAIN PRODUCT SYNC ENGINE (Merchant API — productInputs.insert)
 // ============================================================================
 export async function syncProductToGoogle(productId: string) {
   await security.assertAdmin();
@@ -158,6 +210,9 @@ export async function syncProductToGoogle(productId: string) {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
 
     if (!config?.gmcContentApiEnabled) return { success: false, error: "GMC Auto Sync is disabled." };
+    if (!config.gmcDataSourceName) {
+      return { success: false, error: "Merchant API data source not configured yet (gmcDataSourceName missing)." };
+    }
 
     const product = await db.product.findUnique({
       where: { id: productId },
@@ -184,9 +239,8 @@ export async function syncProductToGoogle(productId: string) {
           : (config.gmcAttributeMapping as Record<string, unknown>)
         : null;
 
-    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
+    const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
 
-    // Ignore googleTitle if it contains SEO template variables (e.g. from WooCommerce Rank Math import)
     const isSeoTemplate = (s: string) => /%[a-z_]+%/i.test(s);
     const finalTitle =
       product.googleTitle && product.googleTitle.trim() !== "" && !isSeoTemplate(product.googleTitle)
@@ -198,7 +252,6 @@ export async function syncProductToGoogle(productId: string) {
         ? product.googleDescription
         : product.description || product.shortDescription || product.name;
 
-    // Extract Google-specific fields from metafields JSON
     let google_size = "";
     let google_size_system = "";
     let google_size_type = "";
@@ -209,13 +262,11 @@ export async function syncProductToGoogle(productId: string) {
     let google_adult_content = false;
     let google_availability_date = "";
 
-    // Start with Facebook/shared column values as base fallback
     if (product.size) google_size = product.size;
     if (product.color) google_color = product.color;
     if (product.material) google_material = product.material;
     if (product.pattern) google_pattern = product.pattern;
 
-    // Google-specific metafields take priority — they override the shared columns
     if (product.metafields && typeof product.metafields === "object" && !Array.isArray(product.metafields)) {
       const meta = product.metafields as unknown as Record<string, unknown>;
       if (typeof meta.google_size === "string" && meta.google_size) google_size = meta.google_size;
@@ -231,124 +282,134 @@ export async function syncProductToGoogle(productId: string) {
       }
     }
 
-    const googleProductParams: Record<string, unknown> = {
-      offerId: product.id,
+    const productAttributes: merchantapi_products_v1.Schema$ProductAttributes = {
       title: finalTitle,
       description: stripHtmlTags(finalDescription),
       link: formatGmcUrl(`${SITE_URL}/product/${product.slug}`),
       imageLink: formatGmcUrl(product.featuredImage),
-      contentLanguage: config.gmcLanguage || "en",
-      targetCountry: config.gmcTargetCountry || "AU",
-      channel: "online",
-      availability: product.isPreOrder ? "preorder" : (product.trackQuantity === false || product.stock > 0 ? "in stock" : "out of stock"),
-      condition: product.condition.toLowerCase(),
-      price: { value: Number(product.price).toFixed(2), currency: "AUD" },
+      availability: product.isPreOrder ? "PREORDER" : (product.trackQuantity === false || product.stock > 0 ? "IN_STOCK" : "OUT_OF_STOCK"),
+      // product.condition আগে থেকেই Prisma enum ProductCondition (NEW/REFURBISHED/USED),
+      // যেটা Merchant API-র প্রত্যাশিত uppercase ফরম্যাটের সাথে already মিলে যায়।
+      condition: product.condition,
+      price: { amountMicros: String(Math.round(Number(product.price) * 1_000_000)), currencyCode: "AUD" },
       brand: product.brand?.name || "Generic",
-      gtin: product.barcode || undefined,
+      gtins: product.barcode ? [product.barcode] : undefined,
       mpn: product.mpn || undefined,
       gender: product.gender || undefined,
       ageGroup: product.ageGroup || undefined,
       isBundle: product.googleIsBundle,
     };
 
-    // Sale price — only send if it's a valid discount below regular price
+    // Sale price — শুধু তখনই পাঠানো হচ্ছে যখন এটা একটা valid discount
     if (product.salePrice && Number(product.salePrice) > 0 && Number(product.salePrice) < Number(product.price)) {
-      googleProductParams.salePrice = { value: Number(product.salePrice).toFixed(2), currency: "AUD" };
+      productAttributes.salePrice = { amountMicros: String(Math.round(Number(product.salePrice) * 1_000_000)), currencyCode: "AUD" };
       if (product.saleStart && product.saleEnd) {
-        const fmt = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
-        googleProductParams.salePriceEffectiveDate = `${fmt(product.saleStart)}/${fmt(product.saleEnd)}`;
+        productAttributes.salePriceEffectiveDate = {
+          startTime: toRfc3339(product.saleStart),
+          endTime: toRfc3339(product.saleEnd),
+        };
       }
     }
 
-    // identifier_exists: false is required by Google when product has no GTIN or MPN
-    // Without it, Google will flag the product as "incomplete" and may disapprove it
+    // GTIN/MPN দুটোই না থাকলে identifierExists: false — নাহলে Google
+    // product-টাকে "incomplete" ধরে disapprove করতে পারে
     if (!product.barcode && !product.mpn) {
-      googleProductParams.identifierExists = false;
-    }
-
-    // Country of origin
-    if (product.countryOfManufacture) {
-      googleProductParams.countryOfOrigin = product.countryOfManufacture;
+      productAttributes.identifierExists = false;
     }
 
     if (product.images && product.images.length > 1) {
-      googleProductParams.additionalImageLinks = product.images.slice(1, 11).map((img) => formatGmcUrl(img.url));
+      productAttributes.additionalImageLinks = product.images.slice(1, 11).map((img) => formatGmcUrl(img.url));
     }
 
-    // Category mapping — parse taxonomy ID from stored value
-    // (taxonomy file stores "3951 - Vehicles & Parts > ...", API needs just "3951")
     const rawGoogleCategory =
       product.googleProductCategory ||
       product.categories.find((c) => c.googleCategoryName)?.googleCategoryName ||
       (mappingRules?.attributes?.defaultCategory as string | undefined);
     const googleCategory = parseTaxonomyId(rawGoogleCategory);
-    if (googleCategory) googleProductParams.googleProductCategory = googleCategory;
+    if (googleCategory) productAttributes.googleProductCategory = googleCategory;
 
     if (product.categories.length > 0) {
-      googleProductParams.productTypes = [product.categories.map((c) => c.name).join(" > ")];
+      productAttributes.productTypes = [product.categories.map((c) => c.name).join(" > ")];
     }
 
     const weightUnit = product.weightUnit ?? "kg";
     const dimUnit = product.dimensionUnit ?? "cm";
-    if (product.weight) googleProductParams.shippingWeight = { value: Number(product.weight), unit: weightUnit };
+    if (product.weight) productAttributes.shippingWeight = { value: Number(product.weight), unit: weightUnit };
     if (product.length && product.width && product.height) {
-      googleProductParams.shippingLength = { value: Number(product.length), unit: dimUnit };
-      googleProductParams.shippingWidth = { value: Number(product.width), unit: dimUnit };
-      googleProductParams.shippingHeight = { value: Number(product.height), unit: dimUnit };
+      productAttributes.shippingLength = { value: Number(product.length), unit: dimUnit };
+      productAttributes.shippingWidth = { value: Number(product.width), unit: dimUnit };
+      productAttributes.shippingHeight = { value: Number(product.height), unit: dimUnit };
     }
 
-    if (google_size) googleProductParams.sizes = [google_size];
-    if (google_size_system) googleProductParams.sizeSystem = google_size_system;
-    if (google_size_type) googleProductParams.sizeType = google_size_type;
-    if (google_color) googleProductParams.color = google_color;
-    if (google_material) googleProductParams.material = google_material;
-    if (google_pattern) googleProductParams.pattern = google_pattern;
-    if (google_multipack) googleProductParams.multipack = google_multipack;
-    if (google_adult_content) googleProductParams.adult = google_adult_content;
+    if (google_size) productAttributes.size = google_size;
+    if (google_size_system) productAttributes.sizeSystem = google_size_system;
+    if (google_size_type) productAttributes.sizeTypes = [google_size_type];
+    if (google_color) productAttributes.color = google_color;
+    if (google_material) productAttributes.material = google_material;
+    if (google_pattern) productAttributes.pattern = google_pattern;
+    if (google_multipack) productAttributes.multipack = String(google_multipack);
+    if (google_adult_content) productAttributes.adult = google_adult_content;
     if (google_availability_date) {
-      googleProductParams.availabilityDate = new Date(google_availability_date).toISOString();
+      productAttributes.availabilityDate = new Date(google_availability_date).toISOString();
     }
 
-    // Apply attribute mapping rules
     if (mappingRules?.attributes) {
       const attrs = mappingRules.attributes as Record<string, string[]>;
-      if (!googleProductParams.color) googleProductParams.color = extractMappedValue(attrs.color ?? [], product);
-      if (!googleProductParams.sizes) {
-        const sizeVal = extractMappedValue(attrs.size ?? [], product);
-        if (sizeVal) googleProductParams.sizes = [sizeVal];
-      }
-      if (!googleProductParams.material) googleProductParams.material = extractMappedValue(attrs.material ?? [], product);
-      if (!googleProductParams.pattern) googleProductParams.pattern = extractMappedValue(attrs.pattern ?? [], product);
-      if (!googleProductParams.gender) googleProductParams.gender = extractMappedValue(attrs.gender ?? [], product);
-      if (!googleProductParams.ageGroup) googleProductParams.ageGroup = extractMappedValue(attrs.ageGroup ?? [], product);
+      if (!productAttributes.color) productAttributes.color = extractMappedValue(attrs.color ?? [], product);
+      if (!productAttributes.size) productAttributes.size = extractMappedValue(attrs.size ?? [], product);
+      if (!productAttributes.material) productAttributes.material = extractMappedValue(attrs.material ?? [], product);
+      if (!productAttributes.pattern) productAttributes.pattern = extractMappedValue(attrs.pattern ?? [], product);
+      if (!productAttributes.gender) productAttributes.gender = extractMappedValue(attrs.gender ?? [], product);
+      if (!productAttributes.ageGroup) productAttributes.ageGroup = extractMappedValue(attrs.ageGroup ?? [], product);
     }
 
     if (mappingRules?.customLabels) {
       const labels = mappingRules.customLabels as Record<string, string[]>;
-      googleProductParams.customLabel0 = extractMappedValue(labels.customLabel0 ?? [], product);
-      googleProductParams.customLabel1 = extractMappedValue(labels.customLabel1 ?? [], product);
-      googleProductParams.customLabel2 = extractMappedValue(labels.customLabel2 ?? [], product);
-      googleProductParams.customLabel3 = extractMappedValue(labels.customLabel3 ?? [], product);
-      googleProductParams.customLabel4 = extractMappedValue(labels.customLabel4 ?? [], product);
+      productAttributes.customLabel0 = extractMappedValue(labels.customLabel0 ?? [], product);
+      productAttributes.customLabel1 = extractMappedValue(labels.customLabel1 ?? [], product);
+      productAttributes.customLabel2 = extractMappedValue(labels.customLabel2 ?? [], product);
+      productAttributes.customLabel3 = extractMappedValue(labels.customLabel3 ?? [], product);
+      productAttributes.customLabel4 = extractMappedValue(labels.customLabel4 ?? [], product);
     }
 
-    // Remove undefined / empty string values
-    Object.keys(googleProductParams).forEach((key) => {
-      if (googleProductParams[key] === undefined || googleProductParams[key] === "") {
-        delete googleProductParams[key];
+    // gender/ageGroup admin ফর্মে lowercase সংরক্ষিত হয় ("male", "kids" ইত্যাদি,
+    // v2.1-এর convention অনুযায়ী) — Merchant API-র enum uppercase আশা করে
+    if (productAttributes.gender) productAttributes.gender = productAttributes.gender.toUpperCase();
+    if (productAttributes.ageGroup) productAttributes.ageGroup = productAttributes.ageGroup.toUpperCase();
+
+    // undefined/empty string ভ্যালু বাদ দেওয়া
+    (Object.keys(productAttributes) as (keyof typeof productAttributes)[]).forEach((key) => {
+      if (productAttributes[key] === undefined || productAttributes[key] === "") {
+        delete productAttributes[key];
       }
     });
 
-    const response = await shoppingContent.products.insert({
-      merchantId: config.gmcMerchantId!,
-      requestBody: googleProductParams,
+    // countryOfOrigin-এর কোনো strongly-typed field Merchant API-তে নেই
+    // (googleapis-এর .d.ts টাইপ ডেফিনিশনে যাচাই করা) — তাই Google-এর নিজের
+    // documented fallback অনুযায়ী customAttributes দিয়ে পাঠানো হচ্ছে, যাতে
+    // এই ডেটা হারিয়ে না যায়।
+    const customAttributes: merchantapi_products_v1.Schema$CustomAttribute[] = [];
+    if (product.countryOfManufacture) {
+      customAttributes.push({ name: "country_of_origin", value: product.countryOfManufacture });
+    }
+
+    const response = await merchantapi.accounts.productInputs.insert({
+      parent: getAccountName(config as GmcConfig),
+      dataSource: config.gmcDataSourceName,
+      requestBody: {
+        contentLanguage: (config.gmcLanguage || "en").toLowerCase().trim(),
+        feedLabel: (config.gmcTargetCountry || "AU").toUpperCase().trim(),
+        offerId: product.id,
+        productAttributes,
+        customAttributes: customAttributes.length > 0 ? customAttributes : undefined,
+      },
     });
 
     await db.productChannelStatus.upsert({
       where: { productId_channel: { productId: product.id, channel: "GOOGLE" } },
       update: {
         status: "SYNCED",
-        channelProductId: response.data.id,
+        channelProductId: response.data.product || `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, product.id)}`,
         errorMessage: null,
         googleIssues: Prisma.DbNull,
         lastSyncedAt: new Date(),
@@ -357,7 +418,7 @@ export async function syncProductToGoogle(productId: string) {
         productId: product.id,
         channel: "GOOGLE",
         status: "SYNCED",
-        channelProductId: response.data.id,
+        channelProductId: response.data.product || `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, product.id)}`,
         lastSyncedAt: new Date(),
       },
     });
@@ -393,20 +454,19 @@ export async function syncProductToGoogle(productId: string) {
 }
 
 // ============================================================================
-// 6. REMOVE PRODUCT FROM GOOGLE
+// 6. REMOVE PRODUCT FROM GOOGLE (productInputs.delete)
 // ============================================================================
 export async function removeProductFromGoogle(productId: string) {
   await security.assertAdmin();
   try {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
     if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) return { success: false, error: "GMC not enabled." };
+    if (!config.gmcDataSourceName) return { success: false, error: "Merchant API data source not configured yet." };
 
-    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
-    const lang = (config.gmcLanguage || "en").toLowerCase().trim();
-    const country = (config.gmcTargetCountry || "AU").toUpperCase().trim();
-    const googleProductId = `online:${lang}:${country}:${productId}`;
+    const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
+    const productInputName = `${getAccountName(config as GmcConfig)}/productInputs/${buildProductSegment(config as GmcConfig, productId)}`;
 
-    await shoppingContent.products.delete({ merchantId: config.gmcMerchantId, productId: googleProductId });
+    await merchantapi.accounts.productInputs.delete({ name: productInputName, dataSource: config.gmcDataSourceName });
 
     await db.productChannelStatus.upsert({
       where: { productId_channel: { productId, channel: "GOOGLE" } },
@@ -457,6 +517,9 @@ export async function updateProductChannelVisibility(productId: string, status: 
 
 // ============================================================================
 // 8. BATCH SYNC CONTROLLER (parallel with concurrency limit)
+// Merchant API-তে customBatch নেই (Google-এর নিজস্ব migration guide অনুযায়ী)
+// — কিন্তু পুরনো কোডও কখনো customBatch ব্যবহার করেনি, এই 5-এর chunk-এ
+// concurrent call করার প্যাটার্নটাই আগে থেকেই সঠিক পন্থা, তাই অপরিবর্তিত।
 // ============================================================================
 export async function bulkUpdateProductVisibility(
   updates: { productId: string; status: "SYNCED" | "EXCLUDED" }[]
@@ -465,7 +528,6 @@ export async function bulkUpdateProductVisibility(
   try {
     if (!updates || updates.length === 0) return { success: true };
 
-    // Process in chunks of 5 to avoid Google API rate limits
     const CHUNK_SIZE = 5;
     const errors: string[] = [];
 
@@ -497,6 +559,32 @@ export async function bulkUpdateProductVisibility(
 }
 
 // ============================================================================
+// Shared: একটা processed Product-এর destinationStatuses/itemLevelIssues থেকে
+// লোকাল status বের করা। Merchant API-তে destinationStatuses-এ আর "status"
+// field নেই — approvedCountries/disapprovedCountries/pendingCountries array আছে।
+// ============================================================================
+function resolveStatusFromProductStatus(
+  productStatus: merchantapi_products_v1.Schema$ProductStatus | undefined
+): { finalStatus: "SYNCED" | "FAILED" | "PENDING"; errorMessage: string | null; googleIssues: Prisma.InputJsonValue | typeof Prisma.DbNull } {
+  const destinationStatuses = productStatus?.destinationStatuses || [];
+  const isDisapproved = destinationStatuses.some((d) => (d.disapprovedCountries?.length ?? 0) > 0);
+  const isPending = destinationStatuses.some((d) => (d.pendingCountries?.length ?? 0) > 0);
+
+  if (isDisapproved) {
+    const issues = productStatus?.itemLevelIssues || [];
+    return {
+      finalStatus: "FAILED",
+      errorMessage: issues.length > 0 ? issues[0].description ?? "Disapproved by Google." : "Disapproved by Google.",
+      googleIssues: issues as unknown as Prisma.InputJsonValue,
+    };
+  }
+  if (isPending) {
+    return { finalStatus: "PENDING", errorMessage: "Pending policy review by Google.", googleIssues: Prisma.DbNull };
+  }
+  return { finalStatus: "SYNCED", errorMessage: null, googleIssues: Prisma.DbNull };
+}
+
+// ============================================================================
 // 9. SYNC LIVE PRODUCT STATUSES FROM GOOGLE (on-demand, not on every page load)
 // ============================================================================
 export async function syncLiveProductStatuses() {
@@ -505,17 +593,18 @@ export async function syncLiveProductStatuses() {
     const config = await db.marketingIntegration.findUnique({ where: { id: "marketing_config" } });
     if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) return { success: false };
 
-    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
+    const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
+    const parent = getAccountName(config as GmcConfig);
 
-    const firstStatusPage = await shoppingContent.productstatuses.list({ merchantId: config.gmcMerchantId, maxResults: 250 });
-    const googleStatuses = [...(firstStatusPage.data.resources ?? [])];
-    let statusNextToken: string | undefined = firstStatusPage.data.nextPageToken ?? undefined;
-    while (statusNextToken) {
-      const statusPage = await shoppingContent.productstatuses.list({ merchantId: config.gmcMerchantId, maxResults: 250, pageToken: statusNextToken });
-      googleStatuses.push(...(statusPage.data.resources ?? []));
-      statusNextToken = statusPage.data.nextPageToken ?? undefined;
+    const firstPage = await merchantapi.accounts.products.list({ parent, pageSize: 250 });
+    const products = [...(firstPage.data.products ?? [])];
+    let pageToken: string | undefined = firstPage.data.nextPageToken ?? undefined;
+    while (pageToken) {
+      const page = await merchantapi.accounts.products.list({ parent, pageSize: 250, pageToken });
+      products.push(...(page.data.products ?? []));
+      pageToken = page.data.nextPageToken ?? undefined;
     }
-    if (googleStatuses.length === 0) return { success: true };
+    if (products.length === 0) return { success: true };
 
     // Batch-fetch all local statuses and product IDs to avoid N+1 queries
     const [existingStatuses, existingProducts] = await Promise.all([
@@ -534,32 +623,14 @@ export async function syncLiveProductStatuses() {
     );
     const validProductIds = new Set(existingProducts.map((p) => p.id));
 
-    // Build upsert operations
-    const upsertOps = googleStatuses
-      .map((gStatus) => {
-        const parts = gStatus.productId?.split(":");
-        const localProductId = parts ? parts[parts.length - 1] : null;
+    const upsertOps = products
+      .map((p) => {
+        const localProductId = p.offerId;
         if (!localProductId || excludedSet.has(localProductId) || !validProductIds.has(localProductId)) {
           return null;
         }
 
-        const destinationStatuses = gStatus.destinationStatuses || [];
-        const isDisapproved = destinationStatuses.some((d) => d.status === "disapproved");
-        const isPending = destinationStatuses.some((d) => d.status === "pending");
-
-        let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "SYNCED";
-        let errorMessage: string | null = null;
-        let googleIssues: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
-
-        if (isDisapproved) {
-          finalStatus = "FAILED";
-          const issues = gStatus.itemLevelIssues || [];
-          errorMessage = issues.length > 0 ? issues[0].description ?? "Disapproved by Google." : "Disapproved by Google.";
-          googleIssues = issues as unknown as Prisma.InputJsonValue;
-        } else if (isPending) {
-          finalStatus = "PENDING";
-          errorMessage = "Pending policy review by Google.";
-        }
+        const { finalStatus, errorMessage, googleIssues } = resolveStatusFromProductStatus(p.productStatus);
 
         return db.productChannelStatus.upsert({
           where: { productId_channel: { productId: localProductId, channel: "GOOGLE" } },
@@ -592,38 +663,16 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
       return { success: false, error: "GMC is not enabled." };
     }
 
-    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
-    const lang = (config.gmcLanguage || "en").toLowerCase().trim();
-    const country = (config.gmcTargetCountry || "AU").toUpperCase().trim();
-    const googleProductId = `online:${lang}:${country}:${productId}`;
+    const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
+    const productName = `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, productId)}`;
 
     let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "PENDING";
     let errorMessage: string | null = null;
     let googleIssues: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
 
     try {
-      const response = await shoppingContent.productstatuses.get({
-        merchantId: config.gmcMerchantId,
-        productId: googleProductId,
-      });
-
-      const gStatus = response.data;
-      const destinationStatuses = gStatus.destinationStatuses || [];
-      const isDisapproved = destinationStatuses.some((d) => d.status === "disapproved");
-      const isPending = destinationStatuses.some((d) => d.status === "pending");
-
-      if (isDisapproved) {
-        finalStatus = "FAILED";
-        const issues = gStatus.itemLevelIssues || [];
-        errorMessage = issues.length > 0 ? issues[0].description ?? "Disapproved by Google." : "Disapproved by Google.";
-        // Store ALL issues for detailed UI display
-        googleIssues = issues as unknown as Prisma.InputJsonValue;
-      } else if (isPending) {
-        finalStatus = "PENDING";
-        errorMessage = "Pending policy review by Google.";
-      } else {
-        finalStatus = "SYNCED";
-      }
+      const response = await merchantapi.accounts.products.get({ name: productName });
+      ({ finalStatus, errorMessage, googleIssues } = resolveStatusFromProductStatus(response.data.productStatus));
     } catch (apiError: unknown) {
       const errObj = apiError as { status?: number; message?: string };
       if (errObj.status === 404 || errObj.message?.toLowerCase().includes("not found")) {
@@ -665,39 +714,29 @@ export async function getGoogleMCStats() {
     if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) {
       return { success: false, data: null };
     }
-    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
-    const merchantId = config.gmcMerchantId;
+    const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
+    const parent = getAccountName(config as GmcConfig);
 
-    // Paginated product count
-    const firstPage = await shoppingContent.products.list({ merchantId, maxResults: 250 });
-    let totalProducts = (firstPage.data.resources ?? []).length;
-    let nextToken: string | undefined = firstPage.data.nextPageToken ?? undefined;
-    while (nextToken) {
-      const res = await shoppingContent.products.list({ merchantId, maxResults: 250, pageToken: nextToken });
-      totalProducts += (res.data.resources ?? []).length;
-      nextToken = res.data.nextPageToken ?? undefined;
+    const firstPage = await merchantapi.accounts.products.list({ parent, pageSize: 250 });
+    const products = [...(firstPage.data.products ?? [])];
+    let pageToken: string | undefined = firstPage.data.nextPageToken ?? undefined;
+    while (pageToken) {
+      const page = await merchantapi.accounts.products.list({ parent, pageSize: 250, pageToken });
+      products.push(...(page.data.products ?? []));
+      pageToken = page.data.nextPageToken ?? undefined;
     }
 
-    // Status breakdown from Google's own review system (paginated)
-    const firstStatusPage = await shoppingContent.productstatuses.list({ merchantId, maxResults: 250 });
-    const statuses = [...(firstStatusPage.data.resources ?? [])];
-    let statusNextToken: string | undefined = firstStatusPage.data.nextPageToken ?? undefined;
-    while (statusNextToken) {
-      const statusPage = await shoppingContent.productstatuses.list({ merchantId, maxResults: 250, pageToken: statusNextToken });
-      statuses.push(...(statusPage.data.resources ?? []));
-      statusNextToken = statusPage.data.nextPageToken ?? undefined;
-    }
     let approved = 0, disapproved = 0, pending = 0;
-    for (const s of statuses) {
-      const dests = s.destinationStatuses ?? [];
-      if (dests.some((d) => d.status === "disapproved")) disapproved++;
-      else if (dests.some((d) => d.status === "pending")) pending++;
+    for (const p of products) {
+      const dests = p.productStatus?.destinationStatuses ?? [];
+      if (dests.some((d) => (d.disapprovedCountries?.length ?? 0) > 0)) disapproved++;
+      else if (dests.some((d) => (d.pendingCountries?.length ?? 0) > 0)) pending++;
       else approved++;
     }
 
     return {
       success: true,
-      data: { totalProducts, approved, disapproved, pending },
+      data: { totalProducts: products.length, approved, disapproved, pending },
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";
@@ -718,56 +757,51 @@ export async function cleanupStaleGoogleProducts() {
     if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) {
       return { success: false, error: "GMC is not enabled or Merchant ID is missing." };
     }
+    if (!config.gmcDataSourceName) return { success: false, error: "Merchant API data source not configured yet." };
 
-    const shoppingContent = await getGoogleContentClient(config as GmcConfig);
-    const merchantId = config.gmcMerchantId;
+    const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
+    const parent = getAccountName(config as GmcConfig);
 
-    // 1. Get all current DB product IDs (non-deleted)
     const dbProducts = await db.product.findMany({
       where: { deletedAt: null },
       select: { id: true },
     });
     const validDbIds = new Set(dbProducts.map((p) => p.id));
 
-    // 2. List ALL products currently in Google MC (paginated)
-    const allGoogleProductIds: string[] = [];
-    const firstPage = await shoppingContent.products.list({ merchantId, maxResults: 250 });
-    for (const item of firstPage.data.resources ?? []) {
-      if (item.id) allGoogleProductIds.push(item.id);
-    }
-    let nextToken: string | undefined = firstPage.data.nextPageToken ?? undefined;
-    while (nextToken) {
-      const res = await shoppingContent.products.list({ merchantId, maxResults: 250, pageToken: nextToken });
-      for (const item of res.data.resources ?? []) {
-        if (item.id) allGoogleProductIds.push(item.id);
-      }
-      nextToken = res.data.nextPageToken ?? undefined;
+    const allGoogleProducts: merchantapi_products_v1.Schema$Product[] = [];
+    const firstPage = await merchantapi.accounts.products.list({ parent, pageSize: 250 });
+    allGoogleProducts.push(...(firstPage.data.products ?? []));
+    let pageToken: string | undefined = firstPage.data.nextPageToken ?? undefined;
+    while (pageToken) {
+      const page = await merchantapi.accounts.products.list({ parent, pageSize: 250, pageToken });
+      allGoogleProducts.push(...(page.data.products ?? []));
+      pageToken = page.data.nextPageToken ?? undefined;
     }
 
-    // 3. Identify stale products to delete
-    // Google product ID format: "online:en:AU:{offerId}"
+    // Stale = gla_ prefix (পুরনো WooCommerce import, ইচ্ছাকৃতভাবে রাখা) না,
+    // এবং বর্তমান DB-তে নেইও — এমন প্রোডাক্ট
     const toDelete: string[] = [];
-    for (const googleId of allGoogleProductIds) {
-      const offerId = googleId.split(":").pop() ?? "";
+    for (const item of allGoogleProducts) {
+      const offerId = item.offerId ?? "";
       const isGla = offerId.startsWith("gla_");
       const isInDb = validDbIds.has(offerId);
-      if (!isGla && !isInDb) {
-        toDelete.push(googleId);
+      if (offerId && !isGla && !isInDb && item.name) {
+        // read-side "products" resource-এর name-কে write-side "productInputs"-এ রূপান্তর
+        toDelete.push(item.name.replace("/products/", "/productInputs/"));
       }
     }
 
     if (toDelete.length === 0) {
-      return { success: true, deleted: 0, total: allGoogleProductIds.length, message: "No stale products found." };
+      return { success: true, deleted: 0, total: allGoogleProducts.length, message: "No stale products found." };
     }
 
-    // 4. Delete in batches of 5 to respect rate limits
     const BATCH = 5;
     let deleted = 0;
     for (let i = 0; i < toDelete.length; i += BATCH) {
       const batch = toDelete.slice(i, i + BATCH);
       await Promise.all(
-        batch.map((googleProductId) =>
-          shoppingContent.products.delete({ merchantId, productId: googleProductId }).catch(() => null)
+        batch.map((productInputName) =>
+          merchantapi.accounts.productInputs.delete({ name: productInputName, dataSource: config.gmcDataSourceName! }).catch(() => null)
         )
       );
       deleted += batch.length;
@@ -777,9 +811,9 @@ export async function cleanupStaleGoogleProducts() {
     return {
       success: true,
       deleted,
-      kept: allGoogleProductIds.length - deleted,
-      total: allGoogleProductIds.length,
-      message: `Deleted ${deleted} stale product(s) from Google MC. ${allGoogleProductIds.length - deleted} kept.`,
+      kept: allGoogleProducts.length - deleted,
+      total: allGoogleProducts.length,
+      message: `Deleted ${deleted} stale product(s) from Google MC. ${allGoogleProducts.length - deleted} kept.`,
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";

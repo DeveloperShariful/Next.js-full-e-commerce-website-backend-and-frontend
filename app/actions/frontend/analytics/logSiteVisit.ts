@@ -35,6 +35,21 @@ const CLICK_ID_PLATFORMS: Record<string, string> = {
 const INHERENTLY_PAID_PARAMS = new Set(["gclid", "dclid", "msclkid", "ttclid", "epik", "li_fat_id"]);
 const PAID_MEDIUM_HINTS = new Set(["cpc", "ppc", "paid", "paid_social", "ads", "ad"]);
 
+// ChatGPT/Gemini/Perplexity ইত্যাদি AI assistant থেকে কেউ লিংকে ক্লিক করে এলে
+// GA4 (মে ২০২৬ থেকে) এটাকে আলাদা "AI Assistants" channel হিসেবে ধরে, সাধারণ
+// referral বা google_organic-এর সাথে মিশিয়ে ফেলে না — এখানেও একই ভাবে আলাদা করা হচ্ছে।
+const AI_ASSISTANT_HOSTS = [
+  "chatgpt.com",
+  "openai.com",
+  "gemini.google.com",
+  "perplexity.ai",
+  "claude.ai",
+  "copilot.microsoft.com",
+  "deepseek.com",
+  "grok.com",
+  "x.ai",
+];
+
 function classifyChannel(params: {
   utmSource?: string | null;
   utmMedium?: string | null;
@@ -42,6 +57,11 @@ function classifyChannel(params: {
   searchParams: URLSearchParams;
 }): { channel: string; clickId: string | null } {
   const isPaidMedium = params.utmMedium ? PAID_MEDIUM_HINTS.has(params.utmMedium.toLowerCase()) : false;
+  // ★ channel normalize (trim + lowercase) করা জরুরি — নাহলে utm_source=Facebook
+  // আর utm_source=facebook দুটো আলাদা চ্যানেল হিসেবে গোনা হয়ে যেত (breakdown
+  // টেবিলে ডেটা ভেঙে যেত), যদিও raw utmSource ফিল্ড proof হিসেবে অপরিবর্তিতই থাকছে।
+  const normalizedMedium = params.utmMedium?.trim().toLowerCase();
+  const normalizedSource = params.utmSource?.trim().toLowerCase();
 
   // srsltid = Google Merchant Center-এর নিজস্ব click ID, শুধু Google Shopping-এর
   // FREE/organic listing-এ ক্লিক করলেই যোগ হয় (gclid-এর মতো paid Ads-এ না) —
@@ -57,16 +77,19 @@ function classifyChannel(params: {
     const value = params.searchParams.get(param);
     if (value) {
       const isPaid = INHERENTLY_PAID_PARAMS.has(param) || isPaidMedium;
-      return { channel: isPaid ? `${platform}_ads` : platform, clickId: `${param}=${value}` };
+      // fbclid Facebook আর Instagram দুটোতেই যোগ হয় (একই Meta click ID) — কিন্তু
+      // utm_source=ig/instagram স্পষ্টভাবে বলে দিলে generic "facebook"-এর বদলে
+      // সেই বেশি নির্দিষ্ট নামটাই দেখানো হচ্ছে, যাতে utm_source আর Channel
+      // একে অপরের বিপরীত না দেখায়।
+      let resolvedPlatform = platform;
+      if (param === "fbclid" && (normalizedSource === "ig" || normalizedSource === "instagram")) {
+        resolvedPlatform = "instagram";
+      }
+      return { channel: isPaid ? `${resolvedPlatform}_ads` : resolvedPlatform, clickId: `${param}=${value}` };
     }
   }
 
   // ২. Explicit UTM ট্যাগ
-  // ★ channel normalize (trim + lowercase) করা জরুরি — নাহলে utm_source=Facebook
-  // আর utm_source=facebook দুটো আলাদা চ্যানেল হিসেবে গোনা হয়ে যেত (breakdown
-  // টেবিলে ডেটা ভেঙে যেত), যদিও raw utmSource ফিল্ড proof হিসেবে অপরিবর্তিতই থাকছে।
-  const normalizedMedium = params.utmMedium?.trim().toLowerCase();
-  const normalizedSource = params.utmSource?.trim().toLowerCase();
   if (normalizedMedium === "email" || normalizedSource === "email") {
     return { channel: "email", clickId: null };
   }
@@ -78,6 +101,13 @@ function classifyChannel(params: {
   if (params.referrer) {
     try {
       const refHost = new URL(params.referrer).hostname;
+      // AI assistant (ChatGPT, Gemini, Perplexity ইত্যাদি) চেক আগে করতে হবে,
+      // "google." চেকের আগে — কারণ gemini.google.com-এ "google." থাকে, তাই ওই
+      // চেকটা আগে থাকলে Gemini থেকে আসা visitor ভুলভাবে google_organic হয়ে
+      // যেত। GA4-ও ২০২৬ সাল থেকে এটাকে আলাদা "AI Assistants" channel হিসেবে ধরে।
+      if (AI_ASSISTANT_HOSTS.some((host) => refHost.includes(host))) {
+        return { channel: "ai_assistant", clickId: null };
+      }
       if (refHost.includes("google.")) return { channel: "google_organic", clickId: null };
       if (refHost.includes("facebook.") || refHost.includes("fb.com")) return { channel: "facebook", clickId: null };
       if (refHost.includes("instagram.")) return { channel: "instagram", clickId: null };
@@ -162,7 +192,7 @@ export async function logSiteVisit(data: {
       searchParams,
     });
 
-    await db.siteVisit.create({
+    const newVisit = await db.siteVisit.create({
       data: {
         visitorId,
         landingPage: data.url,
@@ -189,9 +219,20 @@ export async function logSiteVisit(data: {
       path: "/",
     });
 
-    return { success: true, skipped: false };
+    return { success: true, skipped: false, visitId: newVisit.id };
   } catch (error) {
     console.error("[logSiteVisit] Error:", error);
     return { success: false };
+  }
+}
+
+// checkout পেজ লোড হলে একবার কল হয় — order বসাক বা না বসাক, স্বতন্ত্র সিগন্যাল
+// হিসেবে ধরে রাখা হচ্ছে (order placement আলাদাভাবে visitorId দিয়ে ট্র্যাক হয়)।
+// একই row-এ শুধু একটা flag আপডেট — নতুন row তৈরি হয় না, তাই সস্তা।
+export async function markCheckoutReached(visitId: string) {
+  try {
+    await db.siteVisit.update({ where: { id: visitId }, data: { reachedCheckout: true } });
+  } catch {
+    // পুরনো/ভুল visitId হলে নীরবে ignore — fire-and-forget কল, ব্যবহারকারী কিছু দেখবে না
   }
 }

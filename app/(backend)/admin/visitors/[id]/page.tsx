@@ -20,6 +20,16 @@ function ProofRow({ label, value, mono = false }: { label: string; value: React.
   );
 }
 
+// পেজ hide/close হওয়ার আগেই sendBeacon ফায়ার না হলে (ট্যাব crash, বা এখনো
+// browsing করছে) durationSeconds কখনো null থাকতে পারে — সেটা honestly জানানো হয়।
+function formatDuration(seconds: number | null): string {
+  if (seconds === null) return "Not captured (tab closed too fast, or still browsing)";
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
 export default async function VisitorDetailPage({ params }: PageProps) {
   const { id } = await params;
   const [visit, timezone] = await Promise.all([getVisitorDetail(id), getStoreTimezone()]);
@@ -47,6 +57,32 @@ export default async function VisitorDetailPage({ params }: PageProps) {
         <ProofRow label="City" value={visit.city || "—"} />
         <ProofRow label="Device" value={visit.deviceType || "—"} />
         <ProofRow label="Visit Time" value={formatTz(visit.createdAt, timezone, "MMMM d, yyyy 'at' h:mm:ss a")} />
+        <ProofRow label="Time on Site" value={formatDuration(visit.durationSeconds)} />
+        <ProofRow
+          label="Reached Checkout"
+          value={
+            visit.reachedCheckout ? (
+              <span className="text-[#996800] font-semibold">Yes</span>
+            ) : (
+              <span className="text-[#646970]">No</span>
+            )
+          }
+        />
+        <ProofRow
+          label="Converted (Order Placed)"
+          value={
+            visit.convertedOrder ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[#00a32a] font-semibold">Yes</span> —{" "}
+                <Link href={`/admin/orders/${visit.convertedOrder.id}`} className="text-[#2271b1] hover:underline">
+                  Order #{visit.convertedOrder.orderNumber}
+                </Link>
+              </span>
+            ) : (
+              <span className="text-[#646970]">No order placed by this visitor yet</span>
+            )
+          }
+        />
       </div>
 
       <div className="border border-[#c3c4c7] shadow-sm rounded-sm overflow-hidden bg-white mb-6">

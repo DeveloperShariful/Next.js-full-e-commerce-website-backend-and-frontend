@@ -28,8 +28,10 @@ export default function VisitorLogTable({ log, timezone, basePathWithQuery }: Pr
               <tr className="bg-[#f6f7f7]">
                 <th className="py-2 px-4 text-[12px] font-medium text-[#646970] border-b border-[#c3c4c7]">Date & Time</th>
                 <th className="py-2 px-4 text-[12px] font-medium text-[#646970] border-b border-[#c3c4c7]">Channel</th>
+                <th className="py-2 px-4 text-[12px] font-medium text-[#646970] border-b border-[#c3c4c7]">IP Address</th>
                 <th className="py-2 px-4 text-[12px] font-medium text-[#646970] border-b border-[#c3c4c7]">Country</th>
                 <th className="py-2 px-4 text-[12px] font-medium text-[#646970] border-b border-[#c3c4c7]">Landing Page</th>
+                <th className="py-2 px-4 text-[12px] font-medium text-[#646970] border-b border-[#c3c4c7]">Checkout</th>
                 <th className="py-2 px-4 text-[12px] font-medium text-[#646970] border-b border-[#c3c4c7] text-right">Proof</th>
               </tr>
             </thead>
@@ -40,9 +42,19 @@ export default function VisitorLogTable({ log, timezone, basePathWithQuery }: Pr
                     {formatTz(row.createdAt, timezone, "MMM d, yyyy h:mm a")}
                   </td>
                   <td className="py-2 px-4 text-[13px] text-[#2c3338] capitalize">{row.channel}</td>
+                  <td className="py-2 px-4 text-[13px] text-[#646970] font-mono whitespace-nowrap">{row.ipAddress || "—"}</td>
                   <td className="py-2 px-4 text-[13px] text-[#2c3338]">{row.country || "—"}</td>
                   <td className="py-2 px-4 text-[13px] text-[#646970] max-w-[280px] truncate" title={row.landingPage}>
                     {row.landingPage}
+                  </td>
+                  <td className="py-2 px-4 text-[13px]">
+                    {row.reachedCheckout ? (
+                      <span className="text-[12px] font-medium px-1.5 py-0.5 rounded-[3px] bg-[#fff8e5] text-[#996800] border border-[#f0d896]">
+                        Yes
+                      </span>
+                    ) : (
+                      <span className="text-[#a7aaad]">—</span>
+                    )}
                   </td>
                   <td className="py-2 px-4 text-right">
                     <Link

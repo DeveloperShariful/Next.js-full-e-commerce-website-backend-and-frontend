@@ -43,6 +43,7 @@ interface SerializedOrder {
   utmMedium: string | null;
   utmCampaign: string | null;
   referringSite: string | null;
+  fallbackChannel: string | null;
   recoveredFromAbandonedCart: boolean;
   total: number;
   refundedAmount: number;
@@ -305,6 +306,13 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                               } catch {
                                 originText = `Ref: ${order.referringSite}`;
                               }
+                            } else if (order.fallbackChannel && order.fallbackChannel !== "direct") {
+                              // checkout-এর সময় নিজস্ব UTM/referrer capture হয়নি (device বদল,
+                              // browser data মোছা ইত্যাদি) — কিন্তু এই visitor-এর প্রথম visit-এর
+                              // real channel SiteVisit history থেকে পাওয়া গেছে, তাই fake
+                              // "Direct"-এর বদলে সেটাই দেখানো হচ্ছে (~ দিয়ে বোঝানো হয়েছে এটা
+                              // inferred — checkout-মুহূর্তের সরাসরি capture না)।
+                              originText = `~${order.fallbackChannel}`;
                             }
 
                             const hasTracking = order.shippingTrackingNumber || order.transdirectBookingId;

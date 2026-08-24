@@ -57,6 +57,13 @@ export async function POST(request: NextRequest) {
     // Read affiliate cookies server-side (HttpOnly — cannot be read by client JS)
     const cookieAffiliateId = request.cookies.get('solid_affiliate_id')?.value ?? null;
     const cookieVisitId = request.cookies.get('solid_affiliate_visit_id')?.value ?? null;
+    const cookieVisitorId = request.cookies.get('gb_visitor_id')?.value ?? null;
+
+    // Vercel নিজেই এই header overwrite করে (spoof-proof) — SiteVisit-এর মতোই
+    // পদ্ধতি, checkout-এর সময় real customer IP ধরে রাখার জন্য।
+    const rawForwardedFor = request.headers.get('x-forwarded-for');
+    const checkoutIp = rawForwardedFor ? rawForwardedFor.split(',')[0].trim() || null : null;
+    const checkoutUserAgent = request.headers.get('user-agent') || null;
 
     const body = await request.json();
     const {
@@ -299,6 +306,9 @@ export async function POST(request: NextRequest) {
       guestEmail: customerInfo.email,
       userId:      sessionUserId     || undefined,
       affiliateId: cookieAffiliateId || undefined,
+      visitorId: cookieVisitorId || undefined,
+      ipAddress: checkoutIp,
+      userAgent: checkoutUserAgent,
       billingAddress: billingJson,
       shippingAddress: shippingJson,
       shippingMethod: shippingMethodLabel,

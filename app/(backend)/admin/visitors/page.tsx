@@ -11,9 +11,10 @@ import VisitorSummaryCards from "./_components/visitor-summary-cards";
 import VisitorTrendChart from "./_components/visitor-trend-chart";
 import BreakdownTable from "./_components/breakdown-table";
 import VisitorLogTable from "./_components/visitor-log-table";
+import VisitorSearchBar from "./_components/visitor-search-bar";
 import SetupGuide from "./_components/setup-guide";
 
-type SearchParams = Promise<{ period?: string; compare?: string; from?: string; to?: string; vpage?: string; tab?: string }>;
+type SearchParams = Promise<{ period?: string; compare?: string; from?: string; to?: string; vpage?: string; tab?: string; checkout?: string; q?: string }>;
 
 interface PageProps {
   searchParams: SearchParams;
@@ -34,6 +35,8 @@ export default async function VisitorsPage(props: PageProps) {
   const customTo = searchParams.to;
   const vpage = searchParams.vpage ? parseInt(searchParams.vpage, 10) : 1;
   const activeTab = searchParams.tab === "recent" ? "recent" : searchParams.tab === "guide" ? "guide" : "overview";
+  const checkoutOnly = searchParams.checkout === "1";
+  const searchQuery = searchParams.q?.trim() || "";
 
   const timezone = await getStoreTimezone();
   const dates = parseDateRange(period, compare, customFrom, customTo, timezone);
@@ -42,7 +45,7 @@ export default async function VisitorsPage(props: PageProps) {
   // (aggregation বা paginated log) অকারণে চালানো হবে না (performance)
   const [data, log] = await Promise.all([
     activeTab === "overview" ? getVisitorInsightsData(dates.current, dates.previous, timezone) : null,
-    activeTab === "recent" ? getVisitorLog(dates.current, vpage) : null,
+    activeTab === "recent" ? getVisitorLog(dates.current, vpage, checkoutOnly, searchQuery) : null,
   ]);
 
   // ট্যাব/pagination লিংক বানানোর জন্য — date-range filter সবসময় বজায় থাকবে
@@ -53,8 +56,14 @@ export default async function VisitorsPage(props: PageProps) {
   if (customTo) filterQuery.set("to", customTo);
   const baseFilterQuery = filterQuery.toString();
 
+  // "Reached Checkout" card থেকে ক্লিক করলে এই filter-সহ লিংকে আসবে — সংখ্যাটার
+  // প্রমাণ হিসেবে সরাসরি সেই visitor-দের list দেখানো যায়।
+  const checkoutProofLink = `/admin/visitors?${baseFilterQuery}&tab=recent&checkout=1`;
+
   const channelRows = data?.channelBreakdown.map((c) => ({ label: c.channel, count: c.count, percentage: c.percentage })) ?? [];
   const countryRows = data?.countryBreakdown.map((c) => ({ label: c.country, count: c.count, percentage: c.percentage })) ?? [];
+  const checkoutChannelRows = data?.checkoutChannelBreakdown.map((c) => ({ label: c.channel, count: c.count, percentage: c.percentage })) ?? [];
+  const checkoutCountryRows = data?.checkoutCountryBreakdown.map((c) => ({ label: c.country, count: c.count, percentage: c.percentage })) ?? [];
 
   return (
     <div className="w-full">
@@ -67,43 +76,75 @@ export default async function VisitorsPage(props: PageProps) {
         </div>
       ) : null}
 
-      <div className="flex gap-1 border-b border-[#c3c4c7] mb-6">
-        {TABS.map((t) => (
-          <Link
-            key={t.value}
-            href={`/admin/visitors?${baseFilterQuery}&tab=${t.value}`}
-            className={`px-4 py-2.5 text-[14px] font-medium -mb-px border-b-2 transition-colors ${
-              activeTab === t.value
-                ? "border-[#2271b1] text-[#2271b1]"
-                : "border-transparent text-[#646970] hover:text-[#2c3338]"
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#c3c4c7] mb-6 pb-2 sm:pb-0">
+        <div className="flex gap-1">
+          {TABS.map((t) => (
+            <Link
+              key={t.value}
+              href={`/admin/visitors?${baseFilterQuery}&tab=${t.value}`}
+              className={`px-4 py-2.5 text-[14px] font-medium -mb-px border-b-2 transition-colors ${
+                activeTab === t.value
+                  ? "border-[#2271b1] text-[#2271b1]"
+                  : "border-transparent text-[#646970] hover:text-[#2c3338]"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </div>
+        <VisitorSearchBar />
       </div>
 
       {activeTab === "overview" && data ? (
         <>
-          <VisitorSummaryCards data={data} />
+          <VisitorSummaryCards data={data} checkoutProofLink={checkoutProofLink} />
 
           <div className="mb-6">
             <VisitorTrendChart data={data.dailyTrend} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <h3 className="text-[13px] font-semibold text-[#50575e] uppercase tracking-wide mb-2">All Visitors</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <BreakdownTable title="By Channel" labelHeader="Channel" rows={channelRows} />
             <BreakdownTable title="By Country" labelHeader="Country" rows={countryRows} />
+          </div>
+
+          <h3 className="text-[13px] font-semibold text-[#50575e] uppercase tracking-wide mb-2">Visitors Who Reached Checkout</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <BreakdownTable title="By Channel" labelHeader="Channel" rows={checkoutChannelRows} />
+            <BreakdownTable title="By Country" labelHeader="Country" rows={checkoutCountryRows} />
           </div>
         </>
       ) : null}
 
       {activeTab === "recent" && log ? (
-        <VisitorLogTable
-          log={log}
-          timezone={timezone}
-          basePathWithQuery={`/admin/visitors?${baseFilterQuery}&tab=recent`}
-        />
+        <>
+          {checkoutOnly ? (
+            <div className="mb-4 flex items-center justify-between bg-[#fff8e5] border border-[#f0d896] rounded-sm px-4 py-2.5">
+              <span className="text-[13px] text-[#664d03]">
+                Showing only visitors who reached the checkout page ({log.totalCount} of them, in this date range).
+              </span>
+              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+                Clear filter
+              </Link>
+            </div>
+          ) : null}
+          {searchQuery ? (
+            <div className="mb-4 flex items-center justify-between bg-[#e5f5fa] border border-[#8fd1e8] rounded-sm px-4 py-2.5">
+              <span className="text-[13px] text-[#0a4b78]">
+                Showing results for &quot;{searchQuery}&quot; ({log.totalCount} matches, in this date range).
+              </span>
+              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+                Clear search
+              </Link>
+            </div>
+          ) : null}
+          <VisitorLogTable
+            log={log}
+            timezone={timezone}
+            basePathWithQuery={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+          />
+        </>
       ) : null}
 
       {activeTab === "guide" ? <SetupGuide /> : null}

@@ -110,7 +110,7 @@ export const sidebarConfig: SidebarGroup[] = [
       },
       { name: "Coupons", href: "/admin/coupons", icon: TicketPercent , roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER]},
       { name: "Analytics", href: "/admin/analytics", icon: BarChart3, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
-      { name: "Visitors", href: "/admin/visitors", icon: Globe, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
+      { name: "Visitor Tracking", href: "/admin/visitors", icon: Globe, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { name: "Affiliate", href: "/admin/affiliate", icon: Handshake, roles: [Role.SUPER_ADMIN, Role.ADMIN] },
       { name: "Wishlist Report", href: "/admin/wishlist-report", icon: Heart, roles: [Role.SUPER_ADMIN, Role.ADMIN, Role.MANAGER] },
     ] 

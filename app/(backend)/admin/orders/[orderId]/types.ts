@@ -201,6 +201,8 @@ export interface OrderDetailsType {
   utmContent: string | null;
   utmTerm: string | null;
   referringSite: string | null;
+  fallbackChannel?: string | null;
+  fallbackSource?: "visitor" | "ip" | null;
   recoveredFromAbandonedCart: boolean;
 
   // Relations

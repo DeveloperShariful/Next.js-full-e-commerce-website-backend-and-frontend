@@ -1095,6 +1095,7 @@ model Order {
   utmContent        String? // e.g. "blue_banner" -- A/B test creative/placement
   utmTerm           String? // e.g. "kids electric bike" -- paid search keyword
   recoveredFromAbandonedCart Boolean @default(false) // abandoned-cart drip email theke ei order eseche kina
+  visitorId         String? // gb_visitor_id cookie — SiteVisit.visitorId-এর সাথে link করে conversion track করতে
   referringSite     String? //কোন ওয়েবসাইট থেকে আসল
   status            OrderStatus       @default(PENDING)
   paymentStatus     PaymentStatus     @default(UNPAID)
@@ -2672,6 +2673,8 @@ model SiteVisit {
   country     String?
   city        String?
   deviceType  String?
+  durationSeconds Int? // page hide/unload-এ sendBeacon দিয়ে আপডেট হয় — সেশনে কতক্ষণ ছিল
+  reachedCheckout Boolean @default(false) // /checkout পেজে পৌঁছেছিল কিনা — order বসাক বা না বসাক, স্বতন্ত্র সিগন্যাল
   createdAt   DateTime @default(now())
 
   @@index([createdAt])

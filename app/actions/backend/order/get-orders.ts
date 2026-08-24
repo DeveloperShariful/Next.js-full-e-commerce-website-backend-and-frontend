@@ -161,6 +161,33 @@ export async function getOrders(
         refundedAmount: Number(order.refundedAmount || 0),
     }));
 
+    // যে order-এর নিজস্ব utmSource/referringSite নেই (checkout-এর সময়
+    // localStorage খালি ছিল — যেমন device বদল করে অর্ডার করা, বা browser data
+    // মুছে ফেলা), তাদের জন্য visitorId দিয়ে SiteVisit-এ ওই visitor-এর প্রথম
+    // (first-touch) সেশনের real channel খুঁজে fallback হিসেবে দেওয়া হচ্ছে —
+    // batched, একটাই extra query (N+1 না), তাই performance ঠিক থাকে।
+    const missingAttributionVisitorIds = [...new Set(
+      serializedOrders
+        .filter((o) => !o.utmSource && !o.referringSite && o.visitorId)
+        .map((o) => o.visitorId as string)
+    )];
+
+    let fallbackChannelByVisitorId = new Map<string, string>();
+    if (missingAttributionVisitorIds.length > 0) {
+      const fallbackVisits = await db.siteVisit.findMany({
+        where: { visitorId: { in: missingAttributionVisitorIds } },
+        orderBy: { createdAt: "asc" },
+        select: { visitorId: true, channel: true },
+        distinct: ["visitorId"],
+      });
+      fallbackChannelByVisitorId = new Map(fallbackVisits.map((v) => [v.visitorId, v.channel]));
+    }
+
+    const enrichedOrders = serializedOrders.map((order) => ({
+      ...order,
+      fallbackChannel: order.visitorId ? fallbackChannelByVisitorId.get(order.visitorId) ?? null : null,
+    }));
+
     const counts = {
       all:             statusCounts.reduce((acc, curr) => acc + curr._count.status, 0),
       pending:         statusCounts.find(s => s.status === 'PENDING')?._count.status || 0,
@@ -179,10 +206,10 @@ export async function getOrders(
       trash:           trashCount
     };
 
-    return { 
-      success: true, 
-      data: serializedOrders, 
-      meta: { total: totalCount, pages: Math.ceil(totalCount / limit), counts } 
+    return {
+      success: true,
+      data: enrichedOrders,
+      meta: { total: totalCount, pages: Math.ceil(totalCount / limit), counts }
     };
 
   } catch (error: unknown) {
@@ -225,8 +252,48 @@ export async function getOrderDetails(orderId: string) {
     });
     
     if (!order) return { success: false, error: "Order not found" };
-    return { success: true, data: order };
-    
+
+    // checkout-এর সময় নিজস্ব UTM/referrer capture না হলে (device বদল, browser
+    // data মোছা ইত্যাদি), visitorId দিয়ে SiteVisit-এ ওই visitor-এর প্রথম সেশনের
+    // real channel খুঁজে fallback হিসেবে দেওয়া হচ্ছে (উচ্চ নির্ভরযোগ্যতা — একই
+    // browser cookie)। visitorId দিয়েও কিছু না পেলে (cookie block/private
+    // browsing), IP দিয়ে শেষ চেষ্টা — কিন্তু IP shared হতে পারে (office wifi,
+    // mobile carrier NAT), তাই এটা কম নির্ভরযোগ্য: order-এর ২৪ ঘণ্টার মধ্যে,
+    // সবচেয়ে কাছের সময়ের match নেওয়া হচ্ছে (দূরের match ভুল হওয়ার ঝুঁকি বেশি),
+    // আর fallbackSource দিয়ে UI-তে confidence আলাদা করে দেখানো হয়।
+    let fallbackChannel: string | null = null;
+    let fallbackSource: "visitor" | "ip" | null = null;
+    const hasOwnAttribution = order.utmSource || order.utmMedium || order.utmCampaign || order.referringSite;
+
+    if (!hasOwnAttribution) {
+      if (order.visitorId) {
+        const firstVisit = await db.siteVisit.findFirst({
+          where: { visitorId: order.visitorId },
+          orderBy: { createdAt: "asc" },
+          select: { channel: true },
+        });
+        if (firstVisit) {
+          fallbackChannel = firstVisit.channel;
+          fallbackSource = "visitor";
+        }
+      }
+
+      if (!fallbackChannel && order.ipAddress) {
+        const windowStart = new Date(order.createdAt.getTime() - 24 * 60 * 60 * 1000);
+        const ipMatch = await db.siteVisit.findFirst({
+          where: { ipAddress: order.ipAddress, createdAt: { gte: windowStart, lte: order.createdAt } },
+          orderBy: { createdAt: "desc" },
+          select: { channel: true },
+        });
+        if (ipMatch) {
+          fallbackChannel = ipMatch.channel;
+          fallbackSource = "ip";
+        }
+      }
+    }
+
+    return { success: true, data: { ...order, fallbackChannel, fallbackSource } };
+
   } catch (error) {
     console.error("GET_ORDER_DETAILS_ERROR", error);
     return { success: false, error: "Database error" };

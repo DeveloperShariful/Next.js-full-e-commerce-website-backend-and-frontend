@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { trackVisitAction } from '@/app/actions/frontend/affiliate/trackVisitAction';
-import { logSiteVisit } from '@/app/actions/frontend/analytics/logSiteVisit';
+import { logSiteVisit, markCheckoutReached } from '@/app/actions/frontend/analytics/logSiteVisit';
 
 const UTM_STORAGE_KEY = 'utm_data';
 const UTM_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 দিন — AffiliateClick cookie-র সাথে মেলানো
@@ -36,10 +36,46 @@ function getCleanParam(searchParams: URLSearchParams, key: string): string | nul
   return null;
 }
 
+const VISIT_ID_KEY = 'gb_visit_id';
+const VISIT_START_KEY = 'gb_visit_start';
+const CHECKOUT_MARKED_KEY = 'gb_checkout_marked';
+
+// পেজ hidden হওয়ার মুহূর্তে (ট্যাব বদল/বন্ধ) sendBeacon দিয়ে "কতক্ষণ ছিল" পাঠানো
+// হয় — একই SiteVisit row-এ আপডেট হয়, নতুন row তৈরি হয় না। sendBeacon ব্যবহার
+// করা হচ্ছে fetch()-এর বদলে, কারণ পেজ unload হয়ে গেলেও ব্রাউজার এটা background-এ
+// ঠিকই পাঠিয়ে দেয় (fetch() করলে navigation-এর মাঝে বাতিল হয়ে যেতে পারত)।
+// visibilitychange (primary) + pagehide (backup, mobile-এ visibilitychange
+// অনির্ভরযোগ্য হতে পারে) — দুটোই একই handler কল করে, একাধিকবার fire হলেও
+// ক্ষতি নেই (পরের মানটা শুধু আগেরটাকে বড় সংখ্যা দিয়ে overwrite করে)।
+function sendDurationBeacon() {
+  try {
+    const visitId = sessionStorage.getItem(VISIT_ID_KEY);
+    const startStr = sessionStorage.getItem(VISIT_START_KEY);
+    if (!visitId || !startStr) return;
+    const durationSeconds = Math.round((Date.now() - Number(startStr)) / 1000);
+    if (durationSeconds <= 0) return;
+    const blob = new Blob([JSON.stringify({ visitId, durationSeconds })], { type: 'application/json' });
+    navigator.sendBeacon('/api/analytics/track-duration', blob);
+  } catch {}
+}
+
 const SourceTracker = () => {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const visitTracked = useRef(false);
+
+  // মাত্র একবার mount হয় — duration beacon listener রেজিস্টার করার জন্য
+  useEffect(() => {
+    const handleHide = () => {
+      if (document.visibilityState === 'hidden') sendDurationBeacon();
+    };
+    document.addEventListener('visibilitychange', handleHide);
+    window.addEventListener('pagehide', sendDurationBeacon);
+    return () => {
+      document.removeEventListener('visibilitychange', handleHide);
+      window.removeEventListener('pagehide', sendDurationBeacon);
+    };
+  }, []);
 
   useEffect(() => {
     const affiliateId = searchParams.get('sld');
@@ -80,7 +116,7 @@ const SourceTracker = () => {
           // visit logging — একসাথে, non-blocking ভাবে চালানো হচ্ছে (কোনোটাই
           // পেজ রেন্ডার আটকায় না)। logSiteVisit-এর নিজস্ব session-cookie
           // dedup আছে, তাই বারবার call হলেও duplicate row তৈরি হবে না।
-          await Promise.all([
+          const [, visitResult] = await Promise.all([
             trackVisitAction({
               affiliateSlug: affiliateId,
               url: window.location.href,
@@ -100,12 +136,35 @@ const SourceTracker = () => {
             }),
           ]);
           visitTracked.current = true;
+
+          // এই ট্যাবে প্রথমবার row তৈরি হলেই (skipped না) তার id + start time
+          // সেভ করা হচ্ছে — পুরো সেশনে একবারই, পরের navigation-এ overwrite হবে না।
+          if (visitResult?.visitId && !sessionStorage.getItem(VISIT_ID_KEY)) {
+            try {
+              sessionStorage.setItem(VISIT_ID_KEY, visitResult.visitId);
+              sessionStorage.setItem(VISIT_START_KEY, String(Date.now()));
+            } catch {}
+          }
         } catch (error) {
           console.error('[SourceTracker] Visit tracking failed:', error);
         }
       };
 
       track();
+    }
+
+    // checkout পেজে পৌঁছালো কিনা — order বসাক বা না বসাক, স্বতন্ত্র সিগন্যাল।
+    // প্রতিটা pathname বদলে চেক হয় (visitTracked ref-এর ওপর নির্ভর করে না, কারণ
+    // visitor প্রথমে অন্য পেজ দেখে পরে checkout-এ আসতে পারে), কিন্তু সেশনে
+    // একবারই মার্ক হয় (sessionStorage flag দিয়ে dedup)।
+    if (pathname === '/checkout') {
+      try {
+        const visitId = sessionStorage.getItem(VISIT_ID_KEY);
+        if (visitId && !sessionStorage.getItem(CHECKOUT_MARKED_KEY)) {
+          sessionStorage.setItem(CHECKOUT_MARKED_KEY, '1');
+          markCheckoutReached(visitId).catch(() => {});
+        }
+      } catch {}
     }
   }, [searchParams, pathname]);
 

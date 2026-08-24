@@ -56,6 +56,13 @@ const AUTO_ITEMS: { title: T; desc: T }[] = [
     },
   },
   {
+    title: { en: "AI Assistants (ChatGPT, Gemini, Perplexity, Claude, Copilot)", bn: "AI Assistant (ChatGPT, Gemini, Perplexity, Claude, Copilot)" },
+    desc: {
+      en: "Detected from the referrer and shown as its own “ai_assistant” channel — kept separate from Google organic search (Gemini’s domain would otherwise be misread as google.com).",
+      bn: "Referrer থেকে ধরা হয় এবং আলাদা “ai_assistant” channel হিসেবে দেখানো হয় — Google organic search থেকে আলাদা রাখা হয়েছে (নাহলে Gemini-এর ডোমেইনকে ভুলভাবে google.com মনে হতো)।",
+    },
+  },
+  {
     title: { en: "Country / City", bn: "Country / City" },
     desc: {
       en: "Read directly from Vercel’s x-vercel-ip-country / x-vercel-ip-city headers on the live (production) site — no extra lookup. Two caveats: it only appears on a real Vercel deployment (always blank on localhost), and it stops working if a proxy/CDN (e.g. Cloudflare) sits in front of Vercel.",
@@ -78,6 +85,14 @@ const MANUAL_ITEMS: { title: T; code?: string; note?: T; sub?: T }[] = [
   {
     title: { en: "Pinterest or LinkedIn organic post/profile link", bn: "Pinterest বা LinkedIn organic পোস্ট/প্রোফাইল লিংক" },
     code: "https://gobike.com.au?utm_source=pinterest&utm_medium=social&utm_campaign=profile_link",
+  },
+  {
+    title: { en: "WhatsApp (shared product links — \"dark social\")", bn: "WhatsApp (শেয়ার করা product link — \"dark social\")" },
+    note: {
+      en: "WhatsApp strips the referrer completely on every click, organic or broadcast — this is an industry-wide limitation (Meta's own design), not fixable from our side. Without a UTM tag, this traffic is genuinely invisible, not misattributed.",
+      bn: "WhatsApp প্রতিটা ক্লিকেই referrer সম্পূর্ণ মুছে দেয়, organic বা broadcast যাই হোক না কেন — এটা industry-wide সীমাবদ্ধতা (Meta-র নিজস্ব design), আমাদের দিক থেকে ঠিক করা সম্ভব না। UTM ট্যাগ ছাড়া এই ট্রাফিক সত্যিই অদৃশ্য, ভুল classify হয় না।",
+    },
+    code: "https://gobike.com.au?utm_source=whatsapp&utm_medium=social&utm_campaign=product_share",
   },
   {
     title: { en: "Email (Klaviyo campaign / flow)", bn: "Email (Klaviyo campaign / flow)" },

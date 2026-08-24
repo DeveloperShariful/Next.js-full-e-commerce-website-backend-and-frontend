@@ -337,10 +337,30 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                     )}
                 </div>
 
-                {/* UTM / Traffic Source */}
-                {(order.utmSource || order.utmMedium || order.utmCampaign || order.utmContent || order.utmTerm || order.referringSite) && (
-                    <div className="pt-3 mt-3 border-t border-[#f0f0f1]">
-                        <p className="text-[11px] font-semibold text-[#1d2327] uppercase tracking-wide mb-2">Traffic Source</p>
+                {/* UTM / Traffic Source — সবসময় দেখানো হয়, খালি হলেও চুপচাপ হাইড হয় না,
+                    যাতে বোঝা যায় tracking কাজ করছে কিন্তু genuinely কিছু capture হয়নি */}
+                <div className="pt-3 mt-3 border-t border-[#f0f0f1]">
+                    <p className="text-[11px] font-semibold text-[#1d2327] uppercase tracking-wide mb-2">Traffic Source</p>
+                    {!(order.utmSource || order.utmMedium || order.utmCampaign || order.utmContent || order.utmTerm || order.referringSite) ? (
+                        order.fallbackChannel && order.fallbackChannel !== "direct" ? (
+                            <div>
+                                <div className="flex items-center gap-2 text-[12px] text-[#646970]">
+                                    <span className="w-[70px] shrink-0">Channel:</span>
+                                    <span className="font-mono bg-[#fff8e5] border border-[#f0d896] px-1.5 py-0.5 rounded text-[#996800] font-semibold capitalize">{order.fallbackChannel}</span>
+                                    <span className="text-[11px] text-[#a7aaad]">
+                                        {order.fallbackSource === "ip" ? "(inferred from IP match — lower confidence)" : "(inferred from this visitor's browsing history)"}
+                                    </span>
+                                </div>
+                                {order.fallbackSource === "ip" && (
+                                    <p className="text-[11px] text-[#a7aaad] mt-1 ml-[78px] max-w-[320px]">
+                                        No cookie/browsing history matched — this is based only on the checkout IP address matching a visit within 24 hours. IPs can be shared (office wifi, mobile networks), so this could be a different person.
+                                    </p>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-[12px] text-[#646970]">Direct — no referrer or ad-click tag was captured at checkout.</p>
+                        )
+                    ) : (
                         <div className="space-y-1 text-[12px] text-[#646970]">
                             {order.utmSource && (
                                 <div className="flex items-center gap-2">
@@ -379,8 +399,8 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
 

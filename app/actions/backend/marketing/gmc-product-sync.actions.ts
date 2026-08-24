@@ -76,6 +76,7 @@ interface ProductForSync {
   googleTitle: string | null;
   googleDescription: string | null;
   googleIsBundle: boolean;
+  googleOfferIdOverride: string | null;
   googleProductCategory: string | null;
   featuredImage: string | null;
   price: Prisma.Decimal;
@@ -393,13 +394,19 @@ export async function syncProductToGoogle(productId: string) {
       customAttributes.push({ name: "country_of_origin", value: product.countryOfManufacture });
     }
 
+    // legacy WooCommerce/gla_ era-এর high-performing listing-এর ID ধরে রাখতে
+    // (click history অক্ষত রাখার জন্য) — override সেট করা থাকলে সেটাই ব্যবহার
+    // হয়, নাহলে database-এর real product.id-ই আগের মতো offerId হিসেবে যায়।
+    // এটা শুধু Google-কে পাঠানো offerId — database-এর ভেতরের real ID অপরিবর্তিত।
+    const googleOfferId = product.googleOfferIdOverride || product.id;
+
     const response = await merchantapi.accounts.productInputs.insert({
       parent: getAccountName(config as GmcConfig),
       dataSource: config.gmcDataSourceName,
       requestBody: {
         contentLanguage: (config.gmcLanguage || "en").toLowerCase().trim(),
         feedLabel: (config.gmcTargetCountry || "AU").toUpperCase().trim(),
-        offerId: product.id,
+        offerId: googleOfferId,
         productAttributes,
         customAttributes: customAttributes.length > 0 ? customAttributes : undefined,
       },
@@ -409,7 +416,7 @@ export async function syncProductToGoogle(productId: string) {
       where: { productId_channel: { productId: product.id, channel: "GOOGLE" } },
       update: {
         status: "SYNCED",
-        channelProductId: response.data.product || `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, product.id)}`,
+        channelProductId: response.data.product || `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, googleOfferId)}`,
         errorMessage: null,
         googleIssues: Prisma.DbNull,
         lastSyncedAt: new Date(),
@@ -418,7 +425,7 @@ export async function syncProductToGoogle(productId: string) {
         productId: product.id,
         channel: "GOOGLE",
         status: "SYNCED",
-        channelProductId: response.data.product || `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, product.id)}`,
+        channelProductId: response.data.product || `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, googleOfferId)}`,
         lastSyncedAt: new Date(),
       },
     });
@@ -463,8 +470,11 @@ export async function removeProductFromGoogle(productId: string) {
     if (!config?.gmcContentApiEnabled || !config.gmcMerchantId) return { success: false, error: "GMC not enabled." };
     if (!config.gmcDataSourceName) return { success: false, error: "Merchant API data source not configured yet." };
 
+    const product = await db.product.findUnique({ where: { id: productId }, select: { googleOfferIdOverride: true } });
+    const googleOfferId = product?.googleOfferIdOverride || productId;
+
     const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
-    const productInputName = `${getAccountName(config as GmcConfig)}/productInputs/${buildProductSegment(config as GmcConfig, productId)}`;
+    const productInputName = `${getAccountName(config as GmcConfig)}/productInputs/${buildProductSegment(config as GmcConfig, googleOfferId)}`;
 
     await merchantapi.accounts.productInputs.delete({ name: productInputName, dataSource: config.gmcDataSourceName });
 
@@ -614,7 +624,7 @@ export async function syncLiveProductStatuses() {
       }),
       db.product.findMany({
         where: { deletedAt: null },
-        select: { id: true },
+        select: { id: true, googleOfferIdOverride: true },
       }),
     ]);
 
@@ -622,10 +632,15 @@ export async function syncLiveProductStatuses() {
       existingStatuses.filter((s) => s.status === "EXCLUDED").map((s) => s.productId)
     );
     const validProductIds = new Set(existingProducts.map((p) => p.id));
+    // gla_ ইত্যাদি override offerId → আসল database productId, যাতে সেই legacy
+    // ID-তে ফিরে আসা Google status সঠিক local product-এর সাথে match হয়
+    const overrideToProductId = new Map(
+      existingProducts.filter((p) => p.googleOfferIdOverride).map((p) => [p.googleOfferIdOverride as string, p.id])
+    );
 
     const upsertOps = products
       .map((p) => {
-        const localProductId = p.offerId;
+        const localProductId = (p.offerId ? overrideToProductId.get(p.offerId) : undefined) ?? p.offerId;
         if (!localProductId || excludedSet.has(localProductId) || !validProductIds.has(localProductId)) {
           return null;
         }
@@ -663,8 +678,11 @@ export async function syncSingleProductStatusFromGoogle(productId: string) {
       return { success: false, error: "GMC is not enabled." };
     }
 
+    const product = await db.product.findUnique({ where: { id: productId }, select: { googleOfferIdOverride: true } });
+    const googleOfferId = product?.googleOfferIdOverride || productId;
+
     const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
-    const productName = `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, productId)}`;
+    const productName = `${getAccountName(config as GmcConfig)}/products/${buildProductSegment(config as GmcConfig, googleOfferId)}`;
 
     let finalStatus: "SYNCED" | "FAILED" | "PENDING" = "PENDING";
     let errorMessage: string | null = null;
@@ -764,9 +782,12 @@ export async function cleanupStaleGoogleProducts() {
 
     const dbProducts = await db.product.findMany({
       where: { deletedAt: null },
-      select: { id: true },
+      select: { id: true, googleOfferIdOverride: true },
     });
     const validDbIds = new Set(dbProducts.map((p) => p.id));
+    const overrideOfferIds = new Set(
+      dbProducts.filter((p) => p.googleOfferIdOverride).map((p) => p.googleOfferIdOverride as string)
+    );
 
     const allGoogleProducts: merchantapi_products_v1.Schema$Product[] = [];
     const firstPage = await merchantapi.accounts.products.list({ parent, pageSize: 250 });
@@ -780,14 +801,21 @@ export async function cleanupStaleGoogleProducts() {
 
     // Stale = gla_ prefix (পুরনো WooCommerce import, ইচ্ছাকৃতভাবে রাখা) না,
     // এবং বর্তমান DB-তে নেইও — এমন প্রোডাক্ট
-    const toDelete: string[] = [];
+    const toDelete: { productInputName: string; dataSource: string }[] = [];
     for (const item of allGoogleProducts) {
       const offerId = item.offerId ?? "";
       const isGla = offerId.startsWith("gla_");
-      const isInDb = validDbIds.has(offerId);
-      if (offerId && !isGla && !isInDb && item.name) {
-        // read-side "products" resource-এর name-কে write-side "productInputs"-এ রূপান্তর
-        toDelete.push(item.name.replace("/products/", "/productInputs/"));
+      const isInDb = validDbIds.has(offerId) || overrideOfferIds.has(offerId);
+      // প্রতিটা item তার নিজস্ব dataSource-এর অন্তর্গত (v2.1-এর পুরনো legacy feed
+      // থেকে আসা item আমাদের নতুন Merchant API data source-এর অংশ না) — delete
+      // call-এ item-এর real dataSource ব্যবহার করতে হবে, নিজেরটা ধরে নেওয়া যাবে না।
+      // লাইভ টেস্টে এটা ভুল হলে Google "item does not belong to the given data
+      // source" error দেয়, ধরা পড়েছে।
+      if (offerId && !isGla && !isInDb && item.name && item.dataSource) {
+        toDelete.push({
+          productInputName: item.name.replace("/products/", "/productInputs/"),
+          dataSource: item.dataSource,
+        });
       }
     }
 
@@ -797,14 +825,19 @@ export async function cleanupStaleGoogleProducts() {
 
     const BATCH = 5;
     let deleted = 0;
+    let failed = 0;
     for (let i = 0; i < toDelete.length; i += BATCH) {
       const batch = toDelete.slice(i, i + BATCH);
-      await Promise.all(
-        batch.map((productInputName) =>
-          merchantapi.accounts.productInputs.delete({ name: productInputName, dataSource: config.gmcDataSourceName! }).catch(() => null)
+      const results = await Promise.all(
+        batch.map((entry) =>
+          merchantapi.accounts.productInputs
+            .delete({ name: entry.productInputName, dataSource: entry.dataSource })
+            .then(() => true)
+            .catch(() => false)
         )
       );
-      deleted += batch.length;
+      deleted += results.filter(Boolean).length;
+      failed += results.filter((r) => !r).length;
     }
 
     revalidatePath("/admin/marketing/merchant-center");
@@ -813,7 +846,9 @@ export async function cleanupStaleGoogleProducts() {
       deleted,
       kept: allGoogleProducts.length - deleted,
       total: allGoogleProducts.length,
-      message: `Deleted ${deleted} stale product(s) from Google MC. ${allGoogleProducts.length - deleted} kept.`,
+      message: failed > 0
+        ? `Deleted ${deleted} stale product(s). ${failed} could not be deleted (check server logs). ${allGoogleProducts.length - deleted} kept.`
+        : `Deleted ${deleted} stale product(s) from Google MC. ${allGoogleProducts.length - deleted} kept.`,
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";

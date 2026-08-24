@@ -675,6 +675,10 @@ model Product {
   googleTitle           String? // গুগলের জন্য কাস্টম টাইটেল (SEO অপ্টিমাইজেশনের জন্য)
   googleDescription     String?                @db.Text // গুগলের জন্য কাস্টম ডেসক্রিপশন
   googleIsBundle        Boolean                @default(false) // এটি গুগলকে জানাবে প্রোডাক্টটি কাস্টম বান্ডেল কিনা
+  // পুরনো WooCommerce/gla_ era-এর high-performing legacy Merchant Center listing
+  // (accumulated clicks/ranking) ধরে রাখতে — সেট করা থাকলে sync এই ID দিয়ে
+  // Google-এ পাঠানো হয় (product.id-এর বদলে), যাতে click history না হারায়
+  googleOfferIdOverride String?
   analytics             ProductAnalytics[]
   name                  String
   slug                  String                 @unique

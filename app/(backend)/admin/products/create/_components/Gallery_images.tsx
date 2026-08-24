@@ -161,6 +161,7 @@ export default function GalleryImages() {
                 multiple={true}
                 title="Select Gallery Images"
                 source={MediaSource.PRODUCT}
+                restrictType="IMAGE"
             />
         </div>
     );

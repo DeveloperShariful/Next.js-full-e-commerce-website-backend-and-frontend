@@ -2356,6 +2356,11 @@ model MarketingIntegration {
   gmcAutoSyncShipping  Boolean @default(true) // ওয়েবসাইটের শিপিং রুল গুগলে পাঠানো হবে কিনা
   gmcAutoSyncTaxes     Boolean @default(true)
 
+  // 7. Merchant API (Content API v2.1-এর replacement) — primary data source
+  // Format: "accounts/{account}/dataSources/{id}" — একবার সেট করলেই product
+  // insert/delete-এর জন্য reuse হয়, প্রতি call-এ নতুন করে বানাতে হয় না
+  gmcDataSourceName String?
+
   // ==========================================
   // 🚀 NEW: GOOGLE ADS INTEGRATION (WooCommerce Style)
   // ==========================================

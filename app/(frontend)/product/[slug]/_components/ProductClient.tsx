@@ -28,7 +28,7 @@ interface Variation {
   regularPrice?: string;
   salePrice?: string;
   stockStatus?: string;
-  stockQuantity?: number;
+  stockQuantity?: number | null;
   name?: string;
   attributes: { nodes: VariationAttribute[] };
   image?: ImageNode;

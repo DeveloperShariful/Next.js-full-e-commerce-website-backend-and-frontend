@@ -79,6 +79,7 @@ export default function ProductImage() {
                 onSelect={handleSelect}
                 title="Select Product Image"
                 source={MediaSource.PRODUCT}
+                restrictType="IMAGE"
             />
         </div>
     );

@@ -515,6 +515,7 @@ export default function General() {
                 }}
                 title="Select Video"
                 source={MediaSource.PRODUCT}
+                restrictType="VIDEO"
             />
 
             {/* Thumbnail media picker modal */}
@@ -528,6 +529,7 @@ export default function General() {
                 }}
                 title="Select Thumbnail Image"
                 source={MediaSource.PRODUCT}
+                restrictType="IMAGE"
             />
         </div>
     );

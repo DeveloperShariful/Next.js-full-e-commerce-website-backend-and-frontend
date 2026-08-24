@@ -94,15 +94,35 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
   const currentPrice = getPriceAsNumber(product.salePrice) || getPriceAsNumber(product.regularPrice) || 0;
   const availability = product.stockStatus === 'IN_STOCK' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
   
+  // GoBike-এর dedicated ageGroup ফিল্ড এখনো কোনো product-এই পূরণ করা হয়নি
+  // (admin-এ খালি), কিন্তু age range প্রায় সব bike-এর নামেই লেখা থাকে
+  // ("Ages 5-9" ইত্যাদি) — তাই সেখান থেকে বের করে ব্যবহার করা হচ্ছে, যাতে এখনই
+  // কাজ করে, dedicated field পূরণ হওয়ার অপেক্ষায় বসে না থেকে।
+  const ageMatch = product.name.match(/ages?\s*(\d+)\s*[-–—]\s*(\d+)/i);
+  const audience = ageMatch
+    ? { '@type': 'PeopleAudience', suggestedMinAge: Number(ageMatch[1]), suggestedMaxAge: Number(ageMatch[2]) }
+    : undefined;
+
   // ★★★ JSON-LD Schema ★★★
   const productSchema = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
     description: product.description?.replace(/<[^>]*>?/gm, '').substring(0, 5000),
-    image: [product.image?.sourceUrl, ...(product.galleryImages.nodes.map((img: any) => img.sourceUrl) || [])].filter(Boolean),
+    image: [product.image?.sourceUrl, ...(product.galleryImages.nodes.map((img: { sourceUrl: string }) => img.sourceUrl) || [])].filter(Boolean),
     sku: product.sku || product.databaseId.toString(),
     mpn: product.sku || product.databaseId.toString(),
+    gtin14: product.barcode || undefined,
+    // নিচের ৫টা (size/color/material/pattern/category) DB-তে dedicated field
+    // হিসেবে আছে, কিন্তু এই মুহূর্তে কোনো product-এই পূরণ করা নেই — তাই এখন
+    // এগুলো "undefined" থাকবে (schema-তে দেখাবে না), admin panel-এ ডেটা যোগ
+    // করলে পরে এমনিতেই কাজ করা শুরু করবে, কোনো code change লাগবে না।
+    size: product.size || undefined,
+    color: product.color || undefined,
+    material: product.material || undefined,
+    pattern: product.pattern || undefined,
+    category: product.googleProductCategory || product.primaryCategory?.name || undefined,
+    audience,
     brand: { '@type': 'Brand', name: 'GoBike' },
     offers: {
       '@type': 'Offer',
@@ -113,12 +133,13 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
       itemCondition: 'https://schema.org/NewCondition',
       availability: availability,
       seller: { '@type': 'Organization', name: 'GoBike Australia' },
-      // shippingRate is deliberately omitted — real shipping is 100% carrier-calculated
-      // (live Transdirect quote per destination/weight), so no single flat price is
-      // accurate. destination + delivery timeframes below are real and match
-      // /shipping-policy exactly.
+      // ৮০% অর্ডারে coupon দিয়ে free shipping দেওয়া হয় বলে এটা business-এর
+      // de facto standard policy হিসেবে ধরে $0 declare করা হচ্ছে (owner-এর
+      // সিদ্ধান্ত)। destination/delivery timeframe নিচে বাস্তব এবং /shipping-policy
+      // পেজের সাথে হুবহু মিলছে।
       shippingDetails: {
         '@type': 'OfferShippingDetails',
+        shippingRate: { '@type': 'MonetaryAmount', value: 0, currency: 'AUD' },
         shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'AU' },
         deliveryTime: {
           '@type': 'ShippingDeliveryTime',
@@ -140,6 +161,20 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
       ratingValue: product.averageRating,
       reviewCount: product.reviewCount,
     } : undefined,
+    // সব approved review-ই দেখানো হচ্ছে (নতুন query লাগেনি, product page
+    // ইতিমধ্যেই এই ডেটা আনে)।
+    review: product.reviews.edges.length > 0
+      ? product.reviews.edges.map((edge: {
+          rating: number;
+          node: { author: { node: { name: string } }; content: string; date: string };
+        }) => ({
+          '@type': 'Review',
+          reviewRating: { '@type': 'Rating', ratingValue: edge.rating, bestRating: 5 },
+          author: { '@type': 'Person', name: edge.node.author.node.name },
+          datePublished: edge.node.date,
+          ...(edge.node.content ? { reviewBody: edge.node.content.replace(/<[^>]*>?/gm, '').substring(0, 2000) } : {}),
+        }))
+      : undefined,
   };
 
   const breadcrumbSchema = {
@@ -177,12 +212,26 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
     embedUrl: `https://www.youtube.com/embed/${videoData.id}`
   } : null;
 
+  // ★ product.videoUrl (main gallery-এর direct-hosted video, YouTube না) —
+  // এর জন্য কোনো dedicated title/description/upload-date নেই, তাই product-এর
+  // নিজের name/description/createdAt দিয়ে honest approximation করা হচ্ছে।
+  const mainVideoSchema = product.videoUrl ? {
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: `${product.name} — Product Video`,
+    description: (product.shortDescription || product.description || product.name).replace(/<[^>]*>?/gm, '').substring(0, 500),
+    thumbnailUrl: product.videoThumbnail || product.image?.sourceUrl,
+    uploadDate: product.createdAt,
+    contentUrl: product.videoUrl,
+  } : null;
+
   return (
     <div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />}
       {videoSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(videoSchema) }} />}
+      {mainVideoSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(mainVideoSchema) }} />}
 
       <Breadcrumbs items={[
         { label: 'Home', href: '/' },
@@ -193,7 +242,7 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
       ]} />
       
       {/* Client Component কে product পাঠানো হচ্ছে */}
-      <ProductClient product={product as any} />
+      <ProductClient product={product} />
     </div>
   );
 }

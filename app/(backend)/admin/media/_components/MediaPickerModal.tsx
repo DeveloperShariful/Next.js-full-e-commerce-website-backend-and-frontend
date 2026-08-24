@@ -31,14 +31,25 @@ type Props = {
   multiple?: boolean;
   title?: string;
   source?: MediaSource;
+  // দিলে picker শুধু সেই type-ই দেখাবে/আপলোড করতে দেবে, dropdown দিয়ে বদলানো
+  // যাবে না — এটা না দিলে ("Video" field-এ ভুলবশত ছবি বেছে নেওয়া" জাতীয় bug
+  // আটকাতেই এই prop, আগে কোনো restriction ছিল না)।
+  restrictType?: 'IMAGE' | 'VIDEO' | 'DOCUMENT';
 };
 
-export default function MediaPickerModal({ open, onClose, onSelect, multiple = false, title, source }: Props) {
+const ACCEPT_BY_TYPE: Record<'IMAGE' | 'VIDEO' | 'DOCUMENT', string> = {
+  IMAGE: 'image/jpeg,image/png,image/webp,image/gif,image/svg+xml',
+  VIDEO: 'video/mp4,video/quicktime',
+  DOCUMENT: 'application/pdf',
+};
+const ACCEPT_ALL = Object.values(ACCEPT_BY_TYPE).join(',');
+
+export default function MediaPickerModal({ open, onClose, onSelect, multiple = false, title, source, restrictType }: Props) {
   const [mounted, setMounted] = useState(false);
   const [mediaList, setMediaList] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [typeFilter, setTypeFilter] = useState(restrictType ?? 'ALL');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -64,10 +75,10 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
       loadMedia();
       setSelectedIds([]);
       setSearch('');
-      setTypeFilter('ALL');
+      setTypeFilter(restrictType ?? 'ALL');
       setVisibleCount(PAGE_SIZE);
     }
-  }, [open, loadMedia]);
+  }, [open, loadMedia, restrictType]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -184,16 +195,22 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
             />
           </div>
 
-          <select
-            value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value)}
-            className="border border-[#8c8f94] rounded-[3px] px-2 py-[5px] text-[13px] text-[#2c3338] bg-white focus:border-[#2271b1] focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">All types</option>
-            <option value="IMAGE">Images</option>
-            <option value="VIDEO">Videos</option>
-            <option value="DOCUMENT">Documents</option>
-          </select>
+          {restrictType ? (
+            <span className="border border-[#c3c4c7] rounded-[3px] px-2 py-[5px] text-[13px] text-[#646970] bg-[#f6f7f7]">
+              {restrictType === 'IMAGE' ? 'Images only' : restrictType === 'VIDEO' ? 'Videos only' : 'Documents only'}
+            </span>
+          ) : (
+            <select
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+              className="border border-[#8c8f94] rounded-[3px] px-2 py-[5px] text-[13px] text-[#2c3338] bg-white focus:border-[#2271b1] focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">All types</option>
+              <option value="IMAGE">Images</option>
+              <option value="VIDEO">Videos</option>
+              <option value="DOCUMENT">Documents</option>
+            </select>
+          )}
 
           <span className="text-[12px] text-[#646970]">
             {visibleCount < filtered.length ? `${visibleCount} of ${filtered.length} files` : `${filtered.length} files`}
@@ -220,7 +237,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,video/mp4,video/quicktime,application/pdf"
+                accept={restrictType ? ACCEPT_BY_TYPE[restrictType] : ACCEPT_ALL}
                 onChange={handleUpload}
                 disabled={isUploading}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"

@@ -54,6 +54,7 @@ export async function getProductBySlugAction(slug: string) {
       id: product.id,
       databaseId: product.productCode,
       slug: product.slug,
+      createdAt: product.createdAt.toISOString(), // videoUrl-এর VideoObject uploadDate approximation-এর জন্য
       name: product.name,
       description: product.description || "",
       shortDescription: product.shortDescription || "",
@@ -65,6 +66,7 @@ export async function getProductBySlugAction(slug: string) {
       regularPrice: formatPrice(regularPriceNum),
       salePrice: salePriceNum ? formatPrice(salePriceNum) : undefined,
       sku: product.sku || product.productCode.toString(),
+      barcode: product.barcode || undefined, // GTIN — structured data (gtin14)-এর জন্য
       stockStatus: (!product.trackQuantity || product.stock > 0) ? "IN_STOCK" : "OUT_OF_STOCK",
       stockQuantity: product.trackQuantity ? product.stock : null,
       onSale: isOnSale,
@@ -76,6 +78,15 @@ export async function getProductBySlugAction(slug: string) {
       reviewCount: product.reviewCount || 0,
       videoUrl: product.videoUrl || null,
       videoThumbnail: product.videoThumbnail || null,
+      // Structured data (size/audience/color ইত্যাদি)-এর জন্য — আগে fetch হতো
+      // কিন্তু formattedProduct-এ কপি হতো না, তাই page পর্যন্ত পৌঁছাত না।
+      size: product.size || undefined,
+      color: product.color || undefined,
+      material: product.material || undefined,
+      pattern: product.pattern || undefined,
+      gender: product.gender || undefined,
+      ageGroup: product.ageGroup || undefined,
+      googleProductCategory: product.googleProductCategory || undefined,
       primaryCategory: product.categories?.[0]
         ? { name: product.categories[0].name, slug: product.categories[0].slug }
         : null,

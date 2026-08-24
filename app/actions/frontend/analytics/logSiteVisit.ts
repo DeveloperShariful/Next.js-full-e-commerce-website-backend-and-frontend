@@ -10,6 +10,15 @@ const VISITOR_ID_MAX_AGE = 365 * 24 * 60 * 60; // ১ বছর — দীর্
 const SESSION_LOGGED_COOKIE = "gb_visit_logged";
 const SESSION_LOGGED_MAX_AGE = 30 * 60; // ৩০ মিনিট — এই window-এ একবারই log হবে (per-pageview না)
 
+// "ভদ্র" bot/crawler-রা নিজেই User-Agent-এ পরিচয় দিয়ে দেয় (Googlebot,
+// AhrefsBot, headless browser দিয়ে চলা AI scraper ইত্যাদি) — কোনো real
+// browser এই শব্দগুলো নিজের UA-তে রাখে না, তাই false-positive (আসল visitor
+// বাদ পড়া) হওয়ার ঝুঁকি প্রায় শূন্য। যারা ইচ্ছাকৃতভাবে নিজেকে লুকিয়ে normal
+// browser UA নকল করে, তাদের এভাবে ধরা যাবে না — এটা সব bot না, শুধু "নিজে
+// পরিচয় দেওয়া" bot-গুলো বাদ দেয়।
+const BOT_UA_PATTERN =
+  /bot|crawl|spider|slurp|mediapartners|facebookexternalhit|whatsapp|telegrambot|discordbot|slackbot|pinterest(?:bot)?|redditbot|applebot|bytespider|gptbot|chatgpt-user|ccbot|claudebot|anthropic-ai|perplexitybot|python-requests|curl\/|wget|go-http-client|headlesschrome|phantomjs|selenium|puppeteer|playwright/i;
+
 // প্রতিটা platform নিজে থেকেই তাদের লিংকে এই click ID জুড়ে দেয় — এটাই সবচেয়ে
 // নির্ভরযোগ্য প্রমাণ, UTM ট্যাগ ছাড়াই কাজ করে। গুরুত্বপূর্ণ ব্যতিক্রম: fbclid শুধু
 // paid ad-এর প্রমাণ না — Meta নিশ্চিত করেছে এটা organic পোস্ট/কমেন্টের লিংকেও
@@ -135,6 +144,16 @@ export async function logSiteVisit(data: {
   utmTerm?: string | null;
 }) {
   try {
+    const headerList = await headers();
+    const userAgent = headerList.get("user-agent") || "";
+
+    // Googlebot/AhrefsBot/headless-browser AI scraper ইত্যাদি নিজে পরিচয়
+    // দিলেই বাদ — কোনো visitorId cookie ইস্যু হবে না, কোনো row-ও তৈরি হবে না।
+    // এতে Total Visitors/channel/country সংখ্যা আসল মানুষের ডেটা দিয়েই থাকে।
+    if (BOT_UA_PATTERN.test(userAgent)) {
+      return { success: true, skipped: true, isBot: true };
+    }
+
     const cookieStore = await cookies();
 
     // এক সেশনে একবারই row তৈরি হবে — প্রতিটা page view-এ না (performance)
@@ -154,8 +173,6 @@ export async function logSiteVisit(data: {
       });
     }
 
-    const headerList = await headers();
-    const userAgent = headerList.get("user-agent") || "";
     // Vercel নিজে থেকেই এই header পাঠায় (production-এ, কোনো proxy/CDN সামনে না
     // থাকলে) — কোনো external geo-lookup লাগে না। x-vercel-ip-country ISO 3166-1
     // দুই-অক্ষরের কোড (যেমন "AU")। x-vercel-ip-city RFC3986 অনুযায়ী

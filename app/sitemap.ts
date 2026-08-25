@@ -55,6 +55,17 @@ function readMarkdownSlugs(dir: string): { slug: string; lastModified: Date; ima
   }
 }
 
+// ─── video:description প্লেইন টেক্সট হওয়া লাগে (XML sitemap spec) ─────────────
+// product.shortDescription-এ raw rich-HTML (marketing card grid ইত্যাদি) থাকতে
+// পারে — সেটা সরাসরি XML-এ বসালে parsing ভেঙে যায় (Google-এর "Sitemap can be
+// read, but has errors / Parsing error" ঠিক এই কারণেই হচ্ছিল)। tag strip +
+// video:description-এর ম্যাক্স ২০৪৮ ক্যারেক্টার সীমায় truncate করা হচ্ছে।
+function stripHtmlForXmlDescription(html: string | null | undefined, maxLen = 2000): string {
+  if (!html) return '';
+  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.length > maxLen ? `${text.slice(0, maxLen - 1)}…` : text;
+}
+
 // ─── Main sitemap ─────────────────────────────────────────────────────────────
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
@@ -121,7 +132,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             entry.videos = [{
               title: p.name,
               thumbnail_loc: thumbnail,
-              description: p.shortDescription || p.name,
+              description: stripHtmlForXmlDescription(p.shortDescription) || p.name,
               content_loc: p.videoUrl,
             }];
           }
@@ -244,7 +255,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           entry.videos = videos.map(v => ({
             title,
             thumbnail_loc: v.url.replace(/\.[a-zA-Z0-9]+$/, '.jpg'),
-            description: p.metaDesc || p.caption || title,
+            description: stripHtmlForXmlDescription(p.metaDesc || p.caption) || title,
             content_loc: v.url,
           }));
         }

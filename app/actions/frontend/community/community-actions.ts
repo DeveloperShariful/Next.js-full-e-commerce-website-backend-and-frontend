@@ -49,9 +49,14 @@ function autoSeoFields(caption: string | null, firstMedia: { url: string; mediaT
   // Cloudinary video URLs return a poster-frame image if you swap the
   // extension to .jpg (see lib/cloudinary.ts's URL shape) — no separate
   // thumbnail generation step needed.
+  // টেক্সট-only post (কোনো media নেই)-এ og:image আগে null থাকত, ফলে
+  // Facebook-এ link preview ভেঙে যেত (og:image Facebook-এর জন্য আবশ্যিক
+  // ফিল্ড)। fallback হিসেবে সাইটের আসল, real logo ব্যবহার করা হচ্ছে (header-এই
+  // ব্যবহৃত হয়, সরাসরি যাচাই করা 200 OK) — product page-এর পুরনো
+  // "default-og.jpg" fallback আসলে 404 (কখনো আপলোডই হয়নি), তাই সেটা এড়ানো হলো।
   const ogImage = firstMedia
     ? (firstMedia.mediaType === MediaType.VIDEO ? firstMedia.url.replace(/\.[a-zA-Z0-9]+$/, ".jpg") : firstMedia.url)
-    : null;
+    : "https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids-1.webp";
 
   return { metaTitle, metaDesc, ogImage };
 }

@@ -6,6 +6,7 @@ import type { CommunityPostData } from "../_components/PostCard";
 import CommunityPostClientWrapper from "../_components/CommunityPostClientWrapper";
 import ShopBikesLinks from "../_components/ShopBikesLinks";
 import { getCommunityPostBySlug, getMorePostsByAuthor } from "@/app/actions/frontend/community/community-actions";
+import { getCachedLinkPreview } from "@/lib/link-preview";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,11 @@ export default async function CommunityPostPage({ params }: Props) {
   const { slug } = await params;
   const { post } = await getCommunityPostBySlug(slug);
   if (!post) notFound();
-  const postData: CommunityPostData = post;
+  // PostCard.tsx-এর preview card UI আগে থেকেই ঠিক ছিল, কিন্তু এই single-post
+  // পেজ কখনো linkPreview data fetch করতই না — feed/profile page-এ (PostCard
+  // যেখানে attachLinkPreviews দিয়ে ডেটা পায়) কাজ করত, এই পেজে করত না।
+  const linkPreview = await getCachedLinkPreview(post.caption);
+  const postData: CommunityPostData = { ...post, linkPreview };
 
   const morePosts = (await getMorePostsByAuthor(post.author.id, post.id)).posts;
 
@@ -73,12 +78,31 @@ export default async function CommunityPostPage({ params }: Props) {
     url,
     datePublished: post.createdAt.toISOString(),
     dateModified: post.updatedAt.toISOString(),
-    author: { "@type": "Person", name: post.author.name || "GoBike Rider" },
+    author: {
+      "@type": "Person",
+      name: post.author.name || "GoBike Rider",
+      url: `https://gobike.au/community/profile/${post.author.id}`
+    },
     interactionStatistic: [
       { "@type": "InteractionCounter", interactionType: "https://schema.org/LikeAction", userInteractionCount: post.reactionCount },
       { "@type": "InteractionCounter", interactionType: "https://schema.org/CommentAction", userInteractionCount: post.commentCount },
       { "@type": "InteractionCounter", interactionType: "https://schema.org/ShareAction", userInteractionCount: post.shareCount },
     ],
+    // আগে শুধু commentCount (সংখ্যা) পাঠানো হচ্ছিল, আসল comment content না —
+    // Google-এর "comment" field এই real Comment object-গুলোই চায়। ডেটা
+    // (post.comments, top ৩টা) আগে থেকেই fetch হচ্ছিল, শুধু schema-তে যোগ হয়নি।
+    comment: post.comments && post.comments.length > 0
+      ? post.comments.map((c) => ({
+          "@type": "Comment",
+          text: c.content,
+          datePublished: c.createdAt.toISOString(),
+          author: {
+            "@type": "Person",
+            name: c.author.name || "GoBike Rider",
+            url: `https://gobike.au/community/profile/${c.author.id}`
+          }
+        }))
+      : undefined,
   };
 
   const breadcrumbSchema = {

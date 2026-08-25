@@ -52,9 +52,9 @@ export async function generateMetadata({ searchParams }: {
   const pageParam = resolvedSearchParams.page;
   const pageNum = pageParam && !Array.isArray(pageParam) ? parseInt(pageParam, 10) : 1;
   
-  let baseTitle = "Shop All Products";
+  let baseTitle = "Kids Motorbikes & Electric Motorbikes Australia — Shop All Products";
   let title = `${baseTitle} | GoBike Australia`;
-  let description = "Explore our curated selection of high-quality bikes, spare parts, and accessories. From electric childs motorbikes to balancing bikes, find it all at GoBike.";
+  let description = "Shop kids motorbikes and electric motorbikes Australia-wide. Explore our curated selection of high-quality bikes, spare parts, and accessories. From electric childs motorbikes to balancing bikes, find it all at GoBike.";
 
   if (categorySlug) {
     const categoryName = categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -96,9 +96,9 @@ export async function generateMetadata({ searchParams }: {
       'childrens electric bike',
       'australia electric bike',
       'electric bikes for 10 year olds',
-      'childrens electric dirt bike',
-      'balancing bikes',
-      'electric cycles australia',
+      'kids motorbike',
+      'electric motorbikes',
+      'electric motorbikes australia',
       categorySlug ? `${categorySlug} australia` : 'kids ebikes'
     ],
     alternates: {
@@ -255,8 +255,8 @@ export default async function ProductsPage({ searchParams }: {
       
       <div className="max-w-[1300px] mx-auto px-1.5 font-sans mb-12">
         <header className="text-center mb-12 bg-gray-50 rounded-lg p-8 md:p-12">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">{currentCategoryName}</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto text-lg">Explore our curated selection of high-quality products. Find exactly what you are looking for.</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">{category ? currentCategoryName : 'Kids Motorbikes & Electric Motorbikes Australia — All Products'}</h1>
+          <p className="text-gray-600 max-w-2xl mx-auto text-lg">{category ? 'Explore our curated selection of high-quality products. Find exactly what you are looking for.' : 'Shop kids motorbikes and electric motorbikes Australia-wide. Explore our curated selection of high-quality products. Find exactly what you are looking for.'}</p>
         </header>
         
         <ProductFilters categories={categories} />

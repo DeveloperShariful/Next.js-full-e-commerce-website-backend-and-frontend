@@ -9,8 +9,8 @@ import { HomeBlogSection } from './blog/HomeBlogSection';
 
 const siteConfig = {
   url: 'https://gobike.au',
-  title: 'GoBike - Australia\'s Top Rated Kids Electric Balance Bikes',
-  description: "Discover Australia's top-rated electric bikes for kids. Safe, fun, and built for adventure. Shop GoBike for the best kids e-bikes with a 1-year local warranty.",
+  title: 'GoBike Kids Electric Motorbikes & Dirt Bikes — Australia\'s Top Rated Kids Electric Balance Bikes',
+  description: "Shop kids electric motorbikes and electric dirt bikes at GoBike. Discover Australia's top-rated electric bikes for kids. Safe, fun, and built for adventure. Shop GoBike for the best kids e-bikes with a 1-year local warranty.",
   ogImage: 'https://gobikes.au/wp-content/uploads/2025/11/gobike-ebike-safe-speed-modes.jpg',
   logo: 'https://gobikes.au/wp-content/uploads/2025/06/cropped-GOBIKE-Electric-Bike-for-kids-1.webp',
   siteName: 'GoBike Australia',
@@ -34,6 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
     'kids electric bike', 'electric bike for kids', 'kids ebike', 'electric balance bike',
     'gobike', 'gobike australia', 'best kids electric bike australia', 'electric dirt bike kids',
     'children electric bike', 'kids motorbike electric', 'toddler electric bike',
+    'electric motorbike', 'electric dirt bike',
   ],
   alternates: {
     canonical: '/',
@@ -197,7 +198,7 @@ export default async function Home() {
       />
       {/* SEO H1 — server-rendered so Google always sees it */}
       <h1 className="sr-only">
-        GoBike Australia — Kids Electric Bikes for Ages 2–16
+        Kids Electric Motorbikes &amp; Electric Dirt Bikes — GoBike Australia — Kids Electric Bikes for Ages 2–16
       </h1>
       <HomePageClient
         initialFeaturedBikes={initialFeaturedBikes}

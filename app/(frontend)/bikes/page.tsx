@@ -49,8 +49,8 @@ export async function generateMetadata({ searchParams }: {
   const pageNum = pageParam && !Array.isArray(pageParam) ? parseInt(pageParam, 10) : 1;
   const isPaged = pageNum > 1;
 
-  const title = isPaged ? `Shop Kids Electric Bikes | Page ${pageNum} | GoBike Australia` : "All Kids Top Rated Electric Bikes | Electric Cycles Australia";
-  const description = "Browse our full collection of top-rated electric balance bikes for kids. From balancing bikes to childrens electric motorbikes. Safe, durable, and built for adventure.";
+  const title = isPaged ? `Shop Kids Electric Bikes | Page ${pageNum} | GoBike Australia` : "Kids Dirt Bikes & Childrens Motorcycles — All Kids Top Rated Electric Bikes | Electric Cycles Australia";
+  const description = "Shop kids dirt bikes, childrens electric dirt bikes, and childrens motorcycles. Browse our full collection of top-rated electric balance bikes for kids. From balancing bikes to childrens electric motorbikes. Safe, durable, and built for adventure.";
   
   let canonicalUrl = '/bikes';
   if (isPaged) {
@@ -68,13 +68,12 @@ export async function generateMetadata({ searchParams }: {
       'balancing bikes',
       'electric cycles australia',
       'childrens electric dirt bike',
-      'childrens electric bike',
       'balance bike electric',
       'childrens electric motorbikes',
-      'australia electric bike',
       'australian electric bikes',
       'electric childs motorbike',
-      'electric bikes for 10 year olds'
+      'kids dirt bike',
+      'childrens motorcycles'
     ],
     alternates: {
       canonical: canonicalUrl,
@@ -228,12 +227,12 @@ export default async function BikesPage({ searchParams }: {
         
         {/* --- Header Banner (Original UI) --- */}
         <header className="flex flex-col md:flex-row items-center gap-6 md:gap-12 mb-8 md:mb-12 bg-gray-50 rounded-lg md:rounded-xl p-4 md:p-12">
-          <div className="flex-1 text-center md:text-left w-full">
+          <div className="flex-1 text-left w-full">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-3 md:mb-4 leading-tight">
-              Australia&apos;s Top-Rated Electric Bikes for Kids
+              Kids Dirt Bikes &amp; Childrens Motorcycles — Australia&apos;s Top-Rated Electric Bikes for Kids
             </h1>
-            <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto md:mx-0">
-              Give your child the gift of adventure! Our electric balance bikes are engineered for safety, built for fun, and designed to create lifelong memories.
+            <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-2xl mx-0">
+              Shop kids dirt bikes, childrens electric dirt bikes, and childrens motorcycles. Give your child the gift of adventure! Our electric balance bikes are engineered for safety, built for fun, and designed to create lifelong memories.
             </p>
           </div>
           <div className="flex-1 w-full max-w-[580px]">
@@ -265,10 +264,11 @@ export default async function BikesPage({ searchParams }: {
             </p>
           )}
 
-          <div className="mt-10 flex justify-center">
-            {/* pageInfo পাস করা হলো আমাদের নতুন PaginationControls এর জন্য */}
-            <PaginationControls pageInfo={pageInfo} basePath="/bikes" />
-          </div>
+          {(pageInfo.hasNextPage || pageInfo.hasPreviousPage) && (
+            <div className="mt-10 flex justify-center">
+              <PaginationControls pageInfo={pageInfo} basePath="/bikes" />
+            </div>
+          )}
         </main>
 
         {/* --- Why Choose Us Section (Original UI) --- */}

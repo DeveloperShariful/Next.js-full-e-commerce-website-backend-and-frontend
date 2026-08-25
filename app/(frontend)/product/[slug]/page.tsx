@@ -7,6 +7,27 @@ import Breadcrumbs from '@/components/Breadcrumbs';
 import { productFaqMap } from '../productFaqs';
 import { productVideoMap } from '../productVideos';
 
+// keyword-gap পরিকল্পনা অনুযায়ী — প্রতিটা মূল bike-এর জন্য আলাদা, প্রাসঙ্গিক
+// keyword (শুধু এই ৪টা bike-এর পেজে, বাকি সব product অপরিবর্তিত থাকে)
+const productSeoKeywordMap: Record<string, { titleSuffix: string; descSentence: string }> = {
+  'ebike-for-kids-12-inch-electric-bike-ages-2-5': {
+    titleSuffix: 'Motorbike Training Wheels',
+    descSentence: 'This kids motorbike with training wheels and childs electric motorcycle is the perfect first ride.',
+  },
+  'ebike-for-sale-16-inch-gobike-ages-5-9': {
+    titleSuffix: 'Mini E Bike',
+    descSentence: 'This mini e bike, electric mini bike, and kids electric motorbike is built for growing riders.',
+  },
+  '20-inch-electric-bikes-for-sale-ebike-for-kids': {
+    titleSuffix: 'Electric Dirt Bike for Kids',
+    descSentence: 'This kids electric dirt bike and childrens electric motorbike delivers dirt-bike thrills, safely.',
+  },
+  'gobike-24-inch-electric-bike-teens-high-speed-performance-for-ages-13': {
+    titleSuffix: 'Childrens Dirt Bike',
+    descSentence: 'This childrens dirt bike and motorbike for kids is our top performance model.',
+  },
+};
+
 // ✅ নতুন Server Action ইম্পোর্ট করা হলো
 import { getProductBySlugAction } from '@/app/actions/frontend/product/get-product-by-slug';
 
@@ -33,24 +54,23 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const descriptionSource = product.shortDescription || product.description || '';
   const plainDescription = descriptionSource.replace(/<[^>]*>?/gm, '').substring(0, 155);
   const imageUrl = product.image?.sourceUrl || 'https://gobike.au/default-og.jpg';
-  const title = `${product.name} | Best Kids Electric Bike Australia | GoBike`;
-  const seoDescription = `${plainDescription} Shop the best childrens electric dirt bike and balance bike electric options. Top-rated australian electric bikes for ages 2-16.`;
+  const seoKeywords = productSeoKeywordMap[slug];
+  const title = seoKeywords
+    ? `${seoKeywords.titleSuffix} — ${product.name} | Best Kids Electric Bike Australia | GoBike`
+    : `${product.name} | Best Kids Electric Bike Australia | GoBike`;
+  const seoDescription = seoKeywords
+    ? `${seoKeywords.descSentence} ${plainDescription} Backed by GoBike's Australia-wide shipping and 1-year local warranty.`
+    : `${plainDescription} Backed by GoBike's Australia-wide shipping and 1-year local warranty.`;
 
   return {
     title: title,
     description: seoDescription,
     keywords: [
       product.name,
-      'balancing bikes',
-      'electric cycles australia',
-      'childrens electric dirt bike',
-      'childrens electric bike',
-      'kids electric bike',
-      'balance bike electric',
-      'childrens electric motorbikes',
-      'australia electric bike',
-      'electric bikes for 10 year olds',
-      'electric childs motorbike'
+      'gobike ebike',
+      'kids ebike for sale',
+      'kids electric motorbike for sale',
+      'electric bike for kids australia'
     ],
     alternates: { canonical: `https://gobike.au/product/${slug}` },
     openGraph: {

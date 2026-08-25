@@ -152,13 +152,24 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
           transitTime: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 7, unitCode: 'd' }
         }
       },
+      // /refund-and-returns-policy পেজের সাথে হুবহু মিলিয়ে — full refund
+      // (refundType), brand-new condition-এই ফেরত নেওয়া হয় (itemCondition),
+      // customer নিজে label ব্যবস্থা করে (returnLabelSource), damaged/used
+      // ফেরতে ২০% পর্যন্ত restocking fee, আর faulty item-এর জন্য আলাদাভাবে
+      // free return (itemDefectReturnFees) — সবই policy পেজে সত্যিই লেখা আছে।
       hasMerchantReturnPolicy: {
         '@type': 'MerchantReturnPolicy',
         applicableCountry: 'AU',
+        returnPolicyCountry: 'AU',
         returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
         merchantReturnDays: 14,
         returnMethod: 'https://schema.org/ReturnByMail',
-        returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility'
+        returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility',
+        returnLabelSource: 'https://schema.org/ReturnLabelCustomerResponsibility',
+        itemCondition: 'https://schema.org/NewCondition',
+        refundType: 'https://schema.org/FullRefund',
+        restockingFee: 20,
+        itemDefectReturnFees: 'https://schema.org/FreeReturn'
       }
     },
     aggregateRating: product.reviewCount > 0 ? {

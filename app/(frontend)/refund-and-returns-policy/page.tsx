@@ -63,6 +63,48 @@ const faqSchema = {
       "@type": "Answer",
       "text": "If your item arrives damaged, defective, or incorrect, please contact us within 48 hours of delivery. We will arrange a free replacement or a full refund, including all shipping costs."
     }
+  },{
+    "@type": "Question",
+    "name": "Do I have to pay for return shipping?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "If you're simply changing your mind, the cost of return shipping is your responsibility, and we recommend using a tracked postal service so the parcel can be traced back to us. If the item arrived damaged, defective, or incorrect, however, return shipping is completely free — we cover it as part of your replacement or refund."
+    }
+  },{
+    "@type": "Question",
+    "name": "Is there a restocking fee on returns?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Products returned in brand-new, unused condition are not charged a restocking fee. If a returned product shows signs of use, damage, or is missing components, we reserve the right to apply a restocking fee of up to 20% of the item price, or in some cases decline the return altogether."
+    }
+  },{
+    "@type": "Question",
+    "name": "Can I exchange an item instead of getting a refund?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Simple exchange and upgrade options are available — for example, swapping to a different size or model. Email our team with your order number and what you'd like to exchange for, and we'll arrange it alongside your return."
+    }
+  },{
+    "@type": "Question",
+    "name": "How do I start a return with GoBike?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Email gobike@gobike.au with your order number and the reason for the return. If the item is damaged or faulty, attach photos to speed up the process. Our team replies within 1 business day with return instructions."
+    }
+  },{
+    "@type": "Question",
+    "name": "What items can't be returned?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "To be eligible for return, an item must be unused, in brand-new condition with no signs of installation, and in its original packaging with all accessories and parts included. Batteries and other electrical components must remain unopened and unused, for safety reasons — once a battery has been used or its seal broken, it can no longer be accepted back."
+    }
+  },{
+    "@type": "Question",
+    "name": "Does this policy affect my rights under Australian Consumer Law?",
+    "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. This return policy is offered in addition to, and does not limit, your statutory rights under Australian Consumer Law. If a product has a major fault, you remain entitled to a repair, replacement, or refund under the Australian Consumer Law regardless of the terms above."
+    }
   }]
 };
 
@@ -161,6 +203,35 @@ export default function RefundAndReturnsPolicyPage() {
               </ul>
             </div>
             
+            <div className="mb-10">
+              <h2 className="text-[24px] font-semibold text-[#1a1a1a] mb-5 pb-[10px] border-b-2 border-[#f0f0f0]">Frequently Asked Questions</h2>
+
+              <div className="mb-6">
+                <h3 className="text-[18px] font-semibold text-[#1a1a1a] mb-[6px]">Do I have to pay for return shipping?</h3>
+                <p className="text-base mb-0">If you&apos;re simply changing your mind, the cost of return shipping is your responsibility, and we recommend using a tracked postal service so the parcel can be traced back to us. If the item arrived damaged, defective, or incorrect, however, return shipping is completely free — we cover it as part of your replacement or refund.</p>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-[18px] font-semibold text-[#1a1a1a] mb-[6px]">Is there a restocking fee on returns?</h3>
+                <p className="text-base mb-0">Products returned in brand-new, unused condition are not charged a restocking fee. If a returned product shows signs of use, damage, or is missing components, we reserve the right to apply a restocking fee of up to 20% of the item price, or in some cases decline the return altogether.</p>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-[18px] font-semibold text-[#1a1a1a] mb-[6px]">Can I exchange an item instead of getting a refund?</h3>
+                <p className="text-base mb-0">Yes. Simple exchange and upgrade options are available — for example, swapping to a different size or model. Email our team with your order number and what you&apos;d like to exchange for, and we&apos;ll arrange it alongside your return.</p>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-[18px] font-semibold text-[#1a1a1a] mb-[6px]">What items can&apos;t be returned?</h3>
+                <p className="text-base mb-0">To be eligible for return, an item must be unused, in brand-new condition with no signs of installation, and in its original packaging with all accessories and parts included. Batteries and other electrical components must remain unopened and unused, for safety reasons — once a battery has been used or its seal broken, it can no longer be accepted back.</p>
+              </div>
+
+              <div className="mb-0">
+                <h3 className="text-[18px] font-semibold text-[#1a1a1a] mb-[6px]">Does this policy affect my rights under Australian Consumer Law?</h3>
+                <p className="text-base mb-0">No. This return policy is offered in addition to, and does not limit, your statutory rights under Australian Consumer Law. If a product has a major fault, you remain entitled to a repair, replacement, or refund under the Australian Consumer Law regardless of the terms above.</p>
+              </div>
+            </div>
+
             <div className="mb-10">
               <h2 className="text-[24px] font-semibold text-[#1a1a1a] mb-5 pb-[10px] border-b-2 border-[#f0f0f0]">Need Help with Your Return?</h2>
               <p className="text-base mb-[15px]">Your satisfaction is our top priority. If you have any questions, our local Aussie support team is here to help you every step of the way.</p>

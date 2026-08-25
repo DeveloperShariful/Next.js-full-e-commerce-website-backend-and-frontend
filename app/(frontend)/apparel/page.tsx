@@ -159,10 +159,16 @@ export default async function ApparelPage({ searchParams }: {
           'hasMerchantReturnPolicy': {
             '@type': 'MerchantReturnPolicy',
             'applicableCountry': 'AU',
+            'returnPolicyCountry': 'AU',
             'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
             'merchantReturnDays': 14,
             'returnMethod': 'https://schema.org/ReturnByMail',
-            'returnFees': 'https://schema.org/ReturnFeesCustomerResponsibility'
+            'returnFees': 'https://schema.org/ReturnFeesCustomerResponsibility',
+            'returnLabelSource': 'https://schema.org/ReturnLabelCustomerResponsibility',
+            'itemCondition': 'https://schema.org/NewCondition',
+            'refundType': 'https://schema.org/FullRefund',
+            'restockingFee': 20,
+            'itemDefectReturnFees': 'https://schema.org/FreeReturn'
           }
         }
       }

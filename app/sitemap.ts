@@ -55,15 +55,30 @@ function readMarkdownSlugs(dir: string): { slug: string; lastModified: Date; ima
   }
 }
 
+// ─── XML-এ যাওয়া যেকোনো ডাইনামিক স্ট্রিং (title, URL) অবশ্যই escape করতে হয় ──────
+// product.name-এর মতো ফিল্ডে literal "&" (যেমন "Kids & Teens") থাকলে সেটা raw
+// অবস্থায় XML ভেঙে দেয় ("xmlParseEntityRef: no name") — Next.js-এর video/image
+// sitemap extension নিজে থেকে এটা escape করে না, তাই ম্যানুয়ালি করা হচ্ছে।
+function escapeXml(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 // ─── video:description প্লেইন টেক্সট হওয়া লাগে (XML sitemap spec) ─────────────
 // product.shortDescription-এ raw rich-HTML (marketing card grid ইত্যাদি) থাকতে
 // পারে — সেটা সরাসরি XML-এ বসালে parsing ভেঙে যায় (Google-এর "Sitemap can be
 // read, but has errors / Parsing error" ঠিক এই কারণেই হচ্ছিল)। tag strip +
-// video:description-এর ম্যাক্স ২০৪৮ ক্যারেক্টার সীমায় truncate করা হচ্ছে।
+// entity-escape + video:description-এর ম্যাক্স ২০৪৮ ক্যারেক্টার সীমায় truncate।
 function stripHtmlForXmlDescription(html: string | null | undefined, maxLen = 2000): string {
   if (!html) return '';
   const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text.length > maxLen ? `${text.slice(0, maxLen - 1)}…` : text;
+  const truncated = text.length > maxLen ? `${text.slice(0, maxLen - 1)}…` : text;
+  return escapeXml(truncated);
 }
 
 // ─── Main sitemap ─────────────────────────────────────────────────────────────
@@ -115,7 +130,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const images = [
           p.featuredImage,
           ...p.images.map(i => i.url),
-        ].filter((url): url is string => !!url);
+        ].filter((url): url is string => !!url).map(escapeXml);
 
         const entry: MetadataRoute.Sitemap[number] = {
           url: `${BASE_URL}/product/${p.slug}`,
@@ -130,10 +145,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           const thumbnail = p.videoThumbnail || p.featuredImage;
           if (thumbnail) {
             entry.videos = [{
-              title: p.name,
-              thumbnail_loc: thumbnail,
-              description: stripHtmlForXmlDescription(p.shortDescription) || p.name,
-              content_loc: p.videoUrl,
+              title: escapeXml(p.name),
+              thumbnail_loc: escapeXml(thumbnail),
+              description: stripHtmlForXmlDescription(p.shortDescription) || escapeXml(p.name),
+              content_loc: escapeXml(p.videoUrl),
             }];
           }
         }
@@ -186,7 +201,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: p.updatedAt,
         changeFrequency: 'monthly' as const,
         priority: 0.65,
-        ...(p.featuredImage && { images: [p.featuredImage] }),
+        ...(p.featuredImage && { images: [escapeXml(p.featuredImage)] }),
       }));
   } catch {
     blogPages = readMarkdownSlugs('blogs').map(post => ({
@@ -194,7 +209,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: post.lastModified,
       changeFrequency: 'monthly' as const,
       priority: 0.65,
-      ...(post.image && { images: [post.image] }),
+      ...(post.image && { images: [escapeXml(post.image)] }),
     }));
   }
 
@@ -204,7 +219,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: post.lastModified,
     changeFrequency: 'monthly' as const,
     priority: 0.6,
-    ...(post.image && { images: [post.image] }),
+    ...(post.image && { images: [escapeXml(post.image)] }),
   }));
 
   // ── 6. Kids eBike Hub category pages (derived from hub-posts frontmatter) ──
@@ -247,16 +262,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           priority: 0.5,
         };
 
-        if (images.length > 0) entry.images = images;
-        else if (p.ogImage) entry.images = [p.ogImage];
+        if (images.length > 0) entry.images = images.map(escapeXml);
+        else if (p.ogImage) entry.images = [escapeXml(p.ogImage)];
 
         if (videos.length > 0) {
-          const title = p.metaTitle || 'GoBike Community Post';
+          const title = escapeXml(p.metaTitle || 'GoBike Community Post');
           entry.videos = videos.map(v => ({
             title,
-            thumbnail_loc: v.url.replace(/\.[a-zA-Z0-9]+$/, '.jpg'),
+            thumbnail_loc: escapeXml(v.url.replace(/\.[a-zA-Z0-9]+$/, '.jpg')),
             description: stripHtmlForXmlDescription(p.metaDesc || p.caption) || title,
-            content_loc: v.url,
+            content_loc: escapeXml(v.url),
           }));
         }
 

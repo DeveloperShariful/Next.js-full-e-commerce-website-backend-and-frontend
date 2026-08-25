@@ -73,6 +73,11 @@ export default function Breadcrumbs({ pageTitle, items, className }: Breadcrumbs
 
           if (segment === 'product') {
             href = '/shop';
+          } else if ((segment === 'tag' || segment === 'profile') && pathSegments[0] === 'community') {
+            // /community/tag and /community/profile are routing folders only —
+            // there's no page at those bare paths, only at their [dynamic] children,
+            // so linking straight to the segment 404s. Send it to /community instead.
+            href = '/community';
           }
 
           let title = formatBreadcrumb(segment);

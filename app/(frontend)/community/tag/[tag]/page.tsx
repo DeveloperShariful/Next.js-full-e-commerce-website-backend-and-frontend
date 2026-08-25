@@ -14,7 +14,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { tag } = await params;
-  const title = `#${tag} | GoBike Community`;
+  const title = `Posts Tagged #${tag} | GoBike Community`;
   const description = `Posts tagged #${tag} on the GoBike Community.`;
   const url = `https://gobike.au/community/tag/${tag}`;
   return {
@@ -35,7 +35,7 @@ export default async function CommunityTagPage({ params }: Props) {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: `#${tag} | GoBike Community`,
+    name: `Posts Tagged #${tag} | GoBike Community`,
     description: `Posts tagged #${tag} on the GoBike Community.`,
     url,
     isPartOf: { "@type": "WebSite", name: "GoBike Australia", url: "https://gobike.au" },

@@ -111,7 +111,10 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
     description: product.description?.replace(/<[^>]*>?/gm, '').substring(0, 5000),
     image: [product.image?.sourceUrl, ...(product.galleryImages.nodes.map((img: { sourceUrl: string }) => img.sourceUrl) || [])].filter(Boolean),
     sku: product.sku || product.databaseId.toString(),
-    mpn: product.sku || product.databaseId.toString(),
+    // আগে ভুলভাবে sku-এর same ভ্যালু mpn-এ বসানো হচ্ছিল — এখন আসল product.mpn
+    // field ব্যবহার হচ্ছে (Google নিজেই এই ভুলটাকে known/documented MPN-error
+    // pattern হিসেবে চিহ্নিত করে); mpn না থাকলে ফিল্ডটাই বাদ যাবে (undefined)।
+    mpn: product.mpn || undefined,
     gtin14: product.barcode || undefined,
     // নিচের ৫টা (size/color/material/pattern/category) DB-তে dedicated field
     // হিসেবে আছে, কিন্তু এই মুহূর্তে কোনো product-এই পূরণ করা নেই — তাই এখন
@@ -130,6 +133,8 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
       priceCurrency: 'AUD',
       price: currentPrice,
       priceValidUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+      // এই দামে product যেদিন থেকে available (তৈরির তারিখ) — priceValidUntil-এর জোড়া
+      validFrom: product.createdAt.split('T')[0],
       itemCondition: 'https://schema.org/NewCondition',
       availability: availability,
       seller: { '@type': 'Organization', name: 'GoBike Australia' },
@@ -153,7 +158,7 @@ export default async function SingleProductPage({ params }: { params: Promise<{ 
         returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
         merchantReturnDays: 14,
         returnMethod: 'https://schema.org/ReturnByMail',
-        returnFees: 'https://schema.org/RestockingFees'
+        returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility'
       }
     },
     aggregateRating: product.reviewCount > 0 ? {

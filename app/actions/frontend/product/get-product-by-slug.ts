@@ -67,6 +67,7 @@ export async function getProductBySlugAction(slug: string) {
       salePrice: salePriceNum ? formatPrice(salePriceNum) : undefined,
       sku: product.sku || product.productCode.toString(),
       barcode: product.barcode || undefined, // GTIN — structured data (gtin14)-এর জন্য
+      mpn: product.mpn || undefined, // structured data (mpn)-এর জন্য
       stockStatus: (!product.trackQuantity || product.stock > 0) ? "IN_STOCK" : "OUT_OF_STOCK",
       stockQuantity: product.trackQuantity ? product.stock : null,
       onSale: isOnSale,

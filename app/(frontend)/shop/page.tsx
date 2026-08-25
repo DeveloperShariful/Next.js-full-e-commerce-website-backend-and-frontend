@@ -202,7 +202,27 @@ export default async function ProductsPage({ searchParams }: {
             'priceCurrency': 'AUD',
             'price': product.salePrice ? product.salePrice.replace(/[^0-9.]+/g, "") : product.regularPrice?.replace(/[^0-9.]+/g, ""),
             'availability': 'https://schema.org/InStock',
-            'url': `https://gobike.au/product/${product.slug}`
+            'itemCondition': 'https://schema.org/NewCondition',
+            'url': `https://gobike.au/product/${product.slug}`,
+            'seller': { '@type': 'Organization', 'name': 'GoBike Australia' },
+            'shippingDetails': {
+              '@type': 'OfferShippingDetails',
+              'shippingRate': { '@type': 'MonetaryAmount', 'value': 0, 'currency': 'AUD' },
+              'shippingDestination': { '@type': 'DefinedRegion', 'addressCountry': 'AU' },
+              'deliveryTime': {
+                '@type': 'ShippingDeliveryTime',
+                'handlingTime': { '@type': 'QuantitativeValue', 'minValue': 0, 'maxValue': 2, 'unitCode': 'd' },
+                'transitTime': { '@type': 'QuantitativeValue', 'minValue': 2, 'maxValue': 7, 'unitCode': 'd' }
+              }
+            },
+            'hasMerchantReturnPolicy': {
+              '@type': 'MerchantReturnPolicy',
+              'applicableCountry': 'AU',
+              'returnPolicyCategory': 'https://schema.org/MerchantReturnFiniteReturnWindow',
+              'merchantReturnDays': 14,
+              'returnMethod': 'https://schema.org/ReturnByMail',
+              'returnFees': 'https://schema.org/ReturnFeesCustomerResponsibility'
+            }
           }
         }
       }))

@@ -19,7 +19,6 @@ export default function robots(): MetadataRoute.Robots {
           '/order-success',
           '/order-confirmation',
           '/affiliates/dashboard',
-          '/affiliates/register',
           '/sign-in',
           '/sign-up',
           '/forgot-password',

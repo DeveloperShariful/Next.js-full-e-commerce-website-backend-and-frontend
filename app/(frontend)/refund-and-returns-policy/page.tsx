@@ -111,14 +111,13 @@ const faqSchema = {
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "GoBike.au",
+  "name": "GoBike Australia",
   "url": "https://gobike.au",
   "logo": "https://gobikes.au/wp-content/uploads/2025/06/cropped-GOBIKE-Electric-Bike-for-kids-1.webp",
   "contactPoint": {
     "@type": "ContactPoint",
-    "telephone": "+61-426-067-277",
     "contactType": "Customer Service",
-    "email": "support@gobike.au",
+    "email": "gobike@gobike.au",
     "areaServed": "AU"
   }
 };
@@ -239,10 +238,9 @@ export default function RefundAndReturnsPolicyPage() {
               {/* .contactInfoBlock replaced */}
               <div className="border border-[#e9e9e9] p-[30px] rounded-xl mt-[30px]">
                 <p className="text-base mb-0">
-                  <strong className="font-semibold text-[#1a1a1a]">Business Name:</strong> GoBike.au<br />
-                  <strong className="font-semibold text-[#1a1a1a]">Email:</strong> <a href="mailto:support@gobike.au" className="text-[#007bff] font-semibold underline">support@gobike.au</a><br />
-                  <strong className="font-semibold text-[#1a1a1a]">Phone:</strong> +61 426 067 277<br />
-                  <strong className="font-semibold text-[#1a1a1a]">Website:</strong> <Link href="https://gobike.au" className="text-[#007bff] font-semibold underline">Gobike Australia </Link>
+                  <strong className="font-semibold text-[#1a1a1a]">Business Name:</strong> GoBike Australia<br />
+                  <strong className="font-semibold text-[#1a1a1a]">Email:</strong> <a href="mailto:gobike@gobike.au" className="text-[#007bff] font-semibold underline">gobike@gobike.au</a><br />
+                  <strong className="font-semibold text-[#1a1a1a]">Website:</strong> <Link href="https://gobike.au" className="text-[#007bff] font-semibold underline">gobike.au</Link>
                 </p>
               </div>
             </div>

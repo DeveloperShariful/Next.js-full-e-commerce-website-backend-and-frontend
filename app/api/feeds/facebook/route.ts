@@ -102,6 +102,9 @@ export async function GET() {
         color: true,
         material: true,
         pattern: true,
+        weight: true,
+        weightUnit: true,
+        videoUrl: true,
         brand: { select: { name: true } },
         categories: { select: { id: true, name: true, googleCategoryName: true } },
         // Additional product images for g:additional_image_link
@@ -186,6 +189,10 @@ export async function GET() {
       const feedColor    = product.color    || "";
       const feedMaterial = product.material || "";
       const feedPattern  = product.pattern  || "";
+      const feedShippingWeight = product.weight && Number(product.weight) > 0
+        ? `${Number(product.weight)} ${product.weightUnit || "kg"}`
+        : "";
+      const feedVideoUrl = formatUrl(product.videoUrl);
 
       // ======================================================================
       // VARIABLE products → one <item> per variant
@@ -270,6 +277,8 @@ export async function GET() {
               if (idx <= 4 && label) xml += `      <g:custom_label_${idx}>${escapeXml(label)}</g:custom_label_${idx}>\n`;
             });
           }
+          if (feedShippingWeight) xml += `      <g:shipping_weight>${escapeXml(feedShippingWeight)}</g:shipping_weight>\n`;
+          if (feedVideoUrl) xml += `      <video_link>${escapeXml(feedVideoUrl)}</video_link>\n`;
 
           xml += `    </item>\n`;
         });
@@ -334,6 +343,8 @@ export async function GET() {
             if (idx <= 4 && label) xml += `      <g:custom_label_${idx}>${escapeXml(label)}</g:custom_label_${idx}>\n`;
           });
         }
+        if (feedShippingWeight) xml += `      <g:shipping_weight>${escapeXml(feedShippingWeight)}</g:shipping_weight>\n`;
+        if (feedVideoUrl) xml += `      <video_link>${escapeXml(feedVideoUrl)}</video_link>\n`;
 
         xml += `    </item>\n`;
       }

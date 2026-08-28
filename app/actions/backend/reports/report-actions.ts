@@ -182,6 +182,9 @@ export async function submitDailyReport(formData: FormData) {
       summary,
       tasks:  tasks || 'N/A',
       notes:  notes || 'N/A',
+      // WARRANTY_CLAIM_ADMIN-এর media_urls-এর মতোই কমা দিয়ে জোড়া string —
+      // email-generator.ts-এ এখান থেকে সরাসরি <img> tag বসানো হবে
+      images: images.join(','),
     },
   });
 

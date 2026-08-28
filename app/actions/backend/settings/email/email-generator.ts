@@ -331,6 +331,31 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
             </ul>
         </div>
       `;
+  } else if (template.triggerEvent === "DAILY_REPORT" && typeof metadata?.images === "string" && metadata.images.trim() !== "") {
+      const imgUrls = (metadata.images as string).split(',').map((url: string) => url.trim()).filter(Boolean);
+      if (imgUrls.length > 0) {
+          const cells = imgUrls.map((url: string) => `
+            <td style="padding: 6px; width: 33.33%; text-align: center; vertical-align: top;">
+              <a href="${url}" target="_blank" style="display: block;">
+                <img src="${url}" alt="Report photo" width="180"
+                  style="display: block; width: 100%; max-width: 180px; height: auto; border-radius: 6px; border: 1px solid #e0e0e0; margin: 0 auto;">
+              </a>
+            </td>
+          `);
+          // ৩টা করে row-এ ভাগ — email client-এ overflow এড়াতে
+          let rows = "";
+          for (let i = 0; i < cells.length; i += 3) {
+              const rowCells = cells.slice(i, i + 3);
+              while (rowCells.length < 3) rowCells.push('<td style="width: 33.33%;"></td>');
+              rows += `<tr>${rowCells.join('')}</tr>`;
+          }
+          mediaHtml = `
+            <h2 class="sec-h2" style="color: ${baseColor}; font-size: 20px; margin-top: 32px; margin-bottom: 14px; border-top: 1px solid #eee; padding-top: 24px; text-align: center;">Attached Photos</h2>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                ${rows}
+            </table>
+          `;
+      }
   }
 
   // ==========================================

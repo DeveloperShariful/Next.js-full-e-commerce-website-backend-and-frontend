@@ -55,6 +55,7 @@ export default function CartClient() {
       const gtmItems = cartItems.map(item => ({
         item_name: item.name,
         item_id: item.databaseId,
+        content_id: item.variationId ? `${item.id}_${item.variationId}` : item.id,
         price: parsePrice(item.price),
         quantity: item.quantity
       }));
@@ -101,6 +102,7 @@ export default function CartClient() {
       const gtmItems = cartItems.map(item => ({
         item_name: item.name,
         item_id: item.databaseId,
+        content_id: item.variationId ? `${item.id}_${item.variationId}` : item.id,
         price: parsePrice(item.price),
         quantity: item.quantity
       }));

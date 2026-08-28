@@ -210,7 +210,7 @@ export default function ProductClient({ product }: { product: Product }) {
       const priceString = product.salePrice || product.price || '0';
       const priceNum = parseFloat(priceString.replace(/[^0-9.]/g, ''));
 
-      gtmViewItem({ item_name: product.name, item_id: product.databaseId, price: priceNum, quantity: 1 });
+      gtmViewItem({ item_name: product.name, item_id: product.databaseId, content_id: product.id, price: priceNum, quantity: 1 });
 
       klaviyoTrackViewedProduct({
         ProductID: product.databaseId,

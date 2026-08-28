@@ -73,6 +73,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
           price: true,
           total: true,
           image: true,
+          product: { select: { productCode: true } },
         },
       },
     },
@@ -116,9 +117,11 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
   const billingLine = [billing?.city, billing?.state, billing?.postcode].filter(Boolean).join(', ');
 
   const trackedItems = order.items.map((item) => ({
+    // GA4/Google Ads item_id — বাকি সব event (view/cart)-এর সাথে ধারাবাহিক (productCode)
+    productCode: item.product?.productCode ?? null,
     // Facebook Merchant feed এর g:id ফরম্যাটের সাথে মিলিয়ে (product.id বা product.id_variant.id) —
     // যাতে Meta catalogue-এ AddToCart-এর মতো Purchase-ও সঠিকভাবে match হয়
-    productId: item.variantId ? `${item.productId}_${item.variantId}` : item.productId,
+    contentId: item.variantId ? `${item.productId}_${item.variantId}` : item.productId,
     name: [item.productName, item.variantName].filter(Boolean).join(" - "),
     price: parseFloat(String(item.price)),
     quantity: item.quantity,

@@ -5,8 +5,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { useCompare } from '@/context/CompareContext'; 
+import { useCompare } from '@/context/CompareContext';
 import { toast } from 'sonner';
+import { gtmBeginCheckout } from '@/lib/gtm';
 
 interface ProductForCart {
   id: string;
@@ -38,6 +39,19 @@ export default function QuantityAddToCart({ product }: { product: ProductForCart
     setIsBuying(true);
     try {
       await addToCart(product, quantity);
+
+      // Cart page ঘুরে "Proceed to Checkout" না চেপে সরাসরি এখান থেকেই checkout-এ
+      // যাচ্ছে বলে begin_checkout এখানেও আলাদাভাবে fire করতে হবে, নাহলে
+      // Facebook/GA4/TikTok-এ InitiateCheckout event মিস হয়ে যায়
+      const priceNum = parseFloat((product.price || '0').replace(/[^0-9.]/g, ''));
+      gtmBeginCheckout([{
+        item_name: product.name,
+        item_id: product.databaseId,
+        content_id: product.id,
+        price: priceNum,
+        quantity,
+      }]);
+
       closeMiniCart();
       toast.dismiss();
       router.push('/checkout');

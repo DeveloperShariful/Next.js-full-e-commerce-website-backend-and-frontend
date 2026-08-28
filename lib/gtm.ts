@@ -11,10 +11,15 @@ declare const window: WindowWithDataLayer;
 interface GTMProduct {
     item_name: string;
     item_id: number | string;
+    // GA4/Google Ads-এর item_id (productCode) অপরিবর্তিত রেখে, শুধু Facebook/TikTok
+    // catalog matching-এর জন্য আলাদা real product UUID (feed-এর g:id ফরম্যাটে,
+    // variant হলে productId_variantId) — GTM-এ dlv-content_id / cJS-product ids
+    // এখান থেকেই পড়বে
+    content_id?: string;
     price: number;
     quantity: number;
-    item_category?: string; 
-    item_brand?: string;    
+    item_category?: string;
+    item_brand?: string;
 }
 
 

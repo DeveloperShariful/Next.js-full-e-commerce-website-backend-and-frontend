@@ -144,8 +144,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       const priceNum = parseFloat((itemToAdd.price || '0').replace(/[^0-9.]/g, ''));
       const trackingId = itemToAdd.variationId || itemToAdd.databaseId;
+      // Facebook feed-এর g:id ফরম্যাটের সাথে মিলিয়ে (variant হলে productId_variantId)
+      const contentId = itemToAdd.variationId ? `${itemToAdd.id}_${itemToAdd.variationId}` : itemToAdd.id;
 
-      gtmAddToCart({ item_name: itemToAdd.name, item_id: trackingId, price: priceNum, quantity });
+      gtmAddToCart({ item_name: itemToAdd.name, item_id: trackingId, content_id: contentId, price: priceNum, quantity });
       
       const klaviyoItems: KlaviyoItem[] = response.items.map((item: CartItem) => {
           const itemPrice = parseFloat(item.price.replace(/[^0-9.]/g, ''));
@@ -205,7 +207,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       toast.success("Item Remove From Cart");
 
       const priceNum = parseFloat(itemToRemove.price?.replace(/[^0-9.]/g, '') || '0');
-      gtmRemoveFromCart({ item_name: itemToRemove.name, item_id: itemToRemove.databaseId, price: priceNum, quantity: itemToRemove.quantity });
+      const removedContentId = itemToRemove.variationId ? `${itemToRemove.id}_${itemToRemove.variationId}` : itemToRemove.id;
+      gtmRemoveFromCart({ item_name: itemToRemove.name, item_id: itemToRemove.databaseId, content_id: removedContentId, price: priceNum, quantity: itemToRemove.quantity });
     } catch (error: unknown) {
       setCartItems(previousItems);
       toast.error("Could not remove item.");

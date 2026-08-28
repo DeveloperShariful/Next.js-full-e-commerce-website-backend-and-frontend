@@ -5,6 +5,7 @@ import { gtmPurchase } from "@/lib/gtm";
 import { klaviyoTrackPlacedOrder } from "@/lib/klaviyo";
 
 interface TrackedItem {
+  productId: string | null;
   name: string;
   price: number;
   quantity: number;
@@ -32,7 +33,8 @@ export default function PurchaseTracker({
   useEffect(() => {
     const gtmItems = items.map((item, i) => ({
       item_name: item.name,
-      item_id: `${orderNumber}-${i}`,
+      // ফলব্যাক শুধু বিরল কেসের জন্য — product পরে ডিলিট হয়ে গেলে productId null হতে পারে
+      item_id: item.productId || `${orderNumber}-${i}`,
       price: item.price,
       quantity: item.quantity,
     }));
@@ -47,7 +49,7 @@ export default function PurchaseTracker({
     });
 
     const klaviyoItems = items.map((item, i) => ({
-      ProductID: `${orderNumber}-${i}`,
+      ProductID: item.productId || `${orderNumber}-${i}`,
       ProductName: item.name,
       Quantity: item.quantity,
       ItemPrice: item.price,

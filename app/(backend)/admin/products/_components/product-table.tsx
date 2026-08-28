@@ -324,20 +324,21 @@ export default function ProductTable({
           </div>
         )}
         <div className="overflow-x-auto ">
-          <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse min-w-[1200px]">
+          <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse table-fixed min-w-[1200px]">
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
               <tr>
                 <th className="p-2 w-8 text-center border-r border-[#e2e4e7]">
                     <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
                 </th>
-                <th className="p-2 w-14 border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
-                <th className="p-2 font-medium min-w-[170px] w-[170px]">Name</th>
+                <th className="p-2 w-10 font-medium border-r border-[#e2e4e7]">ID</th>
+                <th className="p-2 w-16 md:w-24 border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
+                <th className="p-2 font-medium w-auto md:w-[450px]">Name</th>
                 <th className="p-2 font-medium w-28">SKU</th>
                 <th className="p-2 font-medium w-20">Stock</th>
                 <th className="p-2 font-medium w-28">Price</th>
                 <th className="p-2 font-medium w-14">Cost</th>
                 <th className="p-2 font-medium w-32">Categories</th>
-                <th className="p-2 font-medium w-56">Tags</th>
+                <th className="p-2 font-medium w-auto">Tags</th>
                 <th className="p-2 font-medium w-12 text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
                 <th className="p-2 font-medium w-28">Date</th>
                 <th className="p-2 font-medium w-20">Brands</th>
@@ -346,7 +347,7 @@ export default function ProductTable({
             
             <tbody className="divide-y divide-[#f0f0f1]">
               {products.length === 0 ? (
-                <tr><td colSpan={12} className="p-10 text-center text-[#50575e] italic">No products found.</td></tr>
+                <tr><td colSpan={13} className="p-10 text-center text-[#50575e] italic">No products found.</td></tr>
               ) : (
                 products.map((product, index) => {
                   const displayImage = product.featuredImage || product.images[0]?.url || null;
@@ -363,18 +364,22 @@ export default function ProductTable({
                       <td className="p-2 text-center border-r border-[#f0f0f1] pt-[14px]">
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(product.id)} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
                       </td>
-                      
-                      <td className="p-2 border-r border-[#f0f0f1] pt-[14px]">
-                         <div className="w-[32px] h-[32px] bg-[#f0f0f1] border border-[#c3c4c7] rounded-[2px] flex items-center justify-center overflow-hidden mx-auto">
+
+                      <td className="p-2 border-r border-[#f0f0f1] pt-[14px] text-[#50575e] font-mono text-[12px]">
+                          {product.productCode ?? "—"}
+                      </td>
+
+                      <td className=" align-middle border-r border-[#f0f0f1]">
+                         <div className="w-full aspect-square bg-[#f0f0f1]  rounded-[2px] flex items-center justify-center overflow-hidden">
                             {displayImage ? (
                                <img src={displayImage} alt="" className="h-full w-full object-cover" />
                             ) : (
-                               <ImageIcon className="text-[#8c8f94]" size={14} />
+                               <ImageIcon className="text-[#8c8f94]" size={18} />
                             )}
                          </div>
                       </td>
                       
-                      <td className="p-2 pt-[14px]">
+                      <td className="p-3 pt-[14px]">
                          <div className="flex flex-col">
                            <div className="flex items-center gap-1.5">
                              <Link href={`/admin/products/create?id=${product.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#0a4b78] hover:underline">
@@ -383,10 +388,7 @@ export default function ProductTable({
                              {product.status === 'DRAFT' && <span className="text-[#3c434a] font-bold text-[11px]">— Draft</span>}
                            </div>
                            
-                           <div className="text-[12px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 flex-wrap">
-                               <span className="text-[#8c8f94] text-[10px]">ID: {product.productCode}</span>
-                               <span className="text-[#c3c4c7]">|</span>
-                               
+                           <div className="text-[12px] mt-1 flex items-center gap-1.5 flex-wrap">
                                {statusFilter === 'archived' ? (
                                   <>
                                      <button onClick={() => handleSingleAction(product.id, 'restore')} disabled={isProcessing} className="text-[#2271b1] hover:underline">Restore</button>
@@ -410,11 +412,11 @@ export default function ProductTable({
                          </div>
                       </td>
                       
-                      <td className="p-2 pt-[14px]">
+                      <td className="p-1 pt-[14px]">
                          <span className="text-[#2271b1] hover:underline cursor-pointer">{product.sku || "—"}</span>
                       </td>
                       
-                      <td className="p-2 pt-[14px]">
+                      <td className="p-1 pt-[14px]">
                          {product.trackQuantity ? (
                             <span className={`text-[12px] font-semibold ${stock > 0 ? 'text-[#008a20]' : 'text-[#d63638]'}`}>
                                {stock > 0 ? 'In stock' : 'Out of stock'}
@@ -424,7 +426,7 @@ export default function ProductTable({
                          )}
                       </td>
                       
-                      <td className="p-2 pt-[14px] text-[#2271b1]">
+                      <td className="p-1 pt-[14px] text-[#2271b1]">
                          {product.salePrice ? (
                             <div className="flex flex-col">
                                <span className="line-through text-[#8c8f94] text-[11px]">{formatPrice(product.price)}</span>
@@ -435,7 +437,7 @@ export default function ProductTable({
                          )}
                       </td>
 
-                      <td className="p-2 pt-[14px] text-[#50575e]">
+                      <td className="p-1 pt-[14px] text-[#50575e]">
                          {product.costPerItem ? formatPrice(product.costPerItem) : "—"}
                       </td>
                       
@@ -447,9 +449,14 @@ export default function ProductTable({
                       </td>
                       
                       <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
-                         {product.tags && product.tags.length > 0 
-                            ? product.tags.map((t: { name: string }) => t.name).join(', ') 
-                            : "—"}
+                         {product.tags && product.tags.length > 0 ? (
+                            <>
+                               {product.tags.slice(0, 3).map((t: { name: string }) => t.name).join(', ')}
+                               {product.tags.length > 3 && (
+                                  <span className="text-[#8c8f94]"> +{product.tags.length - 3} more</span>
+                               )}
+                            </>
+                         ) : "—"}
                       </td>
                       
                       <td className="p-2 pt-[14px] text-center">
@@ -464,7 +471,7 @@ export default function ProductTable({
                       <td className="p-2 pt-[14px] text-[#2271b1] hover:underline cursor-pointer">
                          {product.brand?.name || "—"}
                       </td>
-                      
+
                     </tr>
                   );
                 })
@@ -476,14 +483,15 @@ export default function ProductTable({
                 <th className="p-2 w-8 text-center border-r border-[#e2e4e7]">
                   <input type="checkbox" onChange={toggleSelectAll} checked={products.length > 0 && selectedIds.length === products.length} className="w-3.5 h-3.5 rounded-[2px] border-[#8c8f94] focus:ring-[#2271b1] cursor-pointer" />
                 </th>
-                <th className="p-2 text-center border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
-                <th className="p-2 font-medium min-w-[140px] w-[140px]">Name</th>
+                <th className="p-2 w-10 font-medium border-r border-[#e2e4e7]">ID</th>
+                <th className="p-1 w-16 md:w-24 text-center border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
+                <th className="p-2 font-medium w-auto md:w-[280px]">Name</th>
                 <th className="p-2 font-medium w-28">SKU</th>
                 <th className="p-2 font-medium w-20">Stock</th>
                 <th className="p-2 font-medium w-28">Price</th>
                 <th className="p-2 font-medium w-16">Cost</th>
                 <th className="p-2 font-medium w-32">Categories</th>
-                <th className="p-2 font-medium w-56">Tags</th>
+                <th className="p-2 font-medium w-auto">Tags</th>
                 <th className="p-2 font-medium w-12 text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
                 <th className="p-2 font-medium">Date</th>
                 <th className="p-2 font-medium">Brands</th>

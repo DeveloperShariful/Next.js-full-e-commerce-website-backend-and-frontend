@@ -460,7 +460,7 @@ const DEFAULT_TEMPLATES = [
     },
 
     // --- Abandoned Cart Sequence — 7 days, 2 emails/day (Sydney 10am & 6pm) ---
-    // Coupon pacing: Day 1-2 no offer · Day 3-4 FREESHIP (free shipping) ·
+    // Coupon pacing: Day 1-2 no offer · Day 3-4 FREETSHIRT (free crew tee + 5% off) ·
     // Day 5-6 GOBIKE5 (5% off) · Day 7 GOBIKE10 (10% off, final push).
     {
         slug: 'abandoned_cart_d1_am',
@@ -503,18 +503,18 @@ const DEFAULT_TEMPLATES = [
         name: 'Abandoned Cart — Day 3 Morning',
         triggerEvent: 'ABANDONED_CART_D3_AM',
         recipientType: 'customer',
-        subject: 'Free shipping is on us, {customer_name} 🚚',
-        heading: 'Free Shipping, On Us',
-        content: `<p>Hi {customer_name},</p><p>Here's a little nudge to help you finish up — shipping is on us. Use the code below at checkout and we'll cover delivery on your saved cart.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Shipping</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREESHIP</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout — delivery's on the house.</p></div>`,
+        subject: 'Score a free GoBike tee, {customer_name} 👕',
+        heading: 'A Free Tee, On Us',
+        content: `<p>Hi {customer_name},</p><p>Here's a little nudge to help you finish up — complete your order now and we'll throw in a free GoBike Crew T-Shirt, plus take 5% off with the code below.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Tee + 5% Off</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREETSHIRT</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout to save 5% — free crew tee included with every order.</p></div>`,
     },
     {
         slug: 'abandoned_cart_d3_pm',
         name: 'Abandoned Cart — Day 3 Evening',
         triggerEvent: 'ABANDONED_CART_D3_PM',
         recipientType: 'customer',
-        subject: 'Don\'t let FREESHIP slip away, {customer_name}',
+        subject: 'Don\'t let your free tee slip away, {customer_name}',
         heading: "Don't Let This Slip Away",
-        content: `<p>Hi {customer_name},</p><p>A quick heads-up — some of the items in your cart are in limited stock and moving quickly. Your free-shipping code is still active, so it's a great time to lock in your order.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Shipping</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREESHIP</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout — delivery's on the house.</p></div>`,
+        content: `<p>Hi {customer_name},</p><p>A quick heads-up — some of the items in your cart are in limited stock and moving quickly. Your free GoBike Crew T-Shirt offer and 5% code are still active, so it's a great time to lock in your order.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Tee + 5% Off</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREETSHIRT</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout to save 5% — free crew tee included with every order.</p></div>`,
     },
     {
         slug: 'abandoned_cart_d4_am',
@@ -523,7 +523,7 @@ const DEFAULT_TEMPLATES = [
         recipientType: 'customer',
         subject: 'Finish up in under 2 minutes, {customer_name}',
         heading: 'Two Minutes to Checkout',
-        content: `<p>Hi {customer_name},</p><p>Your cart is exactly as you left it, and checkout only takes a couple of minutes. Don't forget — free shipping is still yours with the code below.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Shipping</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREESHIP</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout — delivery's on the house.</p></div>`,
+        content: `<p>Hi {customer_name},</p><p>Your cart is exactly as you left it, and checkout only takes a couple of minutes. Don't forget — a free GoBike Crew T-Shirt and 5% off are still yours with the code below.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Tee + 5% Off</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREETSHIRT</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout to save 5% — free crew tee included with every order.</p></div>`,
     },
     {
         slug: 'abandoned_cart_d4_pm',
@@ -532,7 +532,7 @@ const DEFAULT_TEMPLATES = [
         recipientType: 'customer',
         subject: 'We\'ve kept your cart just for you',
         heading: 'Still Reserved, Just for You',
-        content: `<p>Hi {customer_name},</p><p>Your selected items are still reserved in your cart, free shipping included. Whenever you're ready to continue, everything is right where you left it.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Shipping</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREESHIP</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout — delivery's on the house.</p></div>`,
+        content: `<p>Hi {customer_name},</p><p>Your selected items are still reserved in your cart, free crew tee included. Whenever you're ready to continue, everything is right where you left it.</p><div style="background:#eef7ff;border:2px dashed #006eff;border-radius:10px;padding:18px 20px;text-align:center;margin:22px auto;max-width:420px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#006eff;text-transform:uppercase;letter-spacing:1.5px;">Free Tee + 5% Off</p><p style="margin:0;font-size:24px;font-weight:800;color:#111;letter-spacing:2px;font-family:monospace;">FREETSHIRT</p><p style="margin:8px 0 0;font-size:13px;color:#555;">Enter this code at checkout to save 5% — free crew tee included with every order.</p></div>`,
     },
     {
         slug: 'abandoned_cart_d5_am',

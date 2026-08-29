@@ -276,6 +276,7 @@ export type BlogPostFormData = {
   twitterCard?: string;
   schemaType?: string;
   tableOfContents?: unknown[];
+  faqs?: { question: string; answer: string }[];
   relatedPostIds?: string[];
 };
 
@@ -331,6 +332,8 @@ export async function createBlogPost(formData: BlogPostFormData) {
         twitterCard: formData.twitterCard || "summary_large_image",
         schemaType: formData.schemaType || "BlogPosting",
         tableOfContents: (formData.tableOfContents as object[]) ?? [],
+        // খালি question/answer বাদ দিয়ে সেভ করা হচ্ছে (ফর্মে "+" চাপার পর ফাঁকা রেখে দিলে)
+        faqs: (formData.faqs ?? []).filter((f) => f.question.trim() && f.answer.trim()),
         relatedPostIds: formData.relatedPostIds ?? [],
         keyTakeaways: formData.keyTakeaways ?? [],
         authorBio: formData.authorBio || null,
@@ -402,6 +405,8 @@ export async function updateBlogPost(id: string, formData: BlogPostFormData) {
         twitterCard: formData.twitterCard || "summary_large_image",
         schemaType: formData.schemaType || "BlogPosting",
         tableOfContents: (formData.tableOfContents as object[]) ?? [],
+        // খালি question/answer বাদ দিয়ে সেভ করা হচ্ছে (ফর্মে "+" চাপার পর ফাঁকা রেখে দিলে)
+        faqs: (formData.faqs ?? []).filter((f) => f.question.trim() && f.answer.trim()),
         relatedPostIds: formData.relatedPostIds ?? [],
         keyTakeaways: formData.keyTakeaways ?? [],
         authorBio: formData.authorBio || null,

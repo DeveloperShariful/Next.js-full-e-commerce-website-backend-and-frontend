@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import BlogCategoryFilter from "./_components/BlogCategoryFilter";
 import { getPublishedBlogPosts } from "@/app/actions/backend/blog/blog-actions";
 import { getBlogSettings } from "@/app/actions/backend/blog/blog-settings-actions";
 
@@ -98,7 +99,7 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
       <Breadcrumbs />
 
       {/* Hero Banner */}
-      <div className="relative w-full h-[260px] md:h-[480px] mb-12">
+      <div className="relative w-full h-[260px] md:h-[480px] mb-0 md:mb-12">
         <Image
           src={heroImage}
           alt="GoBike Blog"
@@ -116,11 +117,11 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto mb-20 px-4 font-sans">
+      <div className="max-w-[1400px] mx-auto mb-20 px-0 md:px-4 font-sans">
 
         {/* SEO Intro — only shown on page 1 with no category filter */}
         {page === 1 && !category && (
-          <div className="mb-10 bg-gray-50 border border-gray-100 rounded-2xl p-6 md:p-8">
+          <div className="mb-10 bg-gray-50 border border-gray-100 rounded-2xl p-2 md:p-8">
             <h2 className="text-xl md:text-2xl font-extrabold text-gray-900 mb-3">Kids Electric Bike Tips, Guides & News</h2>
             <p className="text-gray-600 leading-relaxed text-sm md:text-base mb-4">
               Welcome to the GoBike Australia blog — your go-to resource for everything about kids electric bikes, balance bikes and family riding adventures across Australia. Our expert team publishes in-depth safety guides, age-by-age buying advice, maintenance tips and real-world product reviews to help Australian parents make confident decisions. Whether you're choosing between the GoBike 12 and GoBike 16, learning how to care for a lithium-ion battery, or looking for the best riding locations near you, you'll find practical, well-researched content here.
@@ -131,34 +132,8 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
           </div>
         )}
 
-        {/* Category Tabs */}
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-10">
-            <Link
-              href="/blog"
-              className={`px-4 py-2 rounded-full text-sm font-bold border transition-colors ${
-                !category
-                  ? "bg-black text-white border-black"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-black hover:text-black"
-              }`}
-            >
-              All Posts
-            </Link>
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/blog?category=${cat.slug}`}
-                className={`px-4 py-2 rounded-full text-sm font-bold border transition-colors ${
-                  category === cat.slug
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-gray-700 border-gray-300 hover:border-black hover:text-black"
-                }`}
-              >
-                {cat.name}
-              </Link>
-            ))}
-          </div>
-        )}
+        {/* Category Filter — /shop-এর মতোই professional toolbar/dropdown filter */}
+        {categories.length > 0 && <BlogCategoryFilter categories={categories} />}
 
         {posts.length === 0 ? (
           <div className="text-center py-24">
@@ -171,7 +146,7 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
             {featuredPost && (
               <div className="mb-14">
                 <div className="mb-6 border-b border-gray-200 pb-3">
-                  <h2 className="text-2xl font-bold text-gray-900 uppercase tracking-tight">
+                  <h2 className="text-2xl font-bold text-gray-900 uppercase tracking-tight text-center">
                     Latest Post
                   </h2>
                 </div>

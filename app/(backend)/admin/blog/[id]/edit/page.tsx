@@ -81,6 +81,7 @@ export default async function EditBlogPostPage({ params }: EditBlogPostPageProps
         // Extras
         relatedPostIds: post.relatedPostIds,
         keyTakeaways: post.keyTakeaways ?? [],
+        faqs: (post.faqs as { question: string; answer: string }[] | null) ?? [],
         authorBio: post.authorBio ?? "",
         // UI only
         viewCount: post.viewCount,

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import {
   getBlogPostBySlug,
@@ -69,6 +70,20 @@ function extractHeadingsFromHtml(html: string) {
     headings.push({ level, text, id });
   }
   return headings;
+}
+
+// FAQPage schema-র acceptedAnswer.text প্লেইন টেক্সট আশা করে — admin-এ লেখা
+// markdown syntax (**bold**, [link](url) ইত্যাদি) schema-তে যাওয়ার আগে সরিয়ে ফেলা হয়
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // [text](url) → text
+    .replace(/(\*\*|__)(.*?)\1/g, "$2")       // **bold** / __bold__
+    .replace(/(\*|_)(.*?)\1/g, "$2")          // *italic* / _italic_
+    .replace(/`([^`]+)`/g, "$1")              // `code`
+    .replace(/#{1,6}\s*/g, "")                // # headings
+    .replace(/\n{2,}/g, " ")                  // blank lines → single space
+    .replace(/\n/g, " ")
+    .trim();
 }
 
 function addHeadingIds(html: string): string {
@@ -262,6 +277,20 @@ export default async function NewBlogPostPage({ params }: Props) {
     publisher: { "@type": "Organization", name: "GoBike Australia" },
   } : null;
 
+  // ডাইনামিক FAQ — visible section আর schema, দুটোই ঠিক এই একই ডেটা থেকে বানানো,
+  // তাই কখনো একটার সাথে আরেকটার অমিল হবে না (Google-এর নিয়ম: schema-র কন্টেন্ট
+  // পেজে দৃশ্যমানও থাকতে হবে)
+  const faqs = ((post as Record<string, unknown>).faqs as { question: string; answer: string }[] | null) ?? [];
+  const faqSchema = faqs.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: { "@type": "Answer", text: stripMarkdown(faq.answer) },
+    })),
+  } : null;
+
   return (
     <div>
       {/* Separate <script> per schema — most compatible with Google */}
@@ -269,6 +298,9 @@ export default async function NewBlogPostPage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       {videoSchema && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(videoSchema) }} />
+      )}
+      {faqSchema && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       )}
 
       {/* Preload video */}
@@ -473,6 +505,34 @@ export default async function NewBlogPostPage({ params }: Props) {
               "
               dangerouslySetInnerHTML={{ __html: contentWithIds }}
             />
+
+            {/* FAQ — same data that powers the FAQPage schema above; same
+                accordion pattern as /faq so it reads consistently site-wide */}
+            {faqs.length > 0 && (
+              <div className="mt-14 mb-10">
+                <h2 className="text-2xl font-extrabold text-gray-900 mb-6 pb-2 border-b border-gray-100">
+                  Frequently Asked Questions
+                </h2>
+                <div className="space-y-[15px]">
+                  {faqs.map((faq, i) => (
+                    <details
+                      key={i}
+                      className="group bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-200 open:border-blue-200"
+                    >
+                      <summary className="w-full p-5 md:p-6 bg-none border-none text-left text-lg font-medium text-gray-800 cursor-pointer flex justify-between items-center gap-4 list-none [&::-webkit-details-marker]:hidden group-open:text-[#0056b3]">
+                        <span>{faq.question}</span>
+                        <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90 shrink-0">
+                          &gt;
+                        </span>
+                      </summary>
+                      <div className="px-5 md:px-6 pb-5 md:pb-6 text-base leading-[1.7] text-gray-700 [&_strong]:font-bold [&_strong]:text-gray-900 [&_a]:text-[#007bff] [&_a]:font-medium [&_a]:no-underline hover:[&_a]:underline [&_p]:mb-3 last:[&_p]:mb-0">
+                        <ReactMarkdown>{faq.answer}</ReactMarkdown>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Share */}
             {shareEnabled && sharePlatforms.length > 0 && (

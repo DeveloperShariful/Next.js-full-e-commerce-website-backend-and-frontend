@@ -56,6 +56,7 @@ interface BlogFormProps {
     viewCount?: number;
     tags?: string[];
     relatedPostIds?: string[];
+    faqs?: { question: string; answer: string }[];
     author?: { id: string; name: string | null; image: string | null } | null;
   };
   isEdit?: boolean;
@@ -110,6 +111,7 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
     publishedAt: initialData?.publishedAt ?? "",
     scheduledAt: initialData?.scheduledAt ?? undefined,
     relatedPostIds: initialData?.relatedPostIds ?? [],
+    faqs: initialData?.faqs ?? [],
   });
 
   const [slug, setSlug] = useState(() =>
@@ -215,6 +217,19 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
 
   const removeTag = (tag: string) =>
     set("tags", (form.tags ?? []).filter((t) => t !== tag));
+
+  // ── FAQ helpers ──────────────────────────────────────────────────────────
+  const addFaq = () =>
+    set("faqs", [...(form.faqs ?? []), { question: "", answer: "" }]);
+
+  const removeFaq = (index: number) =>
+    set("faqs", (form.faqs ?? []).filter((_, i) => i !== index));
+
+  const updateFaq = (index: number, key: "question" | "answer", value: string) =>
+    set(
+      "faqs",
+      (form.faqs ?? []).map((f, i) => (i === index ? { ...f, [key]: value } : f))
+    );
 
   const handleImageUpload = async (file: File, field: "featuredImage" | "ogImage" | "videoUrl" | "videoThumbnail") => {
     setIsUploading(true);
@@ -399,8 +414,65 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </div>
           </div>
 
-          {/* ── SEO (mobile order 10) ── */}
-          <div className="order-10 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-5 space-y-5">
+          {/* ── FAQ (mobile order 4) ── */}
+          <div className="order-4 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[15px] font-semibold text-[#1d2327]">FAQ</h3>
+              <span className="text-[11px] text-[#646970] bg-[#f0f0f1] px-2 py-0.5 rounded">
+                {(form.faqs ?? []).length} question{(form.faqs ?? []).length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <p className="text-[11px] text-[#646970]">
+              Shown as a visible &quot;Frequently Asked Questions&quot; section at the bottom of
+              the post, and automatically included as FAQPage structured data. Answers support{" "}
+              <strong>Markdown</strong> — <code>**bold**</code>, <code>[link text](https://...)</code>,
+              and blank lines between paragraphs.
+            </p>
+
+            <div className="space-y-3">
+              {(form.faqs ?? []).map((faq, i) => (
+                <div key={i} className="border border-[#c3c4c7] rounded p-3 space-y-2 bg-[#f9f9f9]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-[#646970] uppercase tracking-wide">
+                      Question {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFaq(i)}
+                      className="text-[12px] text-red-500 hover:text-red-700 font-semibold"
+                    >
+                      ✕ Remove
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={faq.question}
+                    onChange={(e) => updateFaq(i, "question", e.target.value)}
+                    placeholder="e.g. Is there a genuinely good electric dirt bike under $1,000?"
+                    className="w-full px-3 py-2 text-[13px] border border-[#c3c4c7] rounded focus:outline-none focus:border-[#2271b1] bg-white"
+                  />
+                  <textarea
+                    value={faq.answer}
+                    onChange={(e) => updateFaq(i, "answer", e.target.value)}
+                    rows={4}
+                    placeholder={"Answer text — Markdown supported, e.g.\nYes, for the youngest age bracket — an entry-level model like the **GoBike 12\"** sits under this price. See our [size guide](/blog/what-age-for-electric-balance-bike) for details."}
+                    className="w-full px-3 py-2 text-[13px] border border-[#c3c4c7] rounded focus:outline-none focus:border-[#2271b1] bg-white resize-y font-mono"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={addFaq}
+              className="w-full px-3 py-2 text-[13px] font-semibold border border-dashed border-[#2271b1] text-[#2271b1] rounded hover:bg-[#f0f8ff]"
+            >
+              + Add Question
+            </button>
+          </div>
+
+          {/* ── SEO (mobile order 11) ── */}
+          <div className="order-11 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-5 space-y-5">
 
             <div className="flex items-center justify-between">
               <h3 className="text-[15px] font-semibold text-[#1d2327]">SEO</h3>
@@ -839,6 +911,20 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             },
           ]
         : []),
+      ...((form.faqs ?? []).filter((f) => f.question.trim() && f.answer.trim()).length > 0
+        ? [
+            {
+              "@type": "FAQPage",
+              mainEntity: (form.faqs ?? [])
+                .filter((f) => f.question.trim() && f.answer.trim())
+                .map((f) => ({
+                  "@type": "Question",
+                  name: f.question,
+                  acceptedAnswer: { "@type": "Answer", text: f.answer },
+                })),
+            },
+          ]
+        : []),
     ],
   },
   null,
@@ -849,8 +935,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </div>
           </div>
 
-          {/* ── Key Takeaways (mobile order 11) ── */}
-          <div className="order-11 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
+          {/* ── Key Takeaways (mobile order 12) ── */}
+          <div className="order-12 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
             <h3 className="text-[13px] font-semibold text-[#1d2327] mb-1">Key Takeaways</h3>
             <p className="text-[11px] text-[#646970] mb-2">
               One point per line. Leave empty to use global default takeaways.
@@ -876,8 +962,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </p>
           </div>
 
-          {/* ── Author Bio (mobile order 12) ── */}
-          <div className="order-12 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
+          {/* ── Author Bio (mobile order 13) ── */}
+          <div className="order-13 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
             <h3 className="text-[13px] font-semibold text-[#1d2327] mb-1">Author Bio (for this post)</h3>
             <p className="text-[11px] text-[#646970] mb-2">Leave empty to use global default bio.</p>
             <textarea
@@ -889,8 +975,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             />
           </div>
 
-          {/* ── Related Posts (mobile order 13) ── */}
-          <div className="order-13 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-5 space-y-3">
+          {/* ── Related Posts (mobile order 14) ── */}
+          <div className="order-14 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-[15px] font-semibold text-[#1d2327]">Related Posts</h3>
               <span className="text-[11px] text-[#646970] bg-[#f0f0f1] px-2 py-0.5 rounded">
@@ -1070,8 +1156,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </div>
           </div>
 
-          {/* ── Featured Image (mobile order 4) ── */}
-          <div className="order-4 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
+          {/* ── Featured Image (mobile order 5) ── */}
+          <div className="order-5 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
             <h3 className="text-[13px] font-semibold text-[#1d2327] mb-3">Featured Image</h3>
             {form.featuredImage ? (
               <div className="relative group">
@@ -1147,8 +1233,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             )}
           </div>
 
-          {/* ── Video (mobile order 5) ── */}
-          <div className="order-5 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1 space-y-4">
+          {/* ── Video (mobile order 6) ── */}
+          <div className="order-6 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1 space-y-4">
             <h3 className="text-[13px] font-semibold text-[#1d2327]">Video</h3>
 
             <div>
@@ -1270,8 +1356,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </div>
           </div>
 
-          {/* ── Author (mobile order 6) ── */}
-          <div className="order-6 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
+          {/* ── Author (mobile order 7) ── */}
+          <div className="order-7 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
             <h3 className="text-[13px] font-semibold text-[#1d2327] mb-3">Author</h3>
             {(() => {
               const selectedAuthor =
@@ -1320,8 +1406,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </p>
           </div>
 
-          {/* ── Category (mobile order 7) ── */}
-          <div className="order-7 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
+          {/* ── Category (mobile order 8) ── */}
+          <div className="order-8 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
             <h3 className="text-[13px] font-semibold text-[#1d2327] mb-3">Category</h3>
             <select
               value={form.categoryId}
@@ -1337,8 +1423,8 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </select>
           </div>
 
-          {/* ── Tags (mobile order 8) ── */}
-          <div className="order-8 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
+          {/* ── Tags (mobile order 9) ── */}
+          <div className="order-9 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
             <h3 className="text-[13px] font-semibold text-[#1d2327] mb-3">Tags</h3>
             <div className="flex gap-2 mb-2">
               <input
@@ -1373,9 +1459,9 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
             </div>
           </div>
 
-          {/* ── Post Info — edit only (mobile order 9) ── */}
+          {/* ── Post Info — edit only (mobile order 10) ── */}
           {isEdit && (
-            <div className="order-9 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
+            <div className="order-10 xl:order-none bg-white border-0 xl:rounded xl:border xl:border-[#c3c4c7] p-1">
               <h3 className="text-[13px] font-semibold text-[#1d2327] mb-2">Post Info</h3>
               <div className="space-y-1 text-[12px] text-[#646970]">
                 <p>

@@ -52,9 +52,6 @@ export default function RichTextEditor({ value, onChange, label, id }: RichTextE
                 <span className="font-bold text-sm text-gray-800 uppercase tracking-wide">
                     {label}
                 </span>
-                <span className="text-xs text-blue-600 font-bold bg-blue-50 border border-blue-200 px-2 py-1 rounded">
-                    WordPress Compatible
-                </span>
             </div>
 
             <div className="relative flex-1 w-full">

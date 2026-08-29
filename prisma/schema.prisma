@@ -3010,6 +3010,9 @@ model BlogPost {
 
   // Extras
   tableOfContents Json?
+  // Dynamic FAQ list — [{question, answer}] — renders visibly on the post AND
+  // powers the FAQPage JSON-LD schema (kept in sync automatically, same source)
+  faqs            Json?
   relatedPostIds  String[]
   keyTakeaways    String[]
   authorBio       String?  @db.Text

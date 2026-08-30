@@ -85,6 +85,13 @@ export const metadata: Metadata = {
     },
   },
 
+  // 🚀 Bing Webmaster Tools site-ownership verification (Tarek Rahman, 2026-08-30)
+  verification: {
+    other: {
+      'msvalidate.01': 'C7EAD6BD95C9C0428E164DEFE32C9F36',
+    },
+  },
+
   other: {
     'geo.region': 'AU-NSW',
     'geo.placename': 'Camden',

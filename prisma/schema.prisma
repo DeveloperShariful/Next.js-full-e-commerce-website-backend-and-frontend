@@ -2389,7 +2389,18 @@ model MarketingIntegration {
   fbDataProcessingOptions Json?
 
   // ==========================================
-  // 4. Klaviyo (Email Marketing)
+  // 4. Custom Head Tags & Scripts (ভবিষ্যতে যেকোনো নতুন verification/tracking
+  //    টুল কোড ডিপ্লয় ছাড়াই admin panel থেকে বসানোর জন্য)
+  // ==========================================
+  // Verification meta tags — [{name, content}] — server-side render হয় (bot-দের
+  // জন্য জরুরি, তাই JS দিয়ে বসানো যাবে না)
+  headVerificationTags Json?
+  // Tracking/analytics script tag (Clarity ইত্যাদি) — raw <script> কোড, DelayedScripts-এর
+  // GTM/Klaviyo-র মতোই browser-এ load হয়
+  customHeadScripts    String? @db.Text
+
+  // ==========================================
+  // 5. Klaviyo (Email Marketing)
   // ==========================================
   klaviyoEnabled            Boolean @default(false)
   klaviyoPublicKey          String?
@@ -2400,7 +2411,7 @@ model MarketingIntegration {
   klaviyoTrackAddedToCart   Boolean @default(true)
 
   // ==========================================
-  // 5. System Status
+  // 6. System Status
   // ==========================================
   // কোন প্ল্যাটফর্ম ভেরিফাই হয়েছে কি হয়নি তার সাধারণ স্টেটাস রাখার জন্য JSON
   verificationStatus Json?    @default("{}")

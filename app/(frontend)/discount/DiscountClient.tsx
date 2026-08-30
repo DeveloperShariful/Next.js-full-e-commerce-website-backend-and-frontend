@@ -209,7 +209,7 @@ export default function DiscountClient() {
               When you use a <strong>GoBike promo code</strong>, you're not just getting a discount—you're investing in top-tier quality backed by real people.
             </p>
             <ul className="space-y-4 text-gray-300 relative z-10">
-              <li className="flex gap-3 items-start"><CheckIcon /> <span><strong>24-Month Warranty:</strong> The best protection in Australia.</span></li>
+              <li className="flex gap-3 items-start"><CheckIcon /> <span><strong>12-Month Warranty:</strong> Full 1-year cover on every GoBike.</span></li>
               <li className="flex gap-3 items-start"><CheckIcon /> <span><strong>Same-Day Dispatch:</strong> Fast shipping from our NSW warehouse.</span></li>
               <li className="flex gap-3 items-start"><CheckIcon /> <span><strong>Local Support:</strong> Expert tech support ready to help within hours.</span></li>
               <li className="flex gap-3 items-start"><CheckIcon /> <span><strong>Built for Safety:</strong> Speed limiters and premium disc brakes.</span></li>

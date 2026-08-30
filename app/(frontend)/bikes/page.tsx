@@ -13,7 +13,7 @@ import FaqAccordion from '@/components/FaqAccordion';
 const bikesFaqs = [
   {
     question: 'How do I know which GoBike is right for my child?',
-    answer: "Start with age as your guide: GoBike 12 (ages 2–5), GoBike 16 (ages 5–9), GoBike 20 (ages 9–16), and GoBike 24 (ages 13+ to adults). Within that range, your child should be able to sit on the seat with feet flat on the ground — see the comparison table above for exact seat-height ranges.",
+    answer: "Start with age as your guide: GoBike 12 (ages 2–5), GoBike 16 (ages 5–9), GoBike 20 (ages 8–14), and GoBike 24 (ages 13+ to adults). Within that range, your child should be able to sit on the seat with feet flat on the ground — see the comparison table above for exact seat-height ranges.",
   },
   {
     question: 'Are GoBike electric bikes legal to ride in Australia?',

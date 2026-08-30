@@ -44,10 +44,10 @@ const jsonLdData = {
   "@type": "FAQPage",
   "mainEntity": [
     {"@type": "Question","name": "Why choose an electric balance bike over a pedal bike?","acceptedAnswer": {"@type": "Answer","text": "An electric balance bike teaches the most crucial skill—balance—but adds a low-speed throttle to build confidence and make riding incredibly fun, helping kids learn faster."}},
-    {"@type": "Question","name": "How do I choose the right size bike for my child?","acceptedAnswer": {"@type": "Answer","text": "Match your child's age to the right model: GoBike 12 for ages 2-5, GoBike 16 for ages 5-9, GoBike 20 for ages 9-16, and GoBike 24 for ages 13+ to adults. Within that, your child should be able to sit on the seat with their feet flat on the ground — see our full model comparison table for exact seat-height ranges."}},
+    {"@type": "Question","name": "How do I choose the right size bike for my child?","acceptedAnswer": {"@type": "Answer","text": "Match your child's age to the right model: GoBike 12 for ages 2-5, GoBike 16 for ages 5-9, GoBike 20 for ages 8-14, and GoBike 24 for ages 13+ to adults. Within that, your child should be able to sit on the seat with their feet flat on the ground — see our full model comparison table for exact seat-height ranges."}},
     {"@type": "Question","name": "What is the weight limit for GoBikes?","acceptedAnswer": {"@type": "Answer","text": "Weight limits vary by model: GoBike 12 and GoBike 16 support riders up to 65kg, GoBike 20 supports up to 100kg, and GoBike 24 supports up to 120kg."}},
     {"@type": "Question","name": "Do you assemble the bikes?","acceptedAnswer": {"@type": "Answer","text": "GoBikes are delivered 80% pre-assembled. Attaching the handlebar and front wheel takes about 15 minutes. A basic toolkit is provided."}},
-    {"@type": "Question","name": "How long will my GoBike battery last?","acceptedAnswer": {"@type": "Answer","text": "The GoBike battery provides up to 75 minutes of riding time on a single full charge."}},
+    {"@type": "Question","name": "How long will my GoBike battery last?","acceptedAnswer": {"@type": "Answer","text": "The GoBike battery provides up to 2 hours of riding time on a single full charge, depending on speed mode, rider weight and terrain."}},
     {"@type": "Question","name": "How long does it take to charge?","acceptedAnswer": {"@type": "Answer","text": "A full charge takes approximately 60 minutes."}},
     {"@type": "Question","name": "Can I use a power tool battery with my GoBike?","acceptedAnswer": {"@type": "Answer","text": "No. For safety and warranty, you must only use the genuine GoBike battery. Using unauthorised batteries is done at your own risk."}},
     {"@type": "Question","name": "Does the bike come with a charger?","acceptedAnswer": {"@type": "Answer","text": "Yes, every GoBike comes with its own specific, high-quality battery charger included in the box."}},
@@ -59,10 +59,10 @@ const jsonLdData = {
     {"@type": "Question","name": "Why would I need suspension forks?","acceptedAnswer": {"@type": "Answer","text": "Suspension forks are a popular upgrade for kids on rougher terrain. They absorb bumps, providing better comfort and control."}},
     {"@type": "Question","name": "Where can I get spare parts?","acceptedAnswer": {"@type": "Answer","text": "We use standard parts for items like brakes and tyres, available at your local bike shop. For specific GoBike parts, contact us directly."}},
     {"@type": "Question","name": "How should I clean the bike?","acceptedAnswer": {"@type": "Answer","text": "Do not use a pressure washer. Remove the battery, then clean with a gentle hose and bucket."}},
-    {"@type": "Question","name": "How do I make a warranty claim?","acceptedAnswer": {"@type": "Answer","text": "Our products adhere to the Australian Consumer Law. For claims, contact your original place of purchase with proof of purchase."}},
+    {"@type": "Question","name": "How do I make a warranty claim?","acceptedAnswer": {"@type": "Answer","text": "For bikes bought online from GoBike, submit a claim at gobike.au/warranty with your order number, email and a short video or photos of the issue. Our Aussie team reviews it, usually within 1 business day, and ships the replacement part directly to you at no cost. If you bought from an authorised retailer, select that store on the form. All claims are backed by your rights under the Australian Consumer Law."}},
     {"@type": "Question","name": "Do you ship Australia-wide?","acceptedAnswer": {"@type": "Answer","text": "Yes! We offer fast shipping for our electric bikes all across Australia."}},
     {"@type": "Question","name": "Can I pick up my order locally?","acceptedAnswer": {"@type": "Answer","text": "Yes, local pickup is available in Camden, NSW."}},
-    {"@type": "Question","name": "What is your return policy?","acceptedAnswer": {"@type": "Answer","text": "We offer a return policy on unused bikes in their original packaging. For full details, please visit our official Return Policy page."}}
+    {"@type": "Question","name": "What is your return policy?","acceptedAnswer": {"@type": "Answer","text": "We offer a 30-day return policy on unused bikes in their original packaging with all accessories included. For full details, see our Return and Refund Policy page."}}
   ]
 };
 
@@ -150,7 +150,7 @@ export default function FaqPage() {
                 <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
               </summary>
               <div className="px-6 pb-6 text-base leading-[1.7]">
-                <p>Match your child&apos;s age to the right model: <strong>GoBike 12</strong> for ages 2–5, <strong>GoBike 16</strong> for ages 5–9, <strong>GoBike 20</strong> for ages 9–16, and <strong>GoBike 24</strong> for ages 13+ to adults. Within that, your child should be able to sit on the seat with their feet flat on the ground — see our full <Link href="/bikes#compare-models" className="text-[#007bff] no-underline font-medium hover:underline">model comparison table</Link> for exact seat-height ranges.</p>
+                <p>Match your child&apos;s age to the right model: <strong>GoBike 12</strong> for ages 2–5, <strong>GoBike 16</strong> for ages 5–9, <strong>GoBike 20</strong> for ages 8–14, and <strong>GoBike 24</strong> for ages 13+ to adults. Within that, your child should be able to sit on the seat with their feet flat on the ground — see our full <Link href="/bikes#compare-models" className="text-[#007bff] no-underline font-medium hover:underline">model comparison table</Link> for exact seat-height ranges.</p>
               </div>
           </details>
 
@@ -185,7 +185,7 @@ export default function FaqPage() {
                 <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
               </summary>
               <div className="px-6 pb-6 text-base leading-[1.7]">
-                <p>The <strong>GoBike battery</strong> provides <strong>up to 75 minutes of riding time</strong> on a full charge. For expert tips on battery health, we recommend this official <a href="https://www.bosch-ebike.com/fileadmin/EBC/Service/Downloads/Akku_Guide/Akku_Guide/Bosch-eBike-Akkuguide-EN-GB.pdf" target="_blank" rel="noopener noreferrer" className="text-[#007bff] no-underline font-medium hover:underline">e-bike Battery Guide</a>.</p>
+                <p>The <strong>GoBike battery</strong> provides <strong>up to 2 hours of riding time</strong> on a full charge, depending on speed mode, rider weight and terrain. For expert tips on battery health, we recommend this official <a href="https://www.bosch-ebike.com/fileadmin/EBC/Service/Downloads/Akku_Guide/Akku_Guide/Bosch-eBike-Akkuguide-EN-GB.pdf" target="_blank" rel="noopener noreferrer" className="text-[#007bff] no-underline font-medium hover:underline">e-bike Battery Guide</a>.</p>
               </div>
           </details>
 
@@ -315,7 +315,7 @@ export default function FaqPage() {
                 <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
               </summary>
               <div className="px-6 pb-6 text-base leading-[1.7]">
-                <p>Our products adhere to the <strong>Australian Consumer Law</strong>. For claims, contact your original place of purchase with proof of purchase. Read more on the official <a href="https://www.accc.gov.au/consumers/buying-products-and-services/consumer-rights-and-guarantees" target="_blank" rel="noopener noreferrer" className="text-[#007bff] no-underline font-medium hover:underline">ACCC website</a>.</p>
+                <p>For bikes bought online from GoBike, submit a claim at <Link href="/warranty" className="text-[#007bff] no-underline font-medium hover:underline">gobike.au/warranty</Link> with your order number, email and a short video or photos of the issue. Our Aussie team reviews it — usually within 1 business day — and ships the replacement part directly to you, free of charge. If you bought from an authorised retailer, just select that store on the form. All claims are backed by your rights under the <strong>Australian Consumer Law</strong> — read more on the official <a href="https://www.accc.gov.au/consumers/buying-products-and-services/consumer-rights-and-guarantees" target="_blank" rel="noopener noreferrer" className="text-[#007bff] no-underline font-medium hover:underline">ACCC website</a>.</p>
               </div>
           </details>
 
@@ -350,7 +350,7 @@ export default function FaqPage() {
                 <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
               </summary>
               <div className="px-6 pb-6 text-base leading-[1.7]">
-                <p>We offer a return policy on unused bikes in their original packaging. For full details, please visit our official <Link href="/privacy-policy" className="text-[#007bff] no-underline font-medium hover:underline"> Return Policy page </Link>.</p>
+                <p>We offer a 30-day return policy on unused bikes in their original packaging. For full details, please visit our official <Link href="/refund-and-returns-policy" className="text-[#007bff] no-underline font-medium hover:underline"> Return &amp; Refund Policy page </Link>.</p>
               </div>
           </details>
 

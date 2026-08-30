@@ -65,7 +65,7 @@ export const compareSpecsMap: Record<string, StaticSpecs> = {
     
     // === GoBike 20 ===
     '20-inch-electric-bikes-for-sale-ebike-for-kids': {
-        ageRange: '9–16 years',
+        ageRange: '8–14 years',
         maxWeight: '100 kg',
         frame: 'Durable 6061 aluminium, heat-treated & TIG-welded',
         netWeight: '18 kg (including battery)',

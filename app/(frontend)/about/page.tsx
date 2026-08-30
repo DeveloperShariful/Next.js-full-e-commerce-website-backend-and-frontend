@@ -46,7 +46,7 @@ const aboutJsonLd = [
     "name": "GoBike Australia",
     "url": "https://gobike.au",
     "foundingDate": "2023",
-    "description": "GoBike Australia creates safe, high-performance electric balance bikes for kids aged 2–16, shipped free Australia-wide with a 1-year warranty.",
+    "description": "GoBike Australia creates safe, high-performance electric balance bikes for kids aged 2–16, shipped Australia-wide with a 1-year warranty.",
     "image": "https://gobikes.au/wp-content/uploads/2025/06/GOBIKE-Electric-Bike-for-kids.webp",
     "priceRange": "$$",
     "address": {

@@ -7,13 +7,13 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Return and Refund Policy | GoBike Australia',
-  description: 'Learn about our 14-day return policy and process for refunds and exchanges at GoBike Australia. We are committed to ensuring your complete satisfaction.',
+  description: 'Learn about our 30-day return policy and process for refunds and exchanges at GoBike Australia. We are committed to ensuring your complete satisfaction.',
   alternates: {
     canonical: '/refund-and-returns-policy',
   },
   openGraph: {
     title: 'Return and Refund Policy | GoBike Australia',
-    description: 'Learn about our 14-day return policy and process for refunds and exchanges at GoBike Australia.',
+    description: 'Learn about our 30-day return policy and process for refunds and exchanges at GoBike Australia.',
     url: 'https://gobike.au/refund-and-returns-policy',
     siteName: 'GoBike Australia',
     images: [
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     site: '@GoBikeAU',
     title: 'Return and Refund Policy | GoBike Australia',
-    description: 'Learn about our 14-day return policy and process for refunds and exchanges at GoBike Australia.',
+    description: 'Learn about our 30-day return policy and process for refunds and exchanges at GoBike Australia.',
     images: ['https://gobikes.au/wp-content/uploads/2025/11/gobike-au-1-year-warranty-kids-ebikes.jpg'],
   },
   keywords: ['gobike return policy', 'kids electric bike refund australia', 'gobike refund and returns', 'electric bike return policy australia'],
@@ -47,7 +47,7 @@ const faqSchema = {
     "name": "What is the return eligibility for GoBike products?",
     "acceptedAnswer": {
       "@type": "Answer",
-      "text": "We accept returns of unused and undamaged ebike conversion kits and other products within 14 calendar days of delivery. The product must be in brand-new condition, in its original packaging, with all parts included."
+      "text": "We accept returns of unused and undamaged ebike conversion kits and other products within 30 calendar days of delivery. The product must be in brand-new condition, in its original packaging, with all parts included."
     }
   },{
     "@type": "Question",
@@ -150,7 +150,7 @@ export default function RefundAndReturnsPolicyPage() {
             {/* .policySection replaced */}
             <div className="mb-10">
               <h2 className="text-[24px] font-semibold text-[#1a1a1a] mb-5 pb-[10px] border-b-2 border-[#f0f0f0]">Return Eligibility: What Can You Return?</h2>
-              <p className="text-base mb-[15px]">We accept returns of <strong className="font-semibold text-[#1a1a1a]">unused and undamaged</strong> products, including ebike conversion kits, within <strong className="font-semibold text-[#1a1a1a]">14 calendar days</strong> of delivery. To be eligible:</p>
+              <p className="text-base mb-[15px]">We accept returns of <strong className="font-semibold text-[#1a1a1a]">unused and undamaged</strong> products, including ebike conversion kits, within <strong className="font-semibold text-[#1a1a1a]">30 calendar days</strong> of delivery. To be eligible:</p>
               
               {/* Custom List Styling for Checkmarks */}
               <ul className="list-none pl-0 mb-[15px]">
@@ -194,7 +194,7 @@ export default function RefundAndReturnsPolicyPage() {
             <div className="mb-10 bg-[#f8f9fa] p-[30px] rounded-xl">
               <h2 className="text-[24px] font-semibold text-[#1a1a1a] mb-5 pb-[10px] border-b-2 border-[#f0f0f0]">Summary of Our Policy</h2>
               <ul className="list-none pl-0 mb-[15px]">
-                <li className="relative pl-[30px] mb-[10px] text-base before:content-['✓'] before:text-[#28a745] before:font-bold before:absolute before:left-0 before:top-[1px]"><strong className="font-semibold text-[#1a1a1a]">14-day return window</strong> for new and unused items.</li>
+                <li className="relative pl-[30px] mb-[10px] text-base before:content-['✓'] before:text-[#28a745] before:font-bold before:absolute before:left-0 before:top-[1px]"><strong className="font-semibold text-[#1a1a1a]">30-day return window</strong> for new and unused items.</li>
                 <li className="relative pl-[30px] mb-[10px] text-base before:content-['✓'] before:text-[#28a745] before:font-bold before:absolute before:left-0 before:top-[1px]">Full refunds processed within 5-7 business days after inspection.</li>
                 <li className="relative pl-[30px] mb-[10px] text-base before:content-['✓'] before:text-[#28a745] before:font-bold before:absolute before:left-0 before:top-[1px]">Faulty or damaged items are replaced or fully refunded at our cost.</li>
                 <li className="relative pl-[30px] mb-[10px] text-base before:content-['✓'] before:text-[#28a745] before:font-bold before:absolute before:left-0 before:top-[1px]">Simple exchange and upgrade options are available.</li>

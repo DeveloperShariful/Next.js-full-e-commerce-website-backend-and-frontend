@@ -81,7 +81,7 @@ export default function TermsAndConditionsPage() {
 
         <div className="mb-10">
           <h2 className="text-[26px] font-bold text-[#1a1a1a] mb-5 pb-[10px] border-b-2 border-[#f0f0f0]">5. Returns, Refunds, and Warranty</h2>
-          <p>Your satisfaction is important to us. Returns are accepted within 14 days for products in their original, unused condition. Every <strong className="text-[#1a1a1a]">kids electric motorbike</strong> is also covered by our full <strong className="text-[#1a1a1a]">1-year warranty</strong>. For more details, please see our <Link href="/refund-and-returns-policy" className="text-[#007bff] font-semibold no-underline hover:underline">Refund and Returns Policy</Link> page.</p>
+          <p>Your satisfaction is important to us. Returns are accepted within 30 days for products in their original, unused condition. Every <strong className="text-[#1a1a1a]">kids electric motorbike</strong> is also covered by our full <strong className="text-[#1a1a1a]">1-year warranty</strong>. For more details, please see our <Link href="/refund-and-returns-policy" className="text-[#007bff] font-semibold no-underline hover:underline">Refund and Returns Policy</Link> page.</p>
         </div>
 
         <div className="mb-10">

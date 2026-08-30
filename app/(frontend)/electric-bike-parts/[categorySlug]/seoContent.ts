@@ -9,11 +9,11 @@ export const seoContentMap: Record<string, any> = {
       'kids electric bike', 'electric bike for kids', 'kids ebike australia',
       'childrens electric bike', 'electric balance bike kids', 'buy kids electric bike'
     ],
-    topIntro: `Shop Australia's most trusted range of <strong>kids electric bikes</strong>, designed for riders aged 2–16. From the beginner-friendly GoBike 12 to the trail-ready GoBike 24 Pro, every bike in our range is built with safety, durability and real riding fun in mind. Free Australia-wide shipping and a 1-year warranty on every bike. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">View our full bike range →</a>`,
+    topIntro: `Shop Australia's most trusted range of <strong>kids electric bikes</strong>, designed for riders aged 2–16. From the beginner-friendly GoBike 12 to the trail-ready GoBike 24 Pro, every bike in our range is built with safety, durability and real riding fun in mind. Australia-wide shipping and a 1-year warranty on every bike. <a href="/bikes" class="text-blue-600 font-semibold hover:underline">View our full bike range →</a>`,
     bottomSections: [
       {
         h2: "The Best Kids Electric Bikes in Australia",
-        p: "GoBike Australia designs kids electric bikes for every stage of a rider's journey. The GoBike 12 is the perfect starting point for toddlers aged 2–5, featuring a low seat height, lightweight aluminium frame and a gentle speed limiter for safe learning. The GoBike 16 steps things up for riders aged 5–9 with a powerful 700W hub motor and hydraulic front suspension. Older kids aged 8–14 will love the GoBike 20 with its 1200W motor and all-weather disc brakes, while teens and serious riders can tackle any trail with the flagship GoBike 24 Pro and its 2500W motor. Every model is shipped free Australia-wide and backed by our 1-year warranty and local support team."
+        p: "GoBike Australia designs kids electric bikes for every stage of a rider's journey. The GoBike 12 is the perfect starting point for toddlers aged 2–5, featuring a low seat height, lightweight aluminium frame and a gentle speed limiter for safe learning. The GoBike 16 steps things up for riders aged 5–9 with a powerful 700W hub motor and hydraulic front suspension. Older kids aged 8–14 will love the GoBike 20 with its 1200W motor and all-weather disc brakes, while teens and serious riders can tackle any trail with the flagship GoBike 24 Pro and its 2500W motor. Every model is shipped Australia-wide and backed by our 1-year warranty and local support team."
       },
       {
         h2: "Why Choose a GoBike Kids Electric Bike?",

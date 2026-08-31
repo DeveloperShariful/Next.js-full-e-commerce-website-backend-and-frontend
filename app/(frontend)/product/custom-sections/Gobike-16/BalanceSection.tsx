@@ -6,7 +6,7 @@ import AnimateOnScroll from '../AnimateOnScroll';
 export default function BalanceSection() {
   return (
     // .sectionContainer & .coloredBackground replaced
-    <section className="w-full py-12 px-[5%] md:px-[1%] box-border bg-[#f7fafc]">
+    <section className="w-full pt-[5px] pb-12 md:py-12 px-[1px] md:px-[1%] box-border bg-[#f7fafc]">
       {/* wrapperStyle replaced with flex-col & gap-16 */}
       <div className="flex flex-col gap-16">
       

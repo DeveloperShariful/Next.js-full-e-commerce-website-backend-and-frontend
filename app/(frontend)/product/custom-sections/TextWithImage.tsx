@@ -31,8 +31,8 @@ export default function TextWithImage({
           />
         </div>
       </div>
-      <div className={`w-full flex flex-col justify-center text-center md:text-left order-2 ${reverse ? 'md:order-1' : 'md:order-2'}`}>
-        <h2 className="text-[2rem] md:text-[2.5rem] font-bold mb-4 text-[#1a202c] leading-[1.2]">{title}</h2>
+      <div className={`w-full flex flex-col justify-center text-left order-2 ${reverse ? 'md:order-1' : 'md:order-2'}`}>
+        <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold mb-4 text-[#1a202c] leading-[1.2]">{title}</h2>
         <p className="text-[1rem] md:text-[1.1rem] text-[#4a5568] leading-[1.7] m-0">{description}</p>
       </div>
 

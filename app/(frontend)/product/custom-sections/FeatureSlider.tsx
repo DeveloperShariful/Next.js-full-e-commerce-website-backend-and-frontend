@@ -52,8 +52,8 @@ export default function FeatureSlider({ title, features }: FeatureSliderProps) {
 
   return (
     <div className="w-full">
-      <div className="flex justify-between items-center mb-10 px-2">
-        <h2 className="text-2xl md:text-[2rem] font-bold text-slate-900">{title}</h2>
+      <div className="flex justify-between items-center mb-10 px-[1px] md:px-2">
+        <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold text-slate-900">{title}</h2>
         {canSlide && (
           <div className="flex gap-2">
             <button 
@@ -82,7 +82,7 @@ export default function FeatureSlider({ title, features }: FeatureSliderProps) {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="box-border px-2 flex-shrink-0"
+              className="box-border px-[1px] md:px-2 flex-shrink-0"
               style={{ width: `${100 / features.length}%` }}
             >
               <div className="rounded-xl overflow-hidden bg-white border border-slate-200 h-full transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1.5 hover:border-slate-300">

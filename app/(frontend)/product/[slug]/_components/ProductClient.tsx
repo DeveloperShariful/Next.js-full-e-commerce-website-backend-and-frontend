@@ -487,23 +487,23 @@ export default function ProductClient({ product }: { product: Product }) {
           হুবহু এক (সাদা কার্ড, shadow, নীল অ্যাকসেন্ট) — সাইট-জুড়ে একই রকম
           লাগে। FAQ না থাকলে সেকশনটাই থাকে না। */}
       {(product.faqs?.length ?? 0) > 0 && (
-        <section className="w-full max-w-[1280px] mx-auto px-4 md:px-8 mt-14 mb-8">
-          <h2 className="text-2xl font-extrabold text-gray-900 mb-6 pb-2 border-b border-gray-100">
+        <section className="w-full max-w-[1280px] mx-auto px-[1px] md:px-8 mt-0 md:mt-14 mb-8">
+          <h2 className="text-[1.3rem] md:text-[1.6rem] font-extrabold text-gray-900 mb-6 pb-2 border-b border-gray-100">
             Frequently Asked Questions
           </h2>
-          <div className="space-y-[15px]">
+          <div className="space-y-[10px]">
             {product.faqs!.map((faq, i) => (
               <details
                 key={i}
                 className="group bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-200 open:border-blue-200"
               >
-                <summary className="w-full p-5 md:p-6 bg-none border-none text-left text-lg font-medium text-gray-800 cursor-pointer flex justify-between items-center gap-4 list-none [&::-webkit-details-marker]:hidden group-open:text-[#0056b3]">
+                <summary className="w-full p-3 md:p-6 bg-none border-none text-left text-lg font-medium text-gray-800 cursor-pointer flex justify-between items-center gap-4 list-none [&::-webkit-details-marker]:hidden group-open:text-[#0056b3]">
                   <span>{faq.question}</span>
                   <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90 shrink-0">
                     &gt;
                   </span>
                 </summary>
-                <div className="px-5 md:px-6 pb-5 md:pb-6 text-base leading-[1.7] text-gray-700 [&_strong]:font-bold [&_strong]:text-gray-900 [&_a]:text-[#007bff] [&_a]:font-medium [&_a]:no-underline hover:[&_a]:underline [&_p]:mb-3 last:[&_p]:mb-0">
+                <div className="px-3 md:px-6 pb-3 md:pb-6 text-base leading-[1.7] text-gray-700 [&_strong]:font-bold [&_strong]:text-gray-900 [&_a]:text-[#007bff] [&_a]:font-medium [&_a]:no-underline hover:[&_a]:underline [&_p]:mb-3 last:[&_p]:mb-0">
                   <ReactMarkdown>{faq.answer}</ReactMarkdown>
                 </div>
               </details>
@@ -513,23 +513,23 @@ export default function ProductClient({ product }: { product: Product }) {
       )}
 
       {videoData  && (
-        <section className="mt-16 border-t border-[#eaeaea] pt-12">
-            <h2 className="text-center text-[2rem] font-bold mb-8">From Wobbles to Woo-hoos!</h2>
+        <section className="mt-[12px] md:mt-16 border-t border-[#eaeaea] pt-[12px] md:pt-12">
+            <h2 className="text-center text-[1.3rem] md:text-[1.6rem] font-bold mb-8">From Wobbles to Woo-hoos!</h2>
             <LazyLoadYouTube videoId={videoData.id} title={product.name} />
         </section>
       )}
       
       <div className="mt-8">
         {product.description && (
-            <section className="mt-16 border-t border-[#eaeaea] pt-12">
-                <h2 className="text-center text-[2rem] font-bold mb-8">Description</h2>
+            <section className="mt-[12px] md:mt-16 border-t border-[#eaeaea] pt-[12px] md:pt-12">
+                <h2 className="text-center text-[1.3rem] md:text-[1.6rem] font-bold mb-8">Description</h2>
                 <div className="prose prose-slate max-w-none break-words overflow-hidden w-full [&>img]:max-w-full [&>img]:h-auto [&_p]:break-words [&_a]:break-all" dangerouslySetInnerHTML={{ __html: product.description }} />
             </section>
         )}
 
         {(product.weight || (product.length && product.width && product.height) || (product.attributes && product.attributes.nodes.length > 0)) && (
-            <section className="mt-16 border-t border-[#eaeaea] pt-12">
-                <h2 className="text-center text-[2rem] font-bold mb-8">Additional Information</h2>
+            <section className="mt-[12px] md:mt-16 border-t border-[#eaeaea] pt-[12px] md:pt-12">
+                <h2 className="text-center text-[1.3rem] md:text-[1.6rem] font-bold mb-8">Additional Information</h2>
                 <div className="leading-[1.8] text-[#333] max-w-[800px] mx-auto bg-gray-50 p-6 rounded-xl border border-gray-100">
                     <table className="w-full border-collapse text-sm md:text-base [&_th]:text-left [&_th]:p-3 [&_th]:border-b [&_th]:border-gray-200 [&_th]:w-[30%] [&_th]:text-gray-600 [&_th]:font-semibold [&_td]:p-3 [&_td]:border-b [&_td]:border-gray-200 [&_td]:text-gray-900 [&_tr:last-child_th]:border-none [&_tr:last-child_td]:border-none">
                         <tbody>
@@ -560,8 +560,8 @@ export default function ProductClient({ product }: { product: Product }) {
         )}
         
         {/* Review Section */}
-        <section id="reviews" className="mt-16 border-t border-[#eaeaea] pt-12">
-            <h2 className="text-center text-[2rem] font-bold mb-8">Customer Reviews</h2>
+        <section id="reviews" className="mt-[12px] md:mt-16 border-t border-[#eaeaea] pt-[12px] md:pt-12">
+            <h2 className="text-center text-[1.3rem] md:text-[1.6rem] font-bold mb-8">Customer Reviews</h2>
             <ReviewForm 
                 productId={product.databaseId}
                 averageRating={product.averageRating ?? 0}
@@ -571,8 +571,8 @@ export default function ProductClient({ product }: { product: Product }) {
         </section>
 
         {product.related && product.related.nodes.length > 0 && (
-            <div className="mt-16 border-t border-[#eaeaea] pt-12">
-            <h2 className="text-center text-[2rem] font-bold mb-8">Related Products</h2>
+            <div className="mt-[12px] md:mt-16 border-t border-[#eaeaea] pt-[12px] md:pt-12">
+            <h2 className="text-center text-[1.3rem] md:text-[1.6rem] font-bold mb-8">Related Products</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {product.related.nodes.map(relatedProduct => (
                     <ProductCard key={relatedProduct.id} product={relatedProduct as any} />

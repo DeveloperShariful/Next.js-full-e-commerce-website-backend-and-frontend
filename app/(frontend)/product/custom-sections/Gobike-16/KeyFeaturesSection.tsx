@@ -32,7 +32,7 @@ const keyFeatures = [
 
 export default function KeyFeaturesSection() {
   return (
-    <section className="w-full py-12 px-[5%] md:px-[1%] box-border">
+    <section className="w-full pt-[5px] pb-12 md:py-12 px-[1px] md:px-[1%] box-border">
       <AnimateOnScroll direction="up">
         <FeatureSlider title="More Key Features" features={keyFeatures} />
       </AnimateOnScroll>

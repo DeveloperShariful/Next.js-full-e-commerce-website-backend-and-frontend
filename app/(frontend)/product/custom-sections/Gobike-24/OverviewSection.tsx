@@ -12,11 +12,11 @@ const overviewImages = [
 
 export default function OverviewSection() {
   return (
-    <section className="w-full py-12 px-[5%] md:px-[1%] box-border">
+    <section className="w-full pt-[5px] pb-12 md:py-12 px-[1px] md:px-[1%] box-border">
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-10 lg:gap-12 items-center max-w-[1200px] mx-auto">
         <AnimateOnScroll direction="left">
-          <div className="text-center lg:text-left lg:pr-8">
-            <h2 className="text-[2.2rem] lg:text-[3rem] font-extrabold leading-[1.2] mb-6 text-[#1a202c]">
+          <div className="text-left lg:pr-8">
+            <h2 className="text-[1.3rem] lg:text-[1.6rem] font-extrabold leading-[1.2] mb-6 text-[#1a202c]">
               GoBike 24 Pro: Serious Power for Serious Young Riders
             </h2>
             <p className="text-[1.1rem] leading-[1.7] text-[#4a5568]">

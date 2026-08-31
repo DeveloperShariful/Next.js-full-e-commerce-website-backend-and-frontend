@@ -45,7 +45,7 @@ const StickyAddToCart = ({
             className="rounded-md shrink-0 w-[45px] h-[45px] md:w-[50px] md:h-[50px]"
           />
         )}
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
              <span className="font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-[14px] md:text-[16px]">
                 {product.name}
              </span>

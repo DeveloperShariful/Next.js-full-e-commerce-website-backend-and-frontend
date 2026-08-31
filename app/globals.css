@@ -116,6 +116,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html, body {
+    /* কোনো একটা element ভুলবশত viewport-এর চেয়ে চওড়া হয়ে গেলেও যাতে
+       পুরো পেজে horizontal scrollbar/shift না আসে — safety net */
+    overflow-x: hidden;
+  }
   body {
     @apply bg-background text-foreground;
   }

@@ -118,8 +118,13 @@
   }
   html, body {
     /* কোনো একটা element ভুলবশত viewport-এর চেয়ে চওড়া হয়ে গেলেও যাতে
-       পুরো পেজে horizontal scrollbar/shift না আসে — safety net */
-    overflow-x: hidden;
+       পুরো পেজে horizontal scrollbar/shift না আসে — safety net।
+       overflow-x: hidden ব্যবহার করা হয়নি, কারণ সেটা browser-কে
+       overflow-y: auto force করতে বাধ্য করে (এক axis hidden হলে অন্যটা
+       visible থাকতে পারে না) — ফলে html/body একটা নতুন scroll container
+       হয়ে যায় আর position: sticky/fixed header ভেঙে যায়। overflow-clip
+       নতুন scroll container তৈরি করে না, তাই sticky/fixed অক্ষত থাকে। */
+    overflow-x: clip;
   }
   body {
     @apply bg-background text-foreground;

@@ -55,9 +55,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const plainDescription = descriptionSource.replace(/<[^>]*>?/gm, '').substring(0, 155);
   const imageUrl = product.image?.sourceUrl || 'https://gobike.au/default-og.jpg';
   const seoKeywords = productSeoKeywordMap[slug];
+  // 🚀 আগে এখানে সব প্রোডাক্টে হুবহু একই "Best Kids Electric Bike Australia | GoBike"
+  // যোগ হতো — root layout-এর title template (%s | GoBike Australia) এর সাথে মিলে
+  // ডাবল-ব্র্যান্ডিং + সাইটজুড়ে duplicate/cannibalizing title তৈরি করছিল। এখন শুধু
+  // product.name (যেটা প্রতিটা প্রোডাক্টে এমনিতেই ইউনিক) ব্যবহার হচ্ছে, ব্র্যান্ড
+  // suffix একবারই template থেকে আসবে।
   const title = seoKeywords
-    ? `${seoKeywords.titleSuffix} — ${product.name} | Best Kids Electric Bike Australia | GoBike`
-    : `${product.name} | Best Kids Electric Bike Australia | GoBike`;
+    ? `${seoKeywords.titleSuffix} — ${product.name}`
+    : product.name;
   const seoDescription = seoKeywords
     ? `${seoKeywords.descSentence} ${plainDescription} Backed by GoBike's Australia-wide shipping and 1-year local warranty.`
     : `${plainDescription} Backed by GoBike's Australia-wide shipping and 1-year local warranty.`;

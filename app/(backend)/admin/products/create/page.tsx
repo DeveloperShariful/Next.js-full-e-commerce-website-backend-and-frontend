@@ -78,7 +78,15 @@ export default async function CreateProductPage(props: PageProps) {
     metafields: [],
     giftCardAmounts: [],
     version: 1,
-    seoSchema: { ogTitle: "", ogDescription: "", robots: "", ogImage: "" }
+    seoSchema: { ogTitle: "", ogDescription: "", robots: "", ogImage: "" },
+    metaTitle: "",
+    metaDesc: "",
+    seoCanonicalUrl: "",
+    noIndex: false,
+    focusKeyword: "",
+    twitterTitle: "",
+    twitterDescription: "",
+    faqs: [],
   };
 
   if (productId) {
@@ -210,6 +218,9 @@ export default async function CreateProductPage(props: PageProps) {
       
       metafields: parsedMetafields,
       seoSchema: product.seoSchema ? product.seoSchema : { ogTitle: "", ogDescription: "", robots: "", ogImage: "" },
+      // 🚀 explicit cast — শুধু ...product স্প্রেডের উপর ভরসা করলে blog-এ যে
+      // "FAQ edit করতে গেলে গায়েব হয়ে যায়" বাগ হয়েছিল, সেটাই আবার হতো
+      faqs: (product.faqs as { question: string; answer: string }[] | null) ?? [],
       
       saleStart: product.saleStart ? product.saleStart.toISOString().split("T")[0] : null,
       saleEnd: product.saleEnd ? product.saleEnd.toISOString().split("T")[0] : null,

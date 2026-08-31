@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useRef, ComponentType } from 'react';
 import Image from 'next/image';
+import ReactMarkdown from 'react-markdown';
 import QuantityAddToCart from './QuantityAddToCart';
 import ReviewForm from './ReviewForm';
 import ProductCard from '@/components/ProductCard';
@@ -102,6 +103,7 @@ interface Product {
   height?: number;
   videoUrl?: string | null;
   videoThumbnail?: string | null;
+  faqs?: { question: string; answer: string }[];
 }
 
 // --- Helper Functions ---
@@ -477,6 +479,37 @@ export default function ProductClient({ product }: { product: Product }) {
                 <SectionComponent key={`custom-section-${index}`} />
             ))}
         </div>
+      )}
+
+      {/* FAQ — admin-এর FAQ বক্স (product.faqs, DB) থেকে সরাসরি — এখানে বসানো
+          কারণ আগে যে হার্ডকোড করা FaqSection ছিল সেটাও ঠিক এই জায়গাতেই
+          (Key Features-এর নিচে) ছিল। ডিজাইন blog/[slug] আর /faq পেজের সাথে
+          হুবহু এক (সাদা কার্ড, shadow, নীল অ্যাকসেন্ট) — সাইট-জুড়ে একই রকম
+          লাগে। FAQ না থাকলে সেকশনটাই থাকে না। */}
+      {(product.faqs?.length ?? 0) > 0 && (
+        <section className="w-full max-w-[1280px] mx-auto px-4 md:px-8 mt-14 mb-8">
+          <h2 className="text-2xl font-extrabold text-gray-900 mb-6 pb-2 border-b border-gray-100">
+            Frequently Asked Questions
+          </h2>
+          <div className="space-y-[15px]">
+            {product.faqs!.map((faq, i) => (
+              <details
+                key={i}
+                className="group bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-200 open:border-blue-200"
+              >
+                <summary className="w-full p-5 md:p-6 bg-none border-none text-left text-lg font-medium text-gray-800 cursor-pointer flex justify-between items-center gap-4 list-none [&::-webkit-details-marker]:hidden group-open:text-[#0056b3]">
+                  <span>{faq.question}</span>
+                  <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90 shrink-0">
+                    &gt;
+                  </span>
+                </summary>
+                <div className="px-5 md:px-6 pb-5 md:pb-6 text-base leading-[1.7] text-gray-700 [&_strong]:font-bold [&_strong]:text-gray-900 [&_a]:text-[#007bff] [&_a]:font-medium [&_a]:no-underline hover:[&_a]:underline [&_p]:mb-3 last:[&_p]:mb-0">
+                  <ReactMarkdown>{faq.answer}</ReactMarkdown>
+                </div>
+              </details>
+            ))}
+          </div>
+        </section>
       )}
 
       {videoData  && (

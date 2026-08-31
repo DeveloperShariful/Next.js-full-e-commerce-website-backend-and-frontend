@@ -44,6 +44,8 @@ export const parseProductFormData = (formData: FormData) => {
 
         videoUrl: formData.get("videoUrl") as string || null,
         videoThumbnail: formData.get("videoThumbnail") as string || null,
+        videoTitle: formData.get("videoTitle") as string || null,
+        videoDescription: formData.get("videoDescription") as string || null,
         
         featuredImage: formData.get("featuredImage") as string || null,
         featuredMediaId: formData.get("featuredMediaId") as string || null,
@@ -87,6 +89,14 @@ export const parseProductFormData = (formData: FormData) => {
         metaTitle: formData.get("metaTitle") as string,
         metaDesc: formData.get("metaDesc") as string,
         seoCanonicalUrl: formData.get("seoCanonicalUrl") as string,
+        // 🚀 SeoBox/OpenGraphBox/TwitterCardBox/FaqBox-এর নতুন ফিল্ড — এখানে
+        // extract করা হচ্ছিল না, তাই form submit করলেও এই ৫টা কখনো DB পর্যন্ত
+        // পৌঁছাত না (UI-তে ঠিকভাবে দেখাতো, কিন্তু সেভ হতো না)।
+        noIndex: formData.get("noIndex") === "true",
+        focusKeyword: formData.get("focusKeyword") as string,
+        twitterTitle: formData.get("twitterTitle") as string,
+        twitterDescription: formData.get("twitterDescription") as string,
+        faqs: parseJSON<{ question: string; answer: string }[]>(formData.get("faqs") as string, []),
 
         taxStatus: taxStatusInput as TaxStatus,
         taxRateId: (formData.get("taxRateId") as string) || null,

@@ -55,7 +55,7 @@ export interface GeneralSettingsData {
     };
     currencyOptions: {
         currency: string;
-        currencyPosition: string; 
+        currencyPosition: string;
         thousandSeparator: string;
         decimalSeparator: string;
         numDecimals: number;

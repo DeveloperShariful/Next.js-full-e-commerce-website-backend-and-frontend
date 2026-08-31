@@ -31,7 +31,15 @@ export const productSchema = z.object({
   metaTitle: emptyToString,
   metaDesc: emptyToString,
   seoCanonicalUrl: emptyToString,
-  
+  noIndex: z.boolean().default(false),
+  focusKeyword: emptyToString,
+  twitterTitle: emptyToString,
+  twitterDescription: emptyToString,
+  faqs: z.array(z.object({
+      question: z.string(),
+      answer: z.string(),
+  })).default([]),
+
   metafields: z.array(z.object({
       key: z.string().min(1, "Key required"),
       value: z.string().min(1, "Value required")
@@ -108,6 +116,8 @@ export const productSchema = z.object({
   
   videoUrl: emptyToString,
   videoThumbnail: emptyToString,
+  videoTitle: emptyToString,
+  videoDescription: emptyToString,
 
   gender: emptyToString,
   ageGroup: emptyToString,

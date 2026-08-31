@@ -79,6 +79,8 @@ export async function getProductBySlugAction(slug: string) {
       reviewCount: product.reviewCount || 0,
       videoUrl: product.videoUrl || null,
       videoThumbnail: product.videoThumbnail || null,
+      videoTitle: product.videoTitle || undefined,
+      videoDescription: product.videoDescription || undefined,
       // Structured data (size/audience/color ইত্যাদি)-এর জন্য — আগে fetch হতো
       // কিন্তু formattedProduct-এ কপি হতো না, তাই page পর্যন্ত পৌঁছাত না।
       size: product.size || undefined,
@@ -88,6 +90,17 @@ export async function getProductBySlugAction(slug: string) {
       gender: product.gender || undefined,
       ageGroup: product.ageGroup || undefined,
       googleProductCategory: product.googleProductCategory || undefined,
+      // 🚀 Admin SEO বক্স (metaTitle/metaDesc/OG/Twitter/noIndex) — আগে fetch-ই
+      // হতো না, তাই admin panel-এ যা-ই টাইপ করা হোক, product page-এ কখনো
+      // পৌঁছাত না। এখন generateMetadata() এই ফিল্ডগুলো read করে।
+      metaTitle: product.metaTitle || undefined,
+      metaDesc: product.metaDesc || undefined,
+      seoCanonicalUrl: product.seoCanonicalUrl || undefined,
+      seoSchema: (product.seoSchema as { ogTitle?: string; ogDescription?: string; ogImage?: string; robots?: string } | null) || null,
+      noIndex: product.noIndex || false,
+      twitterTitle: product.twitterTitle || undefined,
+      twitterDescription: product.twitterDescription || undefined,
+      faqs: (product.faqs as { question: string; answer: string }[] | null) ?? [],
       primaryCategory: product.categories?.[0]
         ? { name: product.categories[0].name, slug: product.categories[0].slug }
         : null,
@@ -115,6 +128,8 @@ export async function getProductBySlugAction(slug: string) {
             stockStatus: (!variant.trackQuantity || variant.stock > 0) ? "IN_STOCK" : "OUT_OF_STOCK",
             stockQuantity: variant.trackQuantity ? variant.stock : null,
             name: variant.name,
+            // ProductGroup schema-র প্রতিটা variant-এর নিজস্ব gtin-এর জন্য
+            barcode: variant.barcode || undefined,
             attributes: {
               nodes: Object.entries(variant.attributes as Record<string, string>).map(([key, val]) => ({
                 name: key,

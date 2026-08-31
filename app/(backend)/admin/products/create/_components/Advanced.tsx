@@ -4,23 +4,11 @@
 
 import { useState, useEffect } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
-import { Plus, Trash2, Settings, ListOrdered, MessageSquare, Link as LinkIcon, Code, LayoutList, AlertTriangle, RefreshCw, X , ImagePlus} from "lucide-react";
+import { Plus, Trash2, ListOrdered, MessageSquare, Code, LayoutList, AlertTriangle } from "lucide-react";
 import { ProductFormData } from "../types";
-import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
-import Image from "next/image";
-import SeoPreview from "@/app/(backend)/admin/_components/SeoPreview";
 
 export default function Advanced() {
-    const { register, control, watch, setValue, formState: { errors } } = useFormContext<ProductFormData>();
-
-    const ogImage = watch("seoSchema.ogImage");
-    const ogTitle = watch("seoSchema.ogTitle");
-    const ogDescription = watch("seoSchema.ogDescription");
-    const productName = watch("name");
-    const productSlug = watch("slug");
-    
-    // Modal State
-    const [openSeoMedia, setOpenSeoMedia] = useState(false);
+    const { register, control, watch } = useFormContext<ProductFormData>();
 
     // Metafields Array
     const { fields, append, remove, replace } = useFieldArray({
@@ -56,11 +44,6 @@ export default function Advanced() {
         } catch (e: unknown) {
             setJsonError(e instanceof Error ? e.message : "Invalid JSON syntax");
         }
-    };
-
-    const handleSeoImageSelect = (items: { url: string }[]) => {
-        if (!items.length) return;
-        setValue("seoSchema.ogImage", items[0].url, { shouldDirty: true });
     };
 
     return (
@@ -111,104 +94,10 @@ export default function Advanced() {
             </div>
 
             {/* =========================================================
-                2. SEO & SOCIAL SHARING
-            ========================================================= */}
-            <div>
-                <h3 className="font-semibold text-[14px] text-[#1d2327] mb-4 flex items-center gap-2">
-                    <Settings size={16} className="text-[#8c8f94]"/> SEO & Social Sharing
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start border-b border-[#f0f0f1] pb-4 mb-4">
-                    <label className="md:text-left text-[13px] text-[#3c434a] mt-1.5 font-medium">OpenGraph Title</label>
-                    <div className="md:col-span-3">
-                        <input 
-                            {...register("seoSchema.ogTitle")} 
-                            className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none" 
-                            placeholder="Title shown on Facebook/Twitter"
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start border-b border-[#f0f0f1] pb-4 mb-4">
-                    <label className="md:text-left text-[13px] text-[#3c434a] mt-1.5 font-medium">OpenGraph Desc.</label>
-                    <div className="md:col-span-3">
-                        <textarea 
-                            {...register("seoSchema.ogDescription")} 
-                            rows={2} 
-                            className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none resize-y" 
-                            placeholder="Description for social media previews"
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start border-b border-[#f0f0f1] pb-4 mb-4">
-                    <label className="md:text-left text-[13px] text-[#3c434a] mt-1.5 font-medium">OpenGraph Image</label>
-                    <div className="md:col-span-3">
-                        {ogImage ? (
-                            <div className="flex flex-col gap-2">
-                                <div className="relative w-[150px] h-[150px] bg-[#f0f0f1] border border-[#c3c4c7] rounded-[2px] overflow-hidden shrink-0">
-                                    <Image src={ogImage} alt="SEO Preview" fill className="object-cover" />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button type="button" onClick={() => setOpenSeoMedia(true)} className="text-[12px] text-[#2271b1] hover:underline flex items-center gap-1">
-                                        <RefreshCw size={12}/> Change image
-                                    </button>
-                                    <span className="text-[#c3c4c7]">|</span>
-                                    <button type="button" onClick={() => setValue("seoSchema.ogImage", "", { shouldDirty: true })} className="text-[12px] text-[#d63638] hover:underline flex items-center gap-1">
-                                        <X size={12}/> Remove image
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <button type="button" onClick={() => setOpenSeoMedia(true)} className="text-[13px] text-[#2271b1] hover:underline flex items-center gap-1.5">
-                                <ImagePlus size={16}/> Set OpenGraph Image
-                            </button>
-                        )}
-                        <p className="text-[11px] text-[#646970] mt-2">Recommended size: 1200 x 630 pixels. Used for Facebook, Twitter, WhatsApp.</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#f0f0f1] pb-4 mb-4">
-                    <label className="md:text-left text-[13px] text-[#3c434a] font-medium flex items-center gap-1.5">
-                        <LinkIcon size={14} className="text-[#8c8f94]"/> Canonical URL
-                    </label>
-                    <div className="md:col-span-3">
-                        <input 
-                            {...register("seoCanonicalUrl")}
-                            className="w-full border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none" 
-                            placeholder="https://... (Leave empty for default)"
-                        />
-                        {errors.seoCanonicalUrl && <p className="text-[#d63638] text-[11px] mt-1">{errors.seoCanonicalUrl.message}</p>}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center border-b border-[#c3c4c7] pb-6">
-                    <label className="md:text-left text-[13px] text-[#3c434a] font-medium">Robots Meta</label>
-                    <div className="md:col-span-3">
-                        <input
-                            {...register("seoSchema.robots")}
-                            className="w-full md:w-1/2 border border-[#8c8f94] px-2 py-1 rounded-[3px] text-[13px] text-[#2c3338] shadow-[inset_0_1px_2px_rgba(0,0,0,0.07)] focus:border-[#2271b1] outline-none"
-                            placeholder="e.g. index, follow"
-                        />
-                    </div>
-                </div>
-
-                {/* Google Search Preview */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start pt-2">
-                    <label className="md:text-left text-[13px] text-[#3c434a] font-medium mt-1">Search Preview</label>
-                    <div className="md:col-span-3">
-                        <SeoPreview
-                            title={ogTitle || productName || ""}
-                            description={ogDescription || ""}
-                            slug={productSlug || ""}
-                            baseUrl="https://yourstore.com/products"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* =========================================================
-                3. CUSTOM FIELDS (Metafields)
+                2. CUSTOM FIELDS (Metafields)
+                (SEO & Social Sharing এখন "SEO" বক্সে সরানো হয়েছে —
+                Short Description-এর নিচে, নতুন metaTitle/metaDesc/focus
+                keyword/Twitter ফিল্ডের সাথে একসাথে — see SeoBox.tsx)
             ========================================================= */}
             <div>
                 <div className="flex justify-between items-center mb-4">
@@ -273,12 +162,6 @@ export default function Advanced() {
                 )}
             </div>
 
-            <MediaPickerModal
-                open={openSeoMedia}
-                onClose={() => setOpenSeoMedia(false)}
-                onSelect={handleSeoImageSelect}
-                title="Select SEO OG Image"
-            />
         </div>
     );
 }

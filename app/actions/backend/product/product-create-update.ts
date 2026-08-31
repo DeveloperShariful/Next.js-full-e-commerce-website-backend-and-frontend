@@ -282,6 +282,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 oldProductData.featuredMediaId !== (data.featuredMediaId || null) ||
                 oldProductData.videoUrl !== (data.videoUrl || null) ||
                 oldProductData.videoThumbnail !== (data.videoThumbnail || null) ||
+                oldProductData.videoTitle !== (data.videoTitle || null) ||
+                oldProductData.videoDescription !== (data.videoDescription || null) ||
                 // Pricing / sale dates
                 (oldProductData.saleStart?.toISOString().split('T')[0] || null) !== (data.saleStart || null) ||
                 (oldProductData.saleEnd?.toISOString().split('T')[0] || null) !== (data.saleEnd || null) ||
@@ -319,6 +321,10 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 oldProductData.metaTitle !== (data.metaTitle || null) ||
                 oldProductData.metaDesc !== (data.metaDesc || null) ||
                 oldProductData.seoCanonicalUrl !== (data.seoCanonicalUrl || null) ||
+                oldProductData.noIndex !== (data.noIndex ?? false) ||
+                oldProductData.focusKeyword !== (data.focusKeyword || null) ||
+                oldProductData.twitterTitle !== (data.twitterTitle || null) ||
+                oldProductData.twitterDescription !== (data.twitterDescription || null) ||
                 // Misc
                 oldProductData.purchaseNote !== (data.purchaseNote || null) ||
                 oldProductData.menuOrder !== (data.menuOrder ?? 0) ||
@@ -394,10 +400,13 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 data.seoSchema || null
             );
 
+            const cleanFaqs = (data.faqs ?? []).filter((f: { question: string; answer: string }) => f.question.trim() && f.answer.trim());
+            const faqsChanged = !oldProductData || !isDeepEqual(oldProductData.faqs, cleanFaqs);
+
             const upsellsChanged = !oldProductData || !arraysHaveSameContent(oldProductData.upsellIds || [], data.upsells || []);
             const crossSellsChanged = !oldProductData || !arraysHaveSameContent(oldProductData.crossSellIds || [], data.crossSells || []);
 
-            const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged || metafieldsChanged || seoSchemaChanged || upsellsChanged || crossSellsChanged;
+            const anyChanges = scalarsChanged || categoriesChanged || tagsChanged || collectionsChanged || inventoryChanged || imagesChanged || attributesChanged || variationsChanged || bundleChanged || metafieldsChanged || seoSchemaChanged || faqsChanged || upsellsChanged || crossSellsChanged;
 
             if (type === "UPDATE" && !anyChanges) {
                 return { success: true, message: "No changes detected.", productId: data.id };
@@ -454,6 +463,8 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
 
                 videoUrl: data.videoUrl,
                 videoThumbnail: data.videoThumbnail,
+                videoTitle: data.videoTitle,
+                videoDescription: data.videoDescription,
                 gender: data.gender,
                 ageGroup: data.ageGroup,
                 
@@ -485,6 +496,12 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 metaTitle: data.metaTitle,
                 metaDesc: data.metaDesc,
                 seoCanonicalUrl: data.seoCanonicalUrl,
+                noIndex: data.noIndex ?? false,
+                focusKeyword: data.focusKeyword,
+                twitterTitle: data.twitterTitle,
+                twitterDescription: data.twitterDescription,
+                // খালি question/answer বাদ দেওয়া হলো (blog FAQ-এর মতোই)
+                faqs: (data.faqs ?? []).filter((f: { question: string; answer: string }) => f.question.trim() && f.answer.trim()) as unknown as Prisma.InputJsonValue,
                 purchaseNote: data.purchaseNote,
                 menuOrder: data.menuOrder,
                 enableReviews: data.enableReviews,

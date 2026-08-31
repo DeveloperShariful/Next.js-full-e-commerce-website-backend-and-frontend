@@ -26,6 +26,7 @@ import Brand from "./Brand";
 import Tag from "./tag";
 import ProductImage from "./Product_image";
 import GalleryImages from "./Gallery_images";
+import ProductVideo from "./ProductVideo";
 import LinkedProducts from "./LinkedProducts";
 import BundleItems from "./BundleItems";
 import Description from "./description";
@@ -33,6 +34,11 @@ import ShortDescription from "./short_description";
 import GoogleShopping from "./GoogleShopping";
 import Facebook from "./Facebook";
 import { ChannelVisibility } from "./ChannelVisibility";
+import SeoBox from "./SeoBox";
+import FaqBox from "./FaqBox";
+import OpenGraphBox from "./OpenGraphBox";
+import TwitterCardBox from "./TwitterCardBox";
+import StructuredDataPreview from "./StructuredDataPreview";
 
 interface ProductFormProps {
   initialData: ProductFormValues;
@@ -129,7 +135,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
     Object.keys(data).forEach((key) => {
         const value = (data as Record<string, unknown>)[key];
         
-        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'categoryIds', 'digitalFiles', 'bundleItems', 'inventoryData', 'metafields', 'seoSchema', 'giftCardAmounts'].includes(key)) {
+        if (['galleryImages', 'tags', 'attributes', 'variations', 'upsells', 'crossSells', 'collectionIds', 'categoryIds', 'digitalFiles', 'bundleItems', 'inventoryData', 'metafields', 'seoSchema', 'giftCardAmounts', 'faqs'].includes(key)) {
             formData.append(key, JSON.stringify(value));
         } 
         else if (value !== null && value !== undefined) {
@@ -312,6 +318,13 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
 
                     <ShortDescription />
 
+                    <FaqBox />
+
+                    <SeoBox />
+                    <OpenGraphBox />
+                    <TwitterCardBox />
+                    <StructuredDataPreview />
+
                 </div>
 
                 {/* =======================================
@@ -331,6 +344,7 @@ export function ProductForm({ initialData, isEdit }: ProductFormProps) {
                     <Tag />
                     <ProductImage />
                     <GalleryImages />
+                    <ProductVideo />
                     {isEdit && initialData.id && (
                       <ChannelVisibility productId={initialData.id} />
                     )}

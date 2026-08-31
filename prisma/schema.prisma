@@ -698,6 +698,11 @@ model Product {
   images                ProductImage[]
   videoUrl              String?
   videoThumbnail        String?
+  // 🚀 VideoObject schema-র জন্য — খালি রাখলে product.name/description থেকে
+  // auto-generate হয়, admin লিখলে সেটাই ব্যবহার হবে (metaTitle/metaDesc-এর
+  // মতোই effective-value প্যাটার্ন)
+  videoTitle            String?
+  videoDescription      String?                @db.Text
   price                 Decimal                @default(0.00) @db.Decimal(12, 2)
   salePrice             Decimal?               @db.Decimal(12, 2)
   saleStart             DateTime?
@@ -748,9 +753,18 @@ model Product {
   upsellIds             String[]
   crossSellIds          String[]
   metaTitle             String?
-  metaDesc              String?
+  metaDesc              String?              @db.Text
   seoCanonicalUrl       String?
-  seoSchema             Json?
+  seoSchema             Json? // {ogTitle, ogDescription, ogImage, robots}
+  // 🚀 Dynamic FAQ list — [{question, answer}] — visible section + FAQPage
+  // JSON-LD schema, blog post-এর faqs field-এর সাথে হুবহু একই প্যাটার্ন
+  faqs                  Json?
+  // 🚀 admin product SEO box (blog-এর SEO section-এর সাথে parity রাখতে যোগ করা) —
+  // এখনো কোনো UI ছিল না, শুধু metaTitle/metaDesc/seoCanonicalUrl/seoSchema-ই ছিল
+  noIndex               Boolean              @default(false)
+  focusKeyword          String?
+  twitterTitle          String?
+  twitterDescription    String?              @db.Text
   gender                String?
   ageGroup              String?
 
@@ -3081,4 +3095,32 @@ model BlogSettings {
   defaultKeyTakeaways String[]
   defaultAuthorBio    String?  @db.Text
   updatedAt           DateTime @updatedAt
+}
+
+// ==========================================
+// External/unmanaged tables — passthrough models
+// এই টেবিলগুলো এই Next.js প্রজেক্ট বানায় না — একটা আলাদা bot/automation সিস্টেম
+// একই Neon database শেয়ার করে এগুলো ব্যবহার করে। কোনো model না থাকলে
+// `prisma db push` এগুলোকে "অপ্রয়োজনীয় drift" ধরে DROP করার প্রস্তাব দেয় (যা
+// আগে একবার bot_handoffs-এর ডেটা হারানোর কারণ হয়েছিল) — এই দুটো model শুধু
+// সেটা আটকানোর জন্য, এই কোডবেস কখনো এগুলো read/write করে না।
+// ==========================================
+model BotSettings {
+  key       String   @id
+  value     String   @default("")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("bot_settings")
+}
+
+model BotHandoff {
+  id          BigInt   @id @default(autoincrement())
+  platform    String
+  senderId    String   @map("sender_id")
+  reason      String?
+  lastMessage String?  @map("last_message")
+  createdAt   DateTime @default(now()) @map("created_at")
+  resolved    Boolean  @default(false)
+
+  @@map("bot_handoffs")
 }

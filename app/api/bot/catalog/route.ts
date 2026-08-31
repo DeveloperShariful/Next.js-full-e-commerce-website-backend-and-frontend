@@ -57,6 +57,9 @@ export async function GET(req: Request) {
           backorderStatus: true,
           isPreOrder: true,
           preOrderMessage: true,
+          rating: true,
+          reviewCount: true,
+          enableReviews: true,
           brand: { select: { name: true } },
           categories: { select: { name: true } },
           attributes: {
@@ -97,7 +100,11 @@ export async function GET(req: Request) {
         isPreOrder: p.isPreOrder,
         preOrderMessage: p.isPreOrder ? p.preOrderMessage || null : null,
         shortDescription:
-          plainText(p.shortDescription, 500) || plainText(p.description, 500),
+          plainText(p.shortDescription, 700) || plainText(p.description, 700),
+        description: plainText(p.description, 1200) || null,
+        rating:
+          p.enableReviews && p.reviewCount > 0 ? Number(p.rating) : null,
+        reviewCount: p.enableReviews ? p.reviewCount : 0,
         brand: p.brand?.name || null,
         categories: p.categories.map((c) => c.name),
         attributes: p.attributes

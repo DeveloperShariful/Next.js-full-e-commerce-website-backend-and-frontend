@@ -111,7 +111,16 @@ const HeroSlider = () => {
 
   const nextSlide = () => setCurrentSlide((prev) => (prev === slidesData.length - 1 ? 0 : prev + 1));
   const prevSlide = () => setCurrentSlide((prev) => (prev === 0 ? slidesData.length - 1 : prev - 1));
-  const handleTouchStart = (e: React.TouchEvent) => setTouchStart(e.targetTouches[0].clientX);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const x = e.targetTouches[0].clientX;
+    setTouchStart(x);
+    // touchEnd-ও এখানে reset করা হচ্ছে — নাহলে সাধারণ ট্যাপে (touchmove
+    // ফায়ারই হয় না) touchEnd আগের কোনো swipe-এর stale ভ্যালুতে থেকে যায়,
+    // আর touchStart - touchEnd কাকতালীয়ভাবে 75px পার হয়ে গিয়ে ঠিক ট্যাপ
+    // করার মুহূর্তেই nextSlide()/prevSlide() কল হয়ে "Shop Now" বাটনের
+    // ক্লিক গিলে ফেলে (mobile-এ, desktop mouse click-এ এই handler-ই চলে না)।
+    setTouchEnd(x);
+  };
   const handleTouchMove = (e: React.TouchEvent) => setTouchEnd(e.targetTouches[0].clientX);
   const handleTouchEnd = () => {
     if (touchStart - touchEnd > 75) nextSlide();

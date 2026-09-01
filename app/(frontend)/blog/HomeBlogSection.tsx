@@ -7,14 +7,14 @@ export async function HomeBlogSection() {
   if (!posts || posts.length === 0) return null;
 
   return (
-    <section className="py-20 px-4 bg-white border-t border-gray-100">
+    <section className="pt-[12px] pb-[12px] md:pt-20 md:pb-20 px-[10px] md:px-4 bg-white border-t border-gray-100">
       <div className="max-w-[1300px] mx-auto">
         <div className="flex items-end justify-between mb-12">
-          <div>
+          <div className="text-center md:text-left w-full md:w-auto">
             <p className="text-xs font-bold tracking-widest uppercase text-gray-600 mb-2">
               From the GoBike Blog
             </p>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
+            <h2 className="text-[1.3rem] md:text-[1.6rem] font-extrabold text-gray-900 leading-tight">
               Tips, Guides & News
             </h2>
           </div>

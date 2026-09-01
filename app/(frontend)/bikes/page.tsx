@@ -226,7 +226,7 @@ export default async function BikesPage({ searchParams }: {
       <div className="max-w-[1300px] mx-auto px-1.5 font-sans">
         
         {/* --- Header Banner (Original UI) --- */}
-        <header className="flex flex-col md:flex-row items-center gap-6 md:gap-12 mb-8 md:mb-12 bg-gray-50 rounded-lg md:rounded-xl p-4 md:p-12">
+        <header className="flex flex-col md:flex-row items-center gap-6 md:gap-12 mb-8 md:mb-12 bg-gray-50 rounded-lg md:rounded-xl p-[10px] md:p-12">
           <div className="flex-1 text-left w-full">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-3 md:mb-4 leading-tight">
               Kids Dirt Bikes &amp; Childrens Motorcycles — Australia&apos;s Top-Rated Electric Bikes for Kids
@@ -272,7 +272,7 @@ export default async function BikesPage({ searchParams }: {
         </main>
 
         {/* --- Why Choose Us Section (Original UI) --- */}
-        <section className="flex flex-col md:flex-row items-center gap-8 md:gap-16 bg-white border border-gray-100 rounded-lg md:rounded-xl p-4 py-8 md:p-10 shadow-sm mb-12 md:mb-16">
+        <section className="flex flex-col md:flex-row items-center gap-8 md:gap-16 bg-white border border-gray-100 rounded-lg md:rounded-xl p-[10px] py-8 md:p-10 shadow-sm mb-12 md:mb-16">
           <div className="w-full md:w-1/2 flex justify-center">
             <Image
               src="https://gobikes.au/wp-content/uploads/2025/08/Gobike-kids-electric-bike-ebike-for-kids-4-scaled-1.webp"
@@ -283,7 +283,7 @@ export default async function BikesPage({ searchParams }: {
             />
           </div>
           <div className="w-full md:w-1/2">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold text-gray-900 mb-4">
               Engineered for Safety, Built for Fun.
             </h2>
             <p className="text-base text-gray-600 mb-6 leading-relaxed">
@@ -328,7 +328,7 @@ export default async function BikesPage({ searchParams }: {
         <section className="text-left  bg-gray-50 rounded-xl p-3 md:p-5">
             <div className="max-w-[1100px] mx-auto text-gray-700 leading-relaxed">
                 
-                 <h2 className="text-2xl text-center font-bold text-gray-900 mb-4">The Ultimate Guide to Kids Electric Bikes in Australia</h2>
+                 <h2 className="text-[1.3rem] md:text-[1.6rem] text-center font-bold text-gray-900 mb-4">The Ultimate Guide to Kids Electric Bikes in Australia</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 ">
                     <div>
@@ -366,7 +366,7 @@ export default async function BikesPage({ searchParams }: {
         {/* --- SEO Bottom Section (Original UI) --- */}
         <section className="text-left bg-gray-50 rounded-xl p-3 md:p-5 mt-8">
           <div className="max-w-[1100px] mx-auto text-gray-700 leading-relaxed">
-            <h2 className="text-center text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="text-center text-[1.3rem] md:text-[1.6rem] font-bold text-gray-900 mb-4">
               Your Journey to Adventure Starts Here
             </h2>
             <p className="text-gray-600 max-w-3xl mx-auto mb-8 leading-relaxed">

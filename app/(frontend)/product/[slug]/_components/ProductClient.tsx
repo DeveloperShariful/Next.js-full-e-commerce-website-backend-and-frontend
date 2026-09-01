@@ -463,11 +463,11 @@ export default function ProductClient({ product }: { product: Product }) {
             {panelConfigs.map((panel) => (
                 <div 
                     key={panel.id} 
-                    className="flex justify-between items-center py-5 border-b border-[#e5e5e5] cursor-pointer text-sm font-bold tracking-[0.5px] text-[#333] transition-colors duration-200 hover:text-blue-600" 
+                    className="flex justify-between items-center py-5 border-b border-[#e5e5e5] cursor-pointer text-sm font-bold tracking-[0.5px] text-[#007bff] transition-colors duration-200 hover:text-blue-800"
                     onClick={() => setActivePanel(panel.id)}
                 >
                     <span>{panel.label}</span>
-                    <span className="text-xl leading-none">&gt;</span>
+                    <span className="text-xl leading-none font-bold text-[#007bff]">&gt;</span>
                 </div>
             ))}
         </div>

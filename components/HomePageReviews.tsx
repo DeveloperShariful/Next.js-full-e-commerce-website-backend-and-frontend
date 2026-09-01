@@ -87,11 +87,11 @@ export default function HomePageReviews({ initialReviews, initialSummary }: Prop
   };
 
   return (
-    <section className="pb-12 bg-white font-sans">
-      <div className="max-w-[1500px] mx-auto px-4">
+    <section className="pb-[12px] md:pb-12 bg-white font-sans">
+      <div className="max-w-[1500px] mx-auto px-[5px] md:px-4">
 
         <div className="text-center mb-12 mt-4">
-          <h2 className="text-[1.7rem] md:text-[2rem] font-extrabold mb-2 tracking-tight text-[#1a1a1a]">
+          <h2 className="text-[1.3rem] md:text-[1.6rem] font-extrabold mb-2 tracking-tight text-[#1a1a1a]">
             What our customers are saying about Gobike
           </h2>
         </div>

@@ -225,13 +225,13 @@ const trustItems = [
 
 const TrustBadges = () => {
   return (
-    <section className="py-12 px-2.5 font-sans">
-      <div className="max-w-[1500px] mx-auto px-2.5">
-        <div className="text-center mb-8">
-          <h2 className="text-[32px] font-bold text-[#1a1a1a] mb-3 tracking-tight">The GoBike Promise: Australias Best Kids Electric Bike</h2>
+    <section className="pt-[12px] pb-[12px] md:pt-12 md:pb-12 px-[5px] md:px-2.5 font-sans">
+      <div className="max-w-[1500px] mx-auto px-[5px] md:px-2.5">
+        <div className="text-left md:text-center mb-8">
+          <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold text-[#1a1a1a] mb-3 tracking-tight">The GoBike Promise: Australias Best Kids Electric Bike</h2>
           <p className="text-lg text-[#666] max-w-[800px] mx-auto leading-[1.5]">We are committed to providing an unmatched riding experience, backed by guarantees you can count on. Here's why GoBike is the choice for Aussie families. Electric balance bike</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-[30px] gap-y-[40px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-[30px] gap-y-[15px] md:gap-y-[40px]">
           {trustItems.map((item, index) => (
             <div className="flex items-start gap-4" key={index}>
               <div className="flex-shrink-0 w-8 h-8">{item.icon}</div>
@@ -283,9 +283,9 @@ const products = [
 
 const ProductCollection = () => {
   return (
-    <section className="py-5">
-      <div className="max-w-[1500px] mx-auto px-2.5">
-        <h2 className="text-center text-[30px] font-bold text-[#1a1a1a] mb-5">The GoBike Electric Bike Latest Collection</h2>
+    <section className="pt-[12px] pb-[12px] md:pt-5 md:pb-5">
+      <div className="max-w-[1500px] mx-auto px-[5px] md:px-2.5">
+        <h2 className="text-center text-[1.3rem] md:text-[1.6rem] font-bold text-[#1a1a1a] mb-5">The GoBike Electric Bike Latest Collection</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[30px]">
           {products.map((product, index) => (
             <Link href={product.link} className="text-center border border-[#e9e9e9] rounded-lg overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-lg flex flex-col justify-between no-underline text-inherit" key={index}>
@@ -314,15 +314,15 @@ const ProductCollection = () => {
 // ====================================================================
 const OurStory = () => {
   return (
-    <section className="py-12 px-2.5 font-sans">
-      <div className="max-w-[1500px] mx-auto px-2.5">
+    <section className="pt-[12px] pb-[12px] md:pt-12 md:pb-12 px-[5px] md:px-2.5 font-sans">
+      <div className="max-w-[1500px] mx-auto px-[5px] md:px-2.5">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-10 lg:gap-20 items-center">
           <div className="w-full">
             <Image loading="lazy" src="https://gobikes.au/wp-content/uploads/2025/08/gobike-scaled-1.webp" alt="Two Australian dads with their kids and electric balance bikes" width={2049} height={2560} sizes="(max-width: 768px) 100vw, 50vw" className="w-full h-auto block rounded-2xl" />
           </div>
           <div className="text-left">
             <p className="text-[20px] font-black text-black mb-2.5 uppercase tracking-[1px]">Our Story</p>
-            <h2 className="text-[34px] font-extrabold text-black mb-5 tracking-tight leading-[1.2]">Founded by Two Dads, Fuelled by Fun GoBike</h2>
+            <h2 className="text-[1.3rem] md:text-[1.6rem] font-extrabold text-black mb-5 tracking-tight leading-[1.2]">Founded by Two Dads, Fuelled by Fun GoBike</h2>
             <p className="text-[17px] text-[#333] leading-[1.8] mb-5">Welcome to GoBike! We are a proud Australian brand, founded in 2023 by two mates in the Macarthur Region of NSW. Our journey began from a simple observation: seeing the pure joy on our kids faces as they rode their first electric balance bikes.</p>
             <p className="text-[17px] text-[#333] leading-[1.8] mb-5">That spark, motivated us to design an even better <strong>kids electric bike</strong> One that elevates their riding experience while giving parents total peace of mind. We are committed to being the <strong>best electric balance bike</strong> brand through top-tier performance, reliability and unbeatable customer service.</p>
             <div className="bg-[#f0f8ff] border-l-4 border-[#007bff] p-5 rounded-r-lg mb-8">
@@ -384,10 +384,10 @@ const SmarterChoice = () => {
   };
 
   return (
-    <section className="py-12 px-2.5 font-sans w-full ml-[calc(50%-50vw)] mr-[calc(50%-50vw)]">
-      <div className="max-w-[1500px] mx-auto px-2.5">
-        <div className="text-center mb-8">
-          <h2 className="text-[32px] font-bold text-[#1a1a1a] mb-3 tracking-tight">Why GoBike is The Smarter Choice</h2>
+    <section className="pt-[12px] pb-[12px] md:pt-12 md:pb-12 px-[5px] md:px-2.5 font-sans w-full ml-[calc(50%-50vw)] mr-[calc(50%-50vw)]">
+      <div className="max-w-[1500px] mx-auto px-[5px] md:px-2.5">
+        <div className="text-left md:text-center mb-8">
+          <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold text-[#1a1a1a] mb-3 tracking-tight">Why GoBike is The Smarter Choice</h2>
           <p className="text-lg text-black max-w-[800px] mx-auto leading-[1.5]">When we could not find the best kids electric bike for our own kids, we decided to build it. Every GoBike is a promise of, durability, performance and pure FUN.</p>
         </div>
 
@@ -437,11 +437,11 @@ const comparisonData = [
 
 const DifferenceSection = () => {
   return (
-    <section className="py-12 px-2.5 font-sans bg-black text-white">
+    <section className="pt-[12px] pb-[12px] md:pt-12 md:pb-12 px-[5px] md:px-2.5 font-sans bg-black text-white">
       <div className="max-w-[1450px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-12 items-center">
           <div className="text-left">
-            <h2 className="text-[32px] font-bold text-white mb-3 tracking-tight text-center">The GoBike Difference</h2>
+            <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold text-white mb-3 tracking-tight text-center">The GoBike Difference</h2>
             <h3 className="text-[18px] text-white mt-0 max-w-[800px] mx-auto leading-[1.5] text-center font-semibold mb-3">Engineered Better. Built Stronger.</h3>
             <p className="text-[17px] leading-[1.7] mb-5">While others cut corners, we deliver what matters: the <strong>highest-performance and most reliable kids electric bike</strong> on the market, backed by a <strong>1-year advanced replacement warranty.</strong></p>
             <p className="text-[17px] leading-[1.7] mb-0">As a proud Aussie brand founded by two dads, we built the bikes we wanted for our own kids. That is the GoBike promise.</p>
@@ -479,14 +479,14 @@ const DifferenceSection = () => {
 // ====================================================================
 const CommunitySection = () => {
   return (
-    <section className="py-12 px-2.5 font-sans bg-[#f8f9fa]">
+    <section className="pt-[12px] pb-[12px] md:pt-12 md:pb-12 px-[5px] md:px-2.5 font-sans bg-[#f8f9fa]">
       <div className="max-w-[1450px] mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-10 lg:gap-20 items-center p-2.5">
           <div className="w-full">
             <Image loading="lazy" src="https://gobikes.au/wp-content/uploads/2025/08/electric-bike-ebike-for-kids-1.webp" alt="GoBike community" width={2199} height={2560} sizes="(max-width: 768px) 100vw, 50vw" className="w-full h-auto block rounded-2xl" />
           </div>
-          <div className="text-center">
-            <h2 className="text-[32px] font-extrabold text-black mb-5 tracking-tight leading-[1.2]">More Than a Bike - It is The GoBike Family</h2>
+          <div className="text-left md:text-center">
+            <h2 className="text-[1.3rem] md:text-[1.6rem] font-extrabold text-black mb-5 tracking-tight leading-[1.2]">More Than a Bike - It is The GoBike Family</h2>
             <p className="text-[17px] text-[#333] leading-[1.8] mb-6 max-w-[700px] mx-auto text-left">At GoBike, our passion is creating unforgettable riding experiences. We did not just set out to sell another kids ebike, we aimed to design the <strong>best electric bike for kids</strong> in Australia, ensuring a fun-filled adventure for them and a stress-free experience for parents.</p>
             <p className="text-[17px] text-[#333] leading-[1.8] mb-6 max-w-[700px] mx-auto text-left">Every <strong>electric balance bike</strong> we create is a blend of fun, reliability, and safety. By choosing GoBike, you&apos;re not just getting a top-quality <strong>kids electric motorbike</strong>; you&apos;re joining a community that values adventure and family bonding.</p>
             <p className="text-[18px] text-black font-semibold mb-8">Create lasting memories and join the adventure today!</p>
@@ -571,9 +571,9 @@ const VideoReviews = () => {
   };
 
   return (
-    <section className="py-12 px-2.5 font-sans bg-[#f8f9fa]">
+    <section className="pt-[12px] pb-[12px] md:pt-12 md:pb-12 px-[8px] md:px-2.5 font-sans bg-[#f8f9fa]">
       <div className="text-center mb-8">
-        <h2 className="text-[32px] font-bold text-[#1a1a1a] mb-3 tracking-tight">See Why Parents & Kids Love The GoBike</h2>
+        <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold text-[#1a1a1a] mb-3 tracking-tight">See Why Parents & Kids Love The GoBike</h2>
         <p className="text-lg text-[#1a1a1a] max-w-[800px] mx-auto leading-[1.5]">From first rides to pro-level tricks, our video reviews showcase the real-world performance and unbeatable fun of our kids electric bikes. See them in action!</p>
       </div>
       <div className="max-w-[1500px] mx-auto px-0.5 relative">
@@ -608,18 +608,18 @@ const faqs = [
 
 const FaqSection = () => {
   return (
-    <section className="py-12 px-2.5 font-sans">
-      <div className="max-w-[1500px] mx-auto px-2.5">
-        <h2 className="text-center mb-9 text-[#1a202c] font-sans text-[32px] font-semibold">Got Questions About Kids e-Bikes? We Have the Answers.</h2>
-        <p className="font-sans text-center text-[17px] text-[#4a5568] max-w-[650px] mx-auto -mt-4 mb-10 leading-[1.6]">Got questions about the <strong>best kids electric bike</strong>? We have answered the most common ones below to help you choose the perfect GoBike for your child in Australia.</p>
+    <section className="pt-[12px] pb-[12px] md:pt-12 md:pb-12 px-[5px] md:px-2.5 font-sans">
+      <div className="max-w-[1500px] mx-auto px-[5px] md:px-2.5">
+        <h2 className="text-left md:text-center mb-9 text-[#1a202c] font-sans text-[1.3rem] md:text-[1.6rem] font-semibold">Got Questions About Kids e-Bikes? We Have the Answers.</h2>
+        <p className="font-sans text-left md:text-center text-[17px] text-[#4a5568] max-w-[650px] mx-auto -mt-4 mb-10 leading-[1.6]">Got questions about the <strong>best kids electric bike</strong>? We have answered the most common ones below to help you choose the perfect GoBike for your child in Australia.</p>
 
         {faqs.map((faq, index) => (
-          <details className="group bg-white mb-4 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#e2e8f0] transition-shadow duration-300 hover:shadow-[0_6px_25px_rgba(0,0,0,0.08)]" key={index}>
-            <summary className="w-full p-6 bg-transparent border-none text-left font-sans text-[18px] font-medium text-[#2d3748] cursor-pointer flex justify-between items-center group-open:text-[#0056b3]">
+          <details className="group bg-white mb-[10px] md:mb-4 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#e2e8f0] transition-shadow duration-300 hover:shadow-[0_6px_25px_rgba(0,0,0,0.08)]" key={index}>
+            <summary className="w-full p-3 md:p-6 bg-transparent border-none text-left font-sans text-[18px] font-medium text-[#2d3748] cursor-pointer flex justify-between items-center group-open:text-[#0056b3]">
               <span>{faq.question}</span>
               <span className="text-xl font-bold text-[#007bff] transition-transform duration-300 group-open:rotate-90">&gt;</span>
             </summary>
-            <div className="px-6 pb-6 overflow-hidden transition-all duration-400 ease-in-out text-[#4a5568] text-base leading-[1.7]">
+            <div className="px-3 md:px-6 pb-3 md:pb-6 overflow-hidden transition-all duration-400 ease-in-out text-[#4a5568] text-base leading-[1.7]">
               <p dangerouslySetInnerHTML={{ __html: faq.answer }}></p>
             </div>
           </details>

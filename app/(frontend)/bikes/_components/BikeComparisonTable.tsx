@@ -40,7 +40,7 @@ export default async function BikeComparisonTable() {
 
   return (
     <section id="compare-models" className="mb-8 md:mb-12 scroll-mt-20">
-      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 text-center">
+      <h2 className="text-[1.3rem] md:text-[1.6rem] font-bold text-gray-900 mb-2 text-center">
         GoBike 12 vs 16 vs 20 vs 24: Compare All Models
       </h2>
       <p className="text-gray-600 text-center max-w-2xl mx-auto mb-6 text-sm md:text-base leading-relaxed">

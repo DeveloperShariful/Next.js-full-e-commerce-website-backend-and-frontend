@@ -5,11 +5,13 @@
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { uploadMediaFile } from '@/lib/upload-media';
 import { saveMediaRecord, bulkDeleteMedia, getAllMedia, type StorageUsage } from '@/app/actions/backend/media/media-action';
+import { classifyStorage } from '@/lib/cloudinary-storage-classify';
 import { Media } from '@prisma/client';
 import MediaToolbar from './MediaToolbar';
 import MediaGrid from './MediaGrid';
 import MediaModal from './MediaModal';
 import StorageUsageWidget from './StorageUsageWidget';
+import { MediaPaginationControls } from './MediaPaginationControls';
 
 type ViewMode = 'grid' | 'list';
 type SortBy = 'date' | 'name' | 'size';
@@ -27,6 +29,7 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [sourceFilter, setSourceFilter] = useState('ALL');
+  const [storageFilter, setStorageFilter] = useState('ALL');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
@@ -43,21 +46,27 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
   // Modal
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  // Pagination
-  const [perPage, setPerPage] = useState(50);
+  // Pagination — "Show: 20/50/100/200" বাটন সরিয়ে fixed 20-per-page (MediaPaginationControls
+  // আগের মতোই আছে — top pager দিয়ে যেকোনো page-এ jump করা যায়, bottom-এ একটা "More" বাটন
+  // দিয়ে সহজে পরের page-এ যাওয়া যায়)।
+  const PER_PAGE = 20;
   const [currentPage, setCurrentPage] = useState(1);
 
   // ── Counts (single pass — O(n) instead of 9 passes) ──
-  const { typeCounts, sourceCounts } = useMemo(() => {
+  const { typeCounts, sourceCounts, storageCounts } = useMemo(() => {
     const tc: Record<string, number> = { ALL: 0, IMAGE: 0, VIDEO: 0, DOCUMENT: 0 };
     const sc: Record<string, number> = { ALL: 0, GENERAL: 0, PRODUCT: 0, CATEGORY: 0, BRAND: 0, AFFILIATE: 0, WARRANTY: 0, USER: 0, STORE: 0, REVIEW: 0 };
+    const stc: Record<string, number> = { ALL: 0 };
     for (const m of mediaList) {
       tc.ALL++;
       if (m.type in tc) tc[m.type] = (tc[m.type] ?? 0) + 1;
       sc.ALL++;
       if (m.source in sc) sc[m.source] = (sc[m.source] ?? 0) + 1;
+      stc.ALL++;
+      const bucket = classifyStorage(m.url);
+      stc[bucket] = (stc[bucket] ?? 0) + 1;
     }
-    return { typeCounts: tc, sourceCounts: sc };
+    return { typeCounts: tc, sourceCounts: sc, storageCounts: stc };
   }, [mediaList]);
 
   // ── Total storage size ──
@@ -75,9 +84,10 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
       const matchSearch = !q || item.filename.toLowerCase().includes(q) || (item.originalName?.toLowerCase().includes(q) ?? false);
       const matchType = typeFilter === 'ALL' || item.type === typeFilter;
       const matchSource = sourceFilter === 'ALL' || item.source === sourceFilter;
-      return matchSearch && matchType && matchSource;
+      const matchStorage = storageFilter === 'ALL' || classifyStorage(item.url) === storageFilter;
+      return matchSearch && matchType && matchSource && matchStorage;
     });
-  }, [mediaList, searchQuery, typeFilter, sourceFilter]);
+  }, [mediaList, searchQuery, typeFilter, sourceFilter, storageFilter]);
 
   const sortedMedia = useMemo(() => {
     const sorted = [...filteredMedia];
@@ -87,12 +97,10 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
     return sorted;
   }, [filteredMedia, sortBy]);
 
-  // ── Pagination ──
-  const totalPages = Math.max(1, Math.ceil(sortedMedia.length / perPage));
+  // ── Pagination slice ──
+  const totalPages = Math.max(1, Math.ceil(sortedMedia.length / PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
-  const paginatedMedia = sortedMedia.slice((safePage - 1) * perPage, safePage * perPage);
-  const fromItem = sortedMedia.length === 0 ? 0 : (safePage - 1) * perPage + 1;
-  const toItem = Math.min(safePage * perPage, sortedMedia.length);
+  const paginatedMedia = sortedMedia.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => { setter(v); setCurrentPage(1); };
 
@@ -222,6 +230,8 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
         setTypeFilter={handleFilterChange(setTypeFilter)}
         sourceFilter={sourceFilter}
         setSourceFilter={handleFilterChange(setSourceFilter)}
+        storageFilter={storageFilter}
+        setStorageFilter={handleFilterChange(setStorageFilter)}
         isBulkMode={isBulkMode}
         setIsBulkMode={setIsBulkMode}
         selectedIds={selectedIds}
@@ -230,6 +240,7 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
         isDeletingBulk={isDeletingBulk}
         typeCounts={typeCounts}
         sourceCounts={sourceCounts}
+        storageCounts={storageCounts}
         viewMode={viewMode}
         setViewMode={setViewMode}
         sortBy={sortBy}
@@ -237,25 +248,14 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
         onSyncComplete={refreshMedia}
       />
 
-      {/* Per-page + counter row */}
-      <div className="flex items-center justify-between px-2 md:px-0 mb-3 text-[13px] text-[#50575e]">
-        <span>
-          {sortedMedia.length === 0
-            ? 'No items found'
-            : `Showing ${fromItem}–${toItem} of ${sortedMedia.length} items`}
-        </span>
-        <div className="flex items-center gap-2">
-          <span>Show:</span>
-          {[20, 50, 100, 200].map(n => (
-            <button
-              key={n}
-              onClick={() => { setPerPage(n); setCurrentPage(1); }}
-              className={`px-2 py-0.5 rounded-sm border text-[12px] transition-colors ${perPage === n ? 'bg-[#2271b1] text-white border-[#2271b1]' : 'bg-white border-[#c3c4c7] text-[#2c3338] hover:border-[#2271b1] hover:text-[#2271b1]'}`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
+      {/* Pagination (Top) — admin/products পেজের pagination-controls.tsx-এর সাথে মিলিয়ে */}
+      <div className="px-2 md:px-0 mb-3">
+        <MediaPaginationControls
+          total={sortedMedia.length}
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* Grid / List */}
@@ -268,44 +268,15 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
         viewMode={viewMode}
       />
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-1 mt-6 flex-wrap">
-          <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={safePage === 1}
-            className="px-3 py-1 border border-[#c3c4c7] bg-white text-[13px] rounded-sm hover:border-[#2271b1] hover:text-[#2271b1] disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            ← Prev
-          </button>
-
-          {Array.from({ length: totalPages }, (_, i) => i + 1)
-            .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
-            .reduce<(number | '...')[]>((acc, p, idx, arr) => {
-              if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...');
-              acc.push(p);
-              return acc;
-            }, [])
-            .map((p, i) =>
-              p === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-2 text-[#8c8f94]">…</span>
-              ) : (
-                <button
-                  key={p}
-                  onClick={() => setCurrentPage(p as number)}
-                  className={`w-8 h-7 border text-[13px] rounded-sm transition-colors ${safePage === p ? 'bg-[#2271b1] text-white border-[#2271b1]' : 'bg-white border-[#c3c4c7] text-[#2c3338] hover:border-[#2271b1] hover:text-[#2271b1]'}`}
-                >
-                  {p}
-                </button>
-              )
-            )}
-
+      {/* "More" — bottom-এ পুরো pager না রেখে সহজ এক ক্লিকে পরের page-এ যাওয়ার
+          বাটন। bulk-select-এ কোনো প্রভাব নাই — selectedIds page বদলালেও থেকে যায়। */}
+      {safePage < totalPages && (
+        <div className="flex justify-center mt-6">
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={safePage === totalPages}
-            className="px-3 py-1 border border-[#c3c4c7] bg-white text-[13px] rounded-sm hover:border-[#2271b1] hover:text-[#2271b1] disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-6 py-2 border border-[#c3c4c7] bg-white text-[13px] font-medium rounded-sm hover:border-[#2271b1] hover:text-[#2271b1] transition-colors"
           >
-            Next →
+            More
           </button>
         </div>
       )}

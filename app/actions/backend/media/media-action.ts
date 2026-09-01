@@ -5,7 +5,7 @@
 import { db } from '@/lib/prisma';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { del, list, type ListBlobResult } from '@vercel/blob';
-import { cloudinary } from '@/lib/cloudinary';
+import { fetchAllCloudinaryUsage, CLOUDINARY_ACCOUNTS, type CloudinaryAccountUsage } from '@/lib/cloudinary';
 import { Media, MediaType, MediaSource, Prisma } from '@prisma/client';
 
 // 1. Save uploaded file info
@@ -68,15 +68,22 @@ export const getAllMedia = unstable_cache(
 const isVercelBlobUrl = (url: string) => url.includes('.public.blob.vercel-storage.com');
 const isCloudinaryUrl = (url: string) => url.includes('res.cloudinary.com');
 
-// Recovers {publicId, resourceType} from our own delivery URL shape (see
-// lib/cloudinary.ts / lib/upload-media.ts) so a deleted Media row's file
-// actually gets removed from Cloudinary too, not just the DB.
-function parseCloudinaryUrl(url: string): { publicId: string; resourceType: 'image' | 'video' } | null {
+// Recovers {cloudName, publicId, resourceType} from our own delivery URL
+// shape (see lib/cloudinary.ts / lib/upload-media.ts) so a deleted Media
+// row's file actually gets removed from Cloudinary too, not just the DB.
+// cloudName-টা দরকার কারণ multi-account fallback-এর পর একটা ফাইল account
+// 0/1/2 — যেকোনোটাতেই থাকতে পারে, শুধু account 0-এর credential দিয়ে delete
+// চেষ্টা করলে ভিন্ন account-এর ফাইল silently delete হবে না।
+function parseCloudinaryUrl(url: string): { cloudName: string; publicId: string; resourceType: 'image' | 'video' } | null {
+  const cloudNameMatch = url.match(/^https:\/\/res\.cloudinary\.com\/([^/]+)\//);
+  if (!cloudNameMatch) return null;
+  const cloudName = cloudNameMatch[1];
+
   const videoMatch = url.match(/\/video\/upload\/.+\/v\d+\/(.+)\.[a-zA-Z0-9]+$/);
-  if (videoMatch) return { publicId: videoMatch[1], resourceType: 'video' };
+  if (videoMatch) return { cloudName, publicId: videoMatch[1], resourceType: 'video' };
 
   const imageMatch = url.match(/\/image\/upload\/.+\/v\d+\/(.+)$/);
-  if (imageMatch) return { publicId: imageMatch[1], resourceType: 'image' };
+  if (imageMatch) return { cloudName, publicId: imageMatch[1], resourceType: 'image' };
 
   return null;
 }
@@ -84,9 +91,23 @@ function parseCloudinaryUrl(url: string): { publicId: string; resourceType: 'ima
 async function deleteFromCloudinary(url: string) {
   const parsed = parseCloudinaryUrl(url);
   if (!parsed) return;
-  await cloudinary.uploader
-    .destroy(parsed.publicId, { resource_type: parsed.resourceType })
-    .catch(err => console.error('Cloudinary delete failed for', url, err));
+
+  const account = CLOUDINARY_ACCOUNTS.find(a => a.cloudName === parsed.cloudName);
+  if (!account) {
+    console.error('Cloudinary delete skipped — no matching account configured for', url);
+    return;
+  }
+
+  // cloudinary SDK-র destroy()-এর TypeScript টাইপ per-call credential override
+  // নেয় না (যদিও runtime-এ কাজ করে) — as any এড়াতে সরাসরি Admin API-তে fetch,
+  // ঠিক fetchCloudinaryUsage()-এর মতোই প্যাটার্নে, যাতে সঠিক account-এর
+  // credential দিয়েই ডিলিট হয়।
+  const auth = Buffer.from(`${account.apiKey}:${account.apiSecret}`).toString('base64');
+  const params = new URLSearchParams({ 'public_ids[]': parsed.publicId });
+  await fetch(
+    `https://api.cloudinary.com/v1_1/${account.cloudName}/resources/${parsed.resourceType}/upload?${params.toString()}`,
+    { method: 'DELETE', headers: { Authorization: `Basic ${auth}` } }
+  ).catch(err => console.error('Cloudinary delete failed for', url, err));
 }
 
 // Helper: Remove all references to a URL from every table
@@ -338,18 +359,13 @@ export async function syncFromVercelBlob(): Promise<{ success: boolean; count?: 
   }
 }
 
-// 9. STORAGE USAGE — Cloudinary account usage (has a real plan/credit limit)
-// + Vercel Blob total size (no account-level quota available without a
-// separate Vercel API token, so this side is usage-only, no limit).
+// 9. STORAGE USAGE — every configured Cloudinary account's usage (each has
+// its own plan/credit limit — see lib/cloudinary.ts for the multi-account
+// fallback this feeds) + Vercel Blob total size (no account-level quota
+// available without a separate Vercel API token, so this side is usage-only,
+// no limit).
 export interface StorageUsage {
-  cloudinary: {
-    plan: string;
-    creditsUsed: number;
-    creditsLimit: number;
-    usedPercent: number;
-    storageBytes: number;
-    bandwidthBytes: number;
-  } | null;
+  cloudinaryAccounts: CloudinaryAccountUsage[];
   vercelBlob: {
     totalBytes: number;
     fileCount: number;
@@ -357,8 +373,8 @@ export interface StorageUsage {
 }
 
 async function _getStorageUsage(): Promise<StorageUsage> {
-  const [cloudinaryResult, vercelResult] = await Promise.allSettled([
-    cloudinary.api.usage(),
+  const [cloudinaryAccounts, vercelResult] = await Promise.all([
+    fetchAllCloudinaryUsage(),
     (async () => {
       let totalBytes = 0;
       let fileCount = 0;
@@ -374,20 +390,10 @@ async function _getStorageUsage(): Promise<StorageUsage> {
         iterations++;
       } while (cursor && iterations < MAX_BLOB_SYNC_PAGES);
       return { totalBytes, fileCount };
-    })(),
+    })().catch(() => null),
   ]);
 
-  return {
-    cloudinary: cloudinaryResult.status === 'fulfilled' ? {
-      plan: cloudinaryResult.value.plan,
-      creditsUsed: cloudinaryResult.value.credits?.usage ?? 0,
-      creditsLimit: cloudinaryResult.value.credits?.limit ?? 0,
-      usedPercent: cloudinaryResult.value.credits?.used_percent ?? 0,
-      storageBytes: cloudinaryResult.value.storage?.usage ?? 0,
-      bandwidthBytes: cloudinaryResult.value.bandwidth?.usage ?? 0,
-    } : null,
-    vercelBlob: vercelResult.status === 'fulfilled' ? vercelResult.value : null,
-  };
+  return { cloudinaryAccounts, vercelBlob: vercelResult };
 }
 
 // External API calls (Cloudinary + full Vercel Blob listing) — cached 10min

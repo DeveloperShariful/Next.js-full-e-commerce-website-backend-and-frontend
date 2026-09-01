@@ -36,17 +36,30 @@ function cloudinaryDeliveryUrl(cloudName: string, publicId: string, version: num
 // Uploads straight from the browser to Cloudinary (file never touches our
 // server, so large videos don't hit Vercel's request body size limit) using
 // a short-lived signature from /api/upload/cloudinary-sign.
-export function uploadToCloudinary(file: File, folder: string, onProgress?: (pct: number) => void): Promise<UploadedFile> {
+//
+// 🚀 Multi-account fallback (2026-09-01): if the account the server picked
+// turns out to be over its limit anyway (proactive usage-check can be up to
+// 10min stale — see lib/cloudinary.ts), the upload itself fails and this
+// retries with that account excluded, asking the sign route for a different
+// one. Only after every configured Cloudinary account has been tried does
+// this throw — which is what makes uploadToCloudinaryOrFallback() below
+// fall back to Vercel Blob, exactly as before.
+export function uploadToCloudinary(
+  file: File,
+  folder: string,
+  onProgress?: (pct: number) => void,
+  excludeIndices: number[] = []
+): Promise<UploadedFile> {
   return fetch('/api/upload/cloudinary-sign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ folder }),
+    body: JSON.stringify({ folder, excludeIndices }),
   })
     .then(res => {
       if (!res.ok) throw new Error('Failed to get upload signature');
       return res.json();
     })
-    .then(({ signature, timestamp, folder: signedFolder, apiKey, cloudName }) => {
+    .then(({ signature, timestamp, folder: signedFolder, apiKey, cloudName, accountIndex }) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('api_key', apiKey);
@@ -66,16 +79,31 @@ export function uploadToCloudinary(file: File, folder: string, onProgress?: (pct
         };
         xhr.onerror = () => reject(new Error('Upload network error'));
         xhr.send(formData);
-      }).then((result): UploadedFile => {
-        const url = cloudinaryDeliveryUrl(cloudName, result.public_id, result.version, result.resource_type);
-        return {
-          url,
-          pathname: result.public_id, // not a Vercel Blob URL, so isVercelBlobUrl() correctly no-ops on delete
-          filename: file.name,
-          mimeType: result.resource_type === 'video' ? 'video/mp4' : file.type,
-          size: result.bytes,
-        };
-      });
+      })
+        .then((result): UploadedFile => {
+          const url = cloudinaryDeliveryUrl(cloudName, result.public_id, result.version, result.resource_type);
+          return {
+            url,
+            pathname: result.public_id, // not a Vercel Blob URL, so isVercelBlobUrl() correctly no-ops on delete
+            filename: file.name,
+            mimeType: result.resource_type === 'video' ? 'video/mp4' : file.type,
+            size: result.bytes,
+          };
+        })
+        .catch((err): Promise<UploadedFile> => {
+          // MAX_RETRY একটা সেফটি ক্যাপ — কতগুলো account আসলে configure করা
+          // আছে সেটা client-side কোড জানে না (lib/cloudinary.ts server-only,
+          // এখানে import করা যাবে না)। আসল "সব account শেষ" চেক নিচেই হয়:
+          // sign route account না পেলে 503 দেয়, আর সেটা catch হয় না (এই
+          // .catch শুধু upload-এর ব্যর্থতা ধরে, sign-fetch-এর না) — তাই সেটা
+          // সরাসরি এখান থেকে বাইরে propagate হয়ে uploadToCloudinaryOrFallback-কে
+          // Vercel Blob fallback নিতে বলে।
+          const MAX_RETRY = 5;
+          const nextExclude = [...excludeIndices, accountIndex];
+          if (nextExclude.length >= MAX_RETRY) throw err;
+          console.warn(`[upload-media] Cloudinary account ${accountIndex} failed, trying next account:`, err);
+          return uploadToCloudinary(file, folder, onProgress, nextExclude);
+        });
     });
 }
 

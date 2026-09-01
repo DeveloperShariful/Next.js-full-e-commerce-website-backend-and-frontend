@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { IoListOutline, IoGridOutline, IoTrashOutline, IoSyncOutline } from 'react-icons/io5';
 import { syncAllExistingMedia, syncFromVercelBlob } from '@/app/actions/backend/media/media-action';
+import { STORAGE_OPTIONS } from '@/lib/cloudinary-storage-classify';
 
 type SortBy = 'date' | 'name' | 'size';
 type ViewMode = 'grid' | 'list';
@@ -16,6 +17,8 @@ type ToolbarProps = {
   setTypeFilter: (val: string) => void;
   sourceFilter: string;
   setSourceFilter: (val: string) => void;
+  storageFilter: string;
+  setStorageFilter: (val: string) => void;
   isBulkMode: boolean;
   setIsBulkMode: (val: boolean) => void;
   selectedIds: string[];
@@ -24,6 +27,7 @@ type ToolbarProps = {
   isDeletingBulk: boolean;
   typeCounts: Record<string, number>;
   sourceCounts: Record<string, number>;
+  storageCounts: Record<string, number>;
   viewMode: ViewMode;
   setViewMode: (m: ViewMode) => void;
   sortBy: SortBy;
@@ -36,10 +40,11 @@ export default function MediaToolbar(props: ToolbarProps) {
     searchQuery, setSearchQuery,
     typeFilter, setTypeFilter,
     sourceFilter, setSourceFilter,
+    storageFilter, setStorageFilter,
     isBulkMode, setIsBulkMode,
     selectedIds, setSelectedIds,
     handleBulkDelete, isDeletingBulk,
-    typeCounts, sourceCounts,
+    typeCounts, sourceCounts, storageCounts,
     viewMode, setViewMode,
     sortBy, setSortBy,
     onSyncComplete,
@@ -75,9 +80,9 @@ export default function MediaToolbar(props: ToolbarProps) {
   };
 
   return (
-    <div className="bg-white border border-[#c3c4c7] px-4 py-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-[13px] shadow-sm mb-6 mx-2 md:mx-0">
+    <div className="bg-white border border-[#c3c4c7] px-2 md:px-4 py-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-[13px] shadow-sm mb-6 mx-2 md:mx-0">
 
-      <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+      <div className="grid grid-cols-2 gap-2 w-full md:flex md:flex-wrap md:items-center md:gap-3 md:w-auto">
         {/* View Mode Toggle */}
         <div className="hidden md:flex border border-[#8c8f94] rounded-sm overflow-hidden">
           <button
@@ -100,7 +105,7 @@ export default function MediaToolbar(props: ToolbarProps) {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          className="bg-white border border-[#8c8f94] text-[#2c3338] px-2 py-1 rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
+          className="w-full md:w-auto bg-white border border-[#8c8f94] text-[#2c3338] px-2 py-1 rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
         >
           <option value="ALL">All media items ({typeCounts.ALL ?? 0})</option>
           <option value="IMAGE">Images ({typeCounts.IMAGE ?? 0})</option>
@@ -112,7 +117,7 @@ export default function MediaToolbar(props: ToolbarProps) {
         <select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
-          className="bg-white border border-[#8c8f94] text-[#2c3338] px-2 py-1 rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
+          className="w-full md:w-auto bg-white border border-[#8c8f94] text-[#2c3338] px-2 py-1 rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
         >
           <option value="ALL">All sources ({sourceCounts.ALL ?? 0})</option>
           <option value="GENERAL">General Uploads ({sourceCounts.GENERAL ?? 0})</option>
@@ -126,11 +131,23 @@ export default function MediaToolbar(props: ToolbarProps) {
           <option value="REVIEW">Reviews ({sourceCounts.REVIEW ?? 0})</option>
         </select>
 
+        {/* Storage Filter — কোন ফাইল কোন account-এ আছে (Cloudinary 1/2/3 / Vercel Blob) */}
+        <select
+          value={storageFilter}
+          onChange={(e) => setStorageFilter(e.target.value)}
+          className="w-full md:w-auto bg-white border border-[#8c8f94] text-[#2c3338] px-2 py-1 rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
+        >
+          <option value="ALL">All storage ({storageCounts.ALL ?? 0})</option>
+          {STORAGE_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label} ({storageCounts[opt.value] ?? 0})</option>
+          ))}
+        </select>
+
         {/* Sort */}
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortBy)}
-          className="bg-white border border-[#8c8f94] text-[#2c3338] px-2 py-1 rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
+          className="w-full md:w-auto bg-white border border-[#8c8f94] text-[#2c3338] px-2 py-1 rounded-sm focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none"
         >
           <option value="date">Sort: Newest first</option>
           <option value="name">Sort: Name A–Z</option>
@@ -141,22 +158,22 @@ export default function MediaToolbar(props: ToolbarProps) {
         {!isBulkMode ? (
           <button
             onClick={() => setIsBulkMode(true)}
-            className="border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded-sm hover:bg-[#f6f7f7] bg-white transition-colors"
+            className="w-full md:w-auto col-span-2 md:col-span-1 border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded-sm hover:bg-[#f6f7f7] bg-white transition-colors"
           >
             Bulk select
           </button>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="col-span-2 md:col-span-1 grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2">
             <button
               onClick={() => { setIsBulkMode(false); setSelectedIds([]); }}
-              className="border border-[#8c8f94] text-[#2c3338] px-3 py-1 rounded-sm hover:bg-[#f6f7f7] bg-white transition-colors"
+              className="w-full md:w-auto border border-[#8c8f94] text-[#2c3338] px-3 py-1 rounded-sm hover:bg-[#f6f7f7] bg-white transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleBulkDelete}
               disabled={selectedIds.length === 0 || isDeletingBulk}
-              className="flex items-center gap-1 border border-[#d63638] text-[#d63638] bg-white px-3 py-1 rounded-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="w-full md:w-auto flex items-center justify-center gap-1 border border-[#d63638] text-[#d63638] bg-white px-3 py-1 rounded-sm hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               <IoTrashOutline size={14} />
               {isDeletingBulk ? 'Deleting...' : `Delete Selected (${selectedIds.length})`}
@@ -166,25 +183,27 @@ export default function MediaToolbar(props: ToolbarProps) {
       </div>
 
       <div className="w-full md:w-auto flex flex-col md:flex-row items-stretch md:items-center justify-end gap-3">
-        <button
-          onClick={handleSync}
-          disabled={isSyncing || isBlobSyncing}
-          className="flex items-center justify-center gap-1 border border-[#2271b1] bg-[#f0f8ff] text-[#2271b1] px-3 py-1 rounded-sm hover:bg-[#e0f0ff] transition-colors disabled:opacity-50"
-          title="Sync all existing images from Products, Categories, Brands, Users & Warranty"
-        >
-          <IoSyncOutline className={isSyncing ? 'animate-spin' : ''} size={16} />
-          {isSyncing ? 'Syncing...' : 'Sync DB Data'}
-        </button>
+        <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto md:gap-3">
+          <button
+            onClick={handleSync}
+            disabled={isSyncing || isBlobSyncing}
+            className="w-full md:w-auto flex items-center justify-center gap-1 border border-[#2271b1] bg-[#f0f8ff] text-[#2271b1] px-1.5 md:px-3 py-1 rounded-sm hover:bg-[#e0f0ff] transition-colors disabled:opacity-50 text-[11px] md:text-[13px] whitespace-nowrap"
+            title="Sync all existing images from Products, Categories, Brands, Users & Warranty"
+          >
+            <IoSyncOutline className={isSyncing ? 'animate-spin' : ''} size={16} />
+            {isSyncing ? 'Syncing...' : 'Sync DB Data'}
+          </button>
 
-        <button
-          onClick={handleBlobSync}
-          disabled={isSyncing || isBlobSyncing}
-          className="flex items-center justify-center gap-1 border border-[#00a32a] bg-[#f0fff4] text-[#00a32a] px-3 py-1 rounded-sm hover:bg-[#e0ffe8] transition-colors disabled:opacity-50"
-          title="Import all files from Vercel Blob storage into Media Library"
-        >
-          <IoSyncOutline className={isBlobSyncing ? 'animate-spin' : ''} size={16} />
-          {isBlobSyncing ? 'Importing...' : 'Sync Blob Storage'}
-        </button>
+          <button
+            onClick={handleBlobSync}
+            disabled={isSyncing || isBlobSyncing}
+            className="w-full md:w-auto flex items-center justify-center gap-1 border border-[#00a32a] bg-[#f0fff4] text-[#00a32a] px-1.5 md:px-3 py-1 rounded-sm hover:bg-[#e0ffe8] transition-colors disabled:opacity-50 text-[11px] md:text-[13px] whitespace-nowrap"
+            title="Import all files from Vercel Blob storage into Media Library"
+          >
+            <IoSyncOutline className={isBlobSyncing ? 'animate-spin' : ''} size={16} />
+            {isBlobSyncing ? 'Importing...' : 'Sync Blob Storage'}
+          </button>
+        </div>
 
         <input
           type="text"

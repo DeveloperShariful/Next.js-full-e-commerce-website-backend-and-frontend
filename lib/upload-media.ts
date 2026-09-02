@@ -14,6 +14,19 @@ export interface UploadedFile {
   filename: string;
   mimeType: string;
   size: number;
+  // 0-100 perceptual quality score (VMAF for video, SSIM for image) measured
+  // by the Hostinger media server at compression time. Only set when the
+  // file actually went through that pipeline — undefined for Cloudinary/
+  // Vercel Blob uploads and the Hostinger raw-copy fallback path. For video,
+  // this arrives as undefined here (transcodePending is true instead) — the
+  // Hostinger server's background worker fills it in later via a callback.
+  qualityScore?: number;
+  // Pre-compression size in bytes, for a before/after comparison. Only set
+  // by the Hostinger pipeline.
+  originalSize?: number;
+  // true for a video whose URL is already live (serving the raw upload) but
+  // whose background compression hasn't finished yet — see uploadToHostinger.
+  transcodePending?: boolean;
 }
 
 interface CloudinaryUploadResult {
@@ -27,6 +40,10 @@ interface HostingerUploadResult {
   success: boolean;
   url: string;
   type: 'image' | 'video';
+  qualityScore?: number | null;
+  size?: number;
+  originalSize?: number;
+  transcodePending?: boolean;
   error?: string;
 }
 
@@ -90,7 +107,10 @@ export function uploadToHostinger(file: File, folder: string, onProgress?: (pct:
         pathname: result.url, // not a Vercel Blob URL, so isVercelBlobUrl() correctly no-ops on delete
         filename: file.name,
         mimeType: result.type === 'video' ? 'video/mp4' : file.type,
-        size: file.size,
+        size: result.size ?? file.size,
+        qualityScore: result.qualityScore ?? undefined,
+        originalSize: result.originalSize ?? undefined,
+        transcodePending: result.transcodePending ?? false,
       };
     });
 }

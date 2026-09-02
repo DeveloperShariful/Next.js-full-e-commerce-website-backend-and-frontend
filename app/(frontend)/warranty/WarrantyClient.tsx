@@ -130,6 +130,9 @@ export default function WarrantyClient() {
           mimeType: uploaded.mimeType,
           size: uploaded.size,
           source: MediaSource.WARRANTY,
+          qualityScore: uploaded.qualityScore,
+          originalSize: uploaded.originalSize,
+          transcodePending: uploaded.transcodePending,
         });
 
         newUploadedUrls.push(uploaded.url);

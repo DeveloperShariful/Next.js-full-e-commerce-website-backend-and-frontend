@@ -174,6 +174,33 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
               <p>File type: {selectedFile.mimeType}</p>
               <p>File size: {formatBytes(selectedFile.size)}</p>
               {selectedFile.source && <p>Source: <span className="font-bold">{selectedFile.source}</span></p>}
+              {selectedFile.transcodePending ? (
+                <p className="flex items-center gap-1.5 text-amber-700">
+                  <span className="w-2.5 h-2.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin shrink-0" />
+                  Transcode processing… quality score will appear once done.
+                </p>
+              ) : selectedFile.qualityScore != null && (
+                <p>
+                  Quality ({selectedFile.type === 'VIDEO' ? 'VMAF' : 'SSIM'}):{' '}
+                  <span
+                    className={`font-bold ${
+                      selectedFile.qualityScore >= 93 ? 'text-green-700'
+                      : selectedFile.qualityScore >= 85 ? 'text-amber-600'
+                      : 'text-red-600'
+                    }`}
+                    title="0-100 perceptual quality score vs. the original, measured at compression time. 93+ is considered visually lossless."
+                  >
+                    {selectedFile.qualityScore.toFixed(1)} / 100
+                  </span>
+                </p>
+              )}
+              {selectedFile.originalSize != null && selectedFile.originalSize !== selectedFile.size && (
+                <p>
+                  Compressed: {formatBytes(selectedFile.originalSize)} →{' '}
+                  <span className="font-bold text-green-700">{formatBytes(selectedFile.size)}</span>
+                  {' '}({Math.round((1 - selectedFile.size / selectedFile.originalSize) * 100)}% smaller)
+                </p>
+              )}
 
               <button
                 onClick={() => handleDelete(selectedFile.id)}

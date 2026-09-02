@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, CalendarDays, FileText, ClipboardList, MessageSquare, Send, ImagePlus, X, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { upload } from '@vercel/blob/client';
+import { uploadToHostingerOrFallback } from '@/lib/upload-media';
 import { submitDailyReport } from '@/app/actions/backend/reports/report-actions';
 import Image from 'next/image';
 
@@ -12,36 +12,56 @@ interface Props {
 }
 
 interface PreviewImage {
-  file: File;
+  file: File | null; // null for images restored from a saved draft (already uploaded, no local File anymore)
   preview: string;
   uploading: boolean;
   url?: string;
   error?: boolean;
 }
 
+// ─── Draft auto-save (localStorage) ───────────────────────────────────────────
+// Refreshing/navigating away before submit used to lose everything typed and
+// every uploaded image. We keep a lightweight draft in localStorage so it can
+// be restored on the next visit. Only uploaded image URLs are saved (not the
+// File objects themselves — those can't survive a reload).
+const DRAFT_KEY = 'gobike-daily-report-draft';
+
+interface DraftData {
+  reportDate?: string;
+  summary?: string;
+  tasks?: string;
+  notes?: string;
+  images?: { url: string; filename: string }[];
+}
+
 export default function ReportForm({ todaySubmitted }: Props) {
+  const today = new Date().toISOString().split('T')[0];
+
   const [isLoading, setIsLoading]     = useState(false);
   const [submitted, setSubmitted]     = useState(false);
   const [isDuplicate, setIsDuplicate] = useState(false);
   const [pendingData, setPendingData] = useState<FormData | null>(null);
+  const [reportDate, setReportDate]   = useState(today);
   const [summary, setSummary]         = useState('');
+  const [tasks, setTasks]             = useState('');
+  const [notes, setNotes]             = useState('');
   const [images, setImages]           = useState<PreviewImage[]>([]);
   const [isDragging, setIsDragging]   = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const fileInputRef  = useRef<HTMLInputElement>(null);
   const dropZoneRef   = useRef<HTMLDivElement>(null);
-  const today = new Date().toISOString().split('T')[0];
 
-  // ─── Upload a single file to Vercel Blob ────────────────────────────────────
+  const clearDraft = useCallback(() => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* storage unavailable, ignore */ }
+  }, []);
+
+  // ─── Upload a single file (Hostinger primary, Cloudinary/Vercel Blob fallback) ─
   const uploadFile = useCallback(async (file: File, index: number) => {
     setImages(prev => prev.map((img, i) => i === index ? { ...img, uploading: true } : img));
     try {
-      const blob = await upload(
-        `reports/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`,
-        file,
-        { access: 'public', handleUploadUrl: '/api/upload' },
-      );
-      setImages(prev => prev.map((img, i) => i === index ? { ...img, uploading: false, url: blob.url } : img));
+      const uploaded = await uploadToHostingerOrFallback(file, 'daily-reports');
+      setImages(prev => prev.map((img, i) => i === index ? { ...img, uploading: false, url: uploaded.url } : img));
     } catch {
       setImages(prev => prev.map((img, i) => i === index ? { ...img, uploading: false, error: true } : img));
       toast.error(`Failed to upload ${file.name}`);
@@ -86,6 +106,58 @@ export default function ReportForm({ todaySubmitted }: Props) {
     return () => document.removeEventListener('paste', handlePaste);
   }, [addFiles]);
 
+  // ─── Restore a saved draft on mount (once) ──────────────────────────────────
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft: DraftData = JSON.parse(raw);
+      const hasContent = !!(draft.summary || draft.tasks || draft.notes || (draft.images && draft.images.length));
+      if (!hasContent) return;
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from an external system (localStorage) on mount, not derivable at render time
+      if (draft.reportDate) setReportDate(draft.reportDate);
+      if (draft.summary) setSummary(draft.summary);
+      if (draft.tasks) setTasks(draft.tasks);
+      if (draft.notes) setNotes(draft.notes);
+      if (draft.images?.length) {
+        setImages(draft.images.map(img => ({
+          file: null,
+          preview: img.url,
+          uploading: false,
+          url: img.url,
+        })));
+      }
+      setDraftRestored(true);
+    } catch {
+      // corrupted draft — ignore silently
+    }
+  }, []);
+
+  // ─── Auto-save draft (debounced) ────────────────────────────────────────────
+  useEffect(() => {
+    // Nothing worth saving yet — also avoids clobbering a not-yet-restored
+    // draft with the empty initial state on first mount.
+    const hasContent = summary || tasks || notes || images.some(img => img.url);
+    if (!hasContent) return;
+
+    const handle = setTimeout(() => {
+      const draft: DraftData = {
+        reportDate,
+        summary,
+        tasks,
+        notes,
+        images: images.filter(img => img.url).map(img => ({ url: img.url as string, filename: img.file?.name ?? 'image' })),
+      };
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch {
+        // storage full/unavailable — not critical, skip
+      }
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [reportDate, summary, tasks, notes, images]);
+
   // ─── Drag & drop ─────────────────────────────────────────────────────────────
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);
@@ -97,7 +169,9 @@ export default function ReportForm({ todaySubmitted }: Props) {
 
   const removeImage = (index: number) => {
     setImages(prev => {
-      URL.revokeObjectURL(prev[index].preview);
+      // Restored-from-draft images use the remote URL as their preview (no
+      // local blob was ever created for them), so only revoke real blob: URLs.
+      if (prev[index].preview.startsWith('blob:')) URL.revokeObjectURL(prev[index].preview);
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -130,9 +204,14 @@ export default function ReportForm({ todaySubmitted }: Props) {
     if (res.success) {
       toast.success(res.message);
       setSubmitted(true);
+      setReportDate(today);
       setSummary('');
+      setTasks('');
+      setNotes('');
       setImages([]);
       setPendingData(null);
+      setDraftRestored(false);
+      clearDraft();
       setTimeout(() => setSubmitted(false), 5000);
     } else {
       toast.error(res.message);
@@ -151,9 +230,14 @@ export default function ReportForm({ todaySubmitted }: Props) {
     if (res.success) {
       toast.success(res.message);
       setSubmitted(true);
+      setReportDate(today);
       setSummary('');
+      setTasks('');
+      setNotes('');
       setImages([]);
       setPendingData(null);
+      setDraftRestored(false);
+      clearDraft();
       setTimeout(() => setSubmitted(false), 5000);
     } else {
       toast.error(res.message);
@@ -190,6 +274,31 @@ export default function ReportForm({ todaySubmitted }: Props) {
           <div className="flex items-center gap-2.5 p-3 bg-green-50 border border-green-200 rounded text-green-700 text-[13px]">
             <CheckCircle2 size={15} className="shrink-0" />
             Report submitted! Admin has been notified via email.
+          </div>
+        )}
+
+        {/* Draft restored banner */}
+        {draftRestored && !submitted && (
+          <div className="flex items-center justify-between gap-2.5 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-[13px]">
+            <div className="flex items-center gap-2.5">
+              <FileText size={15} className="shrink-0" />
+              <span>Draft restored from your last unsaved session.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setReportDate(today);
+                setSummary('');
+                setTasks('');
+                setNotes('');
+                setImages([]);
+                clearDraft();
+                setDraftRestored(false);
+              }}
+              className="text-[12px] font-medium text-blue-700 hover:underline shrink-0"
+            >
+              Clear draft
+            </button>
           </div>
         )}
 
@@ -232,7 +341,8 @@ export default function ReportForm({ todaySubmitted }: Props) {
             <input
               type="date"
               name="reportDate"
-              defaultValue={today}
+              value={reportDate}
+              onChange={e => setReportDate(e.target.value)}
               max={today}
               required
               className="border border-[#8c8f94] rounded-[3px] text-[13px] px-3 py-[6px] w-full max-w-[180px] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition"
@@ -268,6 +378,8 @@ export default function ReportForm({ todaySubmitted }: Props) {
             <textarea
               name="tasks"
               rows={4}
+              value={tasks}
+              onChange={e => setTasks(e.target.value)}
               placeholder={"- Updated product descriptions\n- Responded to 5 support tickets\n- Reviewed 3 orders"}
               className="border border-[#8c8f94] rounded-[3px] text-[13px] px-3 py-2 w-full focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none resize-y font-mono transition"
             />
@@ -284,6 +396,8 @@ export default function ReportForm({ todaySubmitted }: Props) {
             <textarea
               name="notes"
               rows={2}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
               placeholder="Optional: issues, blockers, or anything else..."
               className="border border-[#8c8f94] rounded-[3px] text-[13px] px-3 py-2 w-full focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none resize-y transition"
             />

@@ -147,6 +147,9 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
           mimeType: uploaded.mimeType,
           size: uploaded.size,
           source: effectiveSource,
+          qualityScore: uploaded.qualityScore,
+          originalSize: uploaded.originalSize,
+          transcodePending: uploaded.transcodePending,
         });
 
         if (!dbResult.success) {

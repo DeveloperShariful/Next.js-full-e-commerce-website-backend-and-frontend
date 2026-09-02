@@ -16,6 +16,7 @@ const CLOUDINARY_CLOUD_NAMES: { index: number; cloudName: string }[] = [
 ].filter(a => a.cloudName);
 
 export const STORAGE_OPTIONS: StorageOption[] = [
+  { value: 'hostinger', label: 'Hostinger' }, // এখন primary storage (2026-09-03)
   ...CLOUDINARY_CLOUD_NAMES.map(a => ({ value: `cloudinary-${a.index}`, label: `Cloudinary ${a.index + 1}` })),
   { value: 'vercel-blob', label: 'Vercel Blob' },
   { value: 'other', label: 'Other / External' },
@@ -23,6 +24,7 @@ export const STORAGE_OPTIONS: StorageOption[] = [
 
 export function classifyStorage(url: string | null | undefined): string {
   if (!url) return 'other';
+  if (url.includes('media.gobike.au')) return 'hostinger';
   if (url.includes('.public.blob.vercel-storage.com')) return 'vercel-blob';
 
   const cloudinaryMatch = url.match(/^https:\/\/res\.cloudinary\.com\/([^/]+)\//);

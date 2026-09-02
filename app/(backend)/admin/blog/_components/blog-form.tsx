@@ -244,6 +244,9 @@ export function BlogForm({ categories, authors, allPosts, storeTimezone = "UTC",
         mimeType: uploaded.mimeType,
         size: uploaded.size,
         source: MediaSource.BLOG,
+        qualityScore: uploaded.qualityScore,
+        originalSize: uploaded.originalSize,
+        transcodePending: uploaded.transcodePending,
       });
       toast.success("Uploaded");
     } catch {

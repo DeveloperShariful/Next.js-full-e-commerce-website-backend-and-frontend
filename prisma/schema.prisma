@@ -2260,6 +2260,22 @@ model Media {
   altText       String?
   caption       String?
   description   String?
+  // Perceptual quality score (0-100) measured at compression time on our own
+  // media server: VMAF for VIDEO, SSIM (x100) for IMAGE. Null for anything not
+  // processed through that pipeline (e.g. raw-copy fallback, older Cloudinary/
+  // Vercel Blob uploads migrated before this existed).
+  qualityScore  Float?
+  // Pre-compression size in bytes, for a before/after comparison next to
+  // qualityScore in the admin UI. Null for anything not processed through
+  // the Hostinger compression pipeline (raw-copy fallback, pre-existing
+  // Cloudinary/Vercel Blob uploads). `size` above is always the CURRENT
+  // (i.e. final/compressed, once done) size.
+  originalSize  Int?
+  // true while a video is serving its raw (untranscoded) upload and the
+  // Hostinger background worker hasn't finished compressing it yet — the
+  // worker calls back to update this to false once done (URL stays the same
+  // throughout, only the file bytes and this flag change).
+  transcodePending Boolean @default(false)
   folderId      String?
   folder        MediaFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
   uploadedBy    String?

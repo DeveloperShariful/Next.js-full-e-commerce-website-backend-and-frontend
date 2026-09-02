@@ -16,11 +16,44 @@ function barColor(percent: number) {
   return 'bg-[#00a32a]';
 }
 
+// 100GB Disk Space — hPanel-এর plan limit (পুরো hosting account-এর জন্য, শুধু
+// media.gobike.au-এর uploads/ ফোল্ডারের জন্য না — অন্য domain-ও একই account
+// শেয়ার করে, তাই এই percentage একটা reference/upper-bound, নির্ভুল হিসাব না)।
+const HOSTINGER_PLAN_DISK_BYTES = 100 * 1024 ** 3;
+
 export default function StorageUsageWidget({ usage }: { usage: StorageUsage }) {
-  const { cloudinaryAccounts, vercelBlob } = usage;
+  const { hostinger, cloudinaryAccounts, vercelBlob } = usage;
+  const hostingerPercent = hostinger ? (hostinger.totalBytes / HOSTINGER_PLAN_DISK_BYTES) * 100 : 0;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      {/* Hostinger — এখন primary storage (own domain, own server) */}
+      <div className="bg-white border border-[#c3c4c7] rounded-sm p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[13px] font-semibold text-[#1d2327]">Hostinger</span>
+          <span className="text-[10px] px-1.5 py-0.5 bg-[#f0f0f1] rounded-sm uppercase tracking-wide text-[#646970]">Cloud plan</span>
+        </div>
+        <div className="text-[11px] text-[#8c8f94] mb-1">media.gobike.au — primary</div>
+        {hostinger ? (
+          <>
+            <div className="flex items-center justify-between text-[12px] text-[#646970] mb-1">
+              <span>Disk (uploads/)</span>
+              <span className="font-medium text-[#1d2327]">{formatBytes(hostinger.totalBytes)} / 100 GB</span>
+            </div>
+            <div className="w-full h-2 bg-[#f0f0f1] rounded-full overflow-hidden mb-2">
+              <div className={`h-full ${barColor(hostingerPercent)}`} style={{ width: `${Math.min(hostingerPercent, 100)}%` }} />
+            </div>
+            <div className="flex flex-col gap-0.5 text-[11px] text-[#646970]">
+              <span>{hostinger.fileCount} files</span>
+              <span>Bandwidth: <strong className="text-[#1d2327]">Unlimited</strong></span>
+              <span className="text-[#8c8f94]">100GB is the whole hosting account&apos;s limit (shared with other domains), not just this folder.</span>
+            </div>
+          </>
+        ) : (
+          <p className="text-[12px] text-[#646970]">Usage data unavailable right now.</p>
+        )}
+      </div>
+
       {cloudinaryAccounts.map(acc => (
         <div key={acc.index} className="bg-white border border-[#c3c4c7] rounded-sm p-3">
           <div className="flex items-center justify-between mb-2">

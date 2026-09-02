@@ -16,6 +16,9 @@ export async function saveMediaRecord(data: {
   mimeType: string;
   size: number;
   source?: MediaSource;
+  qualityScore?: number;
+  originalSize?: number;
+  transcodePending?: boolean;
 }): Promise<{ success: boolean; media?: Media; message?: string }> {
   try {
     let type: MediaType = MediaType.OTHER;
@@ -33,6 +36,9 @@ export async function saveMediaRecord(data: {
         size: data.size,
         type,
         source: data.source ?? MediaSource.GENERAL,
+        qualityScore: data.qualityScore ?? null,
+        originalSize: data.originalSize ?? null,
+        transcodePending: data.transcodePending ?? false,
       },
     });
 
@@ -67,6 +73,25 @@ export const getAllMedia = unstable_cache(
 
 const isVercelBlobUrl = (url: string) => url.includes('.public.blob.vercel-storage.com');
 const isCloudinaryUrl = (url: string) => url.includes('res.cloudinary.com');
+const isHostingerUrl = (url: string) => url.includes('media.gobike.au');
+
+// আমাদের নিজস্ব Hostinger media সার্ভার থেকে ফাইল ডিলিট — delete.php-কে static
+// secret দিয়ে কল করা হয় (এই ফাংশন server-only 'use server' ফাইলে, browser-এ
+// কখনো যায় না, তাই signature-এর দরকার নাই — upload.php-র মতো)।
+async function deleteFromHostinger(url: string) {
+  const relPath = url.split('/uploads/')[1];
+  if (!relPath) return;
+  const secret = process.env.HOSTINGER_UPLOAD_SECRET;
+  if (!secret) {
+    console.error('Hostinger delete skipped — HOSTINGER_UPLOAD_SECRET not configured');
+    return;
+  }
+  await fetch(`${process.env.NEXT_PUBLIC_HOSTINGER_MEDIA_URL}/delete.php`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-upload-secret': secret },
+    body: JSON.stringify({ path: relPath }),
+  }).catch(err => console.error('Hostinger delete failed for', url, err));
+}
 
 // Recovers {cloudName, publicId, resourceType} from our own delivery URL
 // shape (see lib/cloudinary.ts / lib/upload-media.ts) so a deleted Media
@@ -146,6 +171,7 @@ export async function deleteMedia(id: string): Promise<{ success: boolean; messa
 
     if (media.pathname && isVercelBlobUrl(media.pathname)) await del(media.pathname);
     else if (isCloudinaryUrl(media.url)) await deleteFromCloudinary(media.url);
+    else if (isHostingerUrl(media.url)) await deleteFromHostinger(media.url);
     await cascadeDeleteByUrl(media.url);
     await db.media.delete({ where: { id } });
 
@@ -173,9 +199,13 @@ export async function bulkDeleteMedia(ids: string[]): Promise<{ success: boolean
     const cloudinaryUrls = mediaRecords
       .map(m => m.url)
       .filter(isCloudinaryUrl);
+    const hostingerUrls = mediaRecords
+      .map(m => m.url)
+      .filter(isHostingerUrl);
 
     if (pathnames.length > 0) await del(pathnames);
     await Promise.all(cloudinaryUrls.map(deleteFromCloudinary));
+    await Promise.all(hostingerUrls.map(deleteFromHostinger));
     await Promise.all(mediaRecords.map(m => cascadeDeleteByUrl(m.url)));
     await db.media.deleteMany({ where: { id: { in: ids } } });
 
@@ -365,6 +395,10 @@ export async function syncFromVercelBlob(): Promise<{ success: boolean; count?: 
 // available without a separate Vercel API token, so this side is usage-only,
 // no limit).
 export interface StorageUsage {
+  hostinger: {
+    totalBytes: number;
+    fileCount: number;
+  } | null;
   cloudinaryAccounts: CloudinaryAccountUsage[];
   vercelBlob: {
     totalBytes: number;
@@ -372,8 +406,28 @@ export interface StorageUsage {
   } | null;
 }
 
+// আমাদের নিজস্ব Hostinger media সার্ভারের uploads/ ফোল্ডারের usage — server.js-এর
+// /stats endpoint থেকে (stats.php দিয়ে proxy হয়ে)।
+async function fetchHostingerUsage(): Promise<{ totalBytes: number; fileCount: number } | null> {
+  const secret = process.env.HOSTINGER_UPLOAD_SECRET;
+  const baseUrl = process.env.NEXT_PUBLIC_HOSTINGER_MEDIA_URL;
+  if (!secret || !baseUrl) return null;
+  try {
+    const res = await fetch(`${baseUrl}/stats.php`, {
+      headers: { 'x-upload-secret': secret },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return { totalBytes: data.totalBytes ?? 0, fileCount: data.fileCount ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
 async function _getStorageUsage(): Promise<StorageUsage> {
-  const [cloudinaryAccounts, vercelResult] = await Promise.all([
+  const [hostinger, cloudinaryAccounts, vercelResult] = await Promise.all([
+    fetchHostingerUsage(),
     fetchAllCloudinaryUsage(),
     (async () => {
       let totalBytes = 0;
@@ -393,7 +447,7 @@ async function _getStorageUsage(): Promise<StorageUsage> {
     })().catch(() => null),
   ]);
 
-  return { cloudinaryAccounts, vercelBlob: vercelResult };
+  return { hostinger, cloudinaryAccounts, vercelBlob: vercelResult };
 }
 
 // External API calls (Cloudinary + full Vercel Blob listing) — cached 10min

@@ -131,6 +131,9 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
           mimeType: uploaded.mimeType,
           size: uploaded.size,
           source: 'GENERAL',
+          qualityScore: uploaded.qualityScore,
+          originalSize: uploaded.originalSize,
+          transcodePending: uploaded.transcodePending,
         });
 
         if (dbResult.success && dbResult.media) {

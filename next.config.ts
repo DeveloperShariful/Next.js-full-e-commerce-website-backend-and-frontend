@@ -50,6 +50,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "media.gobike.au", // নিজস্ব Hostinger media সার্ভার
+      },
+      {
+        protocol: "https",
         hostname: "placehold.co", // প্লেসহোল্ডার ইমেজের জন্য
       },
   

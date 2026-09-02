@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { uploadMediaFile, uploadToCloudinaryOrFallback } from '@/lib/upload-media';
+import { uploadMediaFile, uploadToHostingerOrFallback } from '@/lib/upload-media';
 import { getAllMedia, saveMediaRecord } from '@/app/actions/backend/media/media-action';
 import { Media, MediaSource } from '@prisma/client';
 import Image from 'next/image';
@@ -133,7 +133,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     // every other source only sends video there, images stay on Vercel Blob.
     const uploadFile = (file: File, onProgress: (pct: number) => void) =>
       effectiveSource === MediaSource.WARRANTY
-        ? uploadToCloudinaryOrFallback(file, folder, onProgress)
+        ? uploadToHostingerOrFallback(file, folder, onProgress)
         : uploadMediaFile(file, folder, onProgress);
 
     for (const file of files) {

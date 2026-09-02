@@ -1,12 +1,12 @@
 // lib/upload-media.ts — client-side only (no server SDK imports).
 //
-// Policy: video files always go to Cloudinary (phone-recorded .mov/HEVC
-// footage plays audio-only in Chrome/Edge — see the warranty-claims fix —
-// and Cloudinary's automatic compression matters far more for large video
-// than for images). Images stay on Vercel Blob, which is simpler and
-// sufficient for admin-curated photos; the one carved-out exception is
-// warranty-claim images, which go to Cloudinary too because they're
-// customer/phone-sourced and occasionally arrive as HEIC.
+// Policy (2026-09-02 update): everything (image/video/document) now goes to
+// our own Hostinger media server (media.gobike.au) first — own domain, own
+// storage/bandwidth, video gets ffmpeg-transcoded there (HEVC/.mov -> H.264
+// MP4, same reason Cloudinary was needed before). Cloudinary and Vercel Blob
+// stay wired in as fallbacks (in that order for video, Vercel Blob alone for
+// everything else) so a Hostinger outage never blocks an upload outright —
+// same defensive pattern as the Cloudinary multi-account fallback.
 
 export interface UploadedFile {
   url: string;
@@ -23,6 +23,13 @@ interface CloudinaryUploadResult {
   bytes: number;
 }
 
+interface HostingerUploadResult {
+  success: boolean;
+  url: string;
+  type: 'image' | 'video';
+  error?: string;
+}
+
 function cloudinaryDeliveryUrl(cloudName: string, publicId: string, version: number, resourceType: string): string {
   // Slash-chained (not comma-combined) — some callers (e.g. WarrantyClaim)
   // join multiple file URLs with a comma, so a comma inside the URL itself
@@ -31,6 +38,61 @@ function cloudinaryDeliveryUrl(cloudName: string, publicId: string, version: num
     return `https://res.cloudinary.com/${cloudName}/video/upload/q_auto/vc_auto/v${version}/${publicId}.mp4`;
   }
   return `https://res.cloudinary.com/${cloudName}/image/upload/f_auto/q_auto/v${version}/${publicId}`;
+}
+
+// Uploads straight from the browser to our own Hostinger media server
+// (media.gobike.au) using a short-lived HMAC signature from
+// /api/upload/hostinger-sign — the raw secret never reaches the browser, so
+// it can't be lifted from devtools/network tab and reused indefinitely.
+// Video is ffmpeg-transcoded server-side there; everything else is stored as-is.
+export function uploadToHostinger(file: File, folder: string, onProgress?: (pct: number) => void): Promise<UploadedFile> {
+  return fetch('/api/upload/hostinger-sign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder }),
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to get upload signature');
+      return res.json();
+    })
+    .then(({ timestamp, signature, folder: signedFolder, uploadUrl }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', signedFolder);
+
+      return new Promise<HostingerUploadResult>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl);
+        xhr.setRequestHeader('x-upload-timestamp', String(timestamp));
+        xhr.setRequestHeader('x-upload-signature', signature);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error('Invalid response from Hostinger upload'));
+            }
+          } else {
+            reject(new Error(`Hostinger upload failed (${xhr.status})`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Hostinger upload network error'));
+        xhr.send(formData);
+      });
+    })
+    .then((result): UploadedFile => {
+      if (!result.success || !result.url) throw new Error(result.error || 'Hostinger upload failed');
+      return {
+        url: result.url,
+        pathname: result.url, // not a Vercel Blob URL, so isVercelBlobUrl() correctly no-ops on delete
+        filename: file.name,
+        mimeType: result.type === 'video' ? 'video/mp4' : file.type,
+        size: file.size,
+      };
+    });
 }
 
 // Uploads straight from the browser to Cloudinary (file never touches our
@@ -134,12 +196,26 @@ export async function uploadToCloudinaryOrFallback(file: File, folder: string, o
   }
 }
 
-// The router every general upload UI should call: video -> Cloudinary
-// (falling back to Vercel Blob if Cloudinary is unavailable), everything
-// else -> Vercel Blob directly.
-export function uploadMediaFile(file: File, cloudinaryFolder: string, onProgress?: (pct: number) => void): Promise<UploadedFile> {
-  if (file.type.startsWith('video/')) {
-    return uploadToCloudinaryOrFallback(file, cloudinaryFolder, onProgress);
+// 🚀 Hostinger-first router (2026-09-02): Hostinger is our own infra, so it's
+// tried before any third party. Cloudinary stays as the NEXT rung for every
+// file type (not just video) — Hostinger's image branch stores files as-is
+// with no format conversion, whereas Cloudinary's f_auto handles odd formats
+// (HEIC iPhone photos, the original reason warranty-claim images went there)
+// — so keeping it in the chain for images too avoids a silent regression.
+// Vercel Blob is always the final rung — an upload should never hard-fail
+// just because our own server or a third-party quota has a bad moment.
+export async function uploadToHostingerOrFallback(file: File, folder: string, onProgress?: (pct: number) => void): Promise<UploadedFile> {
+  try {
+    return await uploadToHostinger(file, folder, onProgress);
+  } catch (err) {
+    console.error('[upload-media] Hostinger upload failed, falling back:', err);
+    return uploadToCloudinaryOrFallback(file, folder, onProgress);
   }
-  return uploadToVercelBlob(file, onProgress);
+}
+
+// The router every general upload UI should call: everything -> Hostinger
+// first (own domain/storage, video gets transcoded), falling back to
+// Cloudinary (video) or Vercel Blob (everything else) if Hostinger is down.
+export function uploadMediaFile(file: File, folder: string, onProgress?: (pct: number) => void): Promise<UploadedFile> {
+  return uploadToHostingerOrFallback(file, folder, onProgress);
 }

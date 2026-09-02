@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Role } from "@prisma/client";
 import { toast } from "sonner";
-import { uploadToCloudinaryOrFallback } from "@/lib/upload-media";
+import { uploadToHostingerOrFallback } from "@/lib/upload-media";
 import { createCommunityPost, searchUsersForMention } from "@/app/actions/frontend/community/community-actions";
 import { Avatar, type CommunityPostData } from "./PostCard";
 
@@ -119,7 +119,7 @@ export default function PostComposer({ onPosted }: { onPosted: (post: CommunityP
       const uploadedMedia: { url: string; mediaType: "IMAGE" | "VIDEO" }[] = [];
       for (let i = 0; i < files.length; i++) {
         const pf = files[i];
-        const uploaded = await uploadToCloudinaryOrFallback(pf.file, "community", (pct) => {
+        const uploaded = await uploadToHostingerOrFallback(pf.file, "community", (pct) => {
           setUploadProgress(Math.round(((i * 100) + pct) / files.length));
         });
         uploadedMedia.push({ url: uploaded.url, mediaType: pf.mediaType });

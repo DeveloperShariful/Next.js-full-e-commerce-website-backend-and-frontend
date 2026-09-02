@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { submitWarrantyClaim } from '@/app/actions/frontend/warranty/warranty-action';
 import { saveMediaRecord } from '@/app/actions/backend/media/media-action';
-import { uploadToCloudinaryOrFallback } from '@/lib/upload-media';
+import { uploadToHostingerOrFallback } from '@/lib/upload-media';
 import { toast } from 'sonner';
 import { MediaSource } from '@prisma/client';
 
@@ -118,7 +118,7 @@ export default function WarrantyClient() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const uploaded = await uploadToCloudinaryOrFallback(file, 'warranty-claims', (pct) => {
+        const uploaded = await uploadToHostingerOrFallback(file, 'warranty-claims', (pct) => {
           const overall = Math.round(((i * 100) + pct) / totalFiles);
           setUploadProgress(overall);
         });

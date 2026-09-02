@@ -1,6 +1,7 @@
 // File: app/layout.tsx
 
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Toaster } from "sonner";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -118,6 +119,19 @@ export default async function RootLayout({
           suppressHydrationWarning={true}
           className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
         >
+          {/* Microsoft Clarity — session recording + heatmaps. GTM-এর মতো
+              delayed নয়, page interactive হওয়ার সাথে সাথেই load হয় যাতে পুরো
+              সেশন (bounce ভিজিটর সহ) রেকর্ড হয়। Project: yadfktgcxw।
+              নোট: GTM-এ একই project ID-র "Microsoft Clarity" tag রাখলে double
+              load হবে — একটাই রাখতে হবে। */}
+          <Script id="ms-clarity" strategy="afterInteractive">
+            {`(function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "yadfktgcxw");`}
+          </Script>
+
           {/* Global structured data — Organization + WebSite + SearchAction */}
           <script
             type="application/ld+json"

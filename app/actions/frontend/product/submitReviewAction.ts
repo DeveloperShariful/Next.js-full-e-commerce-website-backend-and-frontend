@@ -3,8 +3,9 @@
 
 import { db } from "@/lib/prisma";
 import { stripHtml } from "@/lib/sanitize";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { saveMediaRecord } from "@/app/actions/backend/media/media-action";
+import { MediaSource } from "@prisma/client";
+import crypto from "crypto";
 
 const ALLOWED_REVIEW_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'webm', 'mov']);
 const MAX_REVIEW_FILE_BYTES = 10 * 1024 * 1024; // 10 MB per file
@@ -23,6 +24,36 @@ async function isValidReviewMedia(file: File): Promise<boolean> {
   if (ext === 'webm') return hdr[0] === 0x1A && hdr[1] === 0x45;
   if (ext === 'mp4' || ext === 'mov') return hdr[4] === 0x66 && hdr[5] === 0x74 && hdr[6] === 0x79 && hdr[7] === 0x70;
   return false;
+}
+
+// Server-to-server upload to our own Hostinger media server — the exact same
+// HMAC-signed upload.php entry point uploadToHostinger() in lib/upload-media.ts
+// uses from the browser (see app/api/upload/hostinger-sign/route.ts), just
+// signed inline here since a Server Action already runs on the server and can
+// hold the raw secret itself. Replaces the old writeFile()-to-local-disk path,
+// which silently broke in production (Vercel's filesystem is read-only there).
+async function uploadReviewFileToHostinger(file: File): Promise<{ url: string; type: string }> {
+  const secret = process.env.HOSTINGER_UPLOAD_SECRET;
+  const baseUrl = process.env.NEXT_PUBLIC_HOSTINGER_MEDIA_URL;
+  if (!secret || !baseUrl) throw new Error('Hostinger upload not configured');
+
+  const folder = 'reviews';
+  const timestamp = Math.round(Date.now() / 1000);
+  const signature = crypto.createHmac('sha256', secret).update(`${timestamp}:${folder}`).digest('hex');
+
+  const formData = new FormData();
+  formData.append('file', file, file.name);
+  formData.append('folder', folder);
+
+  const res = await fetch(`${baseUrl}/upload.php`, {
+    method: 'POST',
+    headers: { 'x-upload-timestamp': String(timestamp), 'x-upload-signature': signature },
+    body: formData,
+  });
+  if (!res.ok) throw new Error(`Hostinger upload failed (${res.status})`);
+  const result = await res.json();
+  if (!result.success || !result.url) throw new Error(result.error || 'Hostinger upload failed');
+  return { url: result.url, type: result.type };
 }
 
 export async function submitReviewAction(formData: FormData) {
@@ -70,26 +101,33 @@ export async function submitReviewAction(formData: FormData) {
       });
     }
 
-    // ৩. Image/Video Upload Handle (type + magic byte validation, safe filename)
+    // ৩. Image/Video Upload Handle (type + magic byte validation) — goes to
+    // our own Hostinger media server, same as every other upload in the app.
     const uploadedFileUrls: string[] = [];
 
     if (mediaFiles && mediaFiles.length > 0) {
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "reviews");
-      await mkdir(uploadDir, { recursive: true }).catch(() => {});
-
       const filesToProcess = mediaFiles.filter(f => f.size > 0).slice(0, MAX_REVIEW_FILES);
 
       for (const file of filesToProcess) {
         const valid = await isValidReviewMedia(file);
         if (!valid) continue; // invalid file হলে silently skip
 
-        const ext = file.name.split('.').pop()!.toLowerCase();
-        const safeFilename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const filepath = path.join(uploadDir, safeFilename);
-        const buffer = Buffer.from(await file.arrayBuffer());
-
-        await writeFile(filepath, buffer);
-        uploadedFileUrls.push(`/uploads/reviews/${safeFilename}`);
+        try {
+          const uploaded = await uploadReviewFileToHostinger(file);
+          uploadedFileUrls.push(uploaded.url);
+          // Media Library-তে দেখানোর জন্য — একটা bad upload যেন পুরো review
+          // submission আটকে না দেয়, তাই এটাও try/catch-এর ভিতরেই
+          await saveMediaRecord({
+            url: uploaded.url,
+            pathname: uploaded.url,
+            filename: file.name,
+            mimeType: file.type,
+            size: file.size,
+            source: MediaSource.REVIEW,
+          });
+        } catch (err) {
+          console.error('[submitReviewAction] media upload failed, skipping this file:', err);
+        }
       }
     }
 

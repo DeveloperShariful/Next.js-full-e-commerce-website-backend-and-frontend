@@ -8,8 +8,9 @@ import dynamic from "next/dynamic";
 import type ReactQuillType from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { Code, Eye, Type, Copy, Check } from "lucide-react";
-import { upload } from "@vercel/blob/client";
+import { uploadMediaFile } from "@/lib/upload-media";
 import { saveMediaRecord } from "@/app/actions/backend/media/media-action";
+import { MediaSource } from "@prisma/client";
 import MediaPickerModal from "@/app/(backend)/admin/media/_components/MediaPickerModal";
 
 interface RichTextEditorProps {
@@ -54,18 +55,22 @@ export default function RichTextEditor({ value, onChange, label }: RichTextEdito
         if (!file.type.startsWith("image/")) return;
         setIsDragUploading(true);
         try {
-            const blob = await upload(file.name, file, {
-                access: "public",
-                handleUploadUrl: "/api/upload",
-            });
+            // "Insert Image" বাটনের (MediaPickerModal, নিচে) সাথে সামঞ্জস্য রেখে
+            // এখানেও Hostinger-first pipeline — আগে সরাসরি Vercel Blob-এ যেত,
+            // যা এই editor-এর নিজের "Insert Image" বাটন থেকে আলাদা path ছিল।
+            const uploaded = await uploadMediaFile(file, "general");
             await saveMediaRecord({
-                url: blob.url,
-                pathname: blob.pathname,
-                filename: file.name,
-                mimeType: file.type,
-                size: file.size,
+                url: uploaded.url,
+                pathname: uploaded.pathname,
+                filename: uploaded.filename,
+                mimeType: uploaded.mimeType,
+                size: uploaded.size,
+                source: MediaSource.GENERAL,
+                qualityScore: uploaded.qualityScore,
+                originalSize: uploaded.originalSize,
+                transcodePending: uploaded.transcodePending,
             });
-            insertImageAtCursor(blob.url);
+            insertImageAtCursor(uploaded.url);
         } catch (err) {
             console.error("Drag-drop image upload failed:", err);
             alert("Image upload failed. Please try again.");

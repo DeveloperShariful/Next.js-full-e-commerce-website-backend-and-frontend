@@ -48,7 +48,7 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
   // Pagination — "Show: 20/50/100/200" বাটন সরিয়ে fixed 20-per-page (MediaPaginationControls
   // আগের মতোই আছে — top pager দিয়ে যেকোনো page-এ jump করা যায়, bottom-এ একটা "More" বাটন
   // দিয়ে সহজে পরের page-এ যাওয়া যায়)।
-  const PER_PAGE = 20;
+  const PER_PAGE = 32; // 8-column grid (lg breakpoint) এ ঠিক ৪ সারি পূর্ণ হয়
   const [currentPage, setCurrentPage] = useState(1);
 
   // ── Counts (single pass — O(n) instead of 9 passes) ──

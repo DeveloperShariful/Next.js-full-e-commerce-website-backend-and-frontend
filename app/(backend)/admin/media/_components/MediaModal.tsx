@@ -29,6 +29,11 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
   const [editForm, setEditForm] = useState({ altText: '', originalName: '', caption: '', description: '' });
   // undefined = not fetched/loading yet, null = fetched but unknown (e.g. HEAD failed), number = known
   const [communitySize, setCommunitySize] = useState<number | null | undefined>(undefined);
+  // Dimensions aren't stored in the DB (never captured at upload time, and
+  // 350+ pre-existing files would need a backfill) — instead measured
+  // straight off the loaded <img>/<video> element in the browser, which
+  // works uniformly for every file old or new with zero backend changes.
+  const [dimensions, setDimensions] = useState<{ w: number; h: number } | null>(null);
 
   const selectedFile = selectedIndex !== null ? filteredMedia[selectedIndex] : null;
 
@@ -41,6 +46,7 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
         description: selectedFile.description || '',
       });
       setCopied(false);
+      setDimensions(null);
     }
   }, [selectedFile]);
 
@@ -116,8 +122,10 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-2 md:p-8 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] shadow-2xl flex flex-col relative animate-fadeIn rounded-sm">
+    // WordPress-এর মতোই প্রায়-full-page — চারপাশে সামান্য gap (backdrop দেখা
+    // যায়) রেখে, কিন্তু আগের ছোট max-w-6xl/90vh box-এর তুলনায় অনেক বড়।
+    <div className="fixed inset-0 bg-black/50 z-[9999] flex pt-12 px-1.5 pb-1.5 md:p-8">
+      <div className="bg-white w-full h-full flex flex-col relative animate-fadeIn rounded-sm shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="flex justify-between items-center border-b border-[#dcdcde] px-4 py-2 bg-white">
@@ -154,13 +162,17 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
         <div className="flex flex-col md:flex-row flex-grow overflow-hidden bg-[#f0f0f1]">
 
           {/* LEFT: Preview */}
-          <div className="w-full md:w-[65%] h-[40vh] md:h-full border-b md:border-b-0 md:border-r border-[#dcdcde] flex items-center justify-center p-4 md:p-8 relative bg-[#f0f0f1]">
+          <div className="w-full md:w-[60%] h-[40vh] md:h-full border-b md:border-b-0 md:border-r border-[#dcdcde] flex items-center justify-center p-1.5 md:p-8 relative bg-[#f0f0f1]">
             {selectedFile.type === 'VIDEO' ? (
               <video
                 key={selectedFile.id}
                 controls
                 src={selectedFile.url}
                 className="w-full max-h-full shadow-lg bg-black object-contain"
+                onLoadedMetadata={(e) => {
+                  const v = e.currentTarget;
+                  setDimensions({ w: v.videoWidth, h: v.videoHeight });
+                }}
               />
             ) : selectedFile.type === 'DOCUMENT' ? (
               <div className="flex flex-col items-center justify-center text-gray-500">
@@ -176,17 +188,24 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
                 alt={selectedFile.altText || 'Preview'}
                 className="w-auto h-auto max-w-full max-h-full object-contain shadow-sm"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+                }}
               />
             )}
           </div>
 
           {/* RIGHT: Details */}
-          <div className="w-full md:w-[35%] bg-[#f6f7f7] p-5 overflow-y-auto custom-scrollbar">
+          <div className="w-full md:w-[40%] bg-[#f6f7f7] p-3 md:p-5 overflow-y-auto custom-scrollbar">
 
             <div className="text-[#646970] text-[13px] border-b border-[#dcdcde] pb-4 mb-5">
               <p className="font-semibold text-[#1d2327] truncate mb-1" title={selectedFile.filename}>{selectedFile.filename}</p>
               <p>Uploaded on: {new Date(selectedFile.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
               <p>File type: {selectedFile.mimeType}</p>
+              {dimensions && (
+                <p>Dimensions: {dimensions.w} by {dimensions.h} pixels</p>
+              )}
               <p>
                 File size:{' '}
                 {selectedFile.isReadOnly && selectedFile.size === 0

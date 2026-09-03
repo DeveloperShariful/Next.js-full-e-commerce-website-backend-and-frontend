@@ -271,7 +271,14 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
         isBulkMode={isBulkMode}
         selectedIds={selectedIds}
         setSelectedIds={setSelectedIds}
-        setSelectedIndex={setSelectedIndex}
+        // MediaGrid শুধু বর্তমান page-এর slice দেখে, তাই ওর index page-local
+        // (0-19)। কিন্তু MediaModal পুরো sortedMedia লিস্ট থেকে item খোঁজে —
+        // তাই local index-কে page offset যোগ করে global index-এ বদলে দিতে
+        // হবে, নাহলে page 2+ এ ক্লিক করলে page 1-এর একই position-এর item
+        // খুলে যায়।
+        setSelectedIndex={(localIndex) =>
+          setSelectedIndex(localIndex === null ? null : localIndex + (safePage - 1) * PER_PAGE)
+        }
         viewMode={viewMode}
       />
 

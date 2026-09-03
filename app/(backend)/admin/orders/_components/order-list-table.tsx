@@ -8,10 +8,16 @@ import Link from "next/link";
 import { isToday, formatDistanceToNow } from "date-fns";
 import { formatTz } from "@/lib/store-time";
 import { toast } from "sonner"; 
-import { Eye, Check, Loader2, RefreshCcw, AlertTriangle, Truck } from "lucide-react";
+import { Eye, Check, Loader2, RefreshCcw, AlertTriangle, Truck, ChevronDown } from "lucide-react";
 import { bulkUpdateOrderStatus, deleteOrder, restoreOrder } from "@/app/actions/backend/order/bulk-update";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
 import type { OrderStatus } from "@prisma/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface OrderAddress {
   firstName?: string;
@@ -190,6 +196,42 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
     }
   };
 
+  // Per-order derived display values — pulled out of the table's row map so
+  // the mobile card layout below can reuse the exact same logic instead of
+  // duplicating it.
+  const getOrderMeta = (order: SerializedOrder) => {
+    const billingName = `${order.billingAddress?.firstName || ''} ${order.billingAddress?.lastName || ''}`.trim();
+    const shippingName = `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.trim();
+    const customerName = billingName || shippingName || order.user?.name || "Guest";
+
+    const orderDate = new Date(order.createdAt);
+    const displayDate = isToday(orderDate)
+        ? `${formatDistanceToNow(orderDate)} ago`
+        : formatTz(orderDate, timezone, "MMM d, yyyy");
+
+    let originText = 'Direct';
+    if (order.affiliate) {
+      originText = `Affiliate: ${order.affiliate.user?.name || 'Partner'}`;
+    } else if (order.utmSource) {
+      originText = order.utmMedium
+        ? `${order.utmSource} / ${order.utmMedium}`
+        : order.utmSource;
+      if (order.utmCampaign) originText += ` — ${order.utmCampaign}`;
+    } else if (order.referringSite) {
+      try {
+        originText = `Ref: ${new URL(order.referringSite).hostname}`;
+      } catch {
+        originText = `Ref: ${order.referringSite}`;
+      }
+    } else if (order.fallbackChannel && order.fallbackChannel !== "direct") {
+      originText = `~${order.fallbackChannel}`;
+    }
+
+    const hasTracking = !!(order.shippingTrackingNumber || order.transdirectBookingId);
+
+    return { customerName, displayDate, originText, hasTracking };
+  };
+
   const formatAddress = (addr: OrderAddress | null | undefined) => {
       if (!addr) return null;
       const firstName = addr.firstName || '';
@@ -255,7 +297,11 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
             </button>
         </div>
 
-        <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] w-full overflow-x-auto">
+        {/* Desktop/tablet — full table (sm and up). Below sm, a card layout
+            (further down) replaces it entirely instead of squeezing/scrolling
+            the same table — a scrolled table on a phone cut important columns
+            off-screen with no clear indication there was more to scroll to. */}
+        <div className="hidden sm:block bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] w-full overflow-x-auto">
             <table className="w-full text-[13px] text-left border-collapse">
                 <thead>
                     <tr className="border-b border-[#c3c4c7]">
@@ -283,39 +329,7 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                     ) : (
                         orders.map((order) => {
                             const isProcessingThis = loadingId === order.id;
-                            const billingName = `${order.billingAddress?.firstName || ''} ${order.billingAddress?.lastName || ''}`.trim();
-                            const shippingName = `${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}`.trim();
-                            const customerName = billingName || shippingName || order.user?.name || "Guest";
-                            
-                            const orderDate = new Date(order.createdAt);
-                            const displayDate = isToday(orderDate)
-                                ? `${formatDistanceToNow(orderDate)} ago`
-                                : formatTz(orderDate, timezone, "MMM d, yyyy");
-
-                            let originText = 'Direct';
-                            if (order.affiliate) {
-                              originText = `Affiliate: ${order.affiliate.user?.name || 'Partner'}`;
-                            } else if (order.utmSource) {
-                              originText = order.utmMedium
-                                ? `${order.utmSource} / ${order.utmMedium}`
-                                : order.utmSource;
-                              if (order.utmCampaign) originText += ` — ${order.utmCampaign}`;
-                            } else if (order.referringSite) {
-                              try {
-                                originText = `Ref: ${new URL(order.referringSite).hostname}`;
-                              } catch {
-                                originText = `Ref: ${order.referringSite}`;
-                              }
-                            } else if (order.fallbackChannel && order.fallbackChannel !== "direct") {
-                              // checkout-এর সময় নিজস্ব UTM/referrer capture হয়নি (device বদল,
-                              // browser data মোছা ইত্যাদি) — কিন্তু এই visitor-এর প্রথম visit-এর
-                              // real channel SiteVisit history থেকে পাওয়া গেছে, তাই fake
-                              // "Direct"-এর বদলে সেটাই দেখানো হচ্ছে (~ দিয়ে বোঝানো হয়েছে এটা
-                              // inferred — checkout-মুহূর্তের সরাসরি capture না)।
-                              originText = `~${order.fallbackChannel}`;
-                            }
-
-                            const hasTracking = order.shippingTrackingNumber || order.transdirectBookingId;
+                            const { customerName, displayDate, originText, hasTracking } = getOrderMeta(order);
 
                             return (
                                 <tr key={order.id} className={`hover:bg-[#f6f7f7] ${selectedOrders.includes(order.id) ? 'bg-[#ffffea]' : ''}`}>
@@ -448,6 +462,118 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                     )}
                 </tbody>
             </table>
+        </div>
+
+        {/* Mobile — stacked cards instead of a horizontally-scrolled table
+            (below sm). Same data/actions as the table, just re-laid-out so
+            everything is visible without scrolling sideways. */}
+        <div className="sm:hidden space-y-3">
+            {orders.length === 0 ? (
+                <div className="bg-white border border-[#c3c4c7] py-6 px-3 text-center text-[#646970] text-[13px]">
+                    No orders found.
+                </div>
+            ) : (
+                orders.map((order) => {
+                    const isProcessingThis = loadingId === order.id;
+                    const { customerName, displayDate, originText, hasTracking } = getOrderMeta(order);
+
+                    return (
+                        <div
+                            key={order.id}
+                            className={`bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] text-[13px] ${selectedOrders.includes(order.id) ? 'bg-[#ffffea]' : ''}`}
+                        >
+                            {/* Order # / customer / status */}
+                            <div className="flex items-start gap-2 p-3">
+                                <input
+                                    type="checkbox"
+                                    className="border-[#8c8f94] mt-1 shrink-0"
+                                    checked={selectedOrders.includes(order.id)}
+                                    onChange={() => toggleSelect(order.id)}
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <Link href={`/admin/orders/${order.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline break-words">
+                                        #{highlight(order.orderNumber, activeQuery)} {highlight(customerName, activeQuery)}
+                                    </Link>
+                                    {order.recoveredFromAbandonedCart && (
+                                        <span className="inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap bg-[#f0e6fb] text-[#7c3aed] mt-1 ml-0">
+                                            ↩ Recovered Cart
+                                        </span>
+                                    )}
+                                    <div className="text-[12px] text-[#646970] mt-1">{displayDate}</div>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                    {isTrashView ? getStatusBadge('DELETED') : getStatusBadge(order.status)}
+                                    <div className="text-[11px] text-[#646970] mt-1 max-w-[120px] truncate" title={originText}>{originText}</div>
+                                </div>
+                            </div>
+
+                            {/* Ship to */}
+                            {order.shippingAddress && (
+                                <div className="px-3 pb-3 border-t border-[#f0f0f1] pt-2">
+                                    <div className="text-[11px] font-semibold text-[#8c8f94] uppercase tracking-wide mb-1">Ship to</div>
+                                    {formatAddress(order.shippingAddress)}
+                                    {order.shippingMethod && (
+                                        <div className="text-[12px] text-[#646970] mt-1 flex items-center gap-1">
+                                            {hasTracking && <Truck size={12} className="text-[#2271b1]" />}
+                                            via {order.shippingMethod}
+                                        </div>
+                                    )}
+                                    {order.paymentGateway && (
+                                        <div className="text-[12px] text-[#646970] mt-1">
+                                            Payment method: {order.paymentMethod || order.paymentGateway}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Total / actions — same row */}
+                            <div className="px-3 pb-3 border-t border-[#f0f0f1] pt-2 flex items-center justify-between gap-2">
+                                <div className="shrink-0">
+                                    <span className="font-semibold text-[#2c3338]">Total: </span>
+                                    <span className="font-semibold text-[#2c3338]">{formatPrice(order.total)}</span>
+                                    <span className="text-[12px] text-[#646970]"> · {order._count?.items || 0} items</span>
+                                </div>
+                                {isProcessingThis ? (
+                                    <Loader2 className="h-5 w-5 animate-spin text-[#8c8f94]" />
+                                ) : (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="h-8 px-3 flex items-center justify-center gap-1 border border-[#c3c4c7] bg-[#f6f7f7] text-[#2c3338] rounded-[3px] hover:bg-white shadow-sm text-[12px] font-medium outline-none">
+                                                Actions <ChevronDown size={14} />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-40 border-[#c3c4c7] shadow-lg p-1">
+                                            {!isTrashView ? (
+                                                <>
+                                                    {order.status === "PROCESSING" && (
+                                                        <DropdownMenuItem onClick={() => handleSingleAction(order.id, 'complete')} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#5b841b] hover:bg-[#edfaef] focus:bg-[#edfaef]">
+                                                            <Check size={14} strokeWidth={3} className="mr-2" /> Complete
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuItem asChild className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#1d2327] hover:bg-[#f0f6fc] focus:bg-[#f0f6fc]">
+                                                        <Link href={`/admin/orders/${order.id}`} onClick={saveScroll}>
+                                                            <Eye size={14} className="mr-2" /> View
+                                                        </Link>
+                                                    </DropdownMenuItem>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <DropdownMenuItem onClick={() => handleSingleAction(order.id, 'restore')} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#2271b1] hover:bg-[#f0f6fc] focus:bg-[#f0f6fc]">
+                                                        <RefreshCcw size={14} className="mr-2" /> Restore
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSingleAction(order.id, 'delete')} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#d63638] hover:bg-[#fcebec] focus:bg-[#fcebec]">
+                                                        <AlertTriangle size={14} className="mr-2" /> Delete
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })
+            )}
         </div>
     </div>
   );

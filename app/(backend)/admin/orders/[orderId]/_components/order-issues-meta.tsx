@@ -24,7 +24,7 @@ export const OrderIssuesMeta = ({ order }: OrderIssuesMetaProps) => {
   const returns: OrderReturn[] = order.returns || [];
 
   return (
-    <div className="mb-5 space-y-4">
+    <div className="space-y-4">
       
       {/* NO ISSUES STATE */}
       {disputes.length === 0 && returns.length === 0 && (

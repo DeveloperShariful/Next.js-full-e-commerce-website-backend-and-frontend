@@ -2,23 +2,22 @@
 
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { formatTz } from "@/lib/store-time";
-import { 
-    Edit2, Loader2, ExternalLink, MapPin, 
-    CreditCard, DollarSign, Package, AlertCircle, Link as LinkIcon 
+import {
+    Edit2, Loader2, ExternalLink, MapPin,
+    CreditCard, DollarSign, Package, AlertCircle, Link as LinkIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 // --- Server Actions ---
-import { updateOrderStatus } from "@/app/actions/backend/order/update-status";
 import { updateOrderCustomerDetails } from "@/app/actions/backend/order/update-order-customer";
 import { searchTransdirectLocations } from "@/app/actions/backend/order/transdirect-locations";
 
 // ✅ STRICT TYPES IMPORT
-import { OrderDetailsType, AddressJson, OrderUser, OrderStatus } from "../types";
+import { OrderDetailsType, AddressJson, OrderUser } from "../types";
 
 interface OrderDetailsMetaProps {
   order: OrderDetailsType;
@@ -29,8 +28,7 @@ type LocationSuggestion = { city: string; state: string; postcode: string | numb
 
 export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaProps) => {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  
+
   // --- Toggle Edit States ---
   const [editBilling, setEditBilling] = useState<boolean>(false);
   const [editShipping, setEditShipping] = useState<boolean>(false);
@@ -69,7 +67,6 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
   // STRICT FORM STATES
   // ==========================================
   const [formData, setFormData] = useState({
-    status: order.status as OrderStatus,
     firstName: user?.name?.split(" ")[0] || billing.firstName || shipping.firstName || "",
     lastName: user?.name?.split(" ").slice(1).join(" ") || billing.lastName || shipping.lastName || "",
     email: user?.email || order.guestEmail || "",
@@ -99,25 +96,6 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
   // ==========================================
   // HANDLERS
   // ==========================================
-  const handleStatusChange = (newStatus: string) => {
-      const typedStatus = newStatus as OrderStatus;
-      setFormData({...formData, status: typedStatus});
-      const form = new FormData();
-      form.append("orderId", order.id);
-      form.append("status", typedStatus);
-      
-      startTransition(async () => {
-          const res = await updateOrderStatus(form);
-          if (res.success) {
-              toast.success("Order status updated successfully.");
-              router.refresh();
-          } else {
-              toast.error(res.error || "Failed to update order status.");
-              setFormData({...formData, status: order.status});
-          }
-      });
-  };
-
   const handleLocationSearch = async (val: string, type: "bill" | "ship") => {
       if (type === "bill") setBillSearch(val);
       else setShipSearch(val);
@@ -185,12 +163,12 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
   };
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] mb-5 rounded-[3px] relative z-20">
+    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[3px] relative z-20">
       
       {/* ========================================== */}
       {/* HEADER SECTION (WOOCOMMERCE STYLE)         */}
       {/* ========================================== */}
-      <div className="px-4 py-3 border-b border-[#c3c4c7]">
+      <div className="px-1.5 py-1.5 lg:px-4 lg:py-3 border-b border-[#c3c4c7]">
         <h2 className="text-[14px] font-semibold text-[#1d2327] m-0 flex items-center gap-2">
             Order #{order.orderNumber} details
             
@@ -243,15 +221,15 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
       {/* ========================================== */}
       {/* MAIN CONTENT - 3 COLUMNS GRID              */}
       {/* ========================================== */}
-      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-8">
-        
+      <div className="p-1.5 lg:p-4 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+
         {/* -------------------------------------- */}
         {/* COLUMN 1: GENERAL                      */}
         {/* -------------------------------------- */}
         <div>
             <h3 className="text-[14px] font-semibold text-[#1d2327] mb-3">General</h3>
-            
-            <div className="space-y-4">
+
+            <div className="space-y-2">
                 <div className="space-y-1 text-[13px] text-[#3c434a]">
                     <label className="block mb-1 text-[#646970]">Date created:</label>
                     <div className="flex items-center gap-1">
@@ -264,35 +242,10 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                 </div>
 
                 <div className="space-y-1 text-[13px]">
-                    <label className="block mb-1 text-[#646970]">Status:</label>
-                    <div className="relative">
-                        <select 
-                            value={formData.status}
-                            onChange={(e) => handleStatusChange(e.target.value)}
-                            disabled={isPending}
-                            className="w-full max-w-[250px] h-[28px] px-2 border border-[#8c8f94] bg-white text-[#32373c] rounded-[3px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] shadow-sm disabled:bg-[#f6f7f7] cursor-pointer"
-                        >
-                            <option value="DRAFT">Draft</option>
-                            <option value="PENDING">Pending payment</option>
-                            <option value="PROCESSING">Processing</option>
-                            <option value="AWAITING_PAYMENT">Awaiting Payment</option>
-                            <option value="PACKED">Packed</option>
-                            <option value="SHIPPED">Shipped</option>
-                            <option value="DELIVERED">Completed</option>
-                            <option value="CANCELLED">Cancelled</option>
-                            <option value="REFUNDED">Refunded</option>
-                            <option value="FAILED">Failed</option>
-                            <option value="RETURNED">Returned</option>
-                        </select>
-                        {isPending && <Loader2 size={14} className="absolute right-[20px] top-[7px] animate-spin text-[#2271b1]" />}
-                    </div>
-                </div>
-
-                <div className="space-y-1 text-[13px]">
                     <label className="block mb-1 text-[#646970]">Customer:</label>
                     <div className="relative w-full max-w-[250px]">
-                        <select 
-                            disabled 
+                        <select
+                            disabled
                             className="w-full h-[28px] px-2 border border-[#8c8f94] bg-[#f6f7f7] text-[#32373c] rounded-[3px] outline-none shadow-sm cursor-not-allowed appearance-none"
                         >
                             {user ? (
@@ -302,7 +255,7 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                             )}
                         </select>
                     </div>
-                    
+
                     {user && (
                         <div className="mt-1.5">
                             <Link href={`/admin/users/${user.id}`} target="_blank" className="text-[#2271b1] hover:text-[#135e96] hover:underline flex items-center gap-1 text-[12px]">
@@ -313,7 +266,7 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                 </div>
 
                 {/* SCHEMA: Additional Order Relations */}
-                <div className="pt-2 mt-2 space-y-1 text-[12px] text-[#646970]">
+                <div className="pt-1 mt-1 space-y-1 text-[12px] text-[#646970]">
                     {order.currency && (
                         <div className="flex justify-between max-w-[250px] border-t border-[#f0f0f1] pt-1">
                             <span>Currency:</span> <span className="font-bold text-[#3c434a]">{order.currency}</span>
@@ -339,7 +292,7 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
 
                 {/* UTM / Traffic Source — সবসময় দেখানো হয়, খালি হলেও চুপচাপ হাইড হয় না,
                     যাতে বোঝা যায় tracking কাজ করছে কিন্তু genuinely কিছু capture হয়নি */}
-                <div className="pt-3 mt-3 border-t border-[#f0f0f1]">
+                <div className="pt-2 mt-2 border-t border-[#f0f0f1]">
                     <p className="text-[11px] font-semibold text-[#1d2327] uppercase tracking-wide mb-2">Traffic Source</p>
                     {!(order.utmSource || order.utmMedium || order.utmCampaign || order.utmContent || order.utmTerm || order.referringSite) ? (
                         order.fallbackChannel && order.fallbackChannel !== "direct" ? (
@@ -395,7 +348,7 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                             {order.referringSite && (
                                 <div className="flex items-center gap-2">
                                     <span className="w-[70px] shrink-0">Referrer:</span>
-                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a] truncate max-w-[150px]" title={order.referringSite}>{order.referringSite}</span>
+                                    <span className="font-mono bg-[#f6f7f7] border border-[#e2e4e7] px-1.5 py-0.5 rounded text-[#3c434a] truncate flex-1 min-w-0" title={order.referringSite}>{order.referringSite}</span>
                                 </div>
                             )}
                         </div>
@@ -403,6 +356,14 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                 </div>
             </div>
         </div>
+
+        {/* Billing + Shipping — side by side on mobile/tablet (md:contents
+            makes this wrapper disappear from layout at md+, so the two
+            columns rejoin the outer 3-col grid exactly as before there —
+            border/padding on a `contents` element don't render either, so
+            this divider only shows up while the wrapper is a real box, i.e.
+            mobile/tablet). */}
+        <div className="grid grid-cols-[1.15fr_0.85fr] gap-3 md:contents border-t border-[#f0f0f1] pt-4">
 
         {/* -------------------------------------- */}
         {/* COLUMN 2: BILLING                      */}
@@ -546,18 +507,6 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                     <p className="m-0">{shipping.city} {shipping.state} {shipping.postcode}</p>
                     <p className="m-0 uppercase">{shipping.country || "AU"}</p>
 
-                    <div className="mt-4">
-                         {/* Map Link */}
-                         <a 
-                            href={`https://maps.google.com/?q=${shipping.address1},${shipping.city},${shipping.state},${shipping.postcode}`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-[#2271b1] hover:underline flex items-center gap-1"
-                        >
-                            <MapPin size={12}/> View on map
-                        </a>
-                    </div>
-
                     {/* SCHEMA: Advanced Shipping / Transdirect Options */}
                     {(order.estimatedTransitTime || order.authorityToLeave || order.tailgateDelivery) && (
                         <div className="mt-4 pt-3 border-t border-[#f0f0f1]">
@@ -579,8 +528,24 @@ export const OrderDetailsMeta = ({ order, timezone = "UTC" }: OrderDetailsMetaPr
                             </div>
                         </div>
                     )}
+
+                    {/* Map Link — bottom of the section (Billing's column
+                        usually runs taller with email/phone, so this used to
+                        sit awkwardly high once the two sit side by side) */}
+                    <div className="mt-4">
+                         <a
+                            href={`https://maps.google.com/?q=${shipping.address1},${shipping.city},${shipping.state},${shipping.postcode}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[#2271b1] hover:underline flex items-center gap-1"
+                        >
+                            <MapPin size={12}/> View on map
+                        </a>
+                    </div>
                 </div>
             )}
+        </div>
+
         </div>
 
       </div>

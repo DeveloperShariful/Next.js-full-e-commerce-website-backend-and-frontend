@@ -90,11 +90,11 @@ export const DownloadablePermissionsMeta = ({ order }: DownloadablePermissionsMe
   };
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] mb-5">
+    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
       
       {/* Meta Box Header */}
       <div 
-        className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none hover:bg-[#f6f7f7] transition-colors"
+        className="px-1.5 py-1.5 lg:px-4 lg:py-3 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none hover:bg-[#f6f7f7] transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Downloadable product permissions</h2>
@@ -105,7 +105,7 @@ export const DownloadablePermissionsMeta = ({ order }: DownloadablePermissionsMe
 
       {/* Meta Box Content */}
       {isOpen && (
-        <div className="p-4 bg-white">
+        <div className="p-1.5 lg:p-4 bg-white">
             
             {/* List of Granted Products */}
             {currentPermissions.length > 0 && (

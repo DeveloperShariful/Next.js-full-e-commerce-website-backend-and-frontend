@@ -8,6 +8,7 @@ import { ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { updateOrderStatus } from "@/app/actions/backend/order/update-status";
 import { deleteOrder } from "@/app/actions/backend/order/bulk-update";
+import { StatusDropdown, ORDER_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS, FULFILLMENT_STATUS_OPTIONS } from "./status-dropdown";
 
 // ✅ STRICT TYPES IMPORT
 import { OrderDetailsType } from "../types";
@@ -20,6 +21,9 @@ export const OrderSidebarActions = ({ order }: OrderSidebarActionsProps) => {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
+  const [statusVal, setStatusVal] = useState<string>(order.status);
+  const [paymentStatusVal, setPaymentStatusVal] = useState<string>(order.paymentStatus);
+  const [fulfillmentStatusVal, setFulfillmentStatusVal] = useState<string>(order.fulfillmentStatus);
 
   // --- HANDLER: STATUS UPDATE (Triggers Emails from Backend) ---
   const handleUpdate = (formData: FormData) => {
@@ -57,7 +61,7 @@ export const OrderSidebarActions = ({ order }: OrderSidebarActionsProps) => {
         
         {/* Meta Box Header (Collapsible) */}
         <div 
-            className="px-3 py-2 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none bg-white hover:bg-[#f6f7f7] transition-colors"
+            className="px-1.5 py-1.5 lg:px-3 lg:py-2 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none bg-white hover:bg-[#f6f7f7] transition-colors"
             onClick={() => setIsOpen(!isOpen)}
         >
             <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Order actions</h2>
@@ -69,69 +73,38 @@ export const OrderSidebarActions = ({ order }: OrderSidebarActionsProps) => {
         {/* Content */}
         {isOpen && (
             // 👇 KEY Added Here to reset form on external changes
-            <form action={handleUpdate} className="p-3" key={formKey}>
+            <form action={handleUpdate} className="p-1.5 lg:p-3" key={formKey}>
                 <input type="hidden" name="orderId" value={order.id} />
 
+                {/* Mobile/tablet (below lg, i.e. the full-width instance of this
+                    box at the top of the page): 3 side-by-side columns. Desktop
+                    (the actual lg+ narrow sidebar instance): reverts to the
+                    original stacked layout — same component, just a different
+                    instance is visible at each breakpoint (see page.tsx's
+                    block lg:hidden / hidden lg:block wrappers). */}
+                <div className="grid grid-cols-3 gap-1.5 lg:block lg:gap-0">
+
                 {/* Order Status (Restored ALL original options) */}
-                <div className="mb-4 space-y-1">
-                    <label className="text-[12px] text-[#646970] font-semibold">Order Status</label>
-                    <select
-                        name="status"
-                        defaultValue={order.status}
-                        disabled={isPending}
-                        className="w-full h-[30px] px-2 border border-[#8c8f94] bg-white text-[#32373c] text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] shadow-sm rounded-[3px] disabled:bg-[#f6f7f7]"
-                    >
-                        <option value="DRAFT">Draft</option>
-                        <option value="PENDING">Pending payment</option>
-                        <option value="PROCESSING">Processing</option>
-                        <option value="AWAITING_PAYMENT">Awaiting Payment</option>
-                        <option value="PACKED">Packed</option>
-                        <option value="SHIPPED">Shipped</option>
-                        <option value="DELIVERED">Completed</option>
-                        <option value="CANCELLED">Cancelled</option>
-                        <option value="REFUNDED">Refunded</option>
-                        <option value="FAILED">Failed</option>
-                        <option value="RETURNED">Returned</option>
-                    </select>
+                <div className="space-y-1 lg:mb-4">
+                    <label className="text-[11px] lg:text-[12px] text-[#646970] font-semibold">Order Status</label>
+                    <StatusDropdown name="status" value={statusVal} onChange={setStatusVal} disabled={isPending} options={ORDER_STATUS_OPTIONS} wideContent />
                 </div>
 
                 {/* Payment Status (Restored ALL original options) */}
-                <div className="mb-4 space-y-1">
-                    <label className="text-[12px] text-[#646970] font-semibold">Payment Status</label>
-                    <select 
-                        name="paymentStatus" 
-                        defaultValue={order.paymentStatus} 
-                        disabled={isPending}
-                        className="w-full h-[30px] px-2 border border-[#8c8f94] bg-white text-[#32373c] text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] shadow-sm rounded-[3px] disabled:bg-[#f6f7f7]"
-                    >
-                        <option value="UNPAID">Unpaid</option>
-                        <option value="PAID">Paid</option>
-                        <option value="PARTIALLY_REFUNDED">Partially Refunded</option>
-                        <option value="REFUNDED">Refunded</option>
-                        <option value="VOIDED">Voided</option>
-                        <option value="AUTHORIZED">Authorized</option>
-                    </select>
+                <div className="space-y-1 lg:mb-4">
+                    <label className="text-[11px] lg:text-[12px] text-[#646970] font-semibold">Payment Status</label>
+                    <StatusDropdown name="paymentStatus" value={paymentStatusVal} onChange={setPaymentStatusVal} disabled={isPending} options={PAYMENT_STATUS_OPTIONS} wideContent />
                 </div>
 
                 {/* Fulfillment Status (Restored ALL original options) */}
-                <div className="mb-4 space-y-1">
-                    <label className="text-[12px] text-[#646970] font-semibold">Fulfillment Status</label>
-                    <select 
-                        name="fulfillmentStatus" 
-                        defaultValue={order.fulfillmentStatus} 
-                        disabled={isPending}
-                        className="w-full h-[30px] px-2 border border-[#8c8f94] bg-white text-[#32373c] text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] shadow-sm rounded-[3px] disabled:bg-[#f6f7f7]"
-                    >
-                        <option value="UNFULFILLED">Unfulfilled</option>
-                        <option value="PARTIALLY_FULFILLED">Partially Fulfilled</option>
-                        <option value="FULFILLED">Fulfilled</option>
-                        <option value="RETURNED">Returned</option>
-                        <option value="PICKED_UP">Picked Up</option>
-                    </select>
+                <div className="space-y-1 lg:mb-4">
+                    <label className="text-[11px] lg:text-[12px] text-[#646970] font-semibold">Fulfillment Status</label>
+                    <StatusDropdown name="fulfillmentStatus" value={fulfillmentStatusVal} onChange={setFulfillmentStatusVal} disabled={isPending} options={FULFILLMENT_STATUS_OPTIONS} />
+                </div>
                 </div>
 
                 {/* Footer Actions (WooCommerce Publish Box Style) */}
-                <div className="pt-3 border-t border-[#f0f0f1] flex justify-between items-center bg-[#f6f7f7] -mx-3 -mb-3 px-3 py-2 mt-4">
+                <div className="pt-2 lg:pt-3 border-t border-[#f0f0f1] flex justify-between items-center bg-[#f6f7f7] -mx-1.5 -mb-1.5 px-1.5 py-1.5 mt-2 lg:-mx-3 lg:-mb-3 lg:px-3 lg:py-2 lg:mt-4">
                     <button 
                         type="button" 
                         onClick={handleTrash}

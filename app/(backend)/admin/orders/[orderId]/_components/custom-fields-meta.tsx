@@ -100,11 +100,11 @@ export const CustomFieldsMeta = ({ order }: CustomFieldsMetaProps) => {
   };
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] mb-5">
+    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
       
       {/* WordPress Meta Box Header (Collapsible) */}
       <div 
-        className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none bg-white hover:bg-[#f6f7f7] transition-colors"
+        className="px-1.5 py-1.5 lg:px-4 lg:py-3 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none bg-white hover:bg-[#f6f7f7] transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Custom Fields</h2>
@@ -115,7 +115,7 @@ export const CustomFieldsMeta = ({ order }: CustomFieldsMetaProps) => {
 
       {/* Meta Box Content */}
       {isOpen && (
-        <div className="p-4 bg-[#f0f0f1]">
+        <div className="p-1.5 lg:p-4 bg-[#f0f0f1]">
             
             {/* 1. Existing Custom Fields Table */}
             <div className="bg-white border border-[#c3c4c7] mb-4">

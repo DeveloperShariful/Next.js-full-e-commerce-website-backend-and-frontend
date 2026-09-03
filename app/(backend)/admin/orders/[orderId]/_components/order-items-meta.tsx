@@ -39,12 +39,12 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
   }
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] mb-5 rounded-[3px]">
+    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[3px]">
       
       {/* ========================================== */}
       {/* TABLE HEADER                               */}
       {/* ========================================== */}
-      <div className="border-b border-[#c3c4c7] px-4 py-3 bg-[#f6f7f7]">
+      <div className="border-b border-[#c3c4c7] px-1.5 py-1.5 lg:px-4 lg:py-3 bg-[#f6f7f7]">
         <h2 className="text-[14px] font-semibold text-[#1d2327] m-0">Item</h2>
       </div>
 
@@ -53,11 +53,11 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
             
             <thead>
                 <tr className="border-b border-[#f0f0f1] text-[#646970]">
-                    <th className="py-2.5 px-4 font-normal w-[40%] min-w-[250px] sm:min-w-[250px]">Item</th>
-                    <th className="py-2.5 px-4 font-normal text-right">Cost</th>
-                    <th className="py-2.5 px-4 font-normal text-right">Price</th>
-                    <th className="py-2.5 px-4 font-normal text-center">Qty</th>
-                    <th className="py-2.5 px-4 font-normal text-right">Total</th>
+                    <th className="py-2 px-1.5 lg:py-2.5 lg:px-4 font-normal w-[40%] min-w-[250px] sm:min-w-[250px]">Item</th>
+                    <th className="py-2 px-1.5 lg:py-2.5 lg:px-4 font-normal text-right">Cost</th>
+                    <th className="py-2 px-1.5 lg:py-2.5 lg:px-4 font-normal text-right">Price</th>
+                    <th className="py-2 px-1.5 lg:py-2.5 lg:px-4 font-normal text-center">Qty</th>
+                    <th className="py-2 px-1.5 lg:py-2.5 lg:px-4 font-normal text-right">Total</th>
                 </tr>
             </thead>
             
@@ -70,7 +70,7 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
                     const img = item.product?.featuredImage || item.image;
                     return (
                         <tr key={item.id} className="hover:bg-[#f6f7f7] group align-top">
-                            <td className="py-3 px-4">
+                            <td className="py-2 px-1.5 lg:py-3 lg:px-4">
                                 <div className="flex items-start gap-3">
                                     <div className="h-10 w-10 border border-[#c3c4c7] bg-white flex items-center justify-center overflow-hidden shrink-0 mt-0.5 shadow-sm">
                                         {img ? <img src={img} alt={item.productName} className="h-full w-full object-cover"/> : <Package size={16} className="text-[#a7aaad]"/>}
@@ -101,12 +101,12 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
                                     </div>
                                 </div>
                             </td>
-                            <td className="py-3 px-4 text-right text-[#a7aaad]">
+                            <td className="py-2 px-1.5 lg:py-3 lg:px-4 text-right text-[#a7aaad]">
                               {formatPrice(item.product?.costPerItem ? Number(item.product.costPerItem) : 0)}
                             </td>
-                            <td className="py-3 px-4 text-right text-[#3c434a]">{formatPrice(Number(item.price))}</td>
-                            <td className="py-3 px-4 text-center text-[#3c434a]">× {item.quantity}</td>
-                            <td className="py-3 px-4 text-right font-medium text-[#2c3338]">{formatPrice(Number(item.total))}</td>
+                            <td className="py-2 px-1.5 lg:py-3 lg:px-4 text-right text-[#3c434a]">{formatPrice(Number(item.price))}</td>
+                            <td className="py-2 px-1.5 lg:py-3 lg:px-4 text-center text-[#3c434a]">× {item.quantity}</td>
+                            <td className="py-2 px-1.5 lg:py-3 lg:px-4 text-right font-medium text-[#2c3338]">{formatPrice(Number(item.total))}</td>
                         </tr>
                     );
                 })}
@@ -116,7 +116,7 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
                 {/* ========================================== */}
                 {order.shippingMethod && (
                     <tr className="bg-[#fcfcfc]">
-                        <td className="py-4 px-4 flex items-start gap-3">
+                        <td className="py-2 px-1.5 lg:py-4 lg:px-4 flex items-start gap-3">
                             <div className="h-10 w-10 flex items-center justify-center text-[#8c8f94] bg-white border border-[#e2e4e7] rounded-[3px] shadow-sm shrink-0">
                                 <Truck size={20} />
                             </div>
@@ -155,7 +155,7 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
                             </div>
                         </td>
                         <td colSpan={3}></td>
-                        <td className="py-4 px-4 text-right font-medium text-[#2c3338] align-top">
+                        <td className="py-2 px-1.5 lg:py-4 lg:px-4 text-right font-medium text-[#2c3338] align-top">
                             {formatPrice(Number(order.shippingTotal))}
                         </td>
                     </tr>
@@ -167,7 +167,7 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
       {/* ========================================== */}
       {/* PRICING TOTALS & BUTTONS (Refund + Invoice)  */}
       {/* ========================================== */}
-      <div className="border-t border-[#c3c4c7] px-4 py-4 flex flex-col md:flex-row justify-between items-start bg-[#f6f7f7]">
+      <div className="border-t border-[#c3c4c7] px-1.5 py-2 lg:px-4 lg:py-4 flex flex-col md:flex-row justify-between items-start bg-[#f6f7f7]">
         
         {/* Left Side: Action Buttons (Refund & Print Invoice) */}
         <div className="w-full md:w-auto mb-4 md:mb-0 flex gap-2">
@@ -194,7 +194,7 @@ export const OrderItemsMeta = ({ order, timezone = "UTC" }: OrderItemsMetaProps)
         </div>
 
         {/* Right Side: Totals Table */}
-        <div className="w-full md:w-[320px] text-[13px] text-[#3c434a]">
+        <div className="w-full md:w-[320px] text-[13px] text-[#3c434a] pr-2">
             <table className="w-full text-right border-collapse">
                 <tbody>
                     <tr>

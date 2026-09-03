@@ -35,10 +35,10 @@ export const OrderTransactionsMeta = ({ transactions, timezone = "UTC" }: OrderT
   const { formatPrice } = useGlobalStore();
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] mb-5 rounded-[3px]">
+    <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] rounded-[3px]">
 
       <div
-        className="px-4 py-3 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none hover:bg-[#f6f7f7] transition-colors"
+        className="px-1.5 py-1.5 lg:px-4 lg:py-3 border-b border-[#c3c4c7] flex justify-between items-center cursor-pointer select-none hover:bg-[#f6f7f7] transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <h2 className="text-[14px] font-semibold text-[#1d2327] m-0 flex items-center gap-2">
@@ -56,7 +56,7 @@ export const OrderTransactionsMeta = ({ transactions, timezone = "UTC" }: OrderT
       </div>
 
       {isOpen && (
-        <div className="p-4">
+        <div className="p-1.5 lg:p-4">
           {transactions.length === 0 ? (
             <p className="text-[13px] text-[#646970] m-0">No transactions found for this order.</p>
           ) : (

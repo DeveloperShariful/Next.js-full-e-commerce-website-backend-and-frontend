@@ -22,7 +22,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const url = `https://gobike.au/community/${slug}`;
   const title = post.metaTitle || "GoBike Community Post";
   const description = post.metaDesc || "Shared on the GoBike Community — see what our riders are up to.";
-  const images = post.ogImage ? [{ url: post.ogImage, width: 1200, height: 630 }] : undefined;
+  // width/height আগে হার্ডকোড 1200×630 ছিল — কিন্তু এগুলো real upload (ফোনে
+  // তোলা ছবি, প্রায়ই portrait) যার actual মাপ কখনোই মাপা হয় না। ভুল মাপ
+  // ঘোষণা করলে Facebook-এর crawler mismatch ধরে অনেক সময় image-টাই বাদ দেয়
+  // (preview না দেখানোর একটা কারণ) — তাই মাপ না জানালে Facebook নিজে থেকেই
+  // fetch করে actual dimension বের করে নেয়, এটাই নিরাপদ।
+  const images = post.ogImage ? [{ url: post.ogImage }] : undefined;
 
   return {
     title,

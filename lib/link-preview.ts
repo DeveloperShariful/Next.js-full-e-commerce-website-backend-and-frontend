@@ -6,12 +6,50 @@
 // post is created/edited — see prewarmLinkPreview().
 
 import { db } from "@/lib/prisma";
+import crypto from "crypto";
 
 const FACEBOOK_HOSTS = new Set(["facebook.com", "www.facebook.com", "m.facebook.com", "fb.watch"]);
 const FIRST_URL_PATTERN = /https?:\/\/[^\s]+/;
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_BYTES = 500_000;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Facebook's own CDN image URLs (scontent.*.fbcdn.net) carry a signed,
+// time-limited token (the `oe=` param) — they 403 on their own after a
+// while regardless of our cache TTL, since nothing here ever re-fetches a
+// post that's never edited again. Mirroring the bytes to our own Hostinger
+// media server once, at fetch time, makes the cached preview permanent.
+async function mirrorImageToHostinger(imageUrl: string): Promise<string> {
+  const secret = process.env.HOSTINGER_UPLOAD_SECRET;
+  const baseUrl = process.env.NEXT_PUBLIC_HOSTINGER_MEDIA_URL;
+  if (!secret || !baseUrl) return imageUrl; // not configured — fall back to the original (Facebook) URL
+
+  try {
+    const imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!imgRes.ok) return imageUrl;
+    const blob = await imgRes.blob();
+
+    const folder = "link-preview";
+    const timestamp = Math.round(Date.now() / 1000);
+    const signature = crypto.createHmac("sha256", secret).update(`${timestamp}:${folder}`).digest("hex");
+
+    const formData = new FormData();
+    formData.append("file", blob, "preview.jpg");
+    formData.append("folder", folder);
+
+    const uploadRes = await fetch(`${baseUrl}/upload.php`, {
+      method: "POST",
+      headers: { "x-upload-timestamp": String(timestamp), "x-upload-signature": signature },
+      body: formData,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!uploadRes.ok) return imageUrl;
+    const result = await uploadRes.json();
+    return result.success && result.url ? result.url : imageUrl;
+  } catch {
+    return imageUrl; // Hostinger hiccup — still cache Facebook's URL rather than losing the preview entirely
+  }
+}
 
 export interface LinkPreviewData {
   url: string;
@@ -98,8 +136,9 @@ async function fetchFacebookOgTags(url: string): Promise<{ title: string | null;
 
     const title = extractMeta(html, "og:title");
     const description = extractMeta(html, "og:description");
-    const image = extractMeta(html, "og:image");
-    if (!title && !image) return null;
+    const rawImage = extractMeta(html, "og:image");
+    if (!title && !rawImage) return null;
+    const image = rawImage ? await mirrorImageToHostinger(rawImage) : null;
     return { title, description, image };
   } catch {
     return null;

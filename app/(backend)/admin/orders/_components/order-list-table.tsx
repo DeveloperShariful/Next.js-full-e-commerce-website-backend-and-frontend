@@ -332,10 +332,14 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                             const { customerName, displayDate, originText, hasTracking } = getOrderMeta(order);
 
                             return (
-                                <tr key={order.id} className={`hover:bg-[#f6f7f7] ${selectedOrders.includes(order.id) ? 'bg-[#ffffea]' : ''}`}>
-                                    <td className="py-3 px-2 text-center align-top">
-                                        <input 
-                                            type="checkbox" 
+                                <tr
+                                    key={order.id}
+                                    onClick={() => { saveScroll(); router.push(`/admin/orders/${order.id}`); }}
+                                    className={`cursor-pointer hover:bg-[#f6f7f7] ${selectedOrders.includes(order.id) ? 'bg-[#ffffea]' : ''}`}
+                                >
+                                    <td className="py-3 px-2 text-center align-top" onClick={(e) => e.stopPropagation()}>
+                                        <input
+                                            type="checkbox"
                                             className="border-[#8c8f94] mt-1"
                                             checked={selectedOrders.includes(order.id)}
                                             onChange={() => toggleSelect(order.id)}
@@ -401,7 +405,7 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                         </div>
                                     </td>
                                     
-                                    <td className="py-3 px-3 align-top text-right">
+                                    <td className="py-3 px-3 align-top text-right" onClick={(e) => e.stopPropagation()}>
                                         {isProcessingThis ? (
                                             <Loader2 className="h-5 w-5 animate-spin text-[#8c8f94] inline-block" />
                                         ) : (
@@ -480,7 +484,8 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                     return (
                         <div
                             key={order.id}
-                            className={`bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] text-[13px] ${selectedOrders.includes(order.id) ? 'bg-[#ffffea]' : ''}`}
+                            onClick={() => { saveScroll(); router.push(`/admin/orders/${order.id}`); }}
+                            className={`bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)] text-[13px] cursor-pointer ${selectedOrders.includes(order.id) ? 'bg-[#ffffea]' : ''}`}
                         >
                             {/* Order # / customer / status */}
                             <div className="flex items-start gap-2 p-3">
@@ -489,6 +494,7 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                     className="border-[#8c8f94] mt-1 shrink-0"
                                     checked={selectedOrders.includes(order.id)}
                                     onChange={() => toggleSelect(order.id)}
+                                    onClick={(e) => e.stopPropagation()}
                                 />
                                 <div className="flex-1 min-w-0">
                                     <Link href={`/admin/orders/${order.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline break-words">
@@ -538,11 +544,11 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                 ) : (
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button className="h-8 px-3 flex items-center justify-center gap-1 border border-[#c3c4c7] bg-[#f6f7f7] text-[#2c3338] rounded-[3px] hover:bg-white shadow-sm text-[12px] font-medium outline-none">
+                                            <button onClick={(e) => e.stopPropagation()} className="h-8 px-3 flex items-center justify-center gap-1 border border-[#c3c4c7] bg-[#f6f7f7] text-[#2c3338] rounded-[3px] hover:bg-white shadow-sm text-[12px] font-medium outline-none">
                                                 Actions <ChevronDown size={14} />
                                             </button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-40 border-[#c3c4c7] shadow-lg p-1">
+                                        <DropdownMenuContent align="end" className="w-40 border-[#c3c4c7] shadow-lg p-1" onClick={(e) => e.stopPropagation()}>
                                             {!isTrashView ? (
                                                 <>
                                                     {order.status === "PROCESSING" && (

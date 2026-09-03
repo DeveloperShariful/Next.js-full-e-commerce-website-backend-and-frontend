@@ -3,13 +3,14 @@
 'use client';
 
 import Image from 'next/image';
-import { Media, MediaType } from '@prisma/client';
+import { MediaType } from '@prisma/client';
+import type { MediaLibraryItem } from '@/app/actions/backend/media/media-action';
 import { IoDocumentTextOutline, IoVideocamOutline, IoCheckmarkOutline, IoImageOutline } from 'react-icons/io5';
 
 type ViewMode = 'grid' | 'list';
 
 type MediaGridProps = {
-  filteredMedia: Media[];
+  filteredMedia: MediaLibraryItem[];
   isBulkMode: boolean;
   selectedIds: string[];
   setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -27,11 +28,12 @@ function formatBytes(bytes: number) {
 export default function MediaGrid(props: MediaGridProps) {
   const { filteredMedia, isBulkMode, selectedIds, setSelectedIds, setSelectedIndex, viewMode = 'grid' } = props;
 
-  const handleItemClick = (index: number, id: string) => {
+  const handleItemClick = (index: number, id: string, isReadOnly?: boolean) => {
     if (isBulkMode) {
+      if (isReadOnly) return; // community items aren't bulk-deletable from here
       setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
     } else {
-      setSelectedIndex(index);
+      setSelectedIndex(index); // still viewable — MediaModal shows it read-only
     }
   };
 
@@ -65,14 +67,16 @@ export default function MediaGrid(props: MediaGridProps) {
               return (
                 <tr
                   key={file.id}
-                  onClick={() => handleItemClick(index, file.id)}
-                  className={`border-b border-[#f0f0f1] cursor-pointer transition-colors hover:bg-[#f6f7f7] ${isSelected ? 'bg-[#e8f0fc]' : ''}`}
+                  onClick={() => handleItemClick(index, file.id, file.isReadOnly)}
+                  className={`border-b border-[#f0f0f1] transition-colors hover:bg-[#f6f7f7] ${isSelected ? 'bg-[#e8f0fc]' : ''} ${isBulkMode && file.isReadOnly ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
                 >
                   {isBulkMode && (
                     <td className="px-3 py-2">
-                      <div className={`w-4 h-4 border-2 flex items-center justify-center ${isSelected ? 'bg-[#2271b1] border-[#2271b1]' : 'bg-white border-[#8c8f94]'}`}>
-                        {isSelected && <IoCheckmarkOutline className="text-white text-xs" />}
-                      </div>
+                      {!file.isReadOnly && (
+                        <div className={`w-4 h-4 border-2 flex items-center justify-center ${isSelected ? 'bg-[#2271b1] border-[#2271b1]' : 'bg-white border-[#8c8f94]'}`}>
+                          {isSelected && <IoCheckmarkOutline className="text-white text-xs" />}
+                        </div>
+                      )}
                     </td>
                   )}
                   <td className="px-3 py-2">
@@ -126,9 +130,10 @@ export default function MediaGrid(props: MediaGridProps) {
         return (
           <div
             key={file.id}
-            onClick={() => handleItemClick(index, file.id)}
+            onClick={() => handleItemClick(index, file.id, file.isReadOnly)}
             className={`
-              group relative w-full aspect-square bg-[#f0f0f1] border shadow-sm cursor-pointer transition-all
+              group relative w-full aspect-square bg-[#f0f0f1] border shadow-sm transition-all
+              ${isBulkMode && file.isReadOnly ? 'cursor-default opacity-60' : 'cursor-pointer'}
               ${isBulkMode ? 'hover:border-[#2271b1]' : 'hover:border-[#2271b1] hover:shadow-md'}
               ${isSelected ? 'border-[#2271b1] ring-2 ring-[#2271b1]' : 'border-[#c3c4c7]'}
             `}
@@ -188,8 +193,8 @@ export default function MediaGrid(props: MediaGridProps) {
               {file.filename}
             </div>
 
-            {/* Bulk Selection Checkmark */}
-            {isBulkMode && (
+            {/* Bulk Selection Checkmark — hidden for read-only (community) items, not bulk-deletable from here */}
+            {isBulkMode && !file.isReadOnly && (
               <div className="absolute top-2 right-2">
                 <div className={`w-6 h-6 border-2 flex items-center justify-center transition-colors shadow-sm
                   ${isSelected ? 'bg-[#2271b1] border-[#2271b1]' : 'bg-white/80 border-gray-400 group-hover:border-[#2271b1]'}

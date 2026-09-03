@@ -71,6 +71,109 @@ export const getAllMedia = unstable_cache(
   { revalidate: 300, tags: ['admin-media'] }
 );
 
+// Media Library page only (NOT MediaPickerModal — a blog/product image picker
+// showing customers' own community photos would be wrong). Read-only merge:
+// real Media rows plus PostMedia (community post attachments) synthesized
+// into the same shape so they're browsable/searchable/filterable together.
+// PostMedia intentionally stays its own table (order + cascade-delete tied
+// to one post — see lib/cloudinary.ts-style comments elsewhere in this
+// codebase for the reasoning) — this does NOT write anything back to Media,
+// it only reads PostMedia alongside it. isReadOnly marks these so the UI
+// hides edit/delete for them (managed from the Community section instead).
+export interface MediaLibraryItem {
+  id: string;
+  url: string;
+  type: MediaType;
+  filename: string;
+  originalName: string | null;
+  publicId: string | null;
+  pathname: string | null;
+  source: string; // MediaSource value, or 'COMMUNITY' for the synthesized rows below
+  width: number | null;
+  height: number | null;
+  mimeType: string;
+  size: number;
+  altText: string | null;
+  caption: string | null;
+  description: string | null;
+  qualityScore: number | null;
+  originalSize: number | null;
+  transcodePending: boolean;
+  folderId: string | null;
+  uploadedBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  isReadOnly?: boolean;
+  communityPostId?: string;
+}
+
+async function _getMediaLibraryItems(): Promise<MediaLibraryItem[]> {
+  const [media, postMedia] = await Promise.all([
+    db.media.findMany({ orderBy: { createdAt: 'desc' } }),
+    db.postMedia.findMany({ orderBy: { createdAt: 'desc' } }),
+  ]);
+
+  const mediaItems: MediaLibraryItem[] = media.map((m) => ({ ...m }));
+
+  const communityItems: MediaLibraryItem[] = postMedia.map((p) => {
+    const filename = p.url.split('/').pop() || 'community-media';
+    return {
+      id: `postmedia-${p.id}`,
+      url: p.url,
+      type: p.mediaType,
+      filename,
+      originalName: null,
+      publicId: null,
+      pathname: p.url,
+      source: 'COMMUNITY',
+      width: null,
+      height: null,
+      // PostMedia doesn't store mime type — best-effort guess from mediaType,
+      // only used for the grid/modal's image-vs-video branching, never for
+      // real upload processing.
+      mimeType: p.mediaType === 'VIDEO' ? 'video/mp4' : 'image/webp',
+      size: 0, // not tracked on PostMedia — excluded from storage totals below
+      altText: null,
+      caption: null,
+      description: null,
+      qualityScore: null,
+      originalSize: null,
+      transcodePending: false,
+      folderId: null,
+      uploadedBy: null,
+      createdAt: p.createdAt,
+      updatedAt: p.createdAt,
+      isReadOnly: true,
+      communityPostId: p.postId,
+    };
+  });
+
+  return [...mediaItems, ...communityItems].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export const getMediaLibraryItems = unstable_cache(
+  _getMediaLibraryItems,
+  ['admin-media-library'],
+  { revalidate: 300, tags: ['admin-media', 'community-posts'] }
+);
+
+// On-demand file size for the community read-only rows above (PostMedia
+// doesn't store size, so it comes back as 0 there). Called only when the
+// Attachment Details modal opens for one such item — not upfront for the
+// whole grid, which could mean hundreds of requests. Runs server-side
+// specifically to avoid the browser CORS restrictions a client-side HEAD
+// fetch to a different-origin host (media.gobike.au, Cloudinary, Vercel
+// Blob) would hit.
+export async function getRemoteFileSize(url: string): Promise<number | null> {
+  try {
+    const res = await fetch(url, { method: 'HEAD' });
+    const len = res.headers.get('content-length');
+    return len ? parseInt(len, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
 const isVercelBlobUrl = (url: string) => url.includes('.public.blob.vercel-storage.com');
 const isCloudinaryUrl = (url: string) => url.includes('res.cloudinary.com');
 const isHostingerUrl = (url: string) => url.includes('media.gobike.au');

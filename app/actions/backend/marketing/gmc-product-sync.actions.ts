@@ -474,9 +474,31 @@ export async function removeProductFromGoogle(productId: string) {
     const googleOfferId = product?.googleOfferIdOverride || productId;
 
     const merchantapi = await getGoogleMerchantClient(config as GmcConfig);
-    const productInputName = `${getAccountName(config as GmcConfig)}/productInputs/${buildProductSegment(config as GmcConfig, googleOfferId)}`;
+    const offerSegment = buildProductSegment(config as GmcConfig, googleOfferId);
+    const productInputName = `${getAccountName(config as GmcConfig)}/productInputs/${offerSegment}`;
 
-    await merchantapi.accounts.productInputs.delete({ name: productInputName, dataSource: config.gmcDataSourceName });
+    try {
+      await merchantapi.accounts.productInputs.delete({ name: productInputName, dataSource: config.gmcDataSourceName });
+    } catch (deleteError: unknown) {
+      // Products synced before a data-source recreation (e.g. the old
+      // legacy feed -> current Merchant API data source transition — see
+      // the cleanupStaleGoogleProducts comment below) still belong to that
+      // OLD data source on Google's side, so deleting with our CURRENT
+      // config.gmcDataSourceName fails with "invalid, dataSource" — this was
+      // already handled for the bulk cleanup path but not here. Fall back to
+      // looking the item up on the read-only `products` resource (no
+      // dataSource needed there) to get its real one, then retry once.
+      const errMsg = deleteError instanceof Error ? deleteError.message.toLowerCase() : "";
+      const isDataSourceMismatch = errMsg.includes("datasource") || errMsg.includes("data source");
+      if (!isDataSourceMismatch) throw deleteError;
+
+      const productName = `${getAccountName(config as GmcConfig)}/products/${offerSegment}`;
+      const lookup = await merchantapi.accounts.products.get({ name: productName });
+      const realDataSource = lookup.data.dataSource;
+      if (!realDataSource || realDataSource === config.gmcDataSourceName) throw deleteError; // no better answer — surface the original error
+
+      await merchantapi.accounts.productInputs.delete({ name: productInputName, dataSource: realDataSource });
+    }
 
     await db.productChannelStatus.upsert({
       where: { productId_channel: { productId, channel: "GOOGLE" } },

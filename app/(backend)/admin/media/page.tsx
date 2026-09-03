@@ -1,6 +1,6 @@
 // app/(backend)/admin/media/page.tsx
 
-import { getAllMedia, getStorageUsage } from '@/app/actions/backend/media/media-action';
+import { getMediaLibraryItems, getStorageUsage } from '@/app/actions/backend/media/media-action';
 import MediaLibraryUI from './_components/MediaLibraryUI';
 import type { Metadata } from 'next';
 
@@ -10,9 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminMediaPage() {
-  // Now initialMedia is strongly typed as Media[]
   const [initialMedia, storageUsage] = await Promise.all([
-    getAllMedia(),
+    getMediaLibraryItems(),
     getStorageUsage(),
   ]);
 

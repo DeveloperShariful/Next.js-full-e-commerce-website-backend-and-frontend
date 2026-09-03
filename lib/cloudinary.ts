@@ -19,13 +19,16 @@ export interface CloudinaryAccount {
   apiSecret: string;
 }
 
+// Account 0 (dbij2wehz, shown as "Cloudinary 1" in the admin dashboard) was
+// removed from this list (2026-09-03) — it hit its free-plan quota (157%)
+// and everything actually referenced by the live site has since been
+// migrated to Hostinger (verified: 0 Media rows still point at it). Nothing
+// stored there was deleted, it's just no longer a fallback destination for
+// new uploads. Indices 1/2 are left as-is (not renumbered) so the admin
+// dashboard keeps showing the same "Cloudinary 2"/"Cloudinary 3" labels the
+// account owner already recognizes — only re-add account 0 here (with its
+// index reset to 0) if that Cloudinary account is ever needed again.
 const RAW_ACCOUNTS: (CloudinaryAccount | null)[] = [
-  {
-    index: 0,
-    cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? "",
-    apiKey: process.env.CLOUDINARY_API_KEY ?? "",
-    apiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
-  },
   {
     index: 1,
     cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME1 ?? "",

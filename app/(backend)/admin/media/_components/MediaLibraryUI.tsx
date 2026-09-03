@@ -4,9 +4,8 @@
 
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { uploadMediaFile } from '@/lib/upload-media';
-import { saveMediaRecord, bulkDeleteMedia, getAllMedia, type StorageUsage } from '@/app/actions/backend/media/media-action';
+import { saveMediaRecord, bulkDeleteMedia, getMediaLibraryItems, type StorageUsage, type MediaLibraryItem } from '@/app/actions/backend/media/media-action';
 import { classifyStorage } from '@/lib/cloudinary-storage-classify';
-import { Media } from '@prisma/client';
 import MediaToolbar from './MediaToolbar';
 import MediaGrid from './MediaGrid';
 import MediaModal from './MediaModal';
@@ -17,12 +16,12 @@ type ViewMode = 'grid' | 'list';
 type SortBy = 'date' | 'name' | 'size';
 
 type MediaLibraryUIProps = {
-  initialMedia: Media[];
+  initialMedia: MediaLibraryItem[];
   storageUsage: StorageUsage;
 };
 
 export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibraryUIProps) {
-  const [mediaList, setMediaList] = useState<Media[]>(initialMedia);
+  const [mediaList, setMediaList] = useState<MediaLibraryItem[]>(initialMedia);
   const [showUploader, setShowUploader] = useState(false);
 
   // Filters, Search, View, Sort
@@ -55,7 +54,7 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
   // ── Counts (single pass — O(n) instead of 9 passes) ──
   const { typeCounts, sourceCounts, storageCounts } = useMemo(() => {
     const tc: Record<string, number> = { ALL: 0, IMAGE: 0, VIDEO: 0, DOCUMENT: 0 };
-    const sc: Record<string, number> = { ALL: 0, GENERAL: 0, PRODUCT: 0, CATEGORY: 0, BRAND: 0, AFFILIATE: 0, WARRANTY: 0, USER: 0, STORE: 0, REVIEW: 0 };
+    const sc: Record<string, number> = { ALL: 0, GENERAL: 0, PRODUCT: 0, CATEGORY: 0, BRAND: 0, AFFILIATE: 0, WARRANTY: 0, BLOG: 0, USER: 0, STORE: 0, REVIEW: 0, COMMUNITY: 0 };
     const stc: Record<string, number> = { ALL: 0 };
     for (const m of mediaList) {
       tc.ALL++;
@@ -106,7 +105,7 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
 
   // ── Refresh after sync (replaces window.location.reload) ──
   const refreshMedia = useCallback(async () => {
-    const fresh = await getAllMedia();
+    const fresh = await getMediaLibraryItems();
     setMediaList(fresh);
   }, []);
 
@@ -118,7 +117,7 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
     setIsUploading(true);
     setUploadProgress(0);
 
-    const uploadedFiles: Media[] = [];
+    const uploadedFiles: MediaLibraryItem[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
@@ -155,15 +154,20 @@ export default function MediaLibraryUI({ initialMedia, storageUsage }: MediaLibr
   };
 
   // ── Bulk Delete ──
+  // Read-only (community) rows are never checkable in the grid, but this
+  // guards against them slipping into selectedIds anyway — bulkDeleteMedia
+  // expects real Media ids, and a "postmedia-..." one would just be a
+  // silent no-op there, so filtering here keeps the count accurate.
   const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) return;
-    if (!confirm(`Are you sure you want to permanently delete ${selectedIds.length} items from your site?\nThis cannot be undone.`)) return;
+    const deletableIds = selectedIds.filter((id) => !id.startsWith('postmedia-'));
+    if (deletableIds.length === 0) return;
+    if (!confirm(`Are you sure you want to permanently delete ${deletableIds.length} items from your site?\nThis cannot be undone.`)) return;
 
     setIsDeletingBulk(true);
-    const res = await bulkDeleteMedia(selectedIds);
+    const res = await bulkDeleteMedia(deletableIds);
 
     if (res.success) {
-      setMediaList(prev => prev.filter(m => !selectedIds.includes(m.id)));
+      setMediaList(prev => prev.filter(m => !deletableIds.includes(m.id)));
       setSelectedIds([]);
       setIsBulkMode(false);
     } else {

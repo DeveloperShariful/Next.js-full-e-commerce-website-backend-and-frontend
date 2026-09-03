@@ -3,8 +3,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { updateMediaDetails, deleteMedia } from '@/app/actions/backend/media/media-action';
-import { Media } from '@prisma/client';
+import { updateMediaDetails, deleteMedia, getRemoteFileSize } from '@/app/actions/backend/media/media-action';
+import type { MediaLibraryItem } from '@/app/actions/backend/media/media-action';
 import { IoCloseOutline, IoChevronBackOutline, IoChevronForwardOutline, IoDocumentTextOutline } from 'react-icons/io5';
 
 function formatBytes(bytes: number, decimals = 0) {
@@ -17,16 +17,18 @@ function formatBytes(bytes: number, decimals = 0) {
 }
 
 type MediaModalProps = {
-  filteredMedia: Media[];
+  filteredMedia: MediaLibraryItem[];
   selectedIndex: number | null;
   setSelectedIndex: (index: number | null) => void;
-  setMediaList: React.Dispatch<React.SetStateAction<Media[]>>;
+  setMediaList: React.Dispatch<React.SetStateAction<MediaLibraryItem[]>>;
 };
 
 export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIndex, setMediaList }: MediaModalProps) {
   const [copied, setCopied] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ altText: '', originalName: '', caption: '', description: '' });
+  // undefined = not fetched/loading yet, null = fetched but unknown (e.g. HEAD failed), number = known
+  const [communitySize, setCommunitySize] = useState<number | null | undefined>(undefined);
 
   const selectedFile = selectedIndex !== null ? filteredMedia[selectedIndex] : null;
 
@@ -39,6 +41,19 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
         description: selectedFile.description || '',
       });
       setCopied(false);
+    }
+  }, [selectedFile]);
+
+  // PostMedia (community uploads) doesn't store file size, so it always
+  // starts at 0 — fetch the real size on-demand only when this specific
+  // item's details are open, not upfront for the whole grid.
+  useEffect(() => {
+    if (selectedFile?.isReadOnly && selectedFile.size === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- kicking off a network fetch on prop change, not derivable at render time
+      setCommunitySize(undefined); // loading
+      getRemoteFileSize(selectedFile.url).then(setCommunitySize); // resolves to a number, or null if unknown
+    } else {
+      setCommunitySize(undefined);
     }
   }, [selectedFile]);
 
@@ -89,7 +104,7 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
   };
 
   const handleBlurSave = async (field: string, value: string) => {
-    if ((selectedFile as Record<string, unknown>)[field] === value) return;
+    if ((selectedFile as unknown as Record<string, unknown>)[field] === value) return;
 
     setSavingField(field);
     const res = await updateMediaDetails(selectedFile.id, { [field]: value });
@@ -172,7 +187,12 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
               <p className="font-semibold text-[#1d2327] truncate mb-1" title={selectedFile.filename}>{selectedFile.filename}</p>
               <p>Uploaded on: {new Date(selectedFile.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
               <p>File type: {selectedFile.mimeType}</p>
-              <p>File size: {formatBytes(selectedFile.size)}</p>
+              <p>
+                File size:{' '}
+                {selectedFile.isReadOnly && selectedFile.size === 0
+                  ? (communitySize === undefined ? 'Checking…' : communitySize === null ? 'Unknown' : formatBytes(communitySize))
+                  : formatBytes(selectedFile.size)}
+              </p>
               {selectedFile.source && <p>Source: <span className="font-bold">{selectedFile.source}</span></p>}
               {selectedFile.transcodePending ? (
                 <p className="flex items-center gap-1.5 text-amber-700">
@@ -202,12 +222,23 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
                 </p>
               )}
 
-              <button
-                onClick={() => handleDelete(selectedFile.id)}
-                className="text-[#d63638] hover:text-red-800 hover:underline mt-3 block font-medium"
-              >
-                Delete permanently
-              </button>
+              {selectedFile.isReadOnly ? (
+                <div className="mt-3 p-2.5 bg-[#f0f6fc] border border-[#c5d9ed] rounded-sm text-[12px] text-[#1d2327]">
+                  This is a customer&apos;s Community post upload — view only here. Edit or delete it from{' '}
+                  {selectedFile.communityPostId ? (
+                    <a href="/admin/community" className="text-[#2271b1] hover:underline font-medium">
+                      the Community section
+                    </a>
+                  ) : 'the Community section'}.
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleDelete(selectedFile.id)}
+                  className="text-[#d63638] hover:text-red-800 hover:underline mt-3 block font-medium"
+                >
+                  Delete permanently
+                </button>
+              )}
             </div>
 
             <div className="space-y-4 text-[13px]">
@@ -229,7 +260,10 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
                 </button>
               </div>
 
-              {/* Editable fields */}
+              {/* Editable fields — not meaningful for read-only community rows
+                  (PostMedia has no altText/caption/description to edit, and
+                  updateMediaDetails only knows real Media ids anyway) */}
+              {!selectedFile.isReadOnly && (
               <div className="space-y-3">
 
                 {/* Alt Text */}
@@ -292,6 +326,7 @@ export default function MediaModal({ filteredMedia, selectedIndex, setSelectedIn
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </div>
         </div>

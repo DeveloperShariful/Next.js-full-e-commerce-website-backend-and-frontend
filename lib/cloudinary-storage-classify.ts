@@ -9,8 +9,12 @@ export interface StorageOption {
   label: string;
 }
 
+// Account 0 (dbij2wehz, "Cloudinary 1") removed from here too (2026-09-03) —
+// same reasoning as lib/cloudinary.ts: it's no longer an active storage
+// destination, nothing in Media references it anymore, so it shouldn't show
+// up as a selectable filter option. classifyStorage() below still falls
+// back to 'other' for any leftover URL from it, rather than erroring.
 const CLOUDINARY_CLOUD_NAMES: { index: number; cloudName: string }[] = [
-  { index: 0, cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? '' },
   { index: 1, cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME1 ?? '' },
   { index: 2, cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME2 ?? '' },
 ].filter(a => a.cloudName);

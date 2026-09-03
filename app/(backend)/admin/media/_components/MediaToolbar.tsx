@@ -126,6 +126,8 @@ export default function MediaToolbar(props: ToolbarProps) {
           <option value="BRAND">Brands ({sourceCounts.BRAND ?? 0})</option>
           <option value="AFFILIATE">Affiliate Assets ({sourceCounts.AFFILIATE ?? 0})</option>
           <option value="WARRANTY">Warranty Claims ({sourceCounts.WARRANTY ?? 0})</option>
+          <option value="BLOG">Blog ({sourceCounts.BLOG ?? 0})</option>
+          <option value="COMMUNITY">Community ({sourceCounts.COMMUNITY ?? 0})</option>
           <option value="USER">User Avatars ({sourceCounts.USER ?? 0})</option>
           <option value="STORE">Store Logos ({sourceCounts.STORE ?? 0})</option>
           <option value="REVIEW">Reviews ({sourceCounts.REVIEW ?? 0})</option>

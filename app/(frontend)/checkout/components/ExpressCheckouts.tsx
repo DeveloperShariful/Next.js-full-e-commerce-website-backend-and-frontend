@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, type StripeExpressCheckoutElementConfirmEvent } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
 import WalletEscapeHatch from './WalletEscapeHatch';
@@ -99,7 +99,11 @@ function CheckoutForm({
   appliedCoupons,
   onWalletProbe,
 }: ExpressCheckoutsProps & {
-  clientSecret: string;
+  // Nullable on purpose: the wallet buttons now render before the PaymentIntent
+  // exists (it isn't needed to display them — see the note on the early return
+  // below). onConfirm guards for it, and by the time a customer has approved in
+  // the wallet sheet it has long since arrived.
+  clientSecret: string | null;
   onWalletProbe: (state: WalletProbe) => void;
 }) {
   const stripe = useStripe();
@@ -112,9 +116,23 @@ function CheckoutForm({
     elements.update({ amount: Math.round(total * 100) });
   }, [elements, total]);
 
-  const onConfirm = async () => {
+  // The `event` argument matters: Stripe only closes the wallet / Link interface
+  // when event.paymentFailed() is called. Every failure path below MUST call it,
+  // or the customer is left staring at "Processing…" forever while the error
+  // toast sits behind the payment sheet where they can't see it.
+  const onConfirm = async (event: StripeExpressCheckoutElementConfirmEvent) => {
     if (!stripe || !elements) {
       toast.error('Payment system not ready. Please try again.');
+      event.paymentFailed({ reason: 'fail' });
+      return;
+    }
+
+    // The PaymentIntent is created in parallel by CheckoutClient and is normally
+    // ready long before anyone finishes approving in the wallet sheet. This only
+    // fires in the rare race where someone taps within the first moments.
+    if (!clientSecret) {
+      toast.error('Still preparing your payment. Please try again in a moment.');
+      event.paymentFailed({ reason: 'fail', message: 'Still preparing your payment. Please try again in a moment.' });
       return;
     }
 
@@ -131,9 +149,17 @@ function CheckoutForm({
       const selectedRate = shippingRates.find(r => r.id === selectedShipping);
       const returnUrl = `${window.location.origin}/order-confirmation?order_id=${orderDetails.orderId}&key=${orderDetails.orderKey}`;
 
-      // Step 2: Update PI metadata — fire and forget so it never delays confirmPayment.
-      // capture-order's security check only fails on active mismatch, not missing metadata.
-      fetch('/api/stripe/update-payment-intent', {
+      // Step 2: Sync the PaymentIntent to the authoritative order total BEFORE
+      // confirming. Passing orderId makes the route look the order up and
+      // overwrite the PI amount with order.total from the database
+      // (update-payment-intent/route.ts:53-65) — so the charge can never drift
+      // from what the order actually says.
+      //
+      // Deliberately AWAITED. It used to be fire-and-forget for speed, but that
+      // let confirmPayment race ahead while the PI still carried the older
+      // debounced amount from CheckoutClient (debouncedUpdatePIAmount, 800ms).
+      // Costs one round-trip, spent while "Processing…" is already on screen.
+      const piSync = await fetch('/api/stripe/update-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -148,7 +174,13 @@ function CheckoutForm({
             shipping_cost: String(selectedRate?.cost || '0'),
           },
         }),
-      }).catch(err => console.error('[ExpressCheckout] PI metadata update failed:', err));
+      });
+
+      if (!piSync.ok) {
+        // Never confirm against an unverified amount — fail loudly instead.
+        console.error('[ExpressCheckout] PI amount sync failed:', piSync.status);
+        throw new Error('Could not verify the payment amount. Please try another payment method.');
+      }
 
       // Step 3: Confirm payment immediately after order creation.
       // redirect: 'if_required' — Link/saved cards resolve inline (no redirect).
@@ -185,8 +217,14 @@ function CheckoutForm({
       }
 
     } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       toast.dismiss('express-checkout');
-      toast.error(error instanceof Error ? error.message : 'An unexpected error occurred.');
+      toast.error(message);
+
+      // Without this the Link / Google Pay sheet never learns the payment failed
+      // and spins on "Processing…" indefinitely — the toast is hidden behind it,
+      // so the customer has no idea what happened and no way forward.
+      event.paymentFailed({ reason: 'fail', message });
     }
   };
 
@@ -245,10 +283,10 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
   }, []);
 
   // The element only exists once this is true — deliberately the same condition
-  // as the early return below. clientSecret arrives asynchronously from
-  // CheckoutClient, and an ungated timer would fire during the skeleton window
-  // and wrongly declare 'none' before ExpressCheckoutElement had even mounted.
-  const elementMounted = !!clientSecret && !!stripePromise && total > 0;
+  // as the early return below. An ungated timer would fire during the skeleton
+  // window and wrongly declare 'none' before ExpressCheckoutElement had even
+  // mounted.
+  const elementMounted = !!stripePromise && total > 0;
 
   // Safety net: in a hostile WebView the Stripe iframe can load but never post
   // back, so neither onReady nor onLoadError ever fires. Assume 'none' after
@@ -261,8 +299,19 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
     return () => clearTimeout(timer);
   }, [elementMounted, walletProbe]);
 
-  // Wait for clientSecret (needed at confirmPayment time) and a valid total
-  if (!clientSecret || !stripePromise || total <= 0) {
+  // Wait only for Stripe.js and a real total.
+  //
+  // Deliberately NOT waiting for clientSecret: <Elements> below runs on
+  // mode + amount (Stripe's deferred-intent pattern), and clientSecret is used
+  // only inside stripe.confirmPayment — i.e. after the customer has already
+  // approved in the wallet sheet. Gating the render on it made the buttons wait
+  // for a whole extra round-trip (/api/stripe/create-payment-intent) that they
+  // don't need in order to appear.
+  //
+  // Tapping too early is still impossible in practice: the !isShippingSelected
+  // overlay below blocks clicks until a shipping rate is chosen, and onConfirm
+  // guards for a null clientSecret regardless.
+  if (!stripePromise || total <= 0) {
     return (
       <div className="w-full">
         <div className="h-12 w-full bg-[#f0f0f0] rounded-lg animate-pulse" />

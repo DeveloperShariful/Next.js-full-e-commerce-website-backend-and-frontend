@@ -5,6 +5,14 @@ import React, { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
+import WalletEscapeHatch from './WalletEscapeHatch';
+
+/**
+ * Result of asking Stripe whether any wallet (Apple Pay / Google Pay / Link) can
+ * show. 'none' is the normal state inside a Facebook/Instagram in-app browser,
+ * where Meta has not enabled the Payment Request API.
+ */
+type WalletProbe = 'probing' | 'available' | 'none';
 
 // ============================================================================
 // 1. INTERFACES
@@ -72,7 +80,11 @@ function CheckoutForm({
   selectedShipping,
   shippingRates,
   appliedCoupons,
-}: ExpressCheckoutsProps & { clientSecret: string }) {
+  onWalletProbe,
+}: ExpressCheckoutsProps & {
+  clientSecret: string;
+  onWalletProbe: (state: WalletProbe) => void;
+}) {
   const stripe = useStripe();
   const elements = useElements();
 
@@ -161,7 +173,23 @@ function CheckoutForm({
     }
   };
 
-  return <ExpressCheckoutElement onConfirm={onConfirm} />;
+  return (
+    <ExpressCheckoutElement
+      onConfirm={onConfirm}
+      // onReady is the ONLY availability signal in @stripe/react-stripe-js@5.6.0
+      // (there is no availablepaymentmethodschange event in this version).
+      // availablePaymentMethods is undefined when no wallet can show; the
+      // Object.values check also covers Stripe returning an all-false object.
+      onReady={({ availablePaymentMethods }) => {
+        const hasWallet =
+          !!availablePaymentMethods &&
+          Object.values(availablePaymentMethods).some(Boolean);
+        onWalletProbe(hasWallet ? 'available' : 'none');
+      }}
+      // Iframe failed to load entirely — plausible in a restrictive WebView.
+      onLoadError={() => onWalletProbe('none')}
+    />
+  );
 }
 
 // ============================================================================
@@ -174,6 +202,28 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
   const [stripePromise] = useState(() =>
     publicKey ? loadStripe(publicKey) : null
   );
+
+  // Has Stripe told us whether any wallet can show? Lives here — above <Elements>
+  // and above the early return — so the result survives anything Elements does
+  // internally, and so the hooks below never sit after a conditional return.
+  const [walletProbe, setWalletProbe] = useState<WalletProbe>('probing');
+
+  // The element only exists once this is true — deliberately the same condition
+  // as the early return below. clientSecret arrives asynchronously from
+  // CheckoutClient, and an ungated timer would fire during the skeleton window
+  // and wrongly declare 'none' before ExpressCheckoutElement had even mounted.
+  const elementMounted = !!clientSecret && !!stripePromise && total > 0;
+
+  // Safety net: in a hostile WebView the Stripe iframe can load but never post
+  // back, so neither onReady nor onLoadError ever fires. Assume 'none' after
+  // 4.5s. The handler stays attached, so a late 'ready' carrying wallets flips
+  // this back to 'available' and the fallback disappears — optimistic, then
+  // self-correcting, which is why an aggressive timeout is safe here.
+  useEffect(() => {
+    if (!elementMounted || walletProbe !== 'probing') return;
+    const timer = setTimeout(() => setWalletProbe('none'), 4500);
+    return () => clearTimeout(timer);
+  }, [elementMounted, walletProbe]);
 
   // Wait for clientSecret (needed at confirmPayment time) and a valid total
   if (!clientSecret || !stripePromise || total <= 0) {
@@ -200,6 +250,7 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
           clientSecret is passed as a prop to CheckoutForm and used only in
           stripe.confirmPayment — this is Stripe's deferred-intent pattern. */}
       <Elements
+        key="ece"
         stripe={stripePromise}
         options={{
           mode: 'payment',
@@ -208,10 +259,23 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
           appearance: { theme: 'stripe' },
         }}
       >
-        <CheckoutForm {...props} clientSecret={clientSecret} />
+        <CheckoutForm {...props} clientSecret={clientSecret} onWalletProbe={setWalletProbe} />
       </Elements>
 
-      <div className="text-center text-[#6b7280] font-medium text-sm mt-2.5">— OR —</div>
+      {/* React reconciles static children by position, and a falsy && branch still
+          occupies its slot. Both of the below must stay AFTER <Elements>, never
+          before it — inserting a slot ahead of Elements would remount it and
+          reset the wallet probe. */}
+      {walletProbe !== 'none' && (
+        <div className="text-center text-[#6b7280] font-medium text-sm mt-2.5">— OR —</div>
+      )}
+
+      {/* Always mounted, hides itself via the prop, so the slot count never
+          changes. It renders its own divider when visible — so exactly one
+          — OR — shows in every state, and none when there are no wallets and no
+          fallback (which also clears the orphan divider that used to sit above
+          nothing in the in-app browser). */}
+      <WalletEscapeHatch active={walletProbe === 'none'} />
     </div>
   );
 }

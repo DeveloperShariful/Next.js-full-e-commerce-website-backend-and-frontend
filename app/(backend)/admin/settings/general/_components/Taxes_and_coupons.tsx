@@ -46,6 +46,26 @@ export default function Taxes_and_coupons({ data, updateNestedData }: Props) {
 
             <hr className="border-gray-200 my-4"/>
 
+            {/* Checkout Section */}
+            <h3 className="text-sm font-bold text-gray-800 mb-4">Checkout</h3>
+            <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                    <input
+                        type="checkbox"
+                        id="enable_wallet_escape"
+                        checked={data.generalConfig.enableWalletEscapeHatch}
+                        onChange={(e) => updateNestedData('generalConfig', 'enableWalletEscapeHatch', e.target.checked)}
+                        className="mt-0.5 w-4 h-4 text-[#2271b1] rounded border-gray-300 focus:ring-[#2271b1]"
+                    />
+                    <div>
+                        <label htmlFor="enable_wallet_escape" className="block text-sm text-gray-700 select-none cursor-pointer">Show &quot;open in browser&quot; prompt when Apple Pay / Google Pay are unavailable</label>
+                        <p className="text-xs text-gray-500 mt-0.5">Facebook and Instagram in-app browsers cannot show wallet buttons. When enabled, visitors from those apps are offered a link that carries their cart into Chrome or Safari, where one-tap payment works.</p>
+                    </div>
+                </div>
+            </div>
+
+            <hr className="border-gray-200 my-4"/>
+
             {/* Coupons Section */}
             <h3 className="text-sm font-bold text-gray-800 mb-4">Coupons</h3>
             <div className="space-y-4">

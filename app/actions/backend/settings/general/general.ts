@@ -101,6 +101,7 @@ export async function updateGeneralSettings(formData: FormData) {
       calcCouponsSequentially: formData.get("calc_coupons_seq") === "true",
       enableReviews: formData.get("enable_reviews") === "true",
       enableGuestCheckout: formData.get("enable_guest_checkout") === "true",
+      enableWalletEscapeHatch: formData.get("enable_wallet_escape") === "true",
       currencyOptions: currencyOptions,
       timezone: timezone,
     };

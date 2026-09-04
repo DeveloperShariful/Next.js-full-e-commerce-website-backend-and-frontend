@@ -48,6 +48,7 @@ export interface GeneralSettingsData {
         calcCouponsSequentially: boolean; 
         enableReviews: boolean;
         enableGuestCheckout: boolean;
+        enableWalletEscapeHatch: boolean;
     };
     taxSettings: {
         enableTax: boolean;
@@ -79,7 +80,8 @@ export default function GeneralTab() {
         defaultCustomerLocation: "shop_base",
         enableCoupons: true, calcCouponsSequentially: false,
         enableReviews: true,
-        enableGuestCheckout: false
+        enableGuestCheckout: false,
+        enableWalletEscapeHatch: false
     },
     taxSettings: { enableTax: false, pricesIncludeTax: false },
     currencyOptions: {
@@ -118,7 +120,9 @@ export default function GeneralTab() {
                 enableCoupons: gc.enableCoupons ?? true,
                 calcCouponsSequentially: gc.calcCouponsSequentially ?? false,
                 enableReviews: gc.enableReviews ?? true,
-                enableGuestCheckout: gc.enableGuestCheckout ?? false
+                enableGuestCheckout: gc.enableGuestCheckout ?? false,
+                // Opt-in, default OFF — deploying the code must not turn it on.
+                enableWalletEscapeHatch: gc.enableWalletEscapeHatch ?? false
             },
             taxSettings: (s.taxSettings as any) || { enableTax: false, pricesIncludeTax: false },
             currencyOptions: {
@@ -177,6 +181,7 @@ export default function GeneralTab() {
     
     formData.append("enable_reviews", String(data.generalConfig.enableReviews));
     formData.append("enable_guest_checkout", String(data.generalConfig.enableGuestCheckout));
+    formData.append("enable_wallet_escape", String(data.generalConfig.enableWalletEscapeHatch));
 
     formData.append("enable_tax", String(data.taxSettings.enableTax));
     formData.append("prices_include_tax", String(data.taxSettings.pricesIncludeTax));

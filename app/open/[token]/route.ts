@@ -3,7 +3,7 @@
 // Cart handoff endpoint. ONE url, TWO behaviours, decided by User-Agent:
 //
 //   in-app browser (FB/IG WebView) → 200 HTML instructions page, NO redirect
-//   real browser (Chrome/Safari)   → set cart_session cookie, 302 to clean /cart
+//   real browser (Chrome/Safari)   → set cart_session cookie, 302 to clean /checkout
 //
 // Why one route and not two: whatever URL the in-app browser is SITTING ON is the
 // URL Safari opens when the user taps "⋯ → Open in Safari". So the instructions
@@ -67,11 +67,16 @@ export async function GET(
       return applyHeaders(response);
     }
 
-    // ── Branch B: a real browser → restore the cart key, land on a clean /cart ──
+    // ── Branch B: a real browser → restore the cart key, land on clean /checkout ──
     // If the UA regex ever misses a new FB build we land here inside the WebView:
-    // it re-sets a cookie it already has and shows /cart. Useless, but harmless.
+    // it re-sets a cookie it already has and shows checkout. Useless, but harmless.
+    //
+    // Straight to /checkout rather than /cart to save a tap. Safe because the
+    // browser stores this Set-Cookie BEFORE following the 302, so checkout's
+    // empty-cart guard (checkout/page.tsx:29-40) reads the restored key and
+    // finds the cart. If anything did go wrong it falls back to /cart anyway.
     log("redeem", platform);
-    const response = NextResponse.redirect(new URL("/cart", request.url));
+    const response = NextResponse.redirect(new URL("/checkout", request.url));
 
     // Byte-for-byte identical to cartActions.ts:56-60 — deliberately no `secure`
     // and no `sameSite`, so this never diverges from what the cart itself sets.
@@ -117,9 +122,16 @@ function renderInstructions(
   const menuCorner = "top-right";
   const menuAction = isIOS ? "Open in Safari" : isAndroid ? "Open in Chrome" : "Open in Browser";
 
-  const androidButton = isAndroid
-    ? `<a class="btn" href="${intentUrl}">Open in Chrome &rarr;</a>`
-    : "";
+  // Android can be forced, so lead with the button and demote the manual route
+  // to a one-line fallback. iOS cannot be forced, so there the written steps ARE
+  // the mechanism and must stay prominent — never trim them away.
+  const body = isAndroid
+    ? `<a class="btn" href="${intentUrl}">Open in Chrome &rarr;</a>
+       <p class="hint">Not working? Tap <span class="kbd">${menuIcon}</span> at the ${menuCorner}, then <b>${menuAction}</b></p>`
+    : `<ol>
+         <li>Tap <span class="kbd">${menuIcon}</span> at the ${menuCorner} of this window</li>
+         <li>Choose <b>${menuAction}</b></li>
+       </ol>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -134,15 +146,14 @@ function renderInstructions(
        background:#f9f9f9;color:#1f2937;line-height:1.55;-webkit-font-smoothing:antialiased}
   .card{max-width:420px;margin:0 auto;background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:24px 20px}
   h1{margin:0 0 6px;font-size:20px;line-height:1.3;color:#111827}
-  .sub{margin:0 0 20px;font-size:14px;color:#6b7280}
-  ol{margin:0;padding-left:20px;font-size:15px}
+  ol{margin:18px 0 0;padding-left:20px;font-size:15px}
   li{margin-bottom:10px}
   .kbd{display:inline-block;min-width:26px;text-align:center;padding:1px 7px;border:1px solid #d1d5db;
        border-radius:5px;background:#f3f4f6;font-size:15px;line-height:1.5;font-weight:600}
   b{color:#111827}
-  .note{margin:20px 0 0;padding:12px 14px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;
-        font-size:13px;color:#854d0e;text-align:center}
-  .btn{display:block;margin:20px 0 0;padding:14px;background:#111827;color:#fff;text-decoration:none;
+  .note{margin:18px 0 0;font-size:13px;color:#854d0e;text-align:center}
+  .hint{margin:14px 0 0;font-size:13px;color:#6b7280;text-align:center}
+  .btn{display:block;margin:18px 0 0;padding:14px;background:#111827;color:#fff;text-decoration:none;
        text-align:center;font-weight:600;font-size:15px;border-radius:8px}
   .back{display:block;margin:16px 0 0;text-align:center;font-size:13px;color:#6b7280}
 </style>
@@ -150,13 +161,8 @@ function renderInstructions(
 <body>
   <div class="card">
     <h1>One more tap to use ${walletName}</h1>
-    <p class="sub">${walletName} isn&rsquo;t available inside this app&rsquo;s built-in browser.</p>
-    <ol>
-      <li>Tap <span class="kbd">${menuIcon}</span> at the ${menuCorner} of this window</li>
-      <li>Choose <b>${menuAction}</b></li>
-    </ol>
-    ${androidButton}
-    <p class="note">&#128722; Your cart is saved &mdash; it&rsquo;ll be waiting for you.</p>
+    ${body}
+    <p class="note">&#128722; Your cart is saved</p>
     <a class="back" href="/checkout">&larr; Back to checkout</a>
   </div>
 </body>

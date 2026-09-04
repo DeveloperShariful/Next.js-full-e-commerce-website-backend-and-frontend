@@ -113,8 +113,7 @@ export default function WalletEscapeHatch({ active }: WalletEscapeHatchProps) {
       <>
         <div className="w-full py-3 px-4 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800 text-center space-y-2">
           <p>
-            Want to pay in one tap with <strong>{walletLabel}</strong>? It&rsquo;s not
-            available inside this app&rsquo;s browser.
+            Want to pay with <strong>{walletLabel}</strong>?
           </p>
           <a
             href={url}
@@ -123,7 +122,6 @@ export default function WalletEscapeHatch({ active }: WalletEscapeHatchProps) {
           >
             {buttonLabel} &rarr;
           </a>
-          <p className="text-xs text-yellow-700">Your cart comes with you.</p>
         </div>
 
         {/* Owns the divider while visible, so exactly one — OR — shows in every state */}

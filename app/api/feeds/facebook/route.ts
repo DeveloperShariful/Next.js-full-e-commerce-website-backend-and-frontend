@@ -28,9 +28,15 @@ function stripHtmlTags(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// Image/video URLs are stored complete in the database — Hostinger's upload.php
+// returns the full URL, and Cloudinary / Vercel Blob URLs are absolute too. So
+// nothing needs prefixing or rewriting here.
+//
+// The previous regex matched `[^/]*gobike.au`, which also caught the media host
+// and rewrote https://media.gobike.au/... to https://gobike.au/... — a server
+// that doesn't hold those files. That broke every image link in the feed.
 function formatUrl(url: string | null | undefined): string {
-  if (!url) return "";
-  return url.replace(/^https?:\/\/(localhost:\d+|[^/]*gobike\.au)/, SITE_URL);
+  return url ? url.trim() : "";
 }
 
 // Strip SEO template variables like %title%, %sep%, %sitename%
@@ -121,7 +127,10 @@ export async function GET() {
             sku: true,
             barcode: true,
             attributes: true,
-            images: { select: { url: true } },
+            // Ordered like the product's own images — without this the "main"
+            // variant image (images[0]) is whatever the DB returns first, so it
+            // could change between feed fetches.
+            images: { orderBy: { position: "asc" }, select: { url: true } },
           }
         }
       },
@@ -278,7 +287,11 @@ export async function GET() {
             });
           }
           if (feedShippingWeight) xml += `      <g:shipping_weight>${escapeXml(feedShippingWeight)}</g:shipping_weight>\n`;
-          if (feedVideoUrl) xml += `      <video_link>${escapeXml(feedVideoUrl)}</video_link>\n`;
+          // Meta's spec: the g: prefix is only for Google Merchant namespace
+          // attributes; others — video, additional_image_link — go without it.
+          // The field is `video`; `video_link` matches no spec, so Facebook was
+          // simply ignoring it.
+          if (feedVideoUrl) xml += `      <video>${escapeXml(feedVideoUrl)}</video>\n`;
 
           xml += `    </item>\n`;
         });
@@ -344,7 +357,8 @@ export async function GET() {
           });
         }
         if (feedShippingWeight) xml += `      <g:shipping_weight>${escapeXml(feedShippingWeight)}</g:shipping_weight>\n`;
-        if (feedVideoUrl) xml += `      <video_link>${escapeXml(feedVideoUrl)}</video_link>\n`;
+        // Same as the variant branch above: the field is `video`, not `video_link`.
+        if (feedVideoUrl) xml += `      <video>${escapeXml(feedVideoUrl)}</video>\n`;
 
         xml += `    </item>\n`;
       }
@@ -357,7 +371,26 @@ export async function GET() {
     return new NextResponse(xml, {
       headers: {
         "Content-Type": "application/xml",
-        "Cache-Control": "public, max-age=3600, s-maxage=3600",
+        // The cache exists to protect the database: this endpoint is public and
+        // unauthenticated, and every miss runs a heavy query across all active
+        // products with their images, variants and categories. One hour caps
+        // that at a couple of queries per hour no matter how many requests
+        // arrive — including from bots that have found the URL.
+        //
+        // Deliberately NO stale-while-revalidate: it would serve the old copy
+        // while refreshing behind it, so "Update Now" in Commerce Manager right
+        // after a product edit could still hand Facebook stale data. A feed is
+        // read by machines on a schedule — being fresh matters, spending an
+        // extra second to regenerate does not.
+        //
+        // To get a fresh copy on demand without waiting out the hour, add any
+        // query string (…/api/feeds/facebook?t=123) — the CDN treats it as a
+        // different URL. A new deployment also clears this cache.
+        //
+        // This only controls how fresh OUR feed is. Facebook still pulls on its
+        // own schedule (Commerce Manager → Data Sources), which is what actually
+        // decides when changes appear on Facebook.
+        "Cache-Control": "public, max-age=0, s-maxage=3600",
       },
     });
 

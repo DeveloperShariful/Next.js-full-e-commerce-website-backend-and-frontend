@@ -138,7 +138,7 @@ export default function Footer() {
                 <h3 className="text-lg font-bold mb-4 capitalize border-b-2 border-[#1a1a1a] pb-3 inline-block">Follow Us</h3>
                 <ul className="list-none p-0 m-0 space-y-3 mt-3 md:mt-0">
                     <li>
-                      <a href="https://www.facebook.com/Go-Bike-104997195659873" target="_blank" rel="noopener noreferrer" className="text-[#555] flex items-center gap-3 hover:text-black font-medium transition-colors">
+                      <a href="https://www.facebook.com/profile.php?id=61567829633022" target="_blank" rel="noopener noreferrer" className="text-[#555] flex items-center gap-3 hover:text-black font-medium transition-colors">
                         <FaFacebookF className="w-6 h-6 text-white bg-[#1877F2] rounded-full p-1" />
                         <span>Facebook</span>
                       </a>
@@ -150,7 +150,7 @@ export default function Footer() {
                       </a>
                     </li>
                     <li>
-                      <a href="https://www.youtube.com/@Gobike-r7b" target="_blank" rel="noopener noreferrer" className="text-[#555] flex items-center gap-3 hover:text-black font-medium transition-colors">
+                      <a href="https://www.youtube.com/@GOBIKEELECTRICBIKE" target="_blank" rel="noopener noreferrer" className="text-[#555] flex items-center gap-3 hover:text-black font-medium transition-colors">
                         <FaYoutube className="w-6 h-6 text-[#ff0000] bg-white" />
                         <span>Youtube</span>
                       </a>

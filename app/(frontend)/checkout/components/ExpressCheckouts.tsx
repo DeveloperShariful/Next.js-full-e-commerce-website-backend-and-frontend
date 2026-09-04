@@ -14,6 +14,23 @@ import WalletEscapeHatch from './WalletEscapeHatch';
  */
 type WalletProbe = 'probing' | 'available' | 'none';
 
+/**
+ * Never collapse wallets into a "See more" overflow menu. Stripe's default
+ * (overflow: 'auto') lets it hide buttons when space is tight — on a narrow
+ * phone that meant only Link fit and Google Pay was buried behind "See more",
+ * so most mobile shoppers never saw the one-tap button at all.
+ *
+ * maxColumns / maxRows are deliberately left unset — both already default to 0
+ * (unlimited), so the desktop side-by-side arrangement is unchanged. Stripe
+ * forbids combining overflow: 'never' with maxRows > 0; we don't set maxRows.
+ *
+ * Module scope so the object identity is stable and never triggers a needless
+ * elements.update() on re-render.
+ */
+const EXPRESS_CHECKOUT_OPTIONS = {
+  layout: { overflow: 'never' as const },
+};
+
 // ============================================================================
 // 1. INTERFACES
 // ============================================================================
@@ -175,6 +192,7 @@ function CheckoutForm({
 
   return (
     <ExpressCheckoutElement
+      options={EXPRESS_CHECKOUT_OPTIONS}
       onConfirm={onConfirm}
       // onReady is the ONLY availability signal in @stripe/react-stripe-js@5.6.0
       // (there is no availablepaymentmethodschange event in this version).

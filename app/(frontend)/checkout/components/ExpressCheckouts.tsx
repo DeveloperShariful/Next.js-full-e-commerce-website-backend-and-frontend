@@ -1,7 +1,7 @@
 // app/(frontend)/checkout/components/ExpressCheckouts.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, ExpressCheckoutElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
@@ -208,6 +208,24 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
   // internally, and so the hooks below never sit after a conditional return.
   const [walletProbe, setWalletProbe] = useState<WalletProbe>('probing');
 
+  // Test hook: ?forcenowallet=1 pins the probe to 'none'. Needed because Link is
+  // offered in almost every normal browser, so you cannot otherwise reproduce
+  // the "no wallets" state outside a real in-app browser.
+  //
+  // The effect writes a ref only — never setState — so it cannot cascade a
+  // render. Whichever arrives first, Stripe's onReady or the 4.5s timeout below,
+  // routes through handleWalletProbe and lands on 'none'.
+  const forcedNoWallet = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    forcedNoWallet.current = window.location.search.includes('forcenowallet=1');
+  }, []);
+
+  // Stable identity; pins the result to 'none' when the test hook is on.
+  const handleWalletProbe = useCallback((state: WalletProbe) => {
+    setWalletProbe(forcedNoWallet.current ? 'none' : state);
+  }, []);
+
   // The element only exists once this is true — deliberately the same condition
   // as the early return below. clientSecret arrives asynchronously from
   // CheckoutClient, and an ungated timer would fire during the skeleton window
@@ -259,7 +277,7 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
           appearance: { theme: 'stripe' },
         }}
       >
-        <CheckoutForm {...props} clientSecret={clientSecret} onWalletProbe={setWalletProbe} />
+        <CheckoutForm {...props} clientSecret={clientSecret} onWalletProbe={handleWalletProbe} />
       </Elements>
 
       {/* React reconciles static children by position, and a falsy && branch still
@@ -275,7 +293,13 @@ function ExpressCheckoutsComponent(props: ExpressCheckoutsProps) {
           — OR — shows in every state, and none when there are no wallets and no
           fallback (which also clears the orphan divider that used to sit above
           nothing in the in-app browser). */}
-      <WalletEscapeHatch active={walletProbe === 'none'} />
+      {/* z-20 lifts this ABOVE the !isShippingSelected overlay (z-10) above.
+          That overlay exists to block Express Checkout until shipping is picked,
+          but this link only opens a browser — it must stay tappable, and in the
+          in-app browser people usually see it before choosing shipping. */}
+      <div className="relative z-20">
+        <WalletEscapeHatch active={walletProbe === 'none'} />
+      </div>
     </div>
   );
 }

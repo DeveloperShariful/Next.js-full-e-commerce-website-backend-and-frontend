@@ -476,7 +476,7 @@ export async function getPublishedBlogPosts(options: {
           publishedAt: true, readTimeMinutes: true, viewCount: true,
           isFeatured: true, isPinned: true, tags: true,
           category: { select: { id: true, name: true, slug: true, color: true } },
-          author: { select: { id: true, name: true, image: true } },
+          author: { select: { id: true, name: true, image: true, slug: true } },
         },
       }),
       db.blogPost.count({ where }),
@@ -505,7 +505,7 @@ export async function getBlogPostBySlug(slug: string) {
       where: { slug },
       include: {
         category: { select: { id: true, name: true, slug: true, color: true } },
-        author: { select: { id: true, name: true, image: true } },
+        author: { select: { id: true, name: true, image: true, slug: true } },
       },
     });
     if (!post || post.status !== BlogPostStatus.PUBLISHED) return null;
@@ -567,6 +567,70 @@ export async function getRelatedBlogPosts(
       select,
     });
     return posts;
+  } catch {
+    return [];
+  }
+}
+
+// ==========================================
+// AUTHOR PROFILE PAGE (/blog/author/[slug])
+// ==========================================
+// E-E-A-T signal: a real author entity (bio, photo, sameAs social links, list
+// of their published work) that blog posts' Person schema can link to,
+// instead of just pointing at the site homepage.
+export async function getAuthorBySlug(slug: string) {
+  try {
+    const author = await db.user.findUnique({
+      where: { slug },
+      select: { id: true, name: true, image: true, bio: true, socialLinks: true },
+    });
+    if (!author) return null;
+
+    const posts = await db.blogPost.findMany({
+      where: { authorId: author.id, status: BlogPostStatus.PUBLISHED },
+      orderBy: { publishedAt: "desc" },
+      select: {
+        slug: true,
+        title: true,
+        excerpt: true,
+        featuredImage: true,
+        featuredImageAlt: true,
+        publishedAt: true,
+        readTimeMinutes: true,
+        category: { select: { name: true, slug: true, color: true } },
+      },
+    });
+
+    return { author, posts };
+  } catch {
+    return null;
+  }
+}
+
+// All distinct authors with a published post — powers /blog/author (the
+// index page one level up from /blog/author/[slug], so it isn't a dead 404
+// and every profile page is reachable via an internal link for crawlers).
+export async function getAllBlogAuthors() {
+  try {
+    const authorIds = await db.blogPost.findMany({
+      where: { status: BlogPostStatus.PUBLISHED, authorId: { not: null } },
+      distinct: ["authorId"],
+      select: { authorId: true },
+    });
+
+    const authors = await db.user.findMany({
+      where: { id: { in: authorIds.map((a) => a.authorId).filter((id): id is string => !!id) } },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        image: true,
+        bio: true,
+        _count: { select: { blogPosts: { where: { status: BlogPostStatus.PUBLISHED } } } },
+      },
+    });
+
+    return authors.sort((a, b) => b._count.blogPosts - a._count.blogPosts);
   } catch {
     return [];
   }

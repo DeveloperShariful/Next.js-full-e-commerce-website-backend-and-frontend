@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Role } from '@prisma/client';
 import UserFilterLinks from './_components/UserFilterLinks';
 import UserTableClient from './_components/UserTableClient';
+import { ScrollRestorer } from '@/app/(backend)/admin/_components/back-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -134,7 +135,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="w-full pb-10 pt-1 overflow-x-hidden font-sans">
-      
+      <ScrollRestorer scrollKey="users-scroll-y" />
+
       <div className="flex items-center gap-3 mb-3 pl-2 sm:pl-0">
         <h1 className="text-[23px] font-normal text-[#1d2327] leading-none m-0">Users</h1>
         <Link 

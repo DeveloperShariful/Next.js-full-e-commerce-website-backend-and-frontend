@@ -207,6 +207,8 @@ export default async function NewBlogPostPage({ params }: Props) {
 
   const authorName = post.author?.name ?? "GoBike Team";
   const authorImage = post.author?.image ?? null;
+  const authorSlug = (post.author as { slug?: string | null } | null)?.slug ?? null;
+  const authorUrl = authorSlug ? `${SITE_URL}/blog/author/${authorSlug}` : SITE_URL;
   const authorInitials = authorName
     .split(" ")
     .map((w: string) => w[0])
@@ -231,7 +233,15 @@ export default async function NewBlogPostPage({ params }: Props) {
     image: ogImage ? [{ "@type": "ImageObject", url: ogImage, width: 1200, height: 630 }] : [],
     datePublished: publishDate,
     dateModified: modifiedDate,
-    author: { "@type": "Person", name: authorName, url: SITE_URL },
+    // Matching @id (only when the author actually has a profile page) lets
+    // Google connect this mention to the standalone Person entity on
+    // /blog/author/[slug] instead of treating it as an unverified name.
+    author: {
+      "@type": "Person",
+      name: authorName,
+      url: authorUrl,
+      ...(authorSlug ? { "@id": `${authorUrl}#person` } : {}),
+    },
     publisher: {
       "@type": "Organization",
       name: "GoBike Australia",
@@ -334,7 +344,14 @@ export default async function NewBlogPostPage({ params }: Props) {
             {post.title}
           </h1>
           <p className="text-gray-500 text-sm md:text-base font-medium">
-            By <span className="font-bold text-black">{authorName}</span>
+            By{" "}
+            {authorSlug ? (
+              <Link href={`/blog/author/${authorSlug}`} className="font-bold text-black hover:text-blue-600 transition-colors">
+                {authorName}
+              </Link>
+            ) : (
+              <span className="font-bold text-black">{authorName}</span>
+            )}
             {post.publishedAt && (
               <>
                 {" "}
@@ -597,7 +614,13 @@ export default async function NewBlogPostPage({ params }: Props) {
                 </div>
               )}
               <div className="text-center sm:text-left">
-                <h4 className="text-lg font-bold text-gray-900 mb-0.5">{authorName}</h4>
+                <h4 className="text-lg font-bold text-gray-900 mb-0.5">
+                  {authorSlug ? (
+                    <Link href={`/blog/author/${authorSlug}`} className="hover:text-blue-600 transition-colors">
+                      {authorName}
+                    </Link>
+                  ) : authorName}
+                </h4>
                 <p className="text-sm text-gray-500 mb-2">GoBike Australia</p>
                 <p className="text-sm text-gray-600 leading-relaxed">{authorBio}</p>
               </div>
@@ -633,7 +656,13 @@ export default async function NewBlogPostPage({ params }: Props) {
                   </div>
                 )}
                 <div>
-                  <p className="font-bold text-gray-900 text-[15px]">{authorName}</p>
+                  <p className="font-bold text-gray-900 text-[15px]">
+                    {authorSlug ? (
+                      <Link href={`/blog/author/${authorSlug}`} className="hover:text-blue-600 transition-colors">
+                        {authorName}
+                      </Link>
+                    ) : authorName}
+                  </p>
                   <p className="text-[12px] text-gray-500 mt-0.5 mb-2">GoBike Australia</p>
                   <p className="text-[12px] text-gray-600 leading-relaxed">{authorBio}</p>
                 </div>

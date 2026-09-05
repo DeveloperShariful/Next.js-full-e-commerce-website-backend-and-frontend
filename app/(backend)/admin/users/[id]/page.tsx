@@ -2,9 +2,9 @@
 
 import { db } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import UserFormClient from './UserFormClient';
 import { getAllCountries } from '@/app/actions/backend/settings/general/location-helpers';
+import { BackButton } from '@/app/(backend)/admin/_components/back-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +49,10 @@ export default async function UserEditPage({ params }: { params: Promise<{ id: s
     email: user.email,
     role: user.role,
     isActive: user.isActive,
+    image: user.image || '',
+    bio: user.bio || '',
+    slug: user.slug || '',
+    socialLinks: user.socialLinks,
     metafields: (user.metafields && typeof user.metafields === 'object' && !Array.isArray(user.metafields)
       ? user.metafields
       : {}) as Record<string, string>,
@@ -59,7 +63,12 @@ export default async function UserEditPage({ params }: { params: Promise<{ id: s
   return (
     <div className="w-full px-4 sm:px-6 pb-10 pt-4">
       
-      {/* WordPress Style Header with Back Button */}
+      {/* Back to Users Button — Products/Orders-এর মতোই বাম পাশে, উপরে; ঠিক আগের scroll position ও filter/search/page state-এ ফিরে যায় */}
+      <div className="mb-2">
+        <BackButton storageKey="users-return-url" fallbackUrl="/admin/users" label="Back to Users" />
+      </div>
+
+      {/* WordPress Style Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-[23px] font-normal text-[#1d2327]">
@@ -69,14 +78,6 @@ export default async function UserEditPage({ params }: { params: Promise<{ id: s
             <p className="text-[13px] text-[#646970] mt-1">Create a brand new user and add them to this site.</p>
           )}
         </div>
-        
-        {/* Back to Users Button */}
-        <Link 
-          href="/admin/users" 
-          className="inline-flex items-center gap-1 border border-[#2271b1] text-[#2271b1] px-3 py-1.5 text-[13px] font-medium rounded-[3px] hover:bg-[#2271b1] hover:text-white transition-colors bg-white shadow-sm w-fit"
-        >
-          &larr; Back to Users
-        </Link>
       </div>
 
       {/* Activity Summary (Edit mode only) */}

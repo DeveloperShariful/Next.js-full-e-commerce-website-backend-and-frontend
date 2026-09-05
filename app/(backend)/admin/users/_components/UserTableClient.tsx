@@ -83,6 +83,13 @@ export default function UserTableClient({
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
+  // Products/Orders list-এর মতো — Edit page থেকে Back চাপলে ঠিক এই scroll position
+  // আর filter/search/page state-এ ফিরে আসার জন্য
+  const saveScroll = () => {
+    sessionStorage.setItem("users-scroll-y", String(window.scrollY));
+    sessionStorage.setItem("users-return-url", window.location.href);
+  };
+
   // 🛑 FIX: Helper function to display role names correctly
   const formatRole = (role: string) => {
     switch (role) {
@@ -177,11 +184,11 @@ export default function UserTableClient({
                           )}
                         </div>
                         <div className="w-full">
-                          <Link href={`/admin/users/${user.id}`} className="text-[#2271b1] font-bold text-[13px] hover:underline block leading-tight">
+                          <Link href={`/admin/users/${user.id}`} onClick={saveScroll} className="text-[#2271b1] font-bold text-[13px] hover:underline block leading-tight">
                             {user.name || 'Unknown'}
                           </Link>
                           <div className="text-[12px] mt-1 invisible group-hover:visible flex items-center gap-1.5 transition-all w-full">
-                            <Link href={`/admin/users/${user.id}`} className="text-[#2271b1] hover:underline">Edit</Link>
+                            <Link href={`/admin/users/${user.id}`} onClick={saveScroll} className="text-[#2271b1] hover:underline">Edit</Link>
                             <span className="text-[#c3c4c7]">|</span>
                             <button onClick={() => handleDeleteSingle(user.id)} className="text-[#b32d2e] hover:underline cursor-pointer">Delete</button>
                             <span className="text-[#c3c4c7]">|</span>
@@ -233,7 +240,7 @@ export default function UserTableClient({
                   <div className="w-8 h-8 rounded-sm bg-gray-200 shrink-0 overflow-hidden border border-[#c3c4c7] flex items-center justify-center">
                     <svg className="w-6 h-6 text-gray-400 mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" fillRule="evenodd"></path></svg>
                   </div>
-                  <Link href={`/admin/users/${user.id}`} className="text-[#2271b1] font-bold text-[14px] hover:underline truncate block w-full">
+                  <Link href={`/admin/users/${user.id}`} onClick={saveScroll} className="text-[#2271b1] font-bold text-[14px] hover:underline truncate block w-full">
                     {user.name || 'Unknown'}
                   </Link>
                 </div>
@@ -242,9 +249,9 @@ export default function UserTableClient({
                   {/* 🛑 FIX: Uses the formatRole helper */}
                   <p className="text-[#1d2327]">{formatRole(user.role)}</p>
                 </div>
-                
+
                 <div className="text-[12px] mt-2 ml-10 flex flex-wrap items-center gap-2">
-                  <Link href={`/admin/users/${user.id}`} className="text-[#2271b1] hover:underline">Edit</Link>
+                  <Link href={`/admin/users/${user.id}`} onClick={saveScroll} className="text-[#2271b1] hover:underline">Edit</Link>
                   <span className="text-[#c3c4c7]">|</span>
                   <button onClick={() => handleDeleteSingle(user.id)} className="text-[#b32d2e] hover:underline">Delete</button>
                   <span className="text-[#c3c4c7]">|</span>

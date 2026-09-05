@@ -143,8 +143,11 @@ export default function AboutPage() {
               <p className="mb-4">
                 As two mates from the Macarthur Region, NSW, our story started in our own backyards. We saw the excitement in our kids&apos; eyes as they rode their first bikes (shoutout to STACYC!). We became addicted to modifying them, making them faster, better, and more fun.
               </p>
-              <p>
+              <p className="mb-4">
                 This weekend hobby quickly grew into a passion. We realised we could build our own brand—one that blended thrilling performance with the safety every parent demands. In 2023, GoBike was born.
+              </p>
+              <p className="font-semibold text-[#1a1a1a]">
+                — Guy R Abbott, Founder
               </p>
             </div>
           </div>

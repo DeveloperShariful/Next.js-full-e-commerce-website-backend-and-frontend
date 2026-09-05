@@ -148,6 +148,11 @@ export default async function RootLayout({
                     addressRegion: "NSW",
                     addressCountry: "AU",
                   },
+                  founder: {
+                    "@type": "Person",
+                    name: "Guy R Abbott",
+                    jobTitle: "Founder",
+                  },
                   sameAs: [
                     "https://www.facebook.com/Go-Bike-104997195659873",
                     "https://www.instagram.com/gobikeoz/",

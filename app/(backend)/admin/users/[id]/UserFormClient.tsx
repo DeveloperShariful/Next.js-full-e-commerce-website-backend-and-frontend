@@ -119,6 +119,17 @@ export default function UserFormClient({ initialData, countries }: { initialData
   const [openAvatarPicker, setOpenAvatarPicker] = useState(false);
   const handleImageRemove = () => setProfileImage('');
 
+  // Blog author profile (bio/picture above + these) — sameAs links for the
+  // Person schema on /blog/author/[slug]. Only meaningful for the handful of
+  // users who actually author blog posts, so left empty for everyone else.
+  const [socialLinks, setSocialLinks] = useState<string[]>(
+    initialData?.socialLinks?.length ? initialData.socialLinks : ['']
+  );
+  const updateSocialLink = (i: number, value: string) =>
+    setSocialLinks(prev => prev.map((v, idx) => (idx === i ? value : v)));
+  const addSocialLink = () => setSocialLinks(prev => [...prev, '']);
+  const removeSocialLink = (i: number) => setSocialLinks(prev => prev.filter((_, idx) => idx !== i));
+
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -133,6 +144,7 @@ export default function UserFormClient({ initialData, countries }: { initialData
     }
 
     formData.append('image', profileImage);
+    socialLinks.map(l => l.trim()).filter(Boolean).forEach(l => formData.append('socialLinks', l));
 
     try {
       const res = isEditing ? await updateUser(formData) : await createUser(formData);
@@ -258,11 +270,48 @@ export default function UserFormClient({ initialData, countries }: { initialData
           <tr className="border-b border-[#c3c4c7] lg:border-[#f0f0f1] block lg:table-row">
             <th className={thClass}>Biographical Info</th>
             <td className={tdClass}>
-              <textarea name="bio" rows={5} defaultValue={initialData?.notes || ''} className={textareaClass}></textarea>
+              <textarea name="bio" rows={5} defaultValue={initialData?.bio || ''} className={textareaClass}></textarea>
               <span className={descClass}>Share a little biographical information to fill out your profile. This may be shown publicly.</span>
             </td>
           </tr>
-          
+
+          <tr className="border-b border-[#c3c4c7] lg:border-[#f0f0f1] block lg:table-row">
+            <th className={thClass}>Public Author Page</th>
+            <td className={tdClass}>
+              <input name="slug" type="text" defaultValue={initialData?.slug || ''} placeholder="e.g. jane-doe" className={inputClass} />
+              <span className={descClass}>
+                Only set this if this person should have a public blog author page (/blog/author/…) — e.g. someone who
+                actually writes articles. Leave empty for regular customers.
+              </span>
+            </td>
+          </tr>
+
+          <tr className="border-b border-[#c3c4c7] lg:border-[#f0f0f1] block lg:table-row">
+            <th className={thClass}>Social Links</th>
+            <td className={tdClass}>
+              <div className="flex flex-col gap-2">
+                {socialLinks.map((link, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      type="url"
+                      value={link}
+                      onChange={e => updateSocialLink(i, e.target.value)}
+                      placeholder="https://facebook.com/..."
+                      className={inputClass}
+                    />
+                    <button type="button" onClick={() => removeSocialLink(i)} className="text-[13px] text-[#d63638] hover:underline shrink-0">
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={addSocialLink} className="text-[13px] text-[#2271b1] hover:underline w-fit">
+                  + Add another link
+                </button>
+              </div>
+              <span className={descClass}>Shown on the public author page and included as sameAs in the Person schema.</span>
+            </td>
+          </tr>
+
           <tr className="border-b border-[#c3c4c7] lg:border-transparent block lg:table-row">
             <th className={thClass}>Profile Picture</th>
             <td className={tdClass}>

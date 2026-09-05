@@ -150,12 +150,16 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                     Latest Post
                   </h2>
                 </div>
-                <Link
-                  href={`/blog/${featuredPost.slug}`}
-                  className="group flex flex-col md:flex-row bg-white rounded-2xl overflow-hidden shadow-md border border-gray-100 transition-all duration-300 hover:shadow-xl"
-                >
+                <div className="group relative flex flex-col md:flex-row bg-white rounded-2xl overflow-hidden shadow-md border border-gray-100 transition-all duration-300 hover:shadow-xl">
+                  {/* Whole-card click target — post's own author byline (below) punches through this via pointer-events-auto */}
+                  <Link
+                    href={`/blog/${featuredPost.slug}`}
+                    className="absolute inset-0 z-0"
+                    aria-label={featuredPost.title}
+                  />
+
                   {/* Image */}
-                  <div className="relative w-full md:w-1/2 h-[280px] md:h-[420px] bg-gray-100 overflow-hidden">
+                  <div className="relative z-10 pointer-events-none w-full md:w-1/2 h-[280px] md:h-[420px] bg-gray-100 overflow-hidden">
                     {featuredPost.featuredImage ? (
                       <Image
                         src={featuredPost.featuredImage}
@@ -191,7 +195,7 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                   </div>
 
                   {/* Content */}
-                  <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
+                  <div className="relative z-10 pointer-events-none w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
                     <span className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-3">
                       {featuredPost.isPinned ? "Pinned Post" : "Latest Guide"}
                     </span>
@@ -206,7 +210,21 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                             year: "numeric",
                           })
                         : ""}
-                      {featuredPost.author?.name && ` • ${featuredPost.author.name}`}
+                      {featuredPost.author?.name && (
+                        <>
+                          {" • "}
+                          {featuredPost.author.slug ? (
+                            <Link
+                              href={`/blog/author/${featuredPost.author.slug}`}
+                              className="relative z-20 pointer-events-auto text-gray-600 hover:text-blue-600 hover:underline"
+                            >
+                              {featuredPost.author.name}
+                            </Link>
+                          ) : (
+                            featuredPost.author.name
+                          )}
+                        </>
+                      )}
                       {featuredPost.readTimeMinutes && ` • ${featuredPost.readTimeMinutes} min read`}
                     </p>
                     {featuredPost.excerpt && (
@@ -220,7 +238,7 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                       </span>
                     </div>
                   </div>
-                </Link>
+                </div>
               </div>
             )}
 
@@ -234,11 +252,15 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {gridPosts.map((post, index) => (
-                    <article key={post.id}>
+                    <article key={post.id} className="group relative bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-300 flex flex-col h-full">
+                      {/* Whole-card click target — author byline (below) punches through this via pointer-events-auto */}
                       <Link
                         href={`/blog/${post.slug}`}
-                        className="group bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-300 flex flex-col h-full"
-                      >
+                        className="absolute inset-0 z-0"
+                        aria-label={post.title}
+                      />
+
+                      <div className="relative z-10 pointer-events-none flex flex-col h-full">
                         {/* Thumbnail */}
                         <div className="relative w-full aspect-[16/10] bg-gray-100 overflow-hidden">
                           {post.featuredImage ? (
@@ -289,6 +311,21 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                                   year: "numeric",
                                 })
                               : ""}
+                            {post.author?.name && (
+                              <>
+                                {" · "}
+                                {post.author.slug ? (
+                                  <Link
+                                    href={`/blog/author/${post.author.slug}`}
+                                    className="relative z-20 pointer-events-auto hover:text-blue-600 hover:underline"
+                                  >
+                                    {post.author.name}
+                                  </Link>
+                                ) : (
+                                  post.author.name
+                                )}
+                              </>
+                            )}
                             {post.readTimeMinutes && ` · ${post.readTimeMinutes} min read`}
                           </p>
                           {post.excerpt && (
@@ -301,7 +338,7 @@ export default async function NewBlogPage({ searchParams }: PageProps) {
                             <span className="group-hover:translate-x-1 transition-transform">→</span>
                           </span>
                         </div>
-                      </Link>
+                      </div>
                     </article>
                   ))}
                 </div>

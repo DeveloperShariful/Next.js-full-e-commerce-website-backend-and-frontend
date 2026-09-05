@@ -368,6 +368,12 @@ model User {
   dateOfBirth        DateTime?
   gender             String?
   bio                String?
+  // Blog author profile page (/blog/author/[slug]) — nullable, only ever set
+  // for the handful of users who actually author blog posts, generated once
+  // from `name` at that time. Not auto-derived on every read since a slug
+  // must stay stable (already-indexed/linked URLs shouldn't move if someone
+  // later edits their display name).
+  slug               String?             @unique
   nickname           String?
   socialLinks        String[]            @default([])
   notes              String?

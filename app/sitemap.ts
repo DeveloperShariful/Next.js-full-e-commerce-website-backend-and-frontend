@@ -313,6 +313,49 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('[sitemap] community query failed:', err);
   }
 
+  // ── 8. Blog authors — /blog/author index + individual profile pages ──────
+  // (E-E-A-T author pages, added alongside the community profile pages above —
+  // previously missing from the sitemap entirely, so Google had no crawl path
+  // to them besides the byline link on each blog post.)
+  let blogAuthorPages: MetadataRoute.Sitemap = [];
+  try {
+    const authorRows = await db.blogPost.groupBy({
+      by: ['authorId'],
+      where: { status: 'PUBLISHED', authorId: { not: null } },
+      _max: { updatedAt: true },
+    });
+    const authorIds = authorRows
+      .map(r => r.authorId)
+      .filter((id): id is string => !!id);
+
+    const authorsWithSlug = await db.user.findMany({
+      where: { id: { in: authorIds }, slug: { not: null } },
+      select: { id: true, slug: true },
+    });
+
+    const lastModifiedByAuthor = new Map(
+      authorRows.map(r => [r.authorId, r._max.updatedAt ?? new Date()])
+    );
+
+    const profilePages: MetadataRoute.Sitemap = authorsWithSlug
+      .filter((a): a is typeof a & { slug: string } => !!a.slug)
+      .map(a => ({
+        url: `${BASE_URL}/blog/author/${a.slug}`,
+        lastModified: lastModifiedByAuthor.get(a.id) ?? new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.5,
+      }));
+
+    if (profilePages.length > 0) {
+      blogAuthorPages = [
+        { url: `${BASE_URL}/blog/author`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.5 },
+        ...profilePages,
+      ];
+    }
+  } catch (err) {
+    console.error('[sitemap] blog author query failed:', err);
+  }
+
   return [
     ...staticPages,
     ...productPages,
@@ -321,5 +364,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...hubPages,
     ...hubCategoryPages,
     ...communityPages,
+    ...blogAuthorPages,
   ];
 }

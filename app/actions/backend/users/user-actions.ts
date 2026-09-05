@@ -49,6 +49,29 @@ async function saveAddress(userId: string, type: AddressType, addressData: Addre
   }
 }
 
+// ✅ HELPER: Blog author profile page slug (/blog/author/[slug]) — WordPress
+// style, same convention used site-wide for uploaded file names: pure slug
+// first, only append -2/-3... on an actual collision, never a random suffix.
+// Only ever set when an admin explicitly types one in (most Users are just
+// customers and have no reason to get a public author page).
+async function uniqueUserSlug(rawSlug: string, excludeUserId?: string): Promise<string> {
+  const base = rawSlug
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'author';
+
+  let candidate = base;
+  let i = 2;
+  while (true) {
+    const existing = await db.user.findUnique({ where: { slug: candidate }, select: { id: true } });
+    if (!existing || existing.id === excludeUserId) return candidate;
+    candidate = `${base}-${i}`;
+    i++;
+  }
+}
+
 // ✅ HELPER: Auto-Create Affiliate Account if Role is AFFILIATE
 async function ensureAffiliateAccount(userId: string, role: string, userName: string) {
   if (role === 'AFFILIATE') {
@@ -83,6 +106,8 @@ export async function createUser(formData: FormData) {
   const website = formData.get('website') as string;
   const bio = formData.get('bio') as string;
   const image = formData.get('image') as string;
+  const socialLinks = formData.getAll('socialLinks').map(v => String(v).trim()).filter(Boolean);
+  const rawSlug = (formData.get('slug') as string || '').trim();
 
   if (!email) {
     return { success: false, message: 'Email is required.' };
@@ -107,6 +132,7 @@ export async function createUser(formData: FormData) {
     };
 
     const finalName = name?.trim() || nickname?.trim() || "Customer";
+    const slug = rawSlug ? await uniqueUserSlug(rawSlug) : null;
 
     const newUser = await db.user.create({
       data: {
@@ -114,9 +140,11 @@ export async function createUser(formData: FormData) {
         email: email.toLowerCase().trim(),
         role: role || 'CUSTOMER',
         password: hashedPassword,
-        notes: bio?.trim(), 
-        image: image || null, 
-        metafields: metafields, 
+        bio: bio?.trim() || null,
+        slug,
+        socialLinks,
+        image: image || null,
+        metafields: metafields,
         isActive: true
       }
     });
@@ -170,6 +198,8 @@ export async function updateUser(formData: FormData) {
   const website = formData.get('website') as string;
   const bio = formData.get('bio') as string;
   const image = formData.get('image') as string;
+  const socialLinks = formData.getAll('socialLinks').map(v => String(v).trim()).filter(Boolean);
+  const rawSlug = (formData.get('slug') as string || '').trim();
 
   if (!id || !email) {
     return { success: false, message: 'User ID and Email are required.' };
@@ -199,6 +229,7 @@ export async function updateUser(formData: FormData) {
     const finalName = name?.trim() || nickname?.trim() || "Customer";
 
     const hashedPassword = password && password.trim() !== '' ? await bcrypt.hash(password, 10) : undefined;
+    const slug = rawSlug ? await uniqueUserSlug(rawSlug, id) : undefined;
 
     await db.user.update({
       where: { id },
@@ -206,7 +237,9 @@ export async function updateUser(formData: FormData) {
         name: finalName,
         email: email.toLowerCase().trim(),
         role: role,
-        notes: bio?.trim(),
+        bio: bio?.trim() || null,
+        socialLinks,
+        ...(slug !== undefined ? { slug } : {}),
         metafields: updatedMetafields as unknown as Prisma.InputJsonValue,
         image: image !== undefined ? (image || null) : undefined,
         password: hashedPassword,

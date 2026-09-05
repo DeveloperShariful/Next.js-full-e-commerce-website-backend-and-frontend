@@ -193,6 +193,11 @@ export default function Footer() {
                             </Link>
                         </li>
                       ))}
+                      <li>
+                          <Link href="/blog/author" className="text-[#555] hover:text-black hover:font-bold transition-all">
+                              Meet Our Authors
+                          </Link>
+                      </li>
                   </ul>
               </div>
 

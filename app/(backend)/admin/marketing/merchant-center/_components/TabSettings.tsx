@@ -11,11 +11,33 @@ import {
   autoFetchAndSaveConversions,
   fetchAvailableConversionActions // 🚀 নতুন ম্যাজিক ফাংশন ইম্পোর্ট করা হলো
 } from "@/app/actions/backend/marketing/gmc-auth.actions";
-import { 
-  updateGmcSettings, 
-  saveGoogleAdsConversionSettings, 
-  GmcSettingsData 
+import {
+  updateGmcSettings,
+  saveGoogleAdsConversionSettings,
+  saveLocalInventorySettings,
+  GmcSettingsData,
+  LocalInventorySettingsData
 } from "@/app/actions/backend/marketing/gmc-settings.actions";
+
+// Google local inventory feed — সমর্থিত মান
+const PICKUP_METHODS = [
+  { value: "", label: "— None —" },
+  { value: "buy", label: "Buy online, pick up in store" },
+  { value: "reserve", label: "Reserve online, pay in store" },
+  { value: "ship to store", label: "Ship to store" },
+  { value: "not supported", label: "Not supported" },
+];
+const PICKUP_SLAS = [
+  { value: "", label: "— None —" },
+  { value: "same day", label: "Same day" },
+  { value: "next day", label: "Next day" },
+  { value: "2-day", label: "2 days" },
+  { value: "3-day", label: "3 days" },
+  { value: "4-day", label: "4 days" },
+  { value: "5-day", label: "5 days" },
+  { value: "6-day", label: "6 days" },
+  { value: "multi-week", label: "Multiple weeks" },
+];
 
 // ============================================================================
 // 🌍 GOOGLE SUPPORTED COUNTRIES & LANGUAGES
@@ -86,7 +108,21 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
   const [conversionLabel, setConversionLabel] = useState(config?.googleAdsConversionLabel || "");
   const [enhancedConversions, setEnhancedConversions] = useState(config?.googleAdsEnhancedConversionsEnabled || false);
   const [conversionMessage, setConversionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  
+
+  // Local Inventory Feed States
+  const [isPendingLocal, startLocalTransition] = useTransition();
+  const [localData, setLocalData] = useState<LocalInventorySettingsData>({
+    gmcLocalInventoryEnabled: config?.gmcLocalInventoryEnabled || false,
+    gmcStoreCode: config?.gmcStoreCode || "",
+    gmcStorePickupMethod: config?.gmcStorePickupMethod || "",
+    gmcStorePickupSla: config?.gmcStorePickupSla || "",
+  });
+  const [localMessage, setLocalMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [localFeedCopied, setLocalFeedCopied] = useState(false);
+  // client-only origin (admin dashboard, force-dynamic) — effect ছাড়া lazy init
+  const [origin] = useState(() => (typeof window !== "undefined" ? window.location.origin : ""));
+  const localFeedUrl = `${origin}/api/feeds/google-local-inventory`;
+
 
   useEffect(() => {
     if (config) {
@@ -186,6 +222,26 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
     });
   };
 
+  const handleSaveLocalInventory = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalMessage(null);
+    startLocalTransition(async () => {
+      const res = await saveLocalInventorySettings(localData);
+      if (res.success) {
+        setLocalMessage({ type: "success", text: res.message || "Local inventory settings saved." });
+        setTimeout(() => setLocalMessage(null), 3000);
+      } else {
+        setLocalMessage({ type: "error", text: res.error || "Failed to save." });
+      }
+    });
+  };
+
+  const handleCopyLocalFeedUrl = () => {
+    navigator.clipboard.writeText(localFeedUrl);
+    setLocalFeedCopied(true);
+    setTimeout(() => setLocalFeedCopied(false), 3000);
+  };
+
   const handleSaveConversionSettings = (e: React.FormEvent) => {
     e.preventDefault();
     setConversionMessage(null);
@@ -266,6 +322,121 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
                 </button>
               </div>
             </form>
+        </div>
+      </div>
+
+      <div className="md:col-span-12 border-t border-[#ccd0d4] my-2"></div>
+
+      {/* ========================================== */}
+      {/* 🚀 SECTION 1b: LOCAL INVENTORY FEED */}
+      {/* ========================================== */}
+      <div className="md:col-span-4">
+        <h3 className="text-[15px] font-semibold text-[#1d2327] m-0 mb-2">Local inventory feed</h3>
+        <p className="text-[13px] text-[#646970] m-0 leading-relaxed">
+          For Local inventory ads &amp; free local listings. Sends per-store stock &amp; pickup info for your
+          physical store, matched to the main product feed by product ID.
+        </p>
+        <p className="text-[12px] text-[#646970] m-0 mt-2 leading-relaxed">
+          Requires a linked Google Business Profile with your store added, and the store code below must
+          match it <strong>exactly</strong> (case-sensitive).
+        </p>
+      </div>
+
+      <div className="md:col-span-8 mb-10">
+        <div className="bg-white border border-[#ccd0d4] rounded-[3px] p-6">
+          <form onSubmit={handleSaveLocalInventory}>
+            {localMessage && (
+              <div className={`p-3 mb-4 text-[13px] border-l-4 ${localMessage.type === "success" ? "border-[#00a32a] bg-[#f0f6ea]" : "border-[#d63638] bg-[#fcf0f1]"}`}>
+                {localMessage.text}
+              </div>
+            )}
+
+            <table className="w-full text-left border-collapse">
+              <tbody>
+                <tr>
+                  <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327]">Enable feed</th>
+                  <td className="py-4 align-top">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={localData.gmcLocalInventoryEnabled}
+                        onChange={(e) => setLocalData({ ...localData, gmcLocalInventoryEnabled: e.target.checked })}
+                        className="w-4 h-4 border-[#8c8f94] rounded-[3px] text-[#2271b1]"
+                      />
+                      <span className="text-[13px]">Serve the local inventory feed</span>
+                    </label>
+                    <p className="text-[11px] text-[#646970] m-0 mt-1">When off, the feed URL returns an empty file.</p>
+                  </td>
+                </tr>
+                <tr>
+                  <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327]">Store code <span className="text-[#d63638]">*</span></th>
+                  <td className="py-4 align-top">
+                    <input
+                      type="text"
+                      value={localData.gmcStoreCode}
+                      onChange={(e) => setLocalData({ ...localData, gmcStoreCode: e.target.value })}
+                      placeholder="e.g. gobike-sydney-01"
+                      maxLength={64}
+                      className="w-full max-w-[350px] border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none bg-white"
+                    />
+                    <p className="text-[11px] text-[#646970] m-0 mt-1">
+                      From Google Business Profile / Merchant Center &rarr; Stores. Case-sensitive.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327]">Pickup method</th>
+                  <td className="py-4 align-top">
+                    <select
+                      value={localData.gmcStorePickupMethod}
+                      onChange={(e) => setLocalData({ ...localData, gmcStorePickupMethod: e.target.value })}
+                      className="w-full max-w-[350px] border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none bg-white cursor-pointer"
+                    >
+                      {PICKUP_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <th className="py-4 align-top w-[200px] text-[13px] font-semibold text-[#1d2327] border-b-0">Pickup SLA</th>
+                  <td className="py-4 align-top border-b-0">
+                    <select
+                      value={localData.gmcStorePickupSla}
+                      onChange={(e) => setLocalData({ ...localData, gmcStorePickupSla: e.target.value })}
+                      className="w-full max-w-[350px] border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] focus:border-[#2271b1] focus:ring-1 focus:outline-none bg-white cursor-pointer"
+                    >
+                      {PICKUP_SLAS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                    <p className="text-[11px] text-[#646970] m-0 mt-1">
+                      Required by Google only if you enable store pickup in Merchant Center.
+                    </p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Feed URL */}
+            <div className="mt-5 bg-[#f6f7f7] border border-[#ccd0d4] rounded-[3px] p-3">
+              <p className="text-[12px] font-semibold text-[#1d2327] m-0 mb-2">Feed URL</p>
+              <p className="text-[11px] font-mono text-[#2c3338] break-words m-0 select-all">{localFeedUrl}</p>
+              <button
+                type="button"
+                onClick={handleCopyLocalFeedUrl}
+                className="mt-2 bg-white hover:bg-[#f0f0f1] text-[#2271b1] border border-[#ccd0d4] rounded-[3px] px-3 py-1 text-[12px] font-semibold cursor-pointer"
+              >
+                {localFeedCopied ? "Copied!" : "Copy URL"}
+              </button>
+              <p className="text-[11px] text-[#646970] m-0 mt-2 leading-relaxed">
+                In Merchant Center: Data sources &rarr; Add local product inventory feed &rarr; Scheduled fetch &rarr;
+                paste this URL &rarr;.
+              </p>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-[#ccd0d4]">
+              <button type="submit" disabled={isPendingLocal} className="bg-[#2271b1] hover:bg-[#135e96] text-white border border-[#2271b1] rounded-[3px] px-4 py-1.5 text-[13px] font-semibold cursor-pointer shadow-sm disabled:opacity-50">
+                {isPendingLocal ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 

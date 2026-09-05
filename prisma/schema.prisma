@@ -2401,6 +2401,25 @@ model MarketingIntegration {
   // insert/delete-এর জন্য reuse হয়, প্রতি call-এ নতুন করে বানাতে হয় না
   gmcDataSourceName String?
 
+  // 7b. LOCAL PRODUCT INVENTORY FEED (single physical store + Local Inventory Ads)
+  // ----------------------------------------------------------------------------
+  // Route: /api/feeds/google-local-inventory (Atom XML)। primary Merchant API
+  // product feed-এর সাথে `id` মিলিয়ে per-store availability/quantity + pickup
+  // তথ্য পাঠায় (Local inventory ads + free local listings)। stock/availability
+  // আগের মতোই product.stock / variant.stock থেকে; price পাঠানো হয় না (online
+  // দামই in-store দাম, primary feed থেকে আসে)।
+  gmcLocalInventoryEnabled Boolean @default(false)
+  // Google Business Profile-এ সেট করা store code — feed-এর প্রতি <g:store_code>-এ
+  // হুবহু এটাই যায় (case-sensitive, max 64 char)। DB-র অন্য কোথাও এই Google
+  // identifier নেই বলে এখানে রাখতে হচ্ছে।
+  gmcStoreCode         String?
+  // Local Inventory Ads-এ "pickup" annotation-এর জন্য (একই policy সব product-এ):
+  //   pickup_method → "buy" | "reserve" | "ship to store" | "not supported"
+  //   pickup_sla    → "same day" | "next day" | "2-day" … "6-day" | "multi-week"
+  // খালি হলে feed-এ পাঠানো হয় না।
+  gmcStorePickupMethod String?
+  gmcStorePickupSla    String?
+
   // ==========================================
   // 🚀 NEW: GOOGLE ADS INTEGRATION (WooCommerce Style)
   // ==========================================

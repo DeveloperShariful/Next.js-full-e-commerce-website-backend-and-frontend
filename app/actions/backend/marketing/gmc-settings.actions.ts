@@ -19,6 +19,13 @@ export interface ConversionSettingsData {
   googleAdsEnhancedConversionsEnabled: boolean;
 }
 
+export interface LocalInventorySettingsData {
+  gmcLocalInventoryEnabled: boolean;
+  gmcStoreCode: string;
+  gmcStorePickupMethod: string; // "" | "buy" | "reserve" | "ship to store" | "not supported"
+  gmcStorePickupSla: string; // "" | "same day" | "next day" | "2-day" … "6-day" | "multi-week"
+}
+
 // ============================================================================
 // 1. GET GMC SETTINGS (read-only — no assertAdmin needed, page is middleware-protected)
 // ============================================================================
@@ -99,7 +106,64 @@ export async function updateGmcSettings(data: GmcSettingsData) {
 }
 
 // ============================================================================
-// 3. SAVE GOOGLE ADS CONVERSION & TRACKING SETTINGS
+// 3. SAVE LOCAL PRODUCT INVENTORY FEED SETTINGS
+// ----------------------------------------------------------------------------
+// আলাদা action (updateGmcSettings-এর সাথে merge করলে ওই form save করলে এই
+// field গুলো wipe হয়ে যেত — saveGoogleAdsConversionSettings-এর মতোই আলাদা রাখা)।
+// ============================================================================
+const VALID_PICKUP_METHODS = ["", "buy", "reserve", "ship to store", "not supported"];
+const VALID_PICKUP_SLAS = [
+  "", "same day", "next day", "2-day", "3-day", "4-day", "5-day", "6-day", "multi-week",
+];
+
+export async function saveLocalInventorySettings(data: LocalInventorySettingsData) {
+  await security.assertAdmin();
+  try {
+    const storeCode = data.gmcStoreCode.trim();
+    if (data.gmcLocalInventoryEnabled && !storeCode) {
+      return { success: false, error: "Store code is required to enable the local inventory feed." };
+    }
+    if (storeCode.length > 64) {
+      return { success: false, error: "Store code cannot be longer than 64 characters." };
+    }
+
+    const pickupMethod = data.gmcStorePickupMethod.trim().toLowerCase();
+    const pickupSla = data.gmcStorePickupSla.trim().toLowerCase();
+    if (!VALID_PICKUP_METHODS.includes(pickupMethod)) {
+      return { success: false, error: `Invalid pickup method: ${pickupMethod}` };
+    }
+    if (!VALID_PICKUP_SLAS.includes(pickupSla)) {
+      return { success: false, error: `Invalid pickup SLA: ${pickupSla}` };
+    }
+
+    await db.marketingIntegration.upsert({
+      where: { id: "marketing_config" },
+      update: {
+        gmcLocalInventoryEnabled: data.gmcLocalInventoryEnabled,
+        gmcStoreCode: storeCode || null,
+        gmcStorePickupMethod: pickupMethod || null,
+        gmcStorePickupSla: pickupSla || null,
+      },
+      create: {
+        id: "marketing_config",
+        gmcLocalInventoryEnabled: data.gmcLocalInventoryEnabled,
+        gmcStoreCode: storeCode || null,
+        gmcStorePickupMethod: pickupMethod || null,
+        gmcStorePickupSla: pickupSla || null,
+      },
+    });
+
+    revalidatePath("/admin/marketing/merchant-center");
+    return { success: true, message: "Local inventory settings saved." };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to save local inventory settings.";
+    console.error("Error saving local inventory settings:", error);
+    return { success: false, error: msg };
+  }
+}
+
+// ============================================================================
+// 4. SAVE GOOGLE ADS CONVERSION & TRACKING SETTINGS
 // ============================================================================
 export async function saveGoogleAdsConversionSettings(data: ConversionSettingsData) {
   await security.assertAdmin();

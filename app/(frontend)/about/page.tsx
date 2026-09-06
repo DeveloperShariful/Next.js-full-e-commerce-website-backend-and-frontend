@@ -147,7 +147,7 @@ export default function AboutPage() {
                 This weekend hobby quickly grew into a passion. We realised we could build our own brand—one that blended thrilling performance with the safety every parent demands. In 2023, GoBike was born.
               </p>
               <p className="font-semibold text-[#1a1a1a]">
-                — Guy R Abbott, Founder
+                — Ethan, Founder
               </p>
             </div>
           </div>

@@ -150,7 +150,7 @@ export default async function RootLayout({
                   },
                   founder: {
                     "@type": "Person",
-                    name: "Guy R Abbott",
+                    name: "Ethan",
                     jobTitle: "Founder",
                   },
                   sameAs: [

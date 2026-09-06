@@ -123,6 +123,11 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
   const [origin] = useState(() => (typeof window !== "undefined" ? window.location.origin : ""));
   const localFeedUrl = `${origin}/api/feeds/google-local-inventory`;
 
+  // Product Reviews Feed (Product Ratings) — কোনো toggle/setting নেই, শুধু URL
+  // দেখানো হয়; feed নিজেই সবসময় live DB থেকে Approved review গুলো পাঠায়।
+  const [reviewsFeedCopied, setReviewsFeedCopied] = useState(false);
+  const reviewsFeedUrl = `${origin}/api/feeds/google-product-reviews`;
+
 
   useEffect(() => {
     if (config) {
@@ -240,6 +245,12 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
     navigator.clipboard.writeText(localFeedUrl);
     setLocalFeedCopied(true);
     setTimeout(() => setLocalFeedCopied(false), 3000);
+  };
+
+  const handleCopyReviewsFeedUrl = () => {
+    navigator.clipboard.writeText(reviewsFeedUrl);
+    setReviewsFeedCopied(true);
+    setTimeout(() => setReviewsFeedCopied(false), 3000);
   };
 
   const handleSaveConversionSettings = (e: React.FormEvent) => {
@@ -437,6 +448,42 @@ export default function TabSettings({ config, onDisconnect, isPending }: Props) 
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div className="md:col-span-12 border-t border-[#ccd0d4] my-2"></div>
+
+      {/* ========================================== */}
+      {/* 🚀 SECTION 1c: PRODUCT REVIEWS FEED (Product Ratings) */}
+      {/* ========================================== */}
+      <div className="md:col-span-4">
+        <h3 className="text-[15px] font-semibold text-[#1d2327] m-0 mb-2">Product reviews feed</h3>
+        <p className="text-[13px] text-[#646970] m-0 leading-relaxed">
+          For the Product Ratings program — sends your Approved reviews so ⭐ ratings can show under
+          products in Shopping &amp; Search.
+        </p>
+        <p className="text-[12px] text-[#646970] m-0 mt-2 leading-relaxed">
+          No settings needed — it always reflects the reviews currently Approved in Admin &rarr; Reviews.
+        </p>
+      </div>
+
+      <div className="md:col-span-8 mb-10">
+        <div className="bg-white border border-[#ccd0d4] rounded-[3px] p-6">
+          <div className="bg-[#f6f7f7] border border-[#ccd0d4] rounded-[3px] p-3">
+            <p className="text-[12px] font-semibold text-[#1d2327] m-0 mb-2">Feed URL</p>
+            <p className="text-[11px] font-mono text-[#2c3338] break-words m-0 select-all">{reviewsFeedUrl}</p>
+            <button
+              type="button"
+              onClick={handleCopyReviewsFeedUrl}
+              className="mt-2 bg-white hover:bg-[#f0f0f1] text-[#2271b1] border border-[#ccd0d4] rounded-[3px] px-3 py-1 text-[12px] font-semibold cursor-pointer"
+            >
+              {reviewsFeedCopied ? "Copied!" : "Copy URL"}
+            </button>
+            <p className="text-[11px] text-[#646970] m-0 mt-2 leading-relaxed">
+              In Merchant Center: Data sources &rarr; Add product reviews data source &rarr; Scheduled
+              fetch &rarr; paste this URL &rarr; recurring &ldquo;Monthly&rdquo; (or more often).
+            </p>
+          </div>
         </div>
       </div>
 

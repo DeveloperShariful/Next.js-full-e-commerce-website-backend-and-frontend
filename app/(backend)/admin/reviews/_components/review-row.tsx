@@ -118,8 +118,9 @@ export default function ReviewRow({
               </td>
               
               <td className="p-2 align-top pt-3 pr-4">
+                 {/* review.title দেখানো হয় না — এটা real headline না, পুরনো
+                     WooCommerce import-এর internal "wc-XXXX" duplicate-marker */}
                  <div className="text-[13px] text-[#3c434a] leading-relaxed mb-2">
-                   {review.title && <strong className="block mb-1 text-[#1d2327]">{review.title}</strong>}
                    <p>{review.content}</p>
                  </div>
 

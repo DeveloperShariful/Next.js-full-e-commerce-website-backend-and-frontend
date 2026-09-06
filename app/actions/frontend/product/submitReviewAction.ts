@@ -4,6 +4,7 @@
 import { db } from "@/lib/prisma";
 import { stripHtml } from "@/lib/sanitize";
 import { saveMediaRecord } from "@/app/actions/backend/media/media-action";
+import { checkVerifiedPurchase } from "@/lib/verified-purchase";
 import { MediaSource } from "@prisma/client";
 import crypto from "crypto";
 
@@ -132,14 +133,21 @@ export async function submitReviewAction(formData: FormData) {
     }
 
     // ৪. Review Database এ সেভ করা (PENDING স্ট্যাটাস দিয়ে)
+    const isVerified = await checkVerifiedPurchase({
+      userId: user.id,
+      email: email,
+      productId: product.id,
+    });
+
     await db.review.create({
       data: {
         rating: rating,
         content: comment,
-        status: "PENDING", 
+        status: "PENDING",
         images: uploadedFileUrls,
         userId: user.id,
         productId: product.id,
+        isVerified,
       }
     });
 

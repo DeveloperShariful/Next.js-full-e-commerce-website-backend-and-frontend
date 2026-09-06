@@ -31,7 +31,7 @@ export async function getProductBySlugAction(slug: string) {
           orderBy: { createdAt: "desc" },
           include: {
             user: { select: { name: true, image: true } }
-          }
+          },
         }
       },
     });
@@ -157,8 +157,9 @@ export async function getProductBySlugAction(slug: string) {
               author: { node: { name: review.user?.name || "Customer", avatar: { url: review.user?.image || "" } } },
               content: review.content || "",
               date: review.createdAt.toISOString(),
+              isVerified: review.isVerified, // real Order-linked purchase check — lib/verified-purchase.ts
               reviewMedia: reviewMedia,
-              replies: { edges: [] } 
+              replies: { edges: [] }
             }
           };
         })

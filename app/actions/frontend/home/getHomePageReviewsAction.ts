@@ -62,15 +62,16 @@ async function _fetchHomePageReviews() {
       });
 
       return {
-        id: review.id, // Prisma UUID 
-        reviewer: review.user?.name || "Verified Customer",
+        id: review.id, // Prisma UUID
+        reviewer: review.user?.name || "Customer",
         review: review.content || "",
         rating: review.rating,
         date: review.createdAt.toISOString(),
+        is_verified: review.isVerified,
         product_name: review.product?.name || "GoBike",
-        product_permalink: `/${review.product?.slug}`, 
+        product_permalink: `/${review.product?.slug}`,
         product_image: review.product?.featuredImage || "",
-        review_media: reviewMedia, 
+        review_media: reviewMedia,
       };
     });
 

@@ -25,6 +25,7 @@ interface Review {
   review: string;
   rating: number;
   date: string;
+  is_verified?: boolean; // real Order-linked purchase check — lib/verified-purchase.ts
   product_name: string;
   product_permalink: string;
   product_image?: string;
@@ -145,12 +146,14 @@ export default function HomePageReviews({ initialReviews, initialSummary }: Prop
                   "
                 >
                   <div className="flex items-center mb-4 gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#e9ecef] text-[#333] flex items-center justify-center font-bold text-[1.1rem] flex-shrink-0 relative after:content-['✓'] after:absolute after:-bottom-0.5 after:-right-0.5 after:bg-emerald-500 after:text-white after:w-4 after:h-4 after:rounded-full after:border-2 after:border-white after:flex after:items-center after:justify-center after:text-[8px] after:font-bold">
+                    <div className={`w-10 h-10 rounded-full bg-[#e9ecef] text-[#333] flex items-center justify-center font-bold text-[1.1rem] flex-shrink-0 relative ${review.is_verified ? "after:content-['✓'] after:absolute after:-bottom-0.5 after:-right-0.5 after:bg-emerald-500 after:text-white after:w-4 after:h-4 after:rounded-full after:border-2 after:border-white after:flex after:items-center after:justify-center after:text-[8px] after:font-bold" : ""}`}>
                       {review.reviewer.substring(0, 1)}
                     </div>
                     <div className="flex flex-col items-start">
                       <strong className="font-semibold text-base">{review.reviewer}</strong>
-                      <span className="text-[0.8rem] text-black font-bold">Verified review</span>
+                      {review.is_verified && (
+                        <span className="text-[0.8rem] text-black font-bold">Verified review</span>
+                      )}
                     </div>
                   </div>
 

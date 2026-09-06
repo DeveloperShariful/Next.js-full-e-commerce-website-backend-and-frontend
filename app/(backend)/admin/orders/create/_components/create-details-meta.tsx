@@ -153,7 +153,7 @@ export const CreateDetailsMeta = ({ orderData, setOrderData }: CreateDetailsMeta
                     >
                         <option value="PENDING">Pending payment</option>
                         <option value="PROCESSING">Processing</option>
-                        <option value="DELIVERED">Completed</option>
+                        <option value="DELIVERED">Delivered</option>
                     </select>
                 </div>
 

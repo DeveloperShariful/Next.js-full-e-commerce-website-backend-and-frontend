@@ -29,12 +29,13 @@ interface ReplyEdge {
 interface ReviewEdge {
   node: {
     id: string;
-    databaseId: number; 
+    databaseId: number;
     author: { node: { name: string; avatar?: { url: string } }; };
     content: string;
     date: string;
-    reviewMedia?: ReviewMedia[]; 
-    replies?: { edges: ReplyEdge[] }; 
+    isVerified?: boolean; // real Order-linked purchase check — lib/verified-purchase.ts
+    reviewMedia?: ReviewMedia[];
+    replies?: { edges: ReplyEdge[] };
   };
   rating: number;
 }
@@ -339,7 +340,7 @@ export default function ReviewForm({ productId, averageRating, reviewCount, revi
                         {/* Main Review */}
                         <div className="flex gap-4 sm:gap-6 items-start">
                             <div className="flex-shrink-0 w-[50px]">
-                                <div className="w-12 h-12 rounded-full bg-[#e5e7eb] text-gray-700 flex items-center justify-center font-bold text-[1.1rem] relative after:content-['✓'] after:absolute after:-bottom-0.5 after:-right-0.5 after:bg-emerald-500 after:text-white after:w-[18px] after:h-[18px] after:rounded-full after:border-2 after:border-white after:flex after:items-center after:justify-center after:text-[10px] after:font-bold">
+                                <div className={`w-12 h-12 rounded-full bg-[#e5e7eb] text-gray-700 flex items-center justify-center font-bold text-[1.1rem] relative ${edge.node.isVerified ? "after:content-['✓'] after:absolute after:-bottom-0.5 after:-right-0.5 after:bg-emerald-500 after:text-white after:w-[18px] after:h-[18px] after:rounded-full after:border-2 after:border-white after:flex after:items-center after:justify-center after:text-[10px] after:font-bold" : ""}`}>
                                     {edge.node.author.node.name.substring(0, 2).toUpperCase()}
                                 </div>
                             </div>
@@ -353,7 +354,9 @@ export default function ReviewForm({ productId, averageRating, reviewCount, revi
                                         <StarRatingDisplay rating={edge.rating} />
                                     </div>
                                 }
-                                <div className="text-[0.8rem] text-emerald-700 font-semibold inline-block mb-3">✓ Verified review</div>
+                                {edge.node.isVerified && (
+                                    <div className="text-[0.8rem] text-emerald-700 font-semibold inline-block mb-3">✓ Verified review</div>
+                                )}
                                 <div className="text-[0.95rem] leading-[1.6] text-gray-600 mb-3" dangerouslySetInnerHTML={{ __html: textToSafeHtml(edge.node.content) }} />
                                 
                                 {edge.node.reviewMedia && edge.node.reviewMedia.length > 0 && (

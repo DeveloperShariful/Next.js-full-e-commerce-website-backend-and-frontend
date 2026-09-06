@@ -21,9 +21,15 @@ export const ORDER_STATUS_OPTIONS = [
   { value: "PENDING", label: "Pending payment" },
   { value: "PROCESSING", label: "Processing" },
   { value: "AWAITING_PAYMENT", label: "Awaiting Payment" },
+  { value: "PARTIALLY_PAID", label: "Partially Paid" },
   { value: "PACKED", label: "Packed" },
   { value: "SHIPPED", label: "Shipped" },
-  { value: "DELIVERED", label: "Completed" },
+  { value: "DELIVERED", label: "Delivered" },
+  { value: "READY_FOR_PICKUP", label: "Ready for Pickup" },
+  // Delivered ("Delivered" পাওয়ার পর গ্রাহক email পায়) থেকে সম্পূর্ণ আলাদা —
+  // Completed মানে order পুরোপুরি বন্ধ/archive করা, কোনো email যায় না
+  // (app/actions/backend/order/bulk-update.ts ও update-status.ts-এ ইচ্ছাকৃতভাবে skip করা আছে)
+  { value: "COMPLETED", label: "Completed" },
   { value: "CANCELLED", label: "Cancelled" },
   { value: "REFUNDED", label: "Refunded" },
   { value: "FAILED", label: "Failed" },

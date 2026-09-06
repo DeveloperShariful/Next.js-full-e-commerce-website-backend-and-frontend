@@ -187,7 +187,8 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
     const baseClass = "inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap";
     switch (status) {
       case 'PROCESSING': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Processing</span>;
-      case 'DELIVERED': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Completed</span>;
+      case 'DELIVERED': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Delivered</span>;
+      case 'COMPLETED': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Completed</span>;
       case 'PENDING': return <span className={`${baseClass} bg-[#e5e5e5] text-[#777]`}>Pending payment</span>;
       case 'CANCELLED': return <span className={`${baseClass} bg-[#eaa4a4] text-[#761919]`}>Cancelled</span>;
       case 'REFUNDED': return <span className={`${baseClass} bg-[#e5e5e5] text-[#777]`}>Refunded</span>;
@@ -271,7 +272,8 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                     <>
                         <option value="PROCESSING">Change status to processing</option>
                         <option value="SHIPPED">Change status to shipped</option>
-                        <option value="DELIVERED">Change status to completed</option>
+                        <option value="DELIVERED">Change status to delivered</option>
+                        <option value="COMPLETED">Change status to completed (no email)</option>
                         <option value="print">Print Invoices</option>
                         <option value="trash">Move to trash</option>
                     </>
@@ -413,8 +415,8 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                                 {!isTrashView ? (
                                                     <>
                                                         {order.status === "PROCESSING" && (
-                                                            <button 
-                                                                title="Complete"
+                                                            <button
+                                                                title="Mark Delivered"
                                                                 onClick={() => handleSingleAction(order.id, 'complete')}
                                                                 className="h-7 w-7 flex items-center justify-center border border-[#c3c4c7] bg-[#f6f7f7] text-[#5b841b] rounded-[3px] hover:bg-white hover:text-green-700 shadow-sm"
                                                             >
@@ -553,7 +555,7 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                                 <>
                                                     {order.status === "PROCESSING" && (
                                                         <DropdownMenuItem onClick={() => handleSingleAction(order.id, 'complete')} className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#5b841b] hover:bg-[#edfaef] focus:bg-[#edfaef]">
-                                                            <Check size={14} strokeWidth={3} className="mr-2" /> Complete
+                                                            <Check size={14} strokeWidth={3} className="mr-2" /> Mark Delivered
                                                         </DropdownMenuItem>
                                                     )}
                                                     <DropdownMenuItem asChild className="cursor-pointer text-[13px] px-2 py-1.5 rounded text-[#1d2327] hover:bg-[#f0f6fc] focus:bg-[#f0f6fc]">

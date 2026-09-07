@@ -2988,6 +2988,10 @@ model WarrantyClaim {
   status          ClaimStatus @default(PENDING)
   replacementPart String?
   trackingNumber  String?
+  // Transdirect-এর real Booking ID (courier tracking-এর জন্য দরকার — connote/
+  // trackingNumber থেকে ভিন্ন, quote-step-এই confirmTransdirectBooking-এ পাওয়া
+  // যায়, দেখুন app/actions/backend/warranty/transdirect-action.ts)
+  transdirectRealBookingId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

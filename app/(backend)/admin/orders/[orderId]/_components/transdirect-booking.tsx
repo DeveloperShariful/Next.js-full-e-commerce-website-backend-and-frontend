@@ -33,6 +33,10 @@ export const TransdirectSidebar = ({ order }: TransdirectSidebarProps) => {
   const status = order.transdirectOrderStatus;
   const isSynced = status === "booked" && !!order.transdirectBookingId;
   const isFailed = status === "failed";
+  // real courier-tracking Booking ID — Order.transdirectBookingId (WooCommerce-bridge
+  // "Order" ID) থেকে ভিন্ন, quote-step-এই booking-এর সময় transdirectQuoteId-তে
+  // সরাসরি সেভ হয়ে যায় — কোনো আলাদা API call লাগে না (live verify করা)
+  const realBookingId = order.transdirectQuoteId;
 
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-[0_1px_1px_rgba(0,0,0,0.04)]">
@@ -81,6 +85,12 @@ export const TransdirectSidebar = ({ order }: TransdirectSidebarProps) => {
             <div className="mb-3 p-2 bg-[#f6f7f7] border border-[#e2e4e7] rounded-[3px]">
               <span className="font-semibold text-[#1d2327] block mb-1">Transdirect ID:</span>
               <span className="font-mono text-[#2271b1]">{order.transdirectBookingId}</span>
+              {realBookingId && (
+                <>
+                  <span className="font-semibold text-[#1d2327] block mb-1 mt-2">Real Booking ID:</span>
+                  <span className="font-mono text-[#2271b1]">{realBookingId}</span>
+                </>
+              )}
             </div>
           )}
 

@@ -108,6 +108,9 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
           replacement_part: metaStr("replacement_part", "Replacement Part"),
           tracking_number: metaStr("tracking_number", "N/A"),
           courier: metaStr("courier", "Courier"),
+          real_booking_id: metaStr("real_booking_id", "N/A"),
+          delivery_postcode: metaStr("delivery_postcode", "N/A"),
+          track_order_url: metaStr("track_order_url", `${appUrl}/track-order`),
       };
   } else if (template.triggerEvent === "PASSWORD_RESET") {
       variables = {
@@ -161,7 +164,13 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
           courier: order.shippingMethod || "Standard Shipping",
           order_date: formatTz(new Date(order.createdAt), timezone, "MMMM do, yyyy"),
           shipping_address: `${shipping.address1 || ''} ${shipping.city || ''}`,
-          billing_address: `${billing.address1 || ''} ${billing.city || ''}`
+          billing_address: `${billing.address1 || ''} ${billing.city || ''}`,
+          // Shipped/In Transit/Delivered ইমেইলে real Transdirect Booking ID +
+          // postcode + pre-filled track-order লিংক — shipment.ts-এর
+          // applyTransdirectStatusTransition() থেকে metadata হিসেবে আসে
+          real_booking_id: metaStr('real_booking_id', 'N/A'),
+          delivery_postcode: metaStr('delivery_postcode', 'N/A'),
+          track_order_url: metaStr('track_order_url', `${appUrl}/track-order`),
       };
   } else if (metadata) {
       // Generic fallback: affiliate events, custom templates, etc.
@@ -363,10 +372,31 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
   // ==========================================
   let actionButton = "";
 
-  if (template.triggerEvent === "ORDER_SHIPPED" && order?.shippingTrackingUrl) {
+  // Booking ID/Postcode টেক্সট — শুধু real ডেটা থাকলেই দেখাবে (order-এর আসলেই
+  // কোনো Transdirect booking না থাকলে, যেমন Local Pickup, "N/A" লেখা কখনো
+  // customer-কে দেখানো হয় না — পুরো paragraph-ই বাদ যায়)
+  let trackingInfoHtml = "";
+  if (
+    ["ORDER_SHIPPED", "ORDER_IN_TRANSIT", "ORDER_DELIVERED", "WARRANTY_PART_SHIPPED"].includes(template.triggerEvent || "") &&
+    variables.real_booking_id && variables.real_booking_id !== "N/A"
+  ) {
+    trackingInfoHtml = `
+      <p style="text-align: center; color: #555; font-size: 14px; margin-top: 24px;">
+        You can track your parcel live anytime — <strong>Booking ID:</strong> ${variables.real_booking_id}, <strong>Postcode:</strong> ${variables.delivery_postcode}
+      </p>
+    `;
+  }
+
+  if (
+    (template.triggerEvent === "ORDER_SHIPPED" || template.triggerEvent === "ORDER_IN_TRANSIT" || template.triggerEvent === "ORDER_DELIVERED") &&
+    typeof variables.track_order_url === "string"
+  ) {
+    // variables.track_order_url — real Booking ID/postcode-সহ pre-filled হলে
+    // এক ক্লিকেই ট্র্যাক করা যাবে, না থাকলে সাধারণ /track-order পেজে যাবে
+    // (আগে এটা order.shippingTrackingUrl ব্যবহার করতো, যেটা প্রায়ই ফাঁকা থাকতো)
     actionButton = `
       <div style="text-align: center; margin: 32px 0;">
-        <a href="${order.shippingTrackingUrl}" class="btn" style="background-color: ${baseColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: 700; border-radius: 6px; display: inline-block; font-size: 16px;">Track Your Order</a>
+        <a href="${variables.track_order_url}" class="btn" style="background-color: ${baseColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: 700; border-radius: 6px; display: inline-block; font-size: 16px;">Track My Order</a>
       </div>
     `;
   }
@@ -380,10 +410,12 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
     `;
   }
 
-  if (template.triggerEvent === "WARRANTY_PART_SHIPPED" && metadata?.tracking_url) {
+  if (template.triggerEvent === "WARRANTY_PART_SHIPPED" && typeof variables.track_order_url === "string") {
+    // আগে এখানে metadata?.tracking_url চেক করা হতো, যেটা কখনো পাঠানোই হতো না
+    // (dead code) — এখন real track_order_url দিয়ে ঠিক করা হলো
     actionButton = `
       <div style="text-align: center; margin: 32px 0;">
-        <a href="${metadata.tracking_url}" target="_blank" class="btn" style="background-color: ${baseColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: 700; border-radius: 6px; display: inline-block; font-size: 16px;">Track Your Package</a>
+        <a href="${variables.track_order_url}" target="_blank" class="btn" style="background-color: ${baseColor}; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: 700; border-radius: 6px; display: inline-block; font-size: 16px;">Track Your Package</a>
       </div>
     `;
   }
@@ -634,6 +666,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
 
                             ${mediaHtml}
                             ${actionButton}
+                            ${trackingInfoHtml}
                             ${orderDetailsHtml}
 
                         </td>

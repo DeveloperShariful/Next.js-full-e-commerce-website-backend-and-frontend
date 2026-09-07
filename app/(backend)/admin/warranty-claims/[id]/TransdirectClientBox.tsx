@@ -45,6 +45,7 @@ export default function TransdirectClientBox({
   claimId,
   status,
   trackingNumber,
+  realBookingId,
   replacementPart,
   spareParts,
   customerAddress,
@@ -57,6 +58,7 @@ export default function TransdirectClientBox({
   claimId: string,
   status: string,
   trackingNumber: string | null,
+  realBookingId?: string | null,
   replacementPart: string | null,
   spareParts: SparePart[],
   customerAddress: string | null,
@@ -271,6 +273,11 @@ export default function TransdirectClientBox({
             <div className="bg-white border-2 border-dashed border-[#8c8f94] py-3 px-4 inline-block rounded font-mono text-[16px] font-bold text-[#2271b1] tracking-widest shadow-sm">
               {trackingNumber}
             </div>
+            {realBookingId && (
+              <p className="text-[#50575e] mt-3 text-[13px]">
+                Real Booking ID: <span className="font-mono font-semibold text-[#1d2327]">{realBookingId}</span>
+              </p>
+            )}
             <div className="mt-5 pt-4 border-t border-[#c3c4c7]">
               <button
                 type="button"

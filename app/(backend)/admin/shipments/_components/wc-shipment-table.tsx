@@ -146,9 +146,9 @@ export const WcShipmentTable = ({
                      Track <ExternalLink size={12}/>
                   </a>
                 )}
-                {ship.connote && (
-                  <div className="text-[11px] text-[#8c8f94] mt-1">Connote: {ship.connote}</div>
-                )}
+                {/* connote এখন trackingNumber-এর সাথেই একই মান রাখে (দেখুন
+                    shipment.ts-এর refreshTransdirectStatuses) — তাই আলাদা করে
+                    "Connote: X" আবার দেখানো হচ্ছে না, ডুপ্লিকেট এড়াতে */}
               </td>
 
               {/* API Sync (Transdirect) */}

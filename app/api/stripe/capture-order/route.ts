@@ -11,6 +11,7 @@ import { logActivity } from '@/lib/activity-logger';
 import { getStoreTimezone } from '@/lib/get-store-timezone';
 import { storeDateKey } from '@/lib/store-time';
 import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
+import { derivePaymentMethodLabel } from '@/lib/stripe-payment-method';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -54,7 +55,11 @@ export async function POST(request: Request) {
     // ── 1. Retrieve Payment Intent from Stripe ────────────────
     let paymentIntent: Stripe.PaymentIntent;
     try {
-      paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      // latest_charge expand করা হচ্ছে যাতে payment_method_details থেকে বোঝা যায়
+      // customer আসলে Card/Link/Apple Pay/Google Pay — কোনটা দিয়ে pay করেছে।
+      paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['latest_charge'],
+      });
     } catch (stripeError: unknown) {
       const msg = stripeError instanceof Error ? stripeError.message : 'Failed to fetch intent';
       return NextResponse.json({ success: false, message: `Stripe Error: ${msg}` }, { status: 400 });
@@ -101,6 +106,12 @@ export async function POST(request: Request) {
 
     const capturedAmount = paymentIntent.amount_received / 100;
 
+    // latest_charge expand করা থাকলে এখন real object, শুধু string ID না —
+    // সেখান থেকে real payment method (Card/Link/Apple Pay/Google Pay) বের করা।
+    // null মানে BNPL অথবা সাধারণ card — আগের generic label-ই ঠিক থাকবে।
+    const latestCharge = paymentIntent.latest_charge as Stripe.Charge | null;
+    const derivedPaymentMethod = derivePaymentMethodLabel(latestCharge);
+
     // ── 4. Fetch order items (for stock decrement + analytics) ─
     const orderItems = await db.orderItem.findMany({
       where: { orderId },
@@ -128,6 +139,10 @@ export async function POST(request: Request) {
           totalDue: 0,
           isCaptured: true,
           capturedAt: new Date(),
+          // শুধু তখনই override — যখন সত্যিই Link/Apple Pay/Google Pay প্রমাণ পাওয়া
+          // গেছে। নাহলে key-ই বাদ, order-creation-এর সময় সেট করা label (Card/
+          // Klarna/Afterpay/Zip/PayTo) অপরিবর্তিত থাকে।
+          ...(derivedPaymentMethod ? { paymentMethod: derivedPaymentMethod } : {}),
         },
       });
 

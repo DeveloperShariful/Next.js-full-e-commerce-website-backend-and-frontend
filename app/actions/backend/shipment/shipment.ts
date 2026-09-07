@@ -5,8 +5,9 @@
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ShipmentQueryParams, GetShipmentsResponse } from "@/app/(backend)/admin/shipments/types";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, FulfillmentStatus } from "@prisma/client";
 import { logActivity } from "@/lib/activity-logger";
+import { sendOrderEmail } from "@/app/actions/backend/order/order-utils";
 
 // --- 1. GET SHIPMENTS WITH PAGINATION, SEARCH & COUNTS ---
 export async function getShipments(params: ShipmentQueryParams): Promise<GetShipmentsResponse> {
@@ -175,16 +176,37 @@ export async function backfillTransdirectShipments(): Promise<{ success: boolean
   }
 }
 
-// --- 4. REFRESH LIVE STATUS FROM TRANSDIRECT API ---
+// --- 4. REFRESH LIVE STATUS FROM TRANSDIRECT API (+ Order sync + customer email) ---
+//
+// এই function দুই জায়গা থেকে কল হয়:
+//   ১. Admin Shipments পেজের "Refresh Status" বাটন (manual)
+//   ২. app/api/cron/transdirect-status-sync/route.ts (প্রতি ৩০ মিনিটে automatic)
+// দুই ক্ষেত্রেই status বদলালে identical আচরণ — Order status update + customer
+// email — যাতে দুইটা আলাদা code path maintain করতে না হয়। Transdirect-এর
+// কোনো webhook নেই (নিশ্চিত হওয়া গেছে তাদের public API docs দেখে), তাই polling-ই
+// একমাত্র উপায়।
 export async function refreshTransdirectStatuses(): Promise<{ success: boolean; updated: number; error?: string }> {
   try {
     const config = await db.transdirectConfig.findUnique({ where: { id: "transdirect_config" } });
     if (!config?.apiKey) return { success: false, updated: 0, error: "TransDirect API Key missing." };
     const apiKey = config.apiKey;
 
+    // শুধু active (এখনো delivered/cancelled/refunded/returned/failed না হওয়া)
+    // order-এর shipment poll করা হচ্ছে — terminal অবস্থার shipment বারবার চেক
+    // করার দরকার নেই, প্রতি ৩০ মিনিটে চলা cron-এর batch ছোট/দ্রুত রাখতে এটা জরুরি।
     const shipments = await db.shipment.findMany({
-      where: { transdirectId: { not: null } },
-      select: { id: true, transdirectId: true },
+      where: {
+        transdirectId: { not: null },
+        order: {
+          status: { notIn: [OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED, OrderStatus.REFUNDED, OrderStatus.RETURNED, OrderStatus.FAILED] },
+          deletedAt: null,
+        },
+      },
+      select: {
+        id: true, transdirectId: true, orderId: true, lastTrackingStatus: true,
+        courier: true, trackingNumber: true, trackingUrl: true,
+        order: { select: { transdirectQuoteId: true } },
+      },
     });
 
     if (shipments.length === 0) return { success: true, updated: 0 };
@@ -198,27 +220,77 @@ export async function refreshTransdirectStatuses(): Promise<{ success: boolean; 
 
       const results = await Promise.allSettled(
         batch.map(async (ship) => {
-          const res = await fetch(`https://www.transdirect.com.au/api/bookings/${ship.transdirectId}`, {
-            method: "GET",
-            headers: { "Api-Key": apiKey, "Accept": "application/json" },
-          });
+          // ── ধাপ ১: real Transdirect Booking ID ────────────────────────────
+          // আগে এটা আলাদা GET /api/orders/{id} কল করে বের করা হতো, কিন্তু live
+          // যাচাই করে দেখা গেছে booking তৈরির সময়ই quote-step-এ এই একই মান
+          // Order.transdirectQuoteId-তে সরাসরি সেভ হয়ে যায় (transdirect-sync-order.ts
+          // দেখুন) — তাই আলাদা API call করার দরকারই নেই, সরাসরি DB থেকে পড়লেই হয়।
+          const realBookingId: number | null = ship.order?.transdirectQuoteId
+            ? parseInt(ship.order.transdirectQuoteId, 10)
+            : null;
+          if (!realBookingId) return null; // এখনো booking-ই হয়নি
 
-          if (!res.ok) return null;
-          const data = await res.json();
+          // ── ধাপ ২: booking-এর নিজস্ব status (Confirmed/Cancelled ইত্যাদি) —
+          // এটা সবসময় fetch করা হয়, শুধু tracking event history থেকে "cancelled"
+          // বোঝা যায় না (courier কখনো cancelled booking-এর জন্য event পাঠায়ই না) —
+          // এই একই কলে connote/courier-ও পাওয়া যায়।
+          let bookingStatus = "";
+          let connote: string | undefined;
+          let courierFromBooking: string | undefined;
+          try {
+            const bookingRes = await fetch(`https://www.transdirect.com.au/api/bookings/${realBookingId}`, {
+              method: "GET",
+              headers: { "Api-Key": apiKey, "Accept": "application/json" },
+            });
+            if (bookingRes.ok) {
+              const bookingData = await bookingRes.json();
+              bookingStatus = String(bookingData?.status || "").toLowerCase();
+              connote = bookingData?.connote || undefined;
+              courierFromBooking = bookingData?.courier || undefined;
+            }
+          } catch {
+            // best-effort — না পেলে চুপচাপ বাদ, feature ভাঙবে না
+          }
 
-          const rawStatus: string = (data.status || data.booking_status || data.state || "").toLowerCase().trim();
-          if (!rawStatus) return null;
+          let displayStatus: string | null = null;
 
-          // TransDirect status → our display value
-          let displayStatus = rawStatus;
-          if (["new", "pending_order", "pending order"].includes(rawStatus)) displayStatus = "pending";
-          else if (rawStatus === "booked")                                    displayStatus = "booked";
-          else if (["dispatched", "picked_up"].includes(rawStatus))          displayStatus = "dispatched";
-          else if (["in_transit", "in transit"].includes(rawStatus))         displayStatus = "in_transit";
-          else if (rawStatus === "delivered")                                 displayStatus = "delivered";
-          else if (["cancelled", "canceled"].includes(rawStatus))            displayStatus = "cancelled";
+          if (bookingStatus.includes("cancel")) {
+            displayStatus = "cancelled";
+          } else {
+            // ── ধাপ ৩: real Booking ID দিয়ে সম্পূর্ণ tracking event history আনা ──
+            const trackRes = await fetch(`https://www.transdirect.com.au/api/bookings/track/${realBookingId}`, {
+              method: "GET",
+              headers: { "Api-Key": apiKey, "Accept": "application/json" },
+            });
 
-          console.log(`[TD Status] ID ${ship.transdirectId} → raw="${rawStatus}" → display="${displayStatus}"`);
+            if (trackRes.ok) {
+              const trackData: unknown = await trackRes.json();
+              // এখনো কোনো tracking event তৈরি হয়নি (courier এখনো pickup করেনি) —
+              // Transdirect তখন প্লেইন স্ট্রিং ("No booking matched.") ফেরত দেয়, object না
+              if (trackData && typeof trackData === "object") {
+                const events = Object.values(trackData as Record<string, unknown>)[0] as
+                  | Array<{ status?: string; track_status?: string; date?: string }>
+                  | undefined;
+
+                if (events && events.length > 0) {
+                  // events তালিকা chronological (পুরনো → নতুন) — সবচেয়ে শেষ entry-ই বর্তমান status
+                  const latestEvent = events[events.length - 1];
+                  const trackStatusCode = String(latestEvent.track_status || "");
+                  const statusText = (latestEvent.status || "").toLowerCase();
+
+                  if (trackStatusCode === "1" || statusText.includes("picked up")) displayStatus = "dispatched";
+                  else if (trackStatusCode === "2" || trackStatusCode === "3" || statusText.includes("transit") || statusText.includes("onboard")) displayStatus = "in_transit";
+                  else if (trackStatusCode === "4" || statusText.includes("delivered")) displayStatus = "delivered";
+                }
+              }
+            }
+          }
+
+          if (!displayStatus) return null;
+
+          console.log(`[TD Status] Shipment ${ship.id} (real booking ${realBookingId}) → booking status="${bookingStatus}" → display="${displayStatus}"`);
+
+          const previousStatus = ship.lastTrackingStatus;
 
           await db.shipment.update({
             where: { id: ship.id },
@@ -226,8 +298,26 @@ export async function refreshTransdirectStatuses(): Promise<{ success: boolean; 
               lastTrackingStatus: displayStatus,
               lastSyncedAt:       new Date(),
               deliveredDate:      displayStatus === "delivered" ? new Date() : undefined,
+              // Transdirect-এর নিজস্ব public tracking পেজ — TrackOrderForm.tsx-এর
+              // "Verify on Transdirect" বাটনেও একই URL pattern ব্যবহার হয়
+              ...(connote ? { trackingNumber: connote, connote, trackingUrl: `https://www.transdirect.com.au/track/?tn=${connote}` } : {}),
+              ...(courierFromBooking && !ship.courier ? { courier: courierFromBooking } : {}),
             },
           });
+
+          // status সত্যিই বদলেছে তখনই Order-level side effect (status/note/email) —
+          // নাহলে প্রতি ৩০ মিনিটের poll-এই একই ইমেইল বারবার পাঠানো হয়ে যেত
+          if (displayStatus !== previousStatus) {
+            await applyTransdirectStatusTransition({
+              orderId: ship.orderId,
+              displayStatus,
+              courier: courierFromBooking || ship.courier,
+              trackingNumber: connote || ship.trackingNumber,
+              trackingUrl: ship.trackingUrl,
+              realBookingId,
+            });
+          }
+
           return ship.id;
         })
       );
@@ -241,6 +331,159 @@ export async function refreshTransdirectStatuses(): Promise<{ success: boolean; 
     console.error("REFRESH_STATUSES_ERROR", error);
     return { success: false, updated: 0, error: "Failed to refresh statuses." };
   }
+}
+
+// Shipment-এর status সত্যিই বদলালে Order-এর status/fulfillmentStatus আপডেট, একটা
+// audit OrderNote, আর customer-কে সঠিক ইমেইল পাঠানো — একটা জায়গায় centralize করা,
+// যাতে ভবিষ্যতে নতুন status-mapping যোগ করা সহজ হয় এবং duplicate logic না থাকে।
+async function applyTransdirectStatusTransition(params: {
+  orderId: string;
+  displayStatus: string;
+  courier: string | null;
+  trackingNumber: string | null | undefined;
+  trackingUrl: string | null | undefined;
+  realBookingId: number | null;
+}) {
+  const { orderId, displayStatus, courier, trackingNumber, trackingUrl, realBookingId } = params;
+
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: { status: true, deletedAt: true, orderDate: true, shippingAddress: true },
+  });
+  if (!order || order.deletedAt) return;
+
+  // ইমেইলে দেখানোর জন্য — real Booking ID + delivery postcode + pre-filled
+  // track-order লিংক (customer এক ক্লিকেই status দেখতে পারবে, নিজে থেকে টাইপ
+  // করতে হবে না)
+  const shipping = order.shippingAddress as { postcode?: string } | null;
+  const deliveryPostcode = shipping?.postcode || "";
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://gobike.au").replace(/\/+$/, "");
+  const emailExtraData = realBookingId && deliveryPostcode
+    ? {
+        real_booking_id: String(realBookingId),
+        delivery_postcode: deliveryPostcode,
+        track_order_url: `${siteUrl}/track-order?booking=${realBookingId}&postcode=${encodeURIComponent(deliveryPostcode)}`,
+      }
+    : {};
+
+  // Cancelled/refunded/returned/failed/completed order — courier থেকে নতুন
+  // status এলেও Order.status "resurrect" করা হবে না, কোনো customer email-ও
+  // না, শুধু admin-এর জন্য একটা note রাখা হবে। COMPLETED-ও এখানে অন্তর্ভুক্ত —
+  // এটাও একটা চূড়ান্ত ("no more email") অবস্থা, DELIVERED-এর মতোই।
+  const TERMINAL_STATUSES: OrderStatus[] = [
+    OrderStatus.CANCELLED,
+    OrderStatus.REFUNDED,
+    OrderStatus.RETURNED,
+    OrderStatus.FAILED,
+    OrderStatus.COMPLETED,
+  ];
+  const isTerminal = TERMINAL_STATUSES.includes(order.status);
+
+  // 🛡️ ইতিহাস-backfill সুরক্ষা: পুরনো order (যেমন একবার Booking ID backfill বা
+  // নতুন feature চালু হওয়ার পর প্রথমবার poll হওয়া মাসখানেক আগের order) হঠাৎ
+  // "first transition" হিসেবে ধরা পড়লে customer-কে ভুলভাবে "আপনার পার্সেল
+  // এইমাত্র পৌঁছেছে" ইমেইল যাওয়া উচিত না — তারা হয়তো সপ্তাহ/মাস আগেই পেয়ে গেছে।
+  // Order/Shipment status ঠিকই আপডেট হবে (silently, ডেটা সঠিক থাকুক), শুধু
+  // customer-facing ইমেইল বন্ধ থাকবে পুরনো order-এ। ২১ দিন = বাস্তবসম্মত সর্বোচ্চ
+  // shipping window (দেখুন email template-এ থাকা courier estimate গুলো)।
+  const RECENT_ORDER_WINDOW_DAYS = 21;
+  const orderAgeDays = (Date.now() - new Date(order.orderDate).getTime()) / (1000 * 60 * 60 * 24);
+  const isRecentOrder = orderAgeDays <= RECENT_ORDER_WINDOW_DAYS;
+
+  // Terminal order (cancelled/refunded/returned/failed/completed) — courier
+  // থেকে যেকোনো নতুন progress event এলেও Order.status বদলানো বা customer email
+  // পাঠানো হবে না, শুধু admin-এর জন্য একটা note রেখে থেমে যাওয়া হবে। ব্যতিক্রম:
+  // "cancelled" branch (নিচে) — সেটা terminal check-এর বাইরে, কারণ ওটা নিজেই
+  // সবসময় শুধু একটা admin-alert note রাখে, কখনো email পাঠায় না।
+  if (isTerminal && displayStatus !== "cancelled") {
+    await db.orderNote.create({
+      data: {
+        orderId,
+        content: `ℹ️ Transdirect reported status "${displayStatus}" but this order is already ${order.status} — status update and customer email skipped.`,
+        isSystem: true,
+      },
+    });
+    return;
+  }
+
+  if (displayStatus === "dispatched") {
+    if (order.status !== OrderStatus.DELIVERED) {
+      await db.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.SHIPPED,
+          fulfillmentStatus: FulfillmentStatus.FULFILLED,
+          ...(courier ? { shippingMethod: courier } : {}),
+          ...(trackingNumber ? { shippingTrackingNumber: trackingNumber } : {}),
+          ...(trackingUrl ? { shippingTrackingUrl: trackingUrl } : {}),
+        },
+      });
+    }
+    await db.orderNote.create({
+      data: {
+        orderId,
+        content: isRecentOrder
+          ? `📦 Courier picked up the parcel (Transdirect status: dispatched).`
+          : `📦 Courier picked up the parcel (Transdirect status: dispatched). Order is ${Math.round(orderAgeDays)} days old — customer email skipped (historical catch-up, not a real-time event).`,
+        isSystem: true,
+      },
+    });
+    if (isRecentOrder) await sendOrderEmail(orderId, "ORDER_SHIPPED", emailExtraData);
+  } else if (displayStatus === "in_transit") {
+    // ORDER_IN_TRANSIT টেমপ্লেট আগে থেকে না থাকলে self-seed — admin আলাদা করে
+    // "Sync Templates" না চাপলেও ইমেইল কাজ করবে (daily-report-reminder cron-এর
+    // মতোই pattern)।
+    await db.emailTemplate.upsert({
+      where: { triggerEvent: "ORDER_IN_TRANSIT" },
+      update: {},
+      create: {
+        slug: "order_in_transit",
+        name: "Order In Transit",
+        triggerEvent: "ORDER_IN_TRANSIT",
+        recipientType: "customer",
+        subject: "Your GoBike Order #{order_number} is on its way — In Transit 🚚",
+        heading: "Order In Transit",
+        content:
+          "<p>Hi {customer_name},</p><p>Quick update — your order <strong>#{order_number}</strong> is now in transit with <strong>{courier}</strong> and getting closer to you.</p><p><strong>Tracking Number:</strong> {tracking_number}</p><p>We'll let you know as soon as it's delivered!</p>",
+        isEnabled: true,
+      },
+    });
+    await db.orderNote.create({
+      data: {
+        orderId,
+        content: isRecentOrder
+          ? `🚚 Parcel is in transit (Transdirect status: in_transit).`
+          : `🚚 Parcel is in transit (Transdirect status: in_transit). Order is ${Math.round(orderAgeDays)} days old — customer email skipped (historical catch-up, not a real-time event).`,
+        isSystem: true,
+      },
+    });
+    if (isRecentOrder) await sendOrderEmail(orderId, "ORDER_IN_TRANSIT", emailExtraData);
+  } else if (displayStatus === "delivered") {
+    // isTerminal ইতিমধ্যে উপরে চেক হয়ে গেছে (early return) — এখানে পৌঁছালে
+    // মানে order নিশ্চিতভাবেই non-terminal
+    await db.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.DELIVERED },
+    });
+    await db.orderNote.create({
+      data: {
+        orderId,
+        content: isRecentOrder
+          ? `✅ Parcel delivered (Transdirect status: delivered).`
+          : `✅ Parcel delivered (Transdirect status: delivered). Order is ${Math.round(orderAgeDays)} days old — customer email skipped (historical catch-up, not a real-time event).`,
+        isSystem: true,
+      },
+    });
+    if (isRecentOrder) await sendOrderEmail(orderId, "ORDER_DELIVERED", emailExtraData);
+  } else if (displayStatus === "cancelled") {
+    await db.orderNote.create({
+      data: { orderId, content: `⚠️ Transdirect reports this booking as CANCELLED — please review manually.`, isSystem: true },
+    });
+    // ইচ্ছাকৃতভাবে কোনো customer email না — booking বাতিল হওয়া rare/সন্দেহজনক ঘটনা,
+    // admin আগে যাচাই করুক তারপর প্রয়োজনে নিজে থেকে customer-কে জানাক
+  }
+  // 'pending' / 'booked' — কোনো নতুন customer-facing action দরকার নেই, booking
+  // তৈরির সময়ই ORDER_PROCESSING ইমেইল ইতিমধ্যে পাঠানো হয়ে গেছে
 }
 
 // --- 5. BULK ACTIONS (WooCommerce Style) ---

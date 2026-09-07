@@ -25,6 +25,10 @@
       "schedule": "0 23 * * *"
     },
     {
+      "path": "/api/cron/transdirect-status-sync",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/sync-analytics",
       "schedule": "0 0 * * *"
     },

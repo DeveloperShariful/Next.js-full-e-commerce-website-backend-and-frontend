@@ -86,7 +86,33 @@ export async function restockInventory(orderId: string) {
     }
 }
 
-export async function sendOrderEmail(orderId: string, eventType: string) {
+// এই ৩টা trigger-এর ইমেইলে real Booking ID/postcode/track-order লিংক দেখাতে
+// হয় — Transdirect status-poll pipeline (shipment.ts) ছাড়াও admin manually
+// tracking যোগ করলে (fulfillment.ts) বা status bulk-update করলে (bulk-update.ts,
+// update-status.ts) একই trigger-গুলো ফায়ার হয়, কিন্তু ওই caller-গুলো এই extra
+// ডেটা পাস করে না। তাই এখানেই auto-compute করা হচ্ছে (caller explicit
+// extraData দিলে সেটাই প্রাধান্য পাবে) — যাতে কোথাও থেকে ইমেইল গেলেই ঠিক তথ্য
+// থাকে, কোনো caller "ভুলে গেলে" customer literal "N/A" না দেখে।
+const SHIPPING_EVENTS_NEEDING_TRACK_LINK = ["ORDER_SHIPPED", "ORDER_IN_TRANSIT", "ORDER_DELIVERED"];
+
+async function buildTrackOrderEmailData(orderId: string): Promise<Record<string, string>> {
+    const order = await db.order.findUnique({
+        where: { id: orderId },
+        select: { transdirectQuoteId: true, shippingAddress: true },
+    });
+    const shipping = order?.shippingAddress as { postcode?: string } | null;
+    const postcode = shipping?.postcode || "";
+    if (!order?.transdirectQuoteId || !postcode) return {};
+
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://gobike.au").replace(/\/+$/, "");
+    return {
+        real_booking_id: order.transdirectQuoteId,
+        delivery_postcode: postcode,
+        track_order_url: `${siteUrl}/track-order?booking=${order.transdirectQuoteId}&postcode=${encodeURIComponent(postcode)}`,
+    };
+}
+
+export async function sendOrderEmail(orderId: string, eventType: string, extraData?: Record<string, unknown>) {
     try {
         const [order, settings, emailConfig] = await Promise.all([
             db.order.findUnique({
@@ -110,12 +136,17 @@ export async function sendOrderEmail(orderId: string, eventType: string) {
         const customerEmail = order.user?.email || order.guestEmail;
         const adminEmail = settings?.storeEmail || emailConfig?.senderEmail;
 
+        let finalData: Record<string, unknown> = extraData || {};
+        if (SHIPPING_EVENTS_NEEDING_TRACK_LINK.includes(eventType) && !finalData.real_booking_id) {
+            finalData = { ...(await buildTrackOrderEmailData(orderId)), ...finalData };
+        }
+
         if (customerEmail) {
             await sendNotification({
-                trigger: eventType, 
+                trigger: eventType,
                 recipient: customerEmail,
-                orderId: orderId, 
-                data: {}
+                orderId: orderId,
+                data: finalData
             });
         }
 

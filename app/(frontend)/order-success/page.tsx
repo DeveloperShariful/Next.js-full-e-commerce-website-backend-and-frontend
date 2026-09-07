@@ -61,6 +61,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
       shippingAddress: true,
       billingAddress: true,
       shippingMethod: true,
+      paymentMethod: true,
       affiliateId: true,
       referrals: { select: { affiliateId: true } },
       items: {
@@ -202,7 +203,11 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
                 </div>
                 <div className="text-right shrink-0 pl-2">
                   <p className="text-sm font-bold text-gray-900">{formatCurrency(item.total)}</p>
-                  <p className="text-xs text-gray-400">{formatCurrency(item.price)} ea</p>
+                  {/* Qty 1 হলে unit price আর line total একই সংখ্যা — তখন "ea" দেখানো
+                      মানেই একই দাম দুইবার দেখানো, যা দেখতে ভুল/ডুপ্লিকেট মনে হয়। */}
+                  {item.quantity > 1 && (
+                    <p className="text-xs text-gray-400">{formatCurrency(item.price)} ea</p>
+                  )}
                 </div>
               </div>
             ))}
@@ -229,6 +234,16 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
               <div className="flex justify-between text-sm text-green-700 font-medium">
                 <span>Discount</span>
                 <span>−{formatCurrency(order.discountTotal)}</span>
+              </div>
+            )}
+            {order.paymentMethod && (
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Payment method</span>
+                {/* DB-তে সবসময় bare নাম থাকে ("Link", "Apple Pay") — admin
+                    order-list-table.tsx/order-items-meta.tsx-এর মতোই এখানেও
+                    "via" prefix আমরা নিজে বসাচ্ছি, ডাবল "via via" এড়াতে
+                    কখনো DB value-এর ভেতরে "via" বেক করা হয় না। */}
+                <span>via {order.paymentMethod}</span>
               </div>
             )}
             <div className="flex justify-between font-extrabold text-gray-900 text-base pt-2 border-t border-gray-200">

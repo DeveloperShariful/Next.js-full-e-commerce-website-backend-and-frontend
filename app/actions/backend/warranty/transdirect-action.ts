@@ -196,6 +196,10 @@ export async function confirmTransdirectBooking(formData: FormData) {
       where: { id: claimId },
       data: {
         trackingNumber:  confirmData.connote || String(confirmData.id) || orderId,
+        // tempBookingId (quote-step-এই পাওয়া) হলো real Transdirect Booking ID —
+        // main order flow-এ live verify করা হয়েছে এটাই সেই একই মান যেটা
+        // /api/bookings/track/{id}-এ দিয়ে সরাসরি tracking history পাওয়া যায়
+        transdirectRealBookingId: tempBookingId,
         replacementPart: partName,
         address,
         suburb,
@@ -207,6 +211,11 @@ export async function confirmTransdirectBooking(formData: FormData) {
     const trackingNumber = confirmData.connote || String(confirmData.id) || orderId;
     const courierName = selectedCourier.replace(/_/g, ' ').toUpperCase();
 
+    // real Booking ID + postcode + pre-filled track-order লিংক — main order
+    // flow-এর মতোই একই /track-order পেজে সরাসরি কাজ করবে
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://gobike.au').replace(/\/+$/, '');
+    const trackOrderUrl = `${siteUrl}/track-order?booking=${tempBookingId}&postcode=${encodeURIComponent(postcode)}`;
+
     // Customer: "Your replacement part is on the way"
     // Admin: "Part shipped for warranty claim"
     await Promise.allSettled([
@@ -214,11 +223,14 @@ export async function confirmTransdirectBooking(formData: FormData) {
         trigger: 'WARRANTY_PART_SHIPPED',
         recipient: claim.email,
         data: {
-          customer_name:    claim.name,
-          order_number:     claim.orderNumber,
-          replacement_part: partName,
-          tracking_number:  trackingNumber,
-          courier:          courierName,
+          customer_name:     claim.name,
+          order_number:      claim.orderNumber,
+          replacement_part:  partName,
+          tracking_number:   trackingNumber,
+          courier:           courierName,
+          real_booking_id:   tempBookingId,
+          delivery_postcode: postcode,
+          track_order_url:   trackOrderUrl,
         },
       }),
       sendNotification({

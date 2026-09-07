@@ -12,6 +12,7 @@ import { auditService } from '@/lib/audit-service';
 import { markOrderRecoveredIfAbandoned } from '@/lib/mark-order-recovered';
 import { getStoreTimezone } from '@/lib/get-store-timezone';
 import { storeDateKey } from '@/lib/store-time';
+import { derivePaymentMethodLabel } from '@/lib/stripe-payment-method';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -137,6 +138,20 @@ export async function POST(request: Request) {
         select: { productId: true, variantId: true, quantity: true },
       });
 
+      // Webhook event payload-এ latest_charge শুধু string ID (expand করা থাকে না),
+      // তাই real payment method (Card/Link/Apple Pay/Google Pay) বের করতে একটা
+      // আলাদা fetch লাগছে। ব্যর্থ হলেও পুরো rescue flow আটকাবে না — null থাকবে,
+      // মানে order-creation-এর সময়ের generic label-ই অপরিবর্তিত থাকবে।
+      let rescueDerivedPaymentMethod: string | null = null;
+      if (typeof paymentIntent.latest_charge === 'string') {
+        try {
+          const charge = await stripe.charges.retrieve(paymentIntent.latest_charge);
+          rescueDerivedPaymentMethod = derivePaymentMethodLabel(charge);
+        } catch {
+          // Best-effort — চার্জ ফেচ ব্যর্থ হলে fallback label-ই থাকবে
+        }
+      }
+
       // 🛡️ 6. Database Transaction: order update + stock decrement
       await db.$transaction(async (tx) => {
         await tx.order.update({
@@ -149,6 +164,7 @@ export async function POST(request: Request) {
             totalDue: 0,
             isCaptured: true,
             capturedAt: new Date(),
+            ...(rescueDerivedPaymentMethod ? { paymentMethod: rescueDerivedPaymentMethod } : {}),
           },
         });
         await tx.orderTransaction.create({

@@ -125,7 +125,17 @@ export default function PostComposer({ onPosted }: { onPosted: (post: CommunityP
         uploadedMedia.push({ url: uploaded.url, mediaType: pf.mediaType });
       }
 
-      const tags = tagInput.split(",").map(t => t.trim()).filter(Boolean);
+      // কমা, স্পেস অথবা # — যেকোনো দিয়ে আলাদা করা tag হিসেবে ধরা হচ্ছে, কারণ
+      // মানুষ প্রায়ই Instagram/Facebook স্টাইলে "#gobike #kidsbike#electricbike"
+      // পুরোটা এক নিঃশ্বাসে পেস্ট করে দেয় — শুধু কমা দিয়ে split করলে পুরো ব্লকটাই
+      // একটা মাত্র (অবাস্তব লম্বা) tag হয়ে DB-তে ঢুকে যেত, যা /community/tag/[tag]
+      // এর জন্য junk URL তৈরি করছিল।
+      const tags = Array.from(new Set(
+        tagInput
+          .split(/[,\s#]+/)
+          .map(t => t.trim().slice(0, 30))
+          .filter(Boolean)
+      ));
       const mentionedUserIds = Object.values(mentionedUsers);
 
       const res = await createCommunityPost({
@@ -270,7 +280,7 @@ export default function PostComposer({ onPosted }: { onPosted: (post: CommunityP
                 type="text"
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
-                placeholder="Tags (comma separated, optional)"
+                placeholder="Tags — separate with comma, space or # (optional)"
                 className="w-full border border-[#DADDE1] rounded-lg px-3 py-2 text-[14px] outline-none focus:ring-2 mb-3"
                 style={{ ["--tw-ring-color" as string]: FB_BLUE }}
               />

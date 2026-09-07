@@ -26,6 +26,21 @@ interface PaymentGatewayItem {
   name: string;
 }
 
+// Link/Apple Pay/Google Pay — এগুলো DB-র PaymentGateway টেবিলে (Settings →
+// Payments-এ configure করা real integration, নিজস্ব API key/enable-disable
+// সহ) ইচ্ছাকৃতভাবে যোগ করা হয়নি — এগুলো আলাদা কোনো integration না, একই Stripe
+// gateway-র ভেতরেই payment সফল হওয়ার পর সনাক্ত হওয়া sub-type (দেখুন
+// lib/stripe-payment-method.ts)। তাই filter dropdown-এ আলাদাভাবে যোগ করা
+// হচ্ছে — identifier-টাই order.paymentMethod-এর real সেভ করা মান, get-orders.ts
+// এর paymentMethod contains-filter এই একই স্ট্রিং দিয়ে match করবে।
+const WALLET_SUB_FILTERS: PaymentGatewayItem[] = [
+  { identifier: "Link", name: "Stripe - Link" },
+  { identifier: "Apple Pay", name: "Stripe - Apple Pay" },
+  { identifier: "Google Pay", name: "Stripe - Google Pay" },
+  { identifier: "Samsung Pay", name: "Stripe - Samsung Pay" },
+  { identifier: "Amex Express Checkout", name: "Stripe - Amex Express Checkout" },
+];
+
 interface OrdersHeaderProps {
   counts: Record<string, number>;
   gateways: PaymentGatewayItem[]; // 🔥 NEW: Dynamic Gateways Prop
@@ -241,7 +256,7 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
                     className="h-[30px] px-1 sm:px-2 border border-[#8c8f94] bg-white text-[#32373c] shadow-sm w-full sm:w-auto sm:min-w-[160px] disabled:bg-gray-100 text-[11px] sm:text-[13px] flex items-center justify-between gap-1 outline-none"
                 >
                     <span className="truncate">
-                        {paymentMethod === "all" ? "All sales channels" : (gateways.find(gw => gw.identifier === paymentMethod)?.name ?? "All sales channels")}
+                        {paymentMethod === "all" ? "All sales channels" : ([...gateways, ...WALLET_SUB_FILTERS].find(gw => gw.identifier === paymentMethod)?.name ?? "All sales channels")}
                     </span>
                     <ChevronDown className="h-3 w-3 text-[#8c8f94] shrink-0" />
                 </button>
@@ -260,7 +275,7 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
                 >
                     All sales channels
                 </DropdownMenuItem>
-                {gateways.map((gw) => (
+                {[...gateways, ...WALLET_SUB_FILTERS].map((gw) => (
                     <DropdownMenuItem
                         key={gw.identifier}
                         onClick={() => setPaymentMethod(gw.identifier)}

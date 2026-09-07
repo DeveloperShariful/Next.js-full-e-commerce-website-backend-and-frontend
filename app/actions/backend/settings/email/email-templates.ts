@@ -38,15 +38,23 @@ const DEFAULT_TEMPLATES = [
         triggerEvent: 'ORDER_SHIPPED', 
         recipientType: 'customer', 
         subject: 'It’s on the way! Your GoBike Order #{order_number} has shipped 🚚', 
-        content: '<p>Hi {customer_name},</p><p>Your wait is almost over! Your order <strong>#{order_number}</strong> has left our warehouse and is currently on its way to you via <strong>{courier}</strong>.</p><p><strong>Tracking Number:</strong> {tracking_number}</p><p>Please note that it may take up to 24 hours for the tracking link to activate on the courier\'s website.</p>' 
+        content: '<p>Hi {customer_name},</p><p>Your wait is almost over! Your order <strong>#{order_number}</strong> has left our warehouse and is currently on its way to you via <strong>{courier}</strong>.</p><p><strong>Tracking Number:</strong> {tracking_number}</p><p>Please note that it may take up to 24 hours for the tracking link to activate on the courier\'s website.</p>'
     },
-    { 
-        slug: 'order_delivered', 
+    {
+        slug: 'order_in_transit',
+        name: 'Order In Transit',
+        triggerEvent: 'ORDER_IN_TRANSIT',
+        recipientType: 'customer',
+        subject: 'Your GoBike Order #{order_number} is on its way — In Transit 🚚',
+        content: '<p>Hi {customer_name},</p><p>Quick update — your order <strong>#{order_number}</strong> is now in transit with <strong>{courier}</strong> and getting closer to you.</p><p><strong>Tracking Number:</strong> {tracking_number}</p><p>We\'ll let you know as soon as it\'s delivered!</p>'
+    },
+    {
+        slug: 'order_delivered',
         name: 'Order Delivered', 
         triggerEvent: 'ORDER_DELIVERED', 
         recipientType: 'customer', 
         subject: 'Delivered: Your GoBike Order #{order_number} has arrived!', 
-        content: '<p>Hi {customer_name},</p><p>Fantastic news! Your order <strong>#{order_number}</strong> has been marked as delivered.</p><p>We hope you and your little one absolutely love the new GoBike gear. If you have a moment, we’d love to hear your feedback on our website.</p><p>If there are any issues with your delivery, please let us know immediately by replying to this email.</p>' 
+        content: '<p>Hi {customer_name},</p><p>Fantastic news! Your order <strong>#{order_number}</strong> has been marked as delivered.</p><p>We hope you and your little one absolutely love the new GoBike gear. If you have a moment, we’d love to hear your feedback on our website.</p><p>If there are any issues with your delivery, please let us know immediately by replying to this email.</p>'
     },
     { 
         slug: 'order_cancelled', 
@@ -324,7 +332,7 @@ const DEFAULT_TEMPLATES = [
         triggerEvent: 'WARRANTY_PART_SHIPPED', 
         recipientType: 'customer', 
         subject: 'Your Replacement Part is on the way! Tracking: {tracking_number}', 
-        content: '<p>Hi {customer_name},</p><p>Your replacement part (<strong>{replacement_part}</strong>) for order #{order_number} has been shipped via {courier}.</p><p><strong>Tracking Number:</strong> {tracking_number}</p><p>Please note that tracking might take 12-24 hours to update on the courier website.</p>' 
+        content: '<p>Hi {customer_name},</p><p>Your replacement part (<strong>{replacement_part}</strong>) for order #{order_number} has been shipped via {courier}.</p><p><strong>Tracking Number:</strong> {tracking_number}</p><p>Please note that tracking might take 12-24 hours to update on the courier website.</p>'
     },
     { 
         slug: 'admin_warranty_shipped', 

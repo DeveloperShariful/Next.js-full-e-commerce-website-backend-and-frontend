@@ -336,6 +336,7 @@ export default async function SingleClaimPage({ params }: { params: Promise<{ id
             claimId={claim.id}
             status={claim.status}
             trackingNumber={claim.trackingNumber}
+            realBookingId={claim.transdirectRealBookingId}
             replacementPart={claim.replacementPart}
             spareParts={spareParts}
             customerName={claim.name}

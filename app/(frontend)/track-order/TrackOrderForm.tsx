@@ -2,56 +2,117 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import { trackOrderAction } from '@/app/actions/frontend/track-order/trackOrderAction';
+
+interface TrackingEvent {
+  status?: string;
+  description?: string;
+  date?: string;
+  track_status?: string;
+}
+
+interface AddressParty {
+  company_name?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  suburb?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+}
+
+interface BookingItem {
+  description?: string;
+  quantity?: number;
+  weight?: number;
+  length?: number;
+  width?: number;
+  height?: number;
+}
+
+interface Booking {
+  id: number | string;
+  status?: string;
+  latest_status?: string;
+  connote?: string;
+  courier?: string;
+  booked_at?: string;
+  label?: string;
+  order?: { order_number?: string };
+  sender?: AddressParty;
+  receiver?: AddressParty;
+  items?: BookingItem[];
+  tracking_events?: TrackingEvent[];
+  estimated_delivery_range?: string;
+}
 
 export default function TrackOrderForm() {
+  const searchParams = useSearchParams();
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [postcode, setPostcode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [booking, setBooking] = useState<any>(null);
+  const [booking, setBooking] = useState<Booking | null>(null);
   const [error, setError] = useState('');
+  const autoSubmitted = useRef(false);
 
-  const handleTrack = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!trackingNumber.trim()) return;
+  const runTrack = async (bookingId: string, pc: string) => {
+    if (!bookingId.trim() || !pc.trim()) return;
 
     setLoading(true);
     setError('');
     setBooking(null);
 
     try {
-      const res = await fetch('/api/track-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trackingNumber: trackingNumber.trim() }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Tracking details not found');
+      const res = await trackOrderAction(bookingId.trim(), pc.trim());
+      if (!res.success) {
+        throw new Error(res.error || 'Tracking details not found');
       }
-      setBooking(data);
-    } catch (err: any) {
-      setError(err.message);
+      setBooking(res.data as unknown as Booking);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Tracking details not found');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runTrack(trackingNumber, postcode);
+  };
+
+  // ইমেইলের "Track My Order" বাটন থেকে ?booking=X&postcode=Y নিয়ে এলে
+  // ফর্ম নিজে থেকেই ভরে সাথে সাথে ট্র্যাক করে দেয় — customer-কে কিছু টাইপ
+  // করতে হয় না, এক ক্লিকেই ফলাফল
+  useEffect(() => {
+    if (autoSubmitted.current) return;
+    const bookingParam = searchParams.get('booking');
+    const postcodeParam = searchParams.get('postcode');
+    if (bookingParam && postcodeParam) {
+      autoSubmitted.current = true;
+      setTrackingNumber(bookingParam);
+      setPostcode(postcodeParam);
+      runTrack(bookingParam, postcodeParam);
+    }
+  }, [searchParams]);
+
   // --- HELPER FUNCTIONS ---
 
-  const formatText = (text: string) => {
+  const formatText = (text: string | undefined) => {
     if (!text) return 'N/A';
-    return text.replace(/_/g, ' '); 
+    return text.replace(/_/g, ' ');
   };
 
-  const formatAddress = (addrStr: string) => {
+  const formatAddress = (addrStr: string | undefined) => {
     if (!addrStr) return '';
-    return addrStr.replace(/\|/g, ' '); 
+    return addrStr.replace(/\|/g, ' ');
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return 'N/A';
     // Check if it looks like a full ISO date
     if (dateStr.length > 10) {
@@ -60,15 +121,10 @@ export default function TrackOrderForm() {
           hour: '2-digit', minute: '2-digit'
         });
     }
-    return dateStr; 
+    return dateStr;
   };
 
-  const formatMoney = (amount: any) => {
-    if (!amount) return '$0.00';
-    return `$${Number(amount).toFixed(2)}`;
-  };
-
-  const getTrackingColor = (status: string) => {
+  const getTrackingColor = (status: string | undefined) => {
     const s = status?.toLowerCase() || '';
     if (s.includes('delivered') || s.includes('completed')) return 'bg-green-600 border-green-600 text-white';
     if (s.includes('transit') || s.includes('board') || s.includes('driver')) return 'bg-blue-600 border-blue-600 text-white';
@@ -92,18 +148,31 @@ export default function TrackOrderForm() {
             type="text"
             value={trackingNumber}
             onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder="Enter Consignment No (e.g. CPW...)"
+            placeholder="Enter your Booking ID (numbers only)"
+            inputMode="numeric"
             className="w-full flex-1 p-3 border border-[#ccc] rounded-lg focus:outline-none focus:border-[#007bff] text-base"
             required
           />
-          <button 
-            type="submit" 
+          <input
+            type="text"
+            value={postcode}
+            onChange={(e) => setPostcode(e.target.value)}
+            placeholder="Delivery postcode"
+            inputMode="numeric"
+            className="w-full sm:w-[160px] p-3 border border-[#ccc] rounded-lg focus:outline-none focus:border-[#007bff] text-base"
+            required
+          />
+          <button
+            type="submit"
             disabled={loading}
             className="w-full sm:w-auto bg-[#007bff] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#0056b3] transition disabled:bg-gray-300"
           >
             {loading ? 'Searching...' : 'Track'}
           </button>
         </form>
+        <p className="text-center text-sm text-gray-500 -mt-6 mb-8 md:mb-10">
+          For your security, we ask for your delivery postcode along with the Booking ID.
+        </p>
 
         {error && (
            <div className="max-w-[600px] mx-auto w-full bg-red-50 border-l-4 border-red-500 p-4 text-red-700 mb-8 rounded text-sm md:text-base">
@@ -137,19 +206,14 @@ export default function TrackOrderForm() {
                <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div>
                      <div className="text-xs text-[#6b7280] uppercase font-bold mb-2">Current Status</div>
-                     <div className="flex flex-col gap-2 items-start">
-                        {/* 1. BOOKING STATUS (Fixed from DB) */}
-                        <span className="px-3 py-1 rounded-full text-sm font-bold bg-black text-white capitalize inline-block">
-                           Booking: {formatText(booking.status)}
-                        </span>
-
-                        {/* 2. LIVE TRACKING STATUS (From Events) */}
-                        {booking.latest_status && (
-                           <span className={`px-3 py-1 rounded-full text-sm font-bold capitalize inline-block ${getTrackingColor(booking.latest_status)}`}>
-                              Latest: {formatText(booking.latest_status)}
-                           </span>
-                        )}
-                     </div>
+                     {/* একটাই clean badge — sবিস্তারিত ধাপ-ভিত্তিক progress নিচের
+                         "Shipment Progress" section-এই দেখানো হচ্ছে, তাই এখানে
+                         দুটো আলাদা pill দেখিয়ে ডুপ্লিকেট/messy করার দরকার নেই */}
+                     <span className={`px-3 py-1 rounded-full text-sm font-bold capitalize inline-block ${
+                        booking.latest_status ? getTrackingColor(booking.latest_status) : 'bg-black text-white'
+                     }`}>
+                        {formatText(booking.latest_status || booking.status)}
+                     </span>
                   </div>
                   <div>
                      <div className="text-xs text-[#6b7280] uppercase font-bold mb-1">Tracking / Connote</div>
@@ -167,31 +231,113 @@ export default function TrackOrderForm() {
 
             </div>
 
-            {/* --- SECTION 1.5: LIVE TRACKING HISTORY (ALL EVENTS) --- */}
-            {booking.tracking_events && booking.tracking_events.length > 0 && (
-                <div className="bg-white border border-[#e5e7eb] rounded-xl shadow-sm overflow-hidden p-6">
-                    <h3 className="text-lg font-bold text-[#111827] mb-6 border-b pb-2">🚚 Tracking Updates</h3>
-                    <div className="relative border-l-2 border-gray-200 ml-3 space-y-8">
-                        {/* REVERSE to show Newest First */}
-                        {[...booking.tracking_events].reverse().map((event: any, idx: number) => (
-                            <div key={idx} className="relative pl-8">
-                                {/* First item (Newest) gets Blue Dot, others Gray */}
-                                <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${idx === 0 ? 'bg-blue-600' : 'bg-gray-400'}`}></div>
-                                
-                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                                    <div>
-                                        <p className="text-sm font-bold text-[#1a1a1a]">{event.status}</p>
-                                        <p className="text-sm text-gray-600">{event.description}</p>
-                                    </div>
-                                    <p className="text-xs text-gray-500 font-mono mt-1 sm:mt-0 bg-gray-50 px-2 py-1 rounded">
-                                        {event.date}
-                                    </p>
-                                </div>
+            {/* --- SECTION 1.2: SHIPMENT PROGRESS (সবসময় দেখাবে, real event না থাকলেও) --- */}
+            {(() => {
+              const STAGES = ['Booking Confirmed', 'Picked Up', 'In Transit', 'Delivered'];
+              const latest = (booking.latest_status || '').toLowerCase();
+              let currentStage = 0; // 0-indexed
+              if (latest.includes('delivered') || latest.includes('completed')) currentStage = 3;
+              else if (latest.includes('transit') || latest.includes('board') || latest.includes('driver')) currentStage = 2;
+              else if (latest.includes('picked') || latest.includes('collected')) currentStage = 1;
+              // event history-ই না থাকলে শুধু "Booking Confirmed" ধাপ পর্যন্তই সত্যি, বাকিটা এখনো অজানা
+
+              return (
+                <div className="bg-white border border-[#e5e7eb] rounded-xl shadow-sm p-6">
+                  <h3 className="text-lg font-bold text-[#111827] mb-6">Shipment Progress</h3>
+                  <div className="flex items-start">
+                    {STAGES.map((label, idx) => {
+                      const done = idx <= currentStage;
+                      const isLast = idx === STAGES.length - 1;
+                      return (
+                        <div key={label} className={`flex items-center ${isLast ? '' : 'flex-1'}`}>
+                          <div className="flex flex-col items-center text-center w-20">
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
+                                done ? 'bg-[#007bff] border-[#007bff] text-white' : 'bg-white border-gray-300 text-gray-300'
+                              }`}
+                            >
+                              {done ? '✓' : idx + 1}
                             </div>
-                        ))}
-                    </div>
+                            <span className={`text-xs mt-2 font-medium ${done ? 'text-[#111827]' : 'text-gray-400'}`}>
+                              {label}
+                            </span>
+                          </div>
+                          {!isLast && (
+                            <div className={`flex-1 h-[3px] mx-1 ${idx < currentStage ? 'bg-[#007bff]' : 'bg-gray-200'}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {!booking.tracking_events?.length && (
+                    <p className="text-sm text-gray-500 mt-6 text-center">
+                      Your order is booked with the courier — pickup and transit updates will appear here once the parcel is on the move.
+                    </p>
+                  )}
                 </div>
-            )}
+              );
+            })()}
+
+            {/* --- SECTION 1.5: LIVE TRACKING HISTORY (ALL EVENTS + বাকি PENDING ধাপ) --- */}
+            {booking.tracking_events && booking.tracking_events.length > 0 && (() => {
+                // এখনো পৌঁছায়নি এমন ধাপগুলো খুঁজে বের করা — কোনো আন্দাজি/fake তারিখ
+                // দেওয়া হয় না (আমরা জানিই না ঠিক কবে হবে), শুধু "Pending" লেখা থাকে
+                const STAGE_DEFS: Array<{ label: string; match: (s: string) => boolean }> = [
+                    { label: 'Picked Up', match: (s) => s.includes('picked') || s.includes('collected') },
+                    { label: 'In Transit', match: (s) => s.includes('transit') },
+                    { label: 'Onboard for Delivery', match: (s) => s.includes('board') || s.includes('driver') },
+                    { label: 'Delivered', match: (s) => s.includes('delivered') || s.includes('completed') },
+                ];
+                const reached = new Set<string>();
+                (booking.tracking_events as TrackingEvent[]).forEach((e) => {
+                    const s = (e.status || '').toLowerCase();
+                    STAGE_DEFS.forEach((stage) => { if (stage.match(s)) reached.add(stage.label); });
+                });
+                const pendingStages = STAGE_DEFS.filter((stage) => !reached.has(stage.label));
+
+                return (
+                    <div className="bg-white border border-[#e5e7eb] rounded-xl shadow-sm overflow-hidden p-6">
+                        <h3 className="text-lg font-bold text-[#111827] mb-6 border-b pb-2">🚚 Tracking Updates</h3>
+                        <div className="relative border-l-2 border-gray-200 ml-3 space-y-8">
+                            {/* আসল ঘটে যাওয়া event — Newest First */}
+                            {[...booking.tracking_events].reverse().map((event: TrackingEvent, idx: number) => (
+                                <div key={`real-${idx}`} className="relative pl-8">
+                                    <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${idx === 0 ? 'bg-blue-600' : 'bg-gray-400'}`}></div>
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                                        <div>
+                                            <p className="text-sm font-bold text-[#1a1a1a]">{event.status}</p>
+                                            <p className="text-sm text-gray-600">{event.description}</p>
+                                        </div>
+                                        <p className="text-xs text-gray-500 font-mono mt-1 sm:mt-0 bg-gray-50 px-2 py-1 rounded">
+                                            {event.date}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                            {/* এখনো না-হওয়া বাকি ধাপ — greyed out, honest "Pending" label।
+                                শুধু "Delivered"-এ, যদি হিসাব করা যায়, একটা স্পষ্ট
+                                "Estimated" (Transdirect-এর real তারিখ না, আমাদের
+                                courier-quoted transit-time থেকে হিসাব করা) দেখানো হয়। */}
+                            {pendingStages.map((stage) => (
+                                <div key={`pending-${stage.label}`} className="relative pl-8 opacity-50">
+                                    <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white bg-gray-300"></div>
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                                        <div>
+                                            <p className="text-sm font-bold text-[#1a1a1a]">{stage.label}</p>
+                                            <p className="text-sm text-gray-500">Not yet reached</p>
+                                        </div>
+                                        <p className="text-xs text-gray-400 font-mono mt-1 sm:mt-0 bg-gray-50 px-2 py-1 rounded">
+                                            {stage.label === 'Delivered' && booking.estimated_delivery_range
+                                                ? `Estimated: ${booking.estimated_delivery_range}`
+                                                : 'Pending'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* --- SECTION 3: ADDRESSES --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -272,7 +418,7 @@ export default function TrackOrderForm() {
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                         {booking.items.map((item: any, idx: number) => (
+                         {booking.items.map((item: BookingItem, idx: number) => (
                            <tr key={idx} className="hover:bg-gray-50">
                               <td className="px-6 py-4 font-medium text-gray-900 capitalize">
                                 {item.description || 'Carton'}

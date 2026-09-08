@@ -9,17 +9,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatTz } from "@/lib/store-time";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Search, Trash2, X, Eye, EyeOff, ShieldAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Search, Trash2, X, Eye, EyeOff, ShieldAlert, Loader2, MailOpen } from "lucide-react";
 import { toast } from "sonner";
 import { deleteEmailLogs, cleanupOldLogs } from "@/app/actions/backend/settings/email/delete-logs";
+import { getEmailLogPreview } from "@/app/actions/backend/settings/email/email-logs";
 
 // Must match the `limit` used in getEmailLogs (app/actions/backend/settings/email/email-logs.ts)
 const PAGE_SIZE = 20;
 
+// getEmailLogs() list query ইচ্ছাকৃতভাবে htmlBody select করে না (speed-এর জন্য) —
+// তাই list-এর row type পুরো Prisma EmailLog না, সেটা বাদ দেওয়া একটা টাইপ
+type EmailLogRow = Omit<EmailLog, "htmlBody">;
+
 interface Props {
-  logs: EmailLog[];
+  logs: EmailLogRow[];
   meta: { total: number; pages: number };
   currentPage: number;
   onPageChange: (page: number) => void;
@@ -35,6 +41,25 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, search, 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchInput, setSearchInput] = useState(search);
   const [pageInput, setPageInput] = useState(String(currentPage));
+
+  // Row-এ ক্লিক করলে আসল পাঠানো HTML preview
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewLog, setPreviewLog] = useState<{ subject: string; recipient: string; createdAt: Date | string; htmlBody: string | null } | null>(null);
+
+  const openPreview = async (id: string) => {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewLog(null);
+    const res = await getEmailLogPreview(id);
+    if (res.success && res.log) {
+      setPreviewLog(res.log);
+    } else {
+      toast.error("Preview লোড করা যায়নি");
+      setPreviewOpen(false);
+    }
+    setPreviewLoading(false);
+  };
 
   // Keep the search box / page box in sync if the parent state changes externally
   useEffect(() => setSearchInput(search), [search]);
@@ -211,9 +236,14 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, search, 
                         </TableCell>
                     </TableRow>
                 ) : logs.map(log => (
-                    <TableRow key={log.id} className="hover:bg-slate-50 transition-colors">
-                        <TableCell>
-                            <Checkbox 
+                    <TableRow
+                        key={log.id}
+                        className="hover:bg-slate-50 transition-colors cursor-pointer"
+                        onClick={() => openPreview(log.id)}
+                        title="ক্লিক করে আসল email preview দেখুন"
+                    >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
                                 checked={selectedIds.includes(log.id)}
                                 onCheckedChange={(val) => toggleOne(log.id, !!val)}
                             />
@@ -238,8 +268,11 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, search, 
                         <TableCell className="text-sm font-medium text-slate-700">
                             {log.recipient}
                         </TableCell>
-                        <TableCell className="text-sm text-slate-600 truncate max-w-[200px]" title={log.subject}>
-                            {log.subject}
+                        <TableCell className="text-sm text-slate-600 truncate max-w-[200px] group" title={log.subject}>
+                            <span className="inline-flex items-center gap-1.5">
+                                {log.subject}
+                                <MailOpen size={12} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
+                            </span>
                         </TableCell>
                         <TableCell>
                             <Badge variant="outline" className={
@@ -316,6 +349,42 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, search, 
             </div>
         </div>
       )}
+
+      {/* Email Preview Modal — আসল পাঠানো HTML দেখায় (স্টোর করা htmlBody থেকে) */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="p-4 border-b shrink-0">
+            <DialogTitle className="text-sm font-semibold text-slate-700">
+              {previewLog ? previewLog.subject : "Email Preview"}
+            </DialogTitle>
+            {previewLog && (
+              <p className="text-xs text-slate-500">
+                To: {previewLog.recipient} · {formatTz(new Date(previewLog.createdAt), timezone, "MMM d, yyyy · h:mm a")}
+              </p>
+            )}
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto bg-slate-100">
+            {previewLoading ? (
+              <div className="flex items-center justify-center h-64 text-slate-400 gap-2">
+                <Loader2 size={18} className="animate-spin" /> Loading preview...
+              </div>
+            ) : previewLog?.htmlBody ? (
+              <iframe
+                title="Email preview"
+                srcDoc={previewLog.htmlBody}
+                sandbox="allow-popups allow-same-origin"
+                className="w-full h-[65vh] bg-white border-0"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-2 px-6 text-center">
+                <ShieldAlert size={22} className="opacity-40" />
+                <p className="text-sm">এই email-এর জন্য কোনো preview নেই — এই feature যোগ হওয়ার আগে পাঠানো হয়েছিল।</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

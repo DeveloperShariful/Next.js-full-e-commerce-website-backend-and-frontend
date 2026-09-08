@@ -98,6 +98,9 @@ export async function GET(req: Request) {
       if (lock.count === 0) continue; // Already locked by another worker
 
       let subject = `[${item.templateSlug}]`;
+      // try-এর বাইরে declare করা — catch block-এও access দরকার, যাতে ব্যর্থ
+      // হওয়া send-এও (যতটুকু generate হয়েছিল) EmailLog-এ সেভ করা যায়।
+      let htmlBody = "";
 
       try {
         const template = await db.emailTemplate.findUnique({
@@ -106,7 +109,6 @@ export async function GET(req: Request) {
 
         if (!template) throw new Error("Template not found in DB");
 
-        let htmlBody = "";
         subject = template.subject;
         const meta = item.metadata as Record<string, unknown>;
         const customReplyTo = typeof meta?._replyTo === "string" ? meta._replyTo : null;
@@ -160,7 +162,8 @@ export async function GET(req: Request) {
               status: "SENT",
               orderId: item.orderId,
               userId: item.userId,
-              metadata: item.metadata ?? {}
+              metadata: item.metadata ?? {},
+              htmlBody
             }
           })
         ]);
@@ -189,7 +192,8 @@ export async function GET(req: Request) {
               errorMessage: msg,
               orderId: item.orderId,
               userId: item.userId,
-              metadata: item.metadata ?? {}
+              metadata: item.metadata ?? {},
+              htmlBody: htmlBody || null
             }
           })
         ]);

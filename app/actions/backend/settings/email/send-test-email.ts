@@ -97,7 +97,8 @@ export async function sendTestEmail(recipientEmail: string, templateId?: string)
             recipient: recipientEmail,
             subject: emailSubject,
             status: "SENT",
-            templateSlug: "test_email"
+            templateSlug: "test_email",
+            htmlBody: emailHtml
         }
     });
 

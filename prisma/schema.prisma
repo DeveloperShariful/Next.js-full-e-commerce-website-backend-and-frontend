@@ -2148,6 +2148,11 @@ model EmailLog {
   orderId      String?
   userId       String?
   createdAt    DateTime  @default(now())
+  // ✅ পুরো রেন্ডার হওয়া HTML — process-email-queue-এ যা সত্যিই পাঠানো হয়েছিল
+  // সেটাই এখানে সেভ হয়। List-view query কখনো এই field select করে না (বড়
+  // হতে পারে) — শুধু single-log preview খোলার সময় আলাদা করে আনা হয়। পুরনো
+  // (এই field যোগ হওয়ার আগের) log-এ এটা null থাকবে — preview available না।
+  htmlBody     String?   @db.Text
 
   @@index([recipient])
   @@index([status])

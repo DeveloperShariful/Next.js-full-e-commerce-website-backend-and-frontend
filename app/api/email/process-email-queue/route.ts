@@ -4,18 +4,36 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import nodemailer from "nodemailer";
 import { generateEmailHtml } from "@/app/actions/backend/settings/email/email-generator";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
+import { toZonedTime } from "date-fns-tz";
 
 export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+
   // CRON_SECRET set থাকলেই auth enforce করা হবে (localhost-এ সাধারণত set থাকে না → skip)
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
-    const { searchParams } = new URL(req.url);
     const querySecret = searchParams.get("secret");
     const authHeader = req.headers instanceof Headers ? req.headers.get("authorization") : null;
     const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
     if (querySecret !== cronSecret && bearerSecret !== cronSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  // 🕘 Business-hours guard — শুধু vercel.json-এর scheduled cron-এর জন্য
+  // (?scheduled=1 marker দিয়ে চেনা যায়), send-notification.ts-এর immediate
+  // auto-trigger fetch-এ এই param থাকে না — তাই order confirmation/shipping
+  // email এখনো সাথে সাথেই যাবে, যেকোনো সময়। এই scheduled cron শুধু
+  // backup/catch-up হিসেবে কাজ করে (auto-trigger fail করলে ধরার জন্য), তাই
+  // সেটাকেই store-এর local সময় সকাল ৯টা-সন্ধ্যা ৬টার মধ্যে সীমাবদ্ধ রাখা হলো
+  // (DB compute কমাতে) — বাস্তব email delivery-তে প্রভাব পড়বে না।
+  if (searchParams.get("scheduled") === "1") {
+    const storeTimezone = await getStoreTimezone();
+    const localHour = toZonedTime(new Date(), storeTimezone).getHours();
+    if (localHour < 9 || localHour >= 18) {
+      return NextResponse.json({ message: `Outside business hours (${storeTimezone} ${localHour}:00) — scheduled run skipped.` }, { status: 200 });
     }
   }
 

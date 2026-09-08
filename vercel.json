@@ -5,8 +5,8 @@
       "schedule": "0 23 * * *"
     },
     {
-      "path": "/api/email/process-email-queue",
-      "schedule": "0 23 * * *"
+      "path": "/api/email/process-email-queue?scheduled=1",
+      "schedule": "*/30 0-8,22,23 * * *"
     },
     {
       "path": "/api/cron/abandoned-checkout",
@@ -26,7 +26,7 @@
     },
     {
       "path": "/api/cron/transdirect-status-sync",
-      "schedule": "*/30 * * * *"
+      "schedule": "*/30 0-8,23 * * *"
     },
     {
       "path": "/api/cron/sync-analytics",

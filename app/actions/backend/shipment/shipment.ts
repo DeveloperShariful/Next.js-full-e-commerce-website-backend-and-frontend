@@ -8,6 +8,8 @@ import { ShipmentQueryParams, GetShipmentsResponse } from "@/app/(backend)/admin
 import { OrderStatus, FulfillmentStatus } from "@prisma/client";
 import { logActivity } from "@/lib/activity-logger";
 import { sendOrderEmail } from "@/app/actions/backend/order/order-utils";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
+import { toZonedTime } from "date-fns-tz";
 
 // --- 1. GET SHIPMENTS WITH PAGINATION, SEARCH & COUNTS ---
 export async function getShipments(params: ShipmentQueryParams): Promise<GetShipmentsResponse> {
@@ -34,8 +36,20 @@ export async function getShipments(params: ShipmentQueryParams): Promise<GetShip
     } else if (status === "CANCELLED") {
       whereCondition.lastTrackingStatus = { in: ["cancelled", "Cancelled"] };
     } else if (status === "IN_TRANSIT") {
-      whereCondition.lastTrackingStatus = { notIn: ["delivered", "Delivered", "cancelled", "Cancelled"], };
+      // ✅ FIX: SQL-এর NOT IN ফিল্টার NULL value silently বাদ দিয়ে দেয়, কিন্তু
+      // নিচের counts.IN_TRANSIT (JS filter) null/UNKNOWN status-কেও "in transit"
+      // ধরে নেয় — এই mismatch-এর কারণেই ট্যাবে ৫৩ দেখাতো কিন্তু তালিকায় ৩টা।
+      // whereCondition.OR search-এর জন্য আগে থেকেই ব্যবহৃত, তাই আলাদা AND-এ
+      // নিজস্ব OR বসানো হলো যাতে দুটো সাংঘর্ষিক না হয়।
       whereCondition.deliveredDate = null;
+      whereCondition.AND = [
+        {
+          OR: [
+            { lastTrackingStatus: { notIn: ["delivered", "Delivered", "cancelled", "Cancelled"] } },
+            { lastTrackingStatus: null },
+          ],
+        },
+      ];
     } else if (status === "SYNC_FAILED") {
       whereCondition.syncedToGateway = false;
     }
@@ -185,15 +199,43 @@ export async function backfillTransdirectShipments(): Promise<{ success: boolean
 // email — যাতে দুইটা আলাদা code path maintain করতে না হয়। Transdirect-এর
 // কোনো webhook নেই (নিশ্চিত হওয়া গেছে তাদের public API docs দেখে), তাই polling-ই
 // একমাত্র উপায়।
-export async function refreshTransdirectStatuses(): Promise<{ success: boolean; updated: number; error?: string }> {
+export async function refreshTransdirectStatuses(
+  opts: { enforceBusinessHours?: boolean } = {}
+): Promise<{ success: boolean; updated: number; error?: string }> {
   try {
+    // 🕙 Business-hours guard — শুধু automatic cron-এর জন্য (enforceBusinessHours:
+    // true পাঠিয়ে কল করা হয়), admin-এর manual "Refresh Status" বাটনে এই guard
+    // প্রযোজ্য না (default false) — যাতে admin যেকোনো সময় নিজে থেকে চেক করতে
+    // পারেন। Store-এর নিজস্ব configured timezone (getStoreTimezone — সাধারণত
+    // "Australia/Sydney") আর date-fns-tz-এর toZonedTime ব্যবহার হচ্ছে (analytics
+    // date-key হিসাবের মতোই, দেখুন lib/store-time.ts) — যাতে AEST/AEDT (daylight
+    // saving) automatic ভাবে সঠিক থাকে, শুধু fixed UTC অফসেট বসালে বছরের একটা
+    // অংশে ১ ঘণ্টা ভুল পড়তো। সকাল ১০টা-সন্ধ্যা ৬টার মধ্যেই cron চলবে — দিনের
+    // বেলা এমনিতেই DB compute হচ্ছে (real traffic), তাই এই সময় polling করলে
+    // বাড়তি খরচ নেই, কিন্তু রাতে অকারণ DB compute বাড়বে না। vercel.json-এর cron
+    // window (UTC 23:00-08:00) এটার চেয়ে চওড়া — সেটা শুধু invocation সংখ্যা
+    // কমায়, আসল নির্ভুল সীমানা এখানেই।
+    if (opts.enforceBusinessHours) {
+      const storeTimezone = await getStoreTimezone();
+      const localHour = toZonedTime(new Date(), storeTimezone).getHours();
+      if (localHour < 10 || localHour >= 18) {
+        console.log(`[TD Status] Outside business hours (${storeTimezone} ${localHour}:00) — skipping poll.`);
+        return { success: true, updated: 0 };
+      }
+    }
+
     const config = await db.transdirectConfig.findUnique({ where: { id: "transdirect_config" } });
     if (!config?.apiKey) return { success: false, updated: 0, error: "TransDirect API Key missing." };
     const apiKey = config.apiKey;
 
     // শুধু active (এখনো delivered/cancelled/refunded/returned/failed না হওয়া)
     // order-এর shipment poll করা হচ্ছে — terminal অবস্থার shipment বারবার চেক
-    // করার দরকার নেই, প্রতি ৩০ মিনিটে চলা cron-এর batch ছোট/দ্রুত রাখতে এটা জরুরি।
+    // করার দরকার নেই। ✅ FIX: আগে কোনো take/orderBy ছিল না, তাই ~২৫০+ shipment
+    // একবারে প্রসেস করতে গিয়ে ৬০-সেকেন্ড Vercel timeout-এ কেটে যেত, আর সবসময়
+    // একই (প্রথম দিকের) subset-ই প্রসেস হতো, বাকিগুলো কখনো পৌঁছাতোই না। এখন
+    // ছোট batch + lastSyncedAt ascending — প্রতিটা ৩০-মিনিটের run আলাদা batch
+    // cover করে, সময়ের সাথে সব shipment একে একে cover হয়ে যায়।
+    const BATCH_LIMIT = 40;
     const shipments = await db.shipment.findMany({
       where: {
         transdirectId: { not: null },
@@ -207,6 +249,8 @@ export async function refreshTransdirectStatuses(): Promise<{ success: boolean; 
         courier: true, trackingNumber: true, trackingUrl: true,
         order: { select: { transdirectQuoteId: true } },
       },
+      orderBy: { lastSyncedAt: "asc" },
+      take: BATCH_LIMIT,
     });
 
     if (shipments.length === 0) return { success: true, updated: 0 };

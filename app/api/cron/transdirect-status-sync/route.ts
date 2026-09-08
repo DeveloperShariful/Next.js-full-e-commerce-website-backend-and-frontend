@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await refreshTransdirectStatuses();
+  const result = await refreshTransdirectStatuses({ enforceBusinessHours: true });
 
   return NextResponse.json(result, { status: result.success ? 200 : 500 });
 }

@@ -14,7 +14,8 @@ import { EmailLogsTable } from "./email-logs-table";
 interface Props {
   config: EmailConfiguration | null;
   templates: EmailTemplate[];
-  logs: EmailLog[];
+  // getEmailLogs() ইচ্ছাকৃতভাবে htmlBody বাদ দেয় (list-এর speed-এর জন্য)
+  logs: Omit<EmailLog, "htmlBody">[];
   logsMeta: { total: number; pages: number };
   currentLogPage: number;
   onLogPageChange: (page: number) => void;

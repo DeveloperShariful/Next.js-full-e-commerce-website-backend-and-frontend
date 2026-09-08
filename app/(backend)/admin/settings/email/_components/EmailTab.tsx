@@ -12,10 +12,12 @@ import { getEmailLogs } from "@/app/actions/backend/settings/email/email-logs";
 import { EmailSettingsView } from "./email-settings-view";
 import { ScrollRestorer } from "@/app/(backend)/admin/_components/back-button";
 
+// getEmailLogs() ইচ্ছাকৃতভাবে htmlBody select করে না (তালিকা পেজের speed-এর জন্য) —
+// তাই এখানকার logs state পুরো EmailLog না, htmlBody বাদ দেওয়া টাইপ
 interface EmailPageData {
   config: EmailConfiguration | null;
   templates: EmailTemplate[];
-  logs: EmailLog[];
+  logs: Omit<EmailLog, "htmlBody">[];
   logsMeta: { total: number; pages: number };
 }
 

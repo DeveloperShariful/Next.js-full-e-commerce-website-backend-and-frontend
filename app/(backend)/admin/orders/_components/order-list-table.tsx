@@ -186,7 +186,7 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
   const getStatusBadge = (status: string) => {
     const baseClass = "inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap";
     switch (status) {
-      case 'PENDING': return <span className={`${baseClass} bg-[#fcf9e8] text-[#996800]`}>Pending payment</span>;
+      case 'PENDING': return <span className={`${baseClass} bg-[#e5e5e5] text-[#777]`}>Pending payment</span>;
       case 'PROCESSING': return <span className={`${baseClass} bg-[#e5f5fa] text-[#0073aa]`}>Processing</span>;
       case 'READY_FOR_PICKUP': return <span className={`${baseClass} bg-[#f7fee7] text-[#65a30d]`}>Waiting for Pickup</span>;
       case 'DELIVERED': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Delivered</span>;

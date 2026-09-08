@@ -91,7 +91,12 @@ export async function trackOrderAction(bookingIdRaw: string, postcodeRaw: string
   // estimate দিয়ে আনুমানিক delivery window বের করা (Transdirect real ডেটা
   // দেয় না — আগে verify করা হয়েছে, তাই এটা স্পষ্টভাবে "estimated" হিসেবেই
   // পাঠানো হচ্ছে, real Transdirect তারিখ হিসেবে না)।
-  const alreadyDelivered = (booking.latest_status as string | undefined)?.toLowerCase().includes("delivered");
+  // ✅ FIX: description (ছোট, নির্দিষ্ট category — "Delivered") চেক করা হচ্ছে,
+  // status (লম্বা, খুঁটিনাটি বাক্য, যেমন "1 item has been transferred to run
+  // 6513") না — নাহলে "delivered" শব্দটা লম্বা বাক্যে না থাকলে ভুলভাবে "এখনো
+  // delivered হয়নি" ধরে নিয়ে estimated delivery range হিসেব করে ফেলতো।
+  const latestDesc = (booking.latest_description as string | undefined) || (booking.latest_status as string | undefined);
+  const alreadyDelivered = latestDesc?.toLowerCase().includes("delivered");
   if (!alreadyDelivered) {
     try {
       const orderInfo = booking.order as { order_id?: string } | undefined;

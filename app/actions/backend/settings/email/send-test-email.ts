@@ -4,9 +4,16 @@
 
 import { db } from "@/lib/prisma";
 import nodemailer from "nodemailer";
+import { randomUUID } from "crypto";
 import { generateEmailHtml } from "./email-generator";
 
 export async function sendTestEmail(recipientEmail: string, templateId?: string) {
+  // process-email-queue-এর মতোই — আগে থেকে id বানিয়ে email HTML আর EmailLog
+  // row-এ একই id ব্যবহার করা হচ্ছে, যাতে test email-এও open/click tracking
+  // যাচাই করা যায় (deploy হওয়ার পর real internet-এ pixel/click route reach
+  // হতে হবে, তবেই কাজ করবে — localhost-এ পাঠালেও pixel URL production
+  // domain-কেই নির্দেশ করে)।
+  const emailLogId = randomUUID();
   try {
     const config = await db.emailConfiguration.findUnique({
       where: { id: "email_config" }
@@ -75,7 +82,7 @@ export async function sendTestEmail(recipientEmail: string, templateId?: string)
           customer_phone: '0483 821 059',
         };
 
-        emailHtml = generateEmailHtml({ order: sampleOrder ?? undefined, config, template, metadata: sampleMetadata });
+        emailHtml = generateEmailHtml({ order: sampleOrder ?? undefined, config, template, metadata: sampleMetadata, emailLogId });
       } else {
         emailHtml = buildSimpleTestHtml(config);
       }
@@ -94,6 +101,7 @@ export async function sendTestEmail(recipientEmail: string, templateId?: string)
     // Log Success
     await db.emailLog.create({
         data: {
+            id: emailLogId,
             recipient: recipientEmail,
             subject: emailSubject,
             status: "SENT",

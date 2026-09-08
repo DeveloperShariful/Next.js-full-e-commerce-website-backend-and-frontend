@@ -2145,6 +2145,11 @@ model EmailLog {
   errorMessage String?
   metadata     Json?
   openedAt     DateTime?
+  // ✅ email-এর ভেতরের action button (Track My Order ইত্যাদি) real ক্লিক করলে
+  // সেট হয় — pixel-based openedAt-এর চেয়ে অনেক বেশি নির্ভরযোগ্য signal, কারণ
+  // Apple/Gmail-এর privacy protection ছবি preload করে ভুল "opened" দেখাতে
+  // পারে, কিন্তু ক্লিক সবসময়ই real, ইচ্ছাকৃত action।
+  clickedAt    DateTime?
   orderId      String?
   userId       String?
   createdAt    DateTime  @default(now())

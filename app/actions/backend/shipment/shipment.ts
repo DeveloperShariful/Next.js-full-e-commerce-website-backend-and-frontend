@@ -272,7 +272,14 @@ export async function refreshTransdirectStatuses(
           const realBookingId: number | null = ship.order?.transdirectQuoteId
             ? parseInt(ship.order.transdirectQuoteId, 10)
             : null;
-          if (!realBookingId) return null; // এখনো booking-ই হয়নি
+          if (!realBookingId) {
+            // ✅ FIX: lastSyncedAt তবুও touch করা হচ্ছে — নাহলে এই shipment
+            // চিরকাল "সবচেয়ে পুরনো" থেকে যেত (orderBy: lastSyncedAt asc), আর
+            // প্রতিটা batch-এই বারবার এটাই আসতো, বাকি real progress-ওয়ালা
+            // shipment-গুলো কখনো batch-এ জায়গাই পেতো না (starvation)।
+            await db.shipment.update({ where: { id: ship.id }, data: { lastSyncedAt: new Date() } }).catch(() => {});
+            return null; // এখনো booking-ই হয়নি
+          }
 
           // ── ধাপ ২: booking-এর নিজস্ব status (Confirmed/Cancelled ইত্যাদি) —
           // এটা সবসময় fetch করা হয়, শুধু tracking event history থেকে "cancelled"
@@ -313,14 +320,20 @@ export async function refreshTransdirectStatuses(
               // Transdirect তখন প্লেইন স্ট্রিং ("No booking matched.") ফেরত দেয়, object না
               if (trackData && typeof trackData === "object") {
                 const events = Object.values(trackData as Record<string, unknown>)[0] as
-                  | Array<{ status?: string; track_status?: string; date?: string }>
+                  | Array<{ status?: string; description?: string; track_status?: string; date?: string }>
                   | undefined;
 
                 if (events && events.length > 0) {
                   // events তালিকা chronological (পুরনো → নতুন) — সবচেয়ে শেষ entry-ই বর্তমান status
                   const latestEvent = events[events.length - 1];
                   const trackStatusCode = String(latestEvent.track_status || "");
-                  const statusText = (latestEvent.status || "").toLowerCase();
+                  // ✅ FIX: Transdirect-এর event-এ `description` একটা ছোট, নির্দিষ্ট
+                  // category ("Picked up", "In transit") দেয়, `status` একটা লম্বা,
+                  // খুঁটিনাটি বাক্য (যেমন "1 item has been transferred to run
+                  // 6513") যাতে সবসময় সরাসরি keyword নাও থাকতে পারে। trackStatusCode
+                  // (সংখ্যা কোড) মূল/নির্ভরযোগ্য সংকেত, description fallback হিসেবে
+                  // status-এর চেয়ে বেশি সঠিক।
+                  const statusText = ((latestEvent.description || latestEvent.status || "")).toLowerCase();
 
                   if (trackStatusCode === "1" || statusText.includes("picked up")) displayStatus = "dispatched";
                   else if (trackStatusCode === "2" || trackStatusCode === "3" || statusText.includes("transit") || statusText.includes("onboard")) displayStatus = "in_transit";
@@ -340,7 +353,13 @@ export async function refreshTransdirectStatuses(
             }
           }
 
-          if (!displayStatus) return null;
+          if (!displayStatus) {
+            // ✅ FIX: একই কারণে — এখনো real status resolve না হলেও lastSyncedAt
+            // touch করা হচ্ছে, যাতে এই batch cycle-এ অন্তত একবার চেক হওয়া
+            // shipment পরের বার সারিতে পেছনে চলে যায়, starvation না হয়।
+            await db.shipment.update({ where: { id: ship.id }, data: { lastSyncedAt: new Date() } }).catch(() => {});
+            return null;
+          }
 
           console.log(`[TD Status] Shipment ${ship.id} (real booking ${realBookingId}) → booking status="${bookingStatus}" → display="${displayStatus}"`);
 
@@ -465,15 +484,30 @@ async function applyTransdirectStatusTransition(params: {
     // event আসেনি — READY_FOR_PICKUP enum value পুনর্ব্যবহার করা হচ্ছে, তবে
     // label/email এখন "Waiting for Pickup" (courier-pickup অর্থে) — পুরনো
     // "গ্রাহক নিজে store-এ এসে নিয়ে যাবে" অর্থ আর ব্যবহার হচ্ছে না।
-    if (order.status !== OrderStatus.SHIPPED && order.status !== OrderStatus.DELIVERED) {
-      await db.order.update({
-        where: { id: orderId },
+    //
+    // ✅ FIX: order আগেই SHIPPED/DELIVERED হয়ে গেলে পুরো branch-ই থেমে যায় —
+    // শুধু status update-ই না, note/email-ও skip হয়। আগে শুধু status বদল
+    // guard করা ছিল, কিন্তু note+email ছিল unconditional — Transdirect
+    // tracking API-র সাময়িক glitch-এ (events খালি ফেরত এলে) "dispatched"
+    // হয়ে যাওয়া order-এও ভুলভাবে আবার "waiting for pickup" note/email চলে
+    // যেতে পারতো, এমনকি customer আগেই "shipped" email পেয়ে থাকলেও।
+    if (order.status === OrderStatus.SHIPPED || order.status === OrderStatus.DELIVERED) {
+      await db.orderNote.create({
         data: {
-          status: OrderStatus.READY_FOR_PICKUP,
-          ...(courier ? { shippingMethod: courier } : {}),
+          orderId,
+          content: `ℹ️ Transdirect reported "awaiting_pickup" (likely a temporary tracking-API blip) but this order is already ${order.status} — status update and customer email skipped.`,
+          isSystem: true,
         },
       });
+      return;
     }
+    await db.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.READY_FOR_PICKUP,
+        ...(courier ? { shippingMethod: courier } : {}),
+      },
+    });
     await db.orderNote.create({
       data: {
         orderId,
@@ -573,11 +607,14 @@ export async function bulkUpdateShipments(ids: string[], action: string) {
       await db.shipment.deleteMany({ where: { id: { in: ids } } });
       
     } else if (action === "mark_delivered") {
-      
-      // ১. শিপমেন্ট টেবিল আপডেট
+
+      // ১. শিপমেন্ট টেবিল আপডেট — ✅ FIX: lastTrackingStatus-ও একসাথে "delivered"
+      // সেট করা হচ্ছে (আগে শুধু deliveredDate সেট হতো) — নাহলে getShipments()-এর
+      // IN_TRANSIT/DELIVERED tab count আর list-এর মধ্যে mismatch তৈরি হতো, কারণ
+      // count শুধু lastTrackingStatus দেখে, list এখন deliveredDate-ও দেখে।
       await db.shipment.updateMany({
         where: { id: { in: ids } },
-        data: { deliveredDate: new Date() },
+        data: { deliveredDate: new Date(), lastTrackingStatus: "delivered" },
       });
 
       // ২. যেসব শিপমেন্ট মার্ক করা হলো, তাদের অর্ডারগুলোর ID বের করা

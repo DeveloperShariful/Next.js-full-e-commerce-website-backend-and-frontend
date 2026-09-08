@@ -30,7 +30,7 @@ export async function getEmailLogs(page: number = 1, search: string = "") {
         select: {
           id: true, recipient: true, subject: true, templateSlug: true,
           status: true, errorMessage: true, metadata: true, openedAt: true,
-          orderId: true, userId: true, createdAt: true,
+          clickedAt: true, orderId: true, userId: true, createdAt: true,
         },
       }),
       db.emailLog.count({ where }),

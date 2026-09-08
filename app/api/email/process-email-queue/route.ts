@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import nodemailer from "nodemailer";
+import { randomUUID } from "crypto";
 import { generateEmailHtml } from "@/app/actions/backend/settings/email/email-generator";
 import { getStoreTimezone } from "@/lib/get-store-timezone";
 import { toZonedTime } from "date-fns-tz";
@@ -101,6 +102,11 @@ export async function GET(req: Request) {
       // try-এর বাইরে declare করা — catch block-এও access দরকার, যাতে ব্যর্থ
       // হওয়া send-এও (যতটুকু generate হয়েছিল) EmailLog-এ সেভ করা যায়।
       let htmlBody = "";
+      // Open/click tracking-এর জন্য আগে থেকেই id বানানো — generateEmailHtml()-কে
+      // pixel/click-link বসানোর জন্য এই একই id পাঠানো হবে, আর নিচে EmailLog
+      // তৈরির সময়ও এটাই ব্যবহার হবে — তাই email-এর ভেতরের tracking link আর
+      // আসল EmailLog row একদম মিলে যায়।
+      const emailLogId = randomUUID();
 
       try {
         const template = await db.emailTemplate.findUnique({
@@ -121,7 +127,7 @@ export async function GET(req: Request) {
           if (order) {
             type GeneratorOrder = NonNullable<Parameters<typeof generateEmailHtml>[0]['order']>;
             const serializedOrder = JSON.parse(JSON.stringify(order)) as unknown as GeneratorOrder;
-            htmlBody = generateEmailHtml({ order: serializedOrder, config, template, metadata: meta });
+            htmlBody = generateEmailHtml({ order: serializedOrder, config, template, metadata: meta, emailLogId });
             const billing = order.billingAddress as Record<string, string> | null;
             const guestName = billing ? `${billing.firstName || ""} ${billing.lastName || ""}`.trim() : "";
             subject = subject
@@ -131,7 +137,7 @@ export async function GET(req: Request) {
         }
 
         if (!htmlBody) {
-          htmlBody = generateEmailHtml({ config, template, metadata: meta });
+          htmlBody = generateEmailHtml({ config, template, metadata: meta, emailLogId });
           if (meta) {
             Object.keys(meta).forEach(key => {
               if (key !== "_replyTo") {
@@ -156,6 +162,7 @@ export async function GET(req: Request) {
           }),
           db.emailLog.create({
             data: {
+              id: emailLogId,
               recipient: item.recipient,
               subject,
               templateSlug: template.slug,

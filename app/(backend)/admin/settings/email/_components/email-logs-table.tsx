@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatTz } from "@/lib/store-time";
 import { useGlobalStore } from "@/app/providers/global-store-provider";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Search, Trash2, X, Eye, EyeOff, ShieldAlert, Loader2, MailOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RefreshCw, Search, Trash2, X, Eye, EyeOff, ShieldAlert, Loader2, MailOpen, MousePointerClick } from "lucide-react";
 import { toast } from "sonner";
 import { deleteEmailLogs, cleanupOldLogs } from "@/app/actions/backend/settings/email/delete-logs";
 import { getEmailLogPreview } from "@/app/actions/backend/settings/email/email-logs";
@@ -252,11 +252,17 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, search, 
                             {formatTz(new Date(log.createdAt), timezone, "MMM d, h:mm a")}
                         </TableCell>
                         
-                        {/* Read Status (Based on openedAt) */}
+                        {/* Read Status — Clicked (নির্ভরযোগ্য, real action) আর
+                            Opened (pixel-based, Apple/Gmail-এর preload-এ ভুল
+                            positive হতে পারে) আলাদা করে দেখানো হচ্ছে */}
                         <TableCell>
-                            {log.openedAt ? (
-                                <div className="flex items-center gap-1 text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full w-fit">
-                                    <Eye size={12} /> Read
+                            {log.clickedAt ? (
+                                <div className="flex items-center gap-1 text-xs text-green-700 font-medium bg-green-50 px-2 py-1 rounded-full w-fit" title={`Clicked ${formatTz(new Date(log.clickedAt), timezone, "MMM d, h:mm a")}`}>
+                                    <MousePointerClick size={12} /> Clicked
+                                </div>
+                            ) : log.openedAt ? (
+                                <div className="flex items-center gap-1 text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-full w-fit" title="Pixel-based — Apple/Gmail-এর privacy protection false positive দিতে পারে">
+                                    <Eye size={12} /> Opened
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-1 text-xs text-slate-400 font-medium bg-slate-100 px-2 py-1 rounded-full w-fit">

@@ -39,6 +39,12 @@ interface Booking {
   id: number | string;
   status?: string;
   latest_status?: string;
+  // Transdirect-এর প্রতিটা tracking event-এ দুটো আলাদা field আসে: `status` একটা
+  // লম্বা, খুঁটিনাটি বাক্য ("1 item has been transferred to run 6513"), আর
+  // `description` একটা ছোট, নির্দিষ্ট category ("Picked up", "In transit") —
+  // stage-matching-এর জন্য এটাই নির্ভরযোগ্য, লম্বা বাক্যে কখনো কোনো keyword
+  // নাও থাকতে পারে (যেমন run-transfer message-এ "transit" শব্দটাই নেই)।
+  latest_description?: string;
   connote?: string;
   courier?: string;
   booked_at?: string;
@@ -208,11 +214,15 @@ export default function TrackOrderForm() {
                      <div className="text-xs text-[#6b7280] uppercase font-bold mb-2">Current Status</div>
                      {/* একটাই clean badge — sবিস্তারিত ধাপ-ভিত্তিক progress নিচের
                          "Shipment Progress" section-এই দেখানো হচ্ছে, তাই এখানে
-                         দুটো আলাদা pill দেখিয়ে ডুপ্লিকেট/messy করার দরকার নেই */}
+                         দুটো আলাদা pill দেখিয়ে ডুপ্লিকেট/messy করার দরকার নেই।
+                         ✅ FIX: latest_description (ছোট, নির্দিষ্ট category — "In
+                         transit") ব্যবহার করা হচ্ছে, latest_status (লম্বা বাক্য,
+                         যেমন "1 item has been transferred to run 6513") না —
+                         নাহলে রঙ আর সঠিক ধাপ চেনা যেত না, badge-ও অগোছালো দেখাতো। */}
                      <span className={`px-3 py-1 rounded-full text-sm font-bold capitalize inline-block ${
-                        booking.latest_status ? getTrackingColor(booking.latest_status) : 'bg-black text-white'
+                        booking.latest_description ? getTrackingColor(booking.latest_description) : 'bg-black text-white'
                      }`}>
-                        {formatText(booking.latest_status || booking.status)}
+                        {formatText(booking.latest_description || booking.latest_status || booking.status)}
                      </span>
                   </div>
                   <div>
@@ -234,12 +244,21 @@ export default function TrackOrderForm() {
             {/* --- SECTION 1.2: SHIPMENT PROGRESS (সবসময় দেখাবে, real event না থাকলেও) --- */}
             {(() => {
               const STAGES = ['Booking Confirmed', 'Picked Up', 'In Transit', 'Delivered'];
-              const latest = (booking.latest_status || '').toLowerCase();
-              let currentStage = 0; // 0-indexed
+              // ✅ FIX: latest_description (ছোট category) ব্যবহার — latest_status
+              // (লম্বা বাক্য) না, একই কারণে যা উপরের badge-এ ঠিক করা হয়েছে।
+              const latest = (booking.latest_description || booking.latest_status || '').toLowerCase();
+              // ✅ FIX: booking.status "new" মানে Transdirect-এ এখনো real
+              // courier booking-ই হয়নি (admin manually "Book Now" করেনি,
+              // এখনো "Pending") — আগে এই অবস্থাতেও "Booking Confirmed" ✓
+              // দেখানো হতো, যেটা মিথ্যা তথ্য ছিল। tracking event থাকলে
+              // (picked up/transit/delivered) তার মানে booking নিশ্চিতভাবেই
+              // confirm হয়ে গেছে, তাই সেই override-গুলো অক্ষত রাখা হলো।
+              const rawStatus = (booking.status || '').toLowerCase();
+              const isConfirmed = rawStatus !== '' && rawStatus !== 'new';
+              let currentStage = isConfirmed ? 0 : -1; // 0-indexed, -1 = এখনো কোনো ধাপই সত্যি না
               if (latest.includes('delivered') || latest.includes('completed')) currentStage = 3;
               else if (latest.includes('transit') || latest.includes('board') || latest.includes('driver')) currentStage = 2;
               else if (latest.includes('picked') || latest.includes('collected')) currentStage = 1;
-              // event history-ই না থাকলে শুধু "Booking Confirmed" ধাপ পর্যন্তই সত্যি, বাকিটা এখনো অজানা
 
               return (
                 <div className="bg-white border border-[#e5e7eb] rounded-xl shadow-sm p-6">
@@ -271,7 +290,9 @@ export default function TrackOrderForm() {
                   </div>
                   {!booking.tracking_events?.length && (
                     <p className="text-sm text-gray-500 mt-6 text-center">
-                      Your order is booked with the courier — pickup and transit updates will appear here once the parcel is on the move.
+                      {isConfirmed
+                        ? 'Your order is booked with the courier — pickup and transit updates will appear here once the parcel is on the move.'
+                        : "Your order has been received and is being prepared for courier booking. We'll update this page as soon as it's confirmed and on its way."}
                     </p>
                   )}
                 </div>
@@ -290,7 +311,9 @@ export default function TrackOrderForm() {
                 ];
                 const reached = new Set<string>();
                 (booking.tracking_events as TrackingEvent[]).forEach((e) => {
-                    const s = (e.status || '').toLowerCase();
+                    // ✅ FIX: description (ছোট category, "In transit") দিয়ে match —
+                    // status (লম্বা বাক্য) দিয়ে না, একই কারণ (উপরে দেখুন)
+                    const s = (e.description || e.status || '').toLowerCase();
                     STAGE_DEFS.forEach((stage) => { if (stage.match(s)) reached.add(stage.label); });
                 });
                 const pendingStages = STAGE_DEFS.filter((stage) => !reached.has(stage.label));

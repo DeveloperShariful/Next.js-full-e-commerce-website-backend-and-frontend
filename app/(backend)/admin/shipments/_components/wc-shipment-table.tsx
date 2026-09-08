@@ -180,6 +180,8 @@ export const WcShipmentTable = ({
                     return <span className="bg-[#fcf9e8] text-[#996800] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Pending</span>;
                   if (st === "in_transit")
                     return <span className="bg-[#f1e8fb] text-[#7c3aed] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">In Transit</span>;
+                  if (st === "awaiting_pickup")
+                    return <span className="bg-[#f7fee7] text-[#65a30d] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Awaiting Pickup</span>;
                   // fallback — no status fetched yet (এখনো kono real tracking data আসেনি)
                   return <span className="bg-[#fdece3] text-[#c2410c] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Unknown</span>;
                 })()}

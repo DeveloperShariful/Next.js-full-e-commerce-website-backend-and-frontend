@@ -56,6 +56,10 @@ interface EmailGeneratorProps {
   template: EmailTemplate;
   metadata?: Record<string, unknown>;
   timezone?: string;
+  // এই id দেওয়া থাকলেই শুধু open/click tracking বসানো হয় (process-email-queue
+  // থেকে real পাঠানো email-এর জন্য) — preview/test email-এ (id না থাকলে) কিছুই
+  // বসে না, স্বাভাবিক HTML-ই ফেরত যায়।
+  emailLogId?: string;
 }
 
 const getReadablePaymentMethod = (method: string | null) => {
@@ -86,7 +90,7 @@ const safeReplace = (text: string, variables: Record<string, string | number | n
     return result;
 };
 
-export const generateEmailHtml = ({ order, config, template, metadata, timezone = "UTC" }: EmailGeneratorProps) => {
+export const generateEmailHtml = ({ order, config, template, metadata, timezone = "UTC", emailLogId }: EmailGeneratorProps) => {
   const baseColor = config.baseColor || "#2271b1";
   const bgColor = config.backgroundColor || "#f0f0f1";
   const bodyColor = config.bodyBackgroundColor || "#ffffff";
@@ -585,6 +589,21 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
     `;
   }
 
+  // ✅ Click tracking — actionButton-এর ভেতরের আসল href-কে আমাদের নিজস্ব
+  // redirect endpoint দিয়ে wrap করা হচ্ছে, শুধু emailLogId থাকলেই (মানে real
+  // পাঠানো email — preview/test না)। ক্লিক করলে EmailLog.clickedAt সেট হয়ে
+  // সাথে সাথেই আসল লিংকে redirect হয়ে যাবে — customer কিছু টের পাবে না।
+  if (emailLogId && actionButton) {
+    // ✅ FIX: /g flag ছাড়া শুধু প্রথম href-ই wrap হতো — abandoned-cart email-এ
+    // যেখানে checkout বাটনের আগে একাধিক product-image link থাকে, সেখানে আসল
+    // "Complete My Order" CTA-ই কখনো track হতো না। এখন actionButton-এর ভেতরের
+    // সবগুলো href-ই wrap হয়।
+    actionButton = actionButton.replace(/href="(https?:\/\/[^"]+)"/g, (_match, originalUrl) => {
+      const trackedUrl = `${appUrl}/api/email/track-click/${emailLogId}?to=${encodeURIComponent(originalUrl)}`;
+      return `href="${trackedUrl}"`;
+    });
+  }
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -682,6 +701,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
             </td>
         </tr>
     </table>
+    ${emailLogId ? `<img src="${appUrl}/api/email/track-open/${emailLogId}" width="1" height="1" style="display:none;border:0;" alt="" />` : ""}
 </body>
 </html>
   `;

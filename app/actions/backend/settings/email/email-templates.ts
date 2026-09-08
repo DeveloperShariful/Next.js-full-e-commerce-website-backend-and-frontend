@@ -440,11 +440,11 @@ const DEFAULT_TEMPLATES = [
     },
     {
         slug: 'order_ready_for_pickup',
-        name: 'Ready for Pickup',
+        name: 'Waiting for Pickup',
         triggerEvent: 'ORDER_READY_FOR_PICKUP',
         recipientType: 'customer',
-        subject: 'Ready for Pickup: Your Order #{order_number} is Waiting!',
-        content: '<p>Hi {customer_name},</p><p>Great news! Your order <strong>#{order_number}</strong> is now packed and ready for collection at our store.</p><p>Please bring a copy of this email or your order number when you visit. Our team looks forward to seeing you!</p>'
+        subject: 'Your GoBike Order #{order_number} is booked and waiting for pickup',
+        content: '<p>Hi {customer_name},</p><p>Your order <strong>#{order_number}</strong> has been booked with <strong>{courier}</strong> and is now waiting to be collected from our warehouse.</p><p>We\'ll email you again as soon as it\'s picked up and on its way!</p>'
     },
     {
         slug: 'order_partially_paid',

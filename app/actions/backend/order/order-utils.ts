@@ -93,7 +93,7 @@ export async function restockInventory(orderId: string) {
 // ডেটা পাস করে না। তাই এখানেই auto-compute করা হচ্ছে (caller explicit
 // extraData দিলে সেটাই প্রাধান্য পাবে) — যাতে কোথাও থেকে ইমেইল গেলেই ঠিক তথ্য
 // থাকে, কোনো caller "ভুলে গেলে" customer literal "N/A" না দেখে।
-const SHIPPING_EVENTS_NEEDING_TRACK_LINK = ["ORDER_SHIPPED", "ORDER_IN_TRANSIT", "ORDER_DELIVERED"];
+const SHIPPING_EVENTS_NEEDING_TRACK_LINK = ["ORDER_SHIPPED", "ORDER_IN_TRANSIT", "ORDER_DELIVERED", "ORDER_READY_FOR_PICKUP"];
 
 async function buildTrackOrderEmailData(orderId: string): Promise<Record<string, string>> {
     const order = await db.order.findUnique({

@@ -175,13 +175,13 @@ export const WcShipmentTable = ({
                   if (st === "dispatched")
                     return <span className="bg-[#e5f5fa] text-[#0073aa] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Dispatched</span>;
                   if (st === "booked")
-                    return <span className="bg-[#edfaef] text-[#00a32a] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Booked</span>;
+                    return <span className="bg-[#e0f7f5] text-[#0f766e] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Booked</span>;
                   if (st === "pending")
                     return <span className="bg-[#fcf9e8] text-[#996800] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Pending</span>;
                   if (st === "in_transit")
-                    return <span className="bg-[#e5e5e5] text-[#777] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">In Transit</span>;
-                  // fallback — no status fetched yet
-                  return <span className="bg-[#e5e5e5] text-[#777] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Unknown</span>;
+                    return <span className="bg-[#f1e8fb] text-[#7c3aed] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">In Transit</span>;
+                  // fallback — no status fetched yet (এখনো kono real tracking data আসেনি)
+                  return <span className="bg-[#fdece3] text-[#c2410c] px-2 py-[2px] rounded-[3px] text-[11px] font-bold uppercase tracking-wider">Unknown</span>;
                 })()}
               </td>
 

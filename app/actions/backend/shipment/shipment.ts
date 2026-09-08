@@ -328,6 +328,16 @@ export async function refreshTransdirectStatuses(
                 }
               }
             }
+
+            // ── ধাপ ৪: courier-এর কাছ থেকে এখনো কোনো tracking event আসেনি —
+            // কিন্তু booking real/confirmed (connote assigned, status "new" না,
+            // যেটা মানে এখনো manually "Book Now" করাই হয়নি) হলে বোঝা যায় courier
+            // booking আসলেই হয়েছে, শুধু pickup বাকি। "new" বাদ দেওয়া জরুরি —
+            // নাহলে এখনো Transdirect-এ "Pending" পড়ে থাকা order-কেও ভুলভাবে
+            // "booked, waiting pickup" দেখিয়ে দেবে।
+            if (!displayStatus && connote && bookingStatus && !bookingStatus.includes("new")) {
+              displayStatus = "awaiting_pickup";
+            }
           }
 
           if (!displayStatus) return null;
@@ -450,7 +460,31 @@ async function applyTransdirectStatusTransition(params: {
     return;
   }
 
-  if (displayStatus === "dispatched") {
+  if (displayStatus === "awaiting_pickup") {
+    // Courier booking confirmed (real connote assigned) কিন্তু এখনো কোনো pickup
+    // event আসেনি — READY_FOR_PICKUP enum value পুনর্ব্যবহার করা হচ্ছে, তবে
+    // label/email এখন "Waiting for Pickup" (courier-pickup অর্থে) — পুরনো
+    // "গ্রাহক নিজে store-এ এসে নিয়ে যাবে" অর্থ আর ব্যবহার হচ্ছে না।
+    if (order.status !== OrderStatus.SHIPPED && order.status !== OrderStatus.DELIVERED) {
+      await db.order.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.READY_FOR_PICKUP,
+          ...(courier ? { shippingMethod: courier } : {}),
+        },
+      });
+    }
+    await db.orderNote.create({
+      data: {
+        orderId,
+        content: isRecentOrder
+          ? `📋 Booking confirmed with ${courier || "the courier"} — waiting for pickup from our warehouse.`
+          : `📋 Booking confirmed with ${courier || "the courier"} — waiting for pickup. Order is ${Math.round(orderAgeDays)} days old — customer email skipped (historical catch-up, not a real-time event).`,
+        isSystem: true,
+      },
+    });
+    if (isRecentOrder) await sendOrderEmail(orderId, "ORDER_READY_FOR_PICKUP", emailExtraData);
+  } else if (displayStatus === "dispatched") {
     if (order.status !== OrderStatus.DELIVERED) {
       await db.order.update({
         where: { id: orderId },

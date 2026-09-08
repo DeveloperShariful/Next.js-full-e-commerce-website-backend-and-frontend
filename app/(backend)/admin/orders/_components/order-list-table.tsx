@@ -186,14 +186,15 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
   const getStatusBadge = (status: string) => {
     const baseClass = "inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap";
     switch (status) {
-      case 'PROCESSING': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Processing</span>;
+      case 'PENDING': return <span className={`${baseClass} bg-[#fcf9e8] text-[#996800]`}>Pending payment</span>;
+      case 'PROCESSING': return <span className={`${baseClass} bg-[#e5f5fa] text-[#0073aa]`}>Processing</span>;
+      case 'READY_FOR_PICKUP': return <span className={`${baseClass} bg-[#f7fee7] text-[#65a30d]`}>Waiting for Pickup</span>;
       case 'DELIVERED': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Delivered</span>;
-      case 'COMPLETED': return <span className={`${baseClass} bg-[#c6e1c6] text-[#5b841b]`}>Completed</span>;
-      case 'PENDING': return <span className={`${baseClass} bg-[#e5e5e5] text-[#777]`}>Pending payment</span>;
+      case 'COMPLETED': return <span className={`${baseClass} bg-[#e0f7f5] text-[#0f766e]`}>Completed</span>;
       case 'CANCELLED': return <span className={`${baseClass} bg-[#eaa4a4] text-[#761919]`}>Cancelled</span>;
-      case 'REFUNDED': return <span className={`${baseClass} bg-[#e5e5e5] text-[#777]`}>Refunded</span>;
-      case 'FAILED': return <span className={`${baseClass} bg-[#eaa4a4] text-[#761919]`}>Failed</span>;
-      default: return <span className={`${baseClass} bg-[#e5e5e5] text-[#777]`}>{status.replace(/_/g, " ")}</span>;
+      case 'REFUNDED': return <span className={`${baseClass} bg-[#fdece3] text-[#c2410c]`}>Refunded</span>;
+      case 'FAILED': return <span className={`${baseClass} bg-[#fce4ec] text-[#9d174d]`}>Failed</span>;
+      default: return <span className={`${baseClass} bg-[#f1e8fb] text-[#7c3aed]`}>{status.replace(/_/g, " ")}</span>;
     }
   };
 

@@ -129,7 +129,7 @@ export const OrdersHeader = ({ counts, gateways }: OrdersHeaderProps) => {
     { id: "SHIPPED",           label: "Shipped",           countKey: "shipped" },
     { id: "DELIVERED",         label: "Delivered",         countKey: "delivered" },
     { id: "COMPLETED",         label: "Completed",         countKey: "completed" },
-    { id: "READY_FOR_PICKUP",  label: "Ready for Pickup",  countKey: "readyForPickup" },
+    { id: "READY_FOR_PICKUP",  label: "Waiting for Pickup", countKey: "readyForPickup" },
     { id: "CANCELLED",         label: "Cancelled",         countKey: "cancelled" },
     { id: "REFUNDED",          label: "Refunded",          countKey: "refunded" },
     { id: "RETURNED",          label: "Returned",          countKey: "returned" },

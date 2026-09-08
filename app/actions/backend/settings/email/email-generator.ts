@@ -377,7 +377,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
   // customer-কে দেখানো হয় না — পুরো paragraph-ই বাদ যায়)
   let trackingInfoHtml = "";
   if (
-    ["ORDER_SHIPPED", "ORDER_IN_TRANSIT", "ORDER_DELIVERED", "WARRANTY_PART_SHIPPED"].includes(template.triggerEvent || "") &&
+    ["ORDER_SHIPPED", "ORDER_IN_TRANSIT", "ORDER_DELIVERED", "WARRANTY_PART_SHIPPED", "ORDER_READY_FOR_PICKUP"].includes(template.triggerEvent || "") &&
     variables.real_booking_id && variables.real_booking_id !== "N/A"
   ) {
     trackingInfoHtml = `
@@ -388,7 +388,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
   }
 
   if (
-    (template.triggerEvent === "ORDER_SHIPPED" || template.triggerEvent === "ORDER_IN_TRANSIT" || template.triggerEvent === "ORDER_DELIVERED") &&
+    (template.triggerEvent === "ORDER_SHIPPED" || template.triggerEvent === "ORDER_IN_TRANSIT" || template.triggerEvent === "ORDER_DELIVERED" || template.triggerEvent === "ORDER_READY_FOR_PICKUP") &&
     typeof variables.track_order_url === "string"
   ) {
     // variables.track_order_url — real Booking ID/postcode-সহ pre-filled হলে

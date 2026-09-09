@@ -65,10 +65,15 @@ async function _getAllMedia(source?: MediaSource): Promise<Media[]> {
   }
 }
 
+// ✅ ৫ মিনিট থেকে ১২ ঘণ্টায় বাড়ানো হলো — upload/delete-এর সময় revalidateTag
+// দিয়ে instant invalidation এমনিতেই হয় (নিচে দেখুন), তাই স্বাভাবিক ব্যবহারে এই
+// সময়ের কোনো প্রভাব নেই। এটা শুধু একটা safety-net সময়সীমা — সরাসরি script
+// দিয়ে DB-তে Media touch করলে (এই invalidation bypass হয়ে যায়) সর্বোচ্চ ১২
+// ঘণ্টা stale data দেখাতে পারে, যেটা rare/acceptable trade-off।
 export const getAllMedia = unstable_cache(
   _getAllMedia,
   ['admin-media'],
-  { revalidate: 300, tags: ['admin-media'] }
+  { revalidate: 43200, tags: ['admin-media'] }
 );
 
 // Media Library page only (NOT MediaPickerModal — a blog/product image picker
@@ -154,7 +159,7 @@ async function _getMediaLibraryItems(): Promise<MediaLibraryItem[]> {
 export const getMediaLibraryItems = unstable_cache(
   _getMediaLibraryItems,
   ['admin-media-library'],
-  { revalidate: 300, tags: ['admin-media', 'community-posts'] }
+  { revalidate: 43200, tags: ['admin-media', 'community-posts'] }
 );
 
 // On-demand file size for the community read-only rows above (PostMedia
@@ -553,12 +558,12 @@ async function _getStorageUsage(): Promise<StorageUsage> {
   return { hostinger, cloudinaryAccounts, vercelBlob: vercelResult };
 }
 
-// External API calls (Cloudinary + full Vercel Blob listing) — cached 10min
-// so the media page doesn't hit both on every single render. Tagged so
-// delete/upload actions can force a fresh read instead of waiting out the
-// full 10 minutes.
+// External API calls (Cloudinary + full Vercel Blob listing) — cached ১২
+// ঘণ্টা (আগে ১০ মিনিট ছিল) যাতে media page বারবার এই ধীরগতির external API-গুলো
+// hit না করে। Tagged থাকায় delete/upload action-এ সাথে সাথেই fresh read force
+// হয়, পুরো ১২ ঘণ্টা অপেক্ষা করতে হয় না।
 export const getStorageUsage = unstable_cache(
   _getStorageUsage,
   ['storage-usage'],
-  { revalidate: 600, tags: ['storage-usage'] }
+  { revalidate: 43200, tags: ['storage-usage'] }
 );

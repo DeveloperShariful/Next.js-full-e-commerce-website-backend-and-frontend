@@ -9,8 +9,13 @@
 //
 // ★ `id` অবশ্যই primary feed-এর offerId-এর সাথে হুবহু মিলতে হবে:
 //     SIMPLE / BUNDLE → googleOfferIdOverride || product.id
-//     VARIABLE        → "{base}_v_{variantId}"   (gmc-product-sync.actions.ts-এর
+//     VARIABLE        → শুধু variantId (gmc-product-sync.actions.ts-এর
 //                       buildVariantOfferId()-এর সাথে এক রাখতে হবে)
+//     ✅ FIX: আগে "{base}_v_{variantId}" (দুটো UUID জোড়া = ৭৫ ক্যারেক্টার)
+//     ব্যবহার হতো, Google-এর ৫০-ক্যারেক্টার `id` সীমা ছাড়িয়ে primary sync-এ
+//     সব variant reject হয়ে যেতো ("Value too long in attribute: id") — যার
+//     ফলে local inventory data-ও কখনো match করতো না। item_group_id আলাদা
+//     attribute হিসেবে grouping করে, তাই id-তে base প্রেফিক্স লাগে না।
 //
 // Merchant Center → Data sources → "Add local product inventory feed" →
 // Scheduled fetch → এই URL → দিনে ১ বার। Google-এর কাছে store locations
@@ -19,9 +24,6 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
-
-// primary sync-এর সাথে এক রাখতে হবে (gmc-product-sync.actions.ts → VARIANT_OFFER_SEP)
-const VARIANT_OFFER_SEP = "_v_";
 
 // ============================================================================
 // HELPERS
@@ -115,7 +117,7 @@ export async function GET() {
         const base = p.googleOfferIdOverride || p.id;
         if (p.productType === "VARIABLE" && p.variants.length > 0) {
           for (const v of p.variants) {
-            entries.push(buildEntry(`${base}${VARIANT_OFFER_SEP}${v.id}`, v.stock, v.trackQuantity));
+            entries.push(buildEntry(v.id, v.stock, v.trackQuantity));
           }
         } else {
           entries.push(buildEntry(base, p.stock, p.trackQuantity));

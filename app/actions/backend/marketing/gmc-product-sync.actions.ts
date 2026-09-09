@@ -179,10 +179,19 @@ function buildProductSegment(config: GmcConfig, offerId: string): string {
 // হয় (syncLiveProductStatuses / cleanupStaleGoogleProducts) — override-এ
 // "_v_" থাকলেও তাই ভুল হয় না।
 // ============================================================================
-const VARIANT_OFFER_SEP = "_v_";
-
-function buildVariantOfferId(baseOfferId: string, variantId: string): string {
-  return `${baseOfferId}${VARIANT_OFFER_SEP}${variantId}`;
+// ✅ FIX: আগে এখানে `${baseOfferId}${VARIANT_OFFER_SEP}${variantId}` রিটার্ন
+// হতো — দুটোই ৩৬-ক্যারেক্টার UUID হওয়ায় মোট ৭৫ ক্যারেক্টার হয়ে যেতো, Google-এর
+// `id` attribute-এর সর্বোচ্চ সীমা (৫০ ক্যারেক্টার) ছাড়িয়ে "Value too long in
+// attribute: id" error দিয়ে **সব** variant reject করে দিতো (দেখুন GoBike Crew
+// T-Shirt-এর ৮/৮ variant fail)। item_group_id ইতিমধ্যেই আলাদা attribute
+// হিসেবে base offerId পাঠায় (নিচে buildVariantProductAttributes দেখুন), তাই
+// grouping-এর জন্য offer id-তে base প্রেফিক্স জোড়া লাগানোর দরকারই নেই —
+// variantId নিজেই globally unique এবং ৫০-ক্যারেক্টার সীমার মধ্যে, তাই একাই
+// যথেষ্ট। google-local-inventory/route.ts-এও এই একই ফরম্যাট ব্যবহার করা
+// হয়েছে (দুটো মিলে থাকা জরুরি) — signature অপরিবর্তিত রাখা হলো যাতে বাকি সব
+// caller (reverse-lookup সহ) না বদলেই ঠিক থাকে।
+function buildVariantOfferId(_baseOfferId: string, variantId: string): string {
+  return variantId;
 }
 
 // variant.attributes ({ "Color": "Red", "Size": "M" }) থেকে নির্দিষ্ট key খুঁজে

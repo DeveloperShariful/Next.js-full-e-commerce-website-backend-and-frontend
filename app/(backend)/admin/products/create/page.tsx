@@ -96,7 +96,7 @@ export default async function CreateProductPage(props: PageProps) {
         images: { orderBy: { position: "asc" }, include: { media: true } }, 
         featuredMedia: true,
         attributes: { orderBy: { position: "asc" } },
-        variants: { include: { images: true }, orderBy: { id: 'asc' } },
+        variants: { include: { images: { orderBy: { position: 'asc' } }, inventoryLevels: true }, orderBy: { id: 'asc' } },
         tags: true,
         collections: true,
         brand: true,
@@ -257,14 +257,17 @@ export default async function CreateProductPage(props: PageProps) {
         trackQuantity: v.trackQuantity,
         attributes: v.attributes as Record<string, string>,
         images: v.images.map((img) => img.url),
-        
+        // per-location inventory round-trip — আগে load হতো না, ফলে multi-location
+        // variant edit করে save করলে সব stock default location-এ collapse হয়ে যেত
+        inventoryData: v.inventoryLevels.map((il) => ({ locationId: il.locationId, quantity: il.quantity })),
+
         salePrice: v.salePrice ? Number(v.salePrice) : null,
         costPerItem: v.costPerItem ? Number(v.costPerItem) : null,
         weight: v.weight ? Number(v.weight) : null,
         length: v.length ? Number(v.length) : null,
         width: v.width ? Number(v.width) : null,
         height: v.height ? Number(v.height) : null,
-        
+
         isPreOrder: v.isPreOrder,
         preOrderReleaseDate: v.preOrderReleaseDate ? v.preOrderReleaseDate.toISOString().split("T")[0] : null,
       })),

@@ -407,6 +407,20 @@ export async function handleVariations(
           ? cleanPrice(v.salePrice)
           : null;
 
+      // Variant images — গ্যালারি ProductImage rows-এ যায় (নিচে), কিন্তু storefront
+      // (get-product-by-slug / cartActions) + GMC feed fallback পড়ে ProductVariant.image
+      // (single field)। তাই প্রথম ছবিটা এখানে variant.image-এও সেট করা হয় — নাহলে
+      // admin-এ variant image আপলোড করলেও PDP/cart-এ কখনো দেখাত না।
+      const incomingImages = v.images || [];
+      const firstImg = incomingImages[0];
+      const firstImgUrl = firstImg
+        ? typeof firstImg === "string"
+          ? firstImg
+          : firstImg.url
+        : null;
+      const firstImgMediaId =
+        firstImg && typeof firstImg === "object" ? firstImg.mediaId ?? null : null;
+
       const variantData = {
         name: v.name || "Variation",
         sku: v.sku || null,
@@ -416,6 +430,8 @@ export async function handleVariations(
         attributes: v.attributes || {},
         trackQuantity: true,
         barcode: v.barcode || null,
+        image: firstImgUrl,
+        mediaId: firstImgMediaId,
         costPerItem: v.costPerItem ? cleanPrice(v.costPerItem) : null,
         weight: v.weight ? parseFloat(String(v.weight)) : null,
         length: v.length ? parseFloat(String(v.length)) : null,
@@ -442,8 +458,7 @@ export async function handleVariations(
         variantId = newVar.id;
       }
 
-      // Variant images
-      const incomingImages = v.images || [];
+      // Variant gallery images → ProductImage rows (variantId সহ)
       const incomingUrls = incomingImages.map((img) =>
         typeof img === "string" ? img : img.url
       );

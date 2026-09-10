@@ -159,9 +159,11 @@ export default function ProductClient({ product }: { product: Product }) {
 
     if (matchingVariation && selectedAttributeCount >= requiredAttributeCount) {
       setCurrentVariation(matchingVariation);
-      if (matchingVariation.image?.sourceUrl) {
-        setMainImage(matchingVariation.image.sourceUrl);
-      }
+      // ✅ FIX: আগে শুধু variation-এর নিজস্ব image থাকলে setMainImage হতো — image
+      // না থাকা variation select করলে আগের variation-এর ছবিতে "আটকে" থাকত।
+      // এখন variation-এ image না থাকলে parent-এর main image-এ ফিরে যায়।
+      setShowVideo(false);
+      setMainImage(matchingVariation.image?.sourceUrl || product.image?.sourceUrl);
     } else {
       setCurrentVariation(null);
     }
@@ -233,10 +235,13 @@ export default function ProductClient({ product }: { product: Product }) {
     id: product.id,
     databaseId: product.databaseId, 
     // ✅ FIX: Passed real UUID string 'id' instead of fake 'databaseId.toString()'
-    variationId: currentVariation ? currentVariation.id : undefined, 
+    variationId: currentVariation ? currentVariation.id : undefined,
     name: product.name + (currentVariation && Object.keys(selectedAttributes).length > 0 ? ` - ${Object.values(selectedAttributes).join(', ')}` : ''),
     price: displayPrice,
-    image: product.image?.sourceUrl,
+    // variation-এর নিজস্ব image থাকলে সেটাই (নাহলে parent) — server-side getCart-এর
+    // (variant.image || featuredImage) resolution-এর সাথে মিলিয়ে, যাতে optimistic
+    // cart UI-তে ভুল ছবির ঝলক না দেখায়
+    image: currentVariation?.image?.sourceUrl || product.image?.sourceUrl,
     slug: product.slug,
   };
 

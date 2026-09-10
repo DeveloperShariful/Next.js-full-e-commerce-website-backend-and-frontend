@@ -197,19 +197,20 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
         if (type === "UPDATE" && data.id) {
             oldProductData = await db.product.findUnique({
                 where: { id: data.id },
-                include: { 
-                    tags: true, 
+                include: {
+                    tags: true,
                     inventoryLevels: true,
-                    images: true,
-                    attributes: true,
+                    // change-detection order-sensitive (image/attribute reorder ধরতে) — তাই position order লাগে
+                    images: { orderBy: { position: 'asc' } },
+                    attributes: { orderBy: { position: 'asc' } },
                     collections: true,
-                    categories: true, 
-                    brand: true,    
-                    downloadFiles: true, 
+                    categories: true,
+                    brand: true,
+                    downloadFiles: true,
                     bundleItems: true,
                     variants: {
                         where: { deletedAt: null },
-                        include: { images: true, inventoryLevels: true }
+                        include: { images: { orderBy: { position: 'asc' } }, inventoryLevels: true }
                     }
                 }
             });
@@ -261,8 +262,14 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             metafieldsObj.google_availability_date = data.google_availability_date || "";
 
             const normalizeInventory = (items: { locationId: string; quantity: number }[]) => items?.map(i => ({ loc: i.locationId, qty: i.quantity })).sort((a, b) => a.loc.localeCompare(b.loc)) || [];
-            const normalizeImages = (imgs: (string | { url: string })[]) => imgs?.map(i => (typeof i === 'string' ? i : i.url)).sort() || [];
-            const normalizeAttributes = (attrs: { name: string; values?: string[] }[]) => attrs?.map(a => ({ n: a.name, v: [...(a.values || [])].sort() })).sort((a, b) => a.n.localeCompare(b.n)) || [];
+            // ⚠️ FIX: আগে শুধু URL তুলনা হতো (sort করে) — alt text বদলানো বা image reorder
+            // ধরা পড়ত না, ফলে handleImages কল-ই হতো না। এখন order + altText দুটোই তুলনায়।
+            const normalizeImages = (imgs: (string | { url: string; altText?: string | null })[]) =>
+                (imgs || []).map(i => (typeof i === 'string' ? { u: i, a: '' } : { u: i.url, a: i.altText || '' }));
+            // ⚠️ FIX: আগে শুধু name + values তুলনা হতো (sort করে) — visible / "used for
+            // variations" toggle বা attribute reorder ধরা পড়ত না। এখন সবই তুলনায়, order-সহ।
+            const normalizeAttributes = (attrs: { name: string; values?: string[]; visible?: boolean; variation?: boolean }[]) =>
+                (attrs || []).map(a => ({ n: a.name, v: [...(a.values || [])].sort(), vis: a.visible ?? true, vr: a.variation ?? true }));
             
             // 🚀 Scalars changed লজিকে নতুন গুগল মার্চেন্ট সেন্টারের ৫টি কলাম ফিক্স করা হয়েছে (ডেল্টা সিস্টেম অক্ষুণ্ণ রাখতে)
             const scalarsChanged = !oldProductData ||
@@ -378,11 +385,45 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
                 normalizeAttributes(data.attributesData)
             );
 
+            // ⚠️ FIX: আগে এখানে শুধু sku/price/salePrice/stock/preOrder তুলনা হতো —
+            // variant image, name, barcode, attribute-map, cost, ওজন/মাপ, per-location
+            // inventory বদলালে variationsChanged=false থেকে যেত, ফলে handleVariations
+            // কল-ই হতো না এবং পরিবর্তন চুপচাপ হারিয়ে যেত। এখন সবই তুলনায়।
+            const varFingerprint = (v: {
+                sku?: string | null; name?: string | null; barcode?: string | null;
+                price: unknown; salePrice?: unknown; stock: unknown;
+                costPerItem?: unknown; weight?: unknown; length?: unknown; width?: unknown; height?: unknown;
+                isPreOrder?: boolean | null; preOrderReleaseDate?: string | Date | null;
+                images?: ({ url: string } | string)[] | null;
+                attributes?: unknown;
+                inventoryLevels?: { locationId: string; quantity: number }[] | null;
+                inventoryData?: { locationId: string; quantity: number }[] | null;
+            }) => {
+                const attrObj = (v.attributes && typeof v.attributes === "object" && !Array.isArray(v.attributes))
+                    ? (v.attributes as Record<string, unknown>) : {};
+                return {
+                    s: v.sku || "", nm: v.name || "", bc: v.barcode || "",
+                    p: Number(v.price), sp: Number(v.salePrice || 0), st: Number(v.stock),
+                    cost: Number(v.costPerItem || 0),
+                    w: Number(v.weight || 0), l: Number(v.length || 0), wd: Number(v.width || 0), h: Number(v.height || 0),
+                    pre: v.isPreOrder || false,
+                    prd: v.preOrderReleaseDate
+                        ? (v.preOrderReleaseDate instanceof Date
+                            ? v.preOrderReleaseDate.toISOString().split('T')[0]
+                            : String(v.preOrderReleaseDate).split('T')[0])
+                        : null,
+                    img: (v.images || []).map(i => (typeof i === "string" ? i : i.url)).sort(),
+                    at: Object.entries(attrObj).map(([k, val]) => `${k}=${String(val)}`).sort(),
+                    inv: (v.inventoryData || v.inventoryLevels || [])
+                        .map(x => ({ loc: x.locationId, qty: Number(x.quantity) }))
+                        .sort((a, b) => a.loc.localeCompare(b.loc)),
+                };
+            };
             const variationsChanged = data.productType === 'VARIABLE' && (!oldProductData || (
                 oldProductData.variants.length !== data.variationsData.length ||
                 !isDeepEqual(
-                    oldProductData.variants.map(v => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: v.stock, pre: v.isPreOrder, prd: v.preOrderReleaseDate?.toISOString().split('T')[0] || null })).sort((a, b) => a.s.localeCompare(b.s)),
-                    data.variationsData.map(v => ({ s: v.sku || "", p: Number(v.price), sp: Number(v.salePrice || 0), st: Number(v.stock), pre: v.isPreOrder || false, prd: v.preOrderReleaseDate || null })).sort((a, b) => a.s.localeCompare(b.s))
+                    oldProductData.variants.map(varFingerprint).sort((a, b) => (a.s || a.nm).localeCompare(b.s || b.nm)),
+                    data.variationsData.map(varFingerprint).sort((a, b) => (a.s || a.nm).localeCompare(b.s || b.nm))
                 )
             ));
 

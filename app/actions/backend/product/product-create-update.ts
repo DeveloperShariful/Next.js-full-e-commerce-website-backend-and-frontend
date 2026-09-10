@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { Prisma, Role } from "@prisma/client";
 import { generateUniqueSlug, generateDiff, isDeepEqual, arraysHaveSameContent, serializeData, checkBundleCycle, calculateBundleStock } from "@/app/actions/backend/product/product-utils";
 import { auth } from "@/auth";
@@ -619,10 +620,19 @@ async function saveProduct(formData: FormData, type: "CREATE" | "UPDATE"): Promi
             });
         }
 
-        // গুগল মার্চেন্ট সেন্টার সিঙ্ক অ্যাক্টিভ করা
+        // গুগল মার্চেন্ট সেন্টার সিঙ্ক অ্যাক্টিভ করা।
+        // ⚠️ আগে এটা await/after ছাড়াই fire-and-forget করা হতো — Vercel serverless-এ
+        // response পাঠানোর সাথে সাথে function জমে যায়, ফলে চলমান Google API কল
+        // মাঝপথে কেটে যেত (`write EPIPE`) এবং প্রোডাক্ট এডিট GMC-তে পৌঁছাত না।
+        // `after()` Vercel-কে function জীবিত রাখতে বলে যতক্ষণ না কলটা শেষ হয়।
         if (productData && productData.id) {
-            syncProductToGoogle(productData.id).catch((err) => {
-                console.error("Background GMC Sync failed for Product ID:", productData.id, err);
+            const gmcProductId = productData.id;
+            after(async () => {
+                try {
+                    await syncProductToGoogle(gmcProductId);
+                } catch (err) {
+                    console.error("Background GMC Sync failed for Product ID:", gmcProductId, err);
+                }
             });
         }
 

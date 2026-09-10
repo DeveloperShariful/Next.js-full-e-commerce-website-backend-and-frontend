@@ -5,6 +5,10 @@ import { db } from "@/lib/prisma";
 import MainDashboard from "./_components/MainDashboard";
 
 export const dynamic = "force-dynamic";
+// bulk GMC sync (Server Action) এই route segment-এ চলে — VARIABLE product-এর
+// variant-প্রতি Google API call হয় বলে প্রতিটা chunk-এ কিছুটা সময় লাগে, তাই
+// default (~15s)-এর বদলে বেশি headroom দরকার।
+export const maxDuration = 60;
 
 export const metadata = {
   title: "Google Listings & Ads",
@@ -31,6 +35,9 @@ export default async function MerchantCenterPage({
         include: {
           categories: { select: { id: true, name: true } },
           channelStatuses: { where: { channel: "GOOGLE" } },
+          // VARIABLE product-এর প্রতিটা variant Google-এ আলাদা item — feed item
+          // সংখ্যা মেলাতে live variant count লাগে।
+          variants: { where: { deletedAt: null }, select: { id: true } },
         },
         orderBy: { updatedAt: "desc" },
       }),
@@ -57,6 +64,9 @@ export default async function MerchantCenterPage({
         slug: p.slug,
         featuredImage: p.featuredImage,
         sku: p.sku,
+        productType: p.productType,
+        // VARIABLE হলে Google-এ কতগুলো আলাদা item যায় (প্রতি live variant = ১টা)
+        variantCount: p.productType === "VARIABLE" ? p.variants.length : 0,
       },
     };
   });

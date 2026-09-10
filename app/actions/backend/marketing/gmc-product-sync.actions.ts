@@ -61,6 +61,8 @@ interface GmcConfig {
 interface ProductAttribute {
   name: string;
   values: string[];
+  variation: boolean;
+  visible: boolean;
 }
 
 interface ProductTag {
@@ -129,6 +131,9 @@ interface ProductForSync {
   weightUnit: string | null;
   dimensionUnit: string | null;
   metafields: Prisma.JsonValue;
+  customLabels: string[];
+  videoUrl: string | null;
+  metaTitle: string | null;
   brand: { name: string } | null;
   tags: ProductTag[];
   attributes: ProductAttribute[];
@@ -392,10 +397,18 @@ function extractMappedValue(mappedKeys: string[], product: ProductForSync): stri
 
 // ============================================================================
 // 3. HELPER: FORMAT URL (replaces dev/local URLs with real site URL)
+// ----------------------------------------------------------------------------
+// ⚠️ FIX: আগের regex `(localhost:\d+|[^/]*gobike\.au)` `media.gobike.au` (Hostinger-এ
+// থাকা মিডিয়া হোস্ট)-কেও ধরে ফেলত এবং প্রতিটা ছবির URL
+// `https://media.gobike.au/uploads/...` → `https://gobike.au/uploads/...`-এ বদলে
+// দিত। ওই path Vercel-এ নেই → HTML 404 → Google ছবি হিসেবে decode করতে না পেরে
+// **সব প্রোডাক্টে** "Unsupported image type [image_link]" দিত। মিডিয়া URL সবসময়
+// সম্পূর্ণ ও সঠিক করে DB-তে সেভ থাকে (Facebook feed-এর formatUrl-ও শুধু trim করে),
+// তাই শুধু localhost/dev URL-ই SITE_URL-এ বদলানো হয়, বাকি সব absolute URL অক্ষত।
 // ============================================================================
 function formatGmcUrl(url: string | null | undefined): string {
   if (!url) return "";
-  return url.replace(/^https?:\/\/(localhost:\d+|[^/]*gobike\.au)/, SITE_URL);
+  return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, SITE_URL);
 }
 
 // ============================================================================
@@ -638,6 +651,51 @@ export async function syncProductToGoogle(productId: string) {
       productAttributes.customLabel4 = extractMappedValue(labels.customLabel4 ?? [], product);
     }
 
+    // ── product.customLabels[] (সরাসরি অ্যারে ফিল্ড) → custom_label_0..4 ──
+    // mapping rule দিয়ে সেট করা label priority পায়; খালি স্লটগুলোই সরাসরি
+    // অ্যারের মান দিয়ে ভরা হয়। (আগে শুধু mapping rule থাকলেই custom_label যেত।)
+    const LABEL_KEYS = ["customLabel0", "customLabel1", "customLabel2", "customLabel3", "customLabel4"] as const;
+    if (Array.isArray(product.customLabels)) {
+      product.customLabels
+        .map((l) => (typeof l === "string" ? l.trim() : ""))
+        .filter(Boolean)
+        .slice(0, 5)
+        .forEach((label, i) => {
+          if (!productAttributes[LABEL_KEYS[i]]) productAttributes[LABEL_KEYS[i]] = label;
+        });
+    }
+
+    // ── product.tags → product_highlights ──
+    // Google-এর designated list attribute ছোট বর্ণনামূলক স্ট্রিং-এর জন্য।
+    // ট্রিম + de-dupe + ≤150 char + সর্বোচ্চ ১০টা।
+    if (product.tags && product.tags.length > 0) {
+      const seen = new Set<string>();
+      const highlights = product.tags
+        .map((t) => (t.name || "").trim())
+        .filter((v) => v && v.length <= 150)
+        .filter((v) => {
+          const k = v.toLowerCase();
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        })
+        .slice(0, 10);
+      if (highlights.length > 0) productAttributes.productHighlights = highlights;
+    }
+
+    // ── non-variation display attributes (Material, Motor Power, Battery…) →
+    //    product_details (Google product page-এর "Specifications" সেকশন) ──
+    // variation attribute (size/color) বাদ — ওগুলো আলাদা attribute হিসেবে যায়।
+    const detailAttrs = (product.attributes || [])
+      .filter((a) => a.variation === false && a.visible !== false && Array.isArray(a.values) && a.values.length > 0)
+      .map((a) => ({
+        attributeName: (a.name || "").trim().slice(0, 140),
+        attributeValue: a.values.map((v) => (v || "").trim()).filter(Boolean).join(", ").slice(0, 1000),
+      }))
+      .filter((d) => d.attributeName && d.attributeValue)
+      .slice(0, 100);
+    if (detailAttrs.length > 0) productAttributes.productDetails = detailAttrs;
+
     // gender/ageGroup admin ফর্মে lowercase সংরক্ষিত হয় ("male", "kids" ইত্যাদি,
     // v2.1-এর convention অনুযায়ী) — Merchant API-র enum uppercase আশা করে
     if (productAttributes.gender) productAttributes.gender = productAttributes.gender.toUpperCase();
@@ -657,6 +715,24 @@ export async function syncProductToGoogle(productId: string) {
     const customAttributes: merchantapi_products_v1.Schema$CustomAttribute[] = [];
     if (product.countryOfManufacture) {
       customAttributes.push({ name: "country_of_origin", value: product.countryOfManufacture });
+    }
+    // video_link ও short_title — products_v1-এর typed schema-তে এই দুটো field নেই
+    // (.d.ts-এ যাচাই করা), তাই country_of_origin-এর মতোই customAttributes দিয়ে
+    // পাঠানো হয় (Google এই নামগুলো চিনে আসল attribute-এ ম্যাপ করে)।
+    if (product.videoUrl && product.videoUrl.trim()) {
+      customAttributes.push({ name: "video_link", value: formatGmcUrl(product.videoUrl.trim()) });
+    }
+    // short_title শুধু তখনই — যখন metaTitle আসলেই "ছোট" (≤70 char, Google-এর
+    // recommendation) এবং মূল title থেকে আলাদা। SEO-stuffed লম্বা metaTitle
+    // short_title হিসেবে পাঠানো ক্ষতিকর, তাই সেগুলো বাদ।
+    if (
+      product.metaTitle &&
+      product.metaTitle.trim() &&
+      !isSeoTemplate(product.metaTitle) &&
+      product.metaTitle.trim().length <= 70 &&
+      product.metaTitle.trim().toLowerCase() !== finalTitle.trim().toLowerCase()
+    ) {
+      customAttributes.push({ name: "short_title", value: product.metaTitle.trim() });
     }
 
     // legacy WooCommerce/gla_ era-এর high-performing listing-এর ID ধরে রাখতে
@@ -913,19 +989,25 @@ export async function updateProductChannelVisibility(productId: string, status: 
 
 // ============================================================================
 // 8. BATCH SYNC CONTROLLER (parallel with concurrency limit)
-// Merchant API-তে customBatch নেই (Google-এর নিজস্ব migration guide অনুযায়ী)
-// — কিন্তু পুরনো কোডও কখনো customBatch ব্যবহার করেনি, এই 5-এর chunk-এ
-// concurrent call করার প্যাটার্নটাই আগে থেকেই সঠিক পন্থা, তাই অপরিবর্তিত।
+// ----------------------------------------------------------------------------
+// প্রতিটা call-এ অল্প কিছু product (client CHUNK=4 করে পাঠায়) — কারণ VARIABLE
+// product-এর প্রতিটা variant একটা করে Google API call, একসাথে ২৭টা product দিলে
+// ৪০+ call হয়ে Vercel function timeout-এ কেটে যেত (partial sync, resume নেই)।
+// client এখন ছোট chunk-এ বারবার call করে progress দেখায়; এই function per-call
+// synced/failed গুনে ফেরত দেয় যাতে client accumulate করতে পারে।
+// প্রতিটা syncProductToGoogle fresh `db.product.findUnique` করে — সবসময় latest
+// DB state, full attribute rebuild, Google-এ full replace।
 // ============================================================================
 export async function bulkUpdateProductVisibility(
   updates: { productId: string; status: "SYNCED" | "EXCLUDED" }[]
-) {
-  await security.assertAdmin();
+): Promise<{ success: boolean; synced: number; failed: number; errors: string[]; error?: string }> {
   try {
-    if (!updates || updates.length === 0) return { success: true };
+    await security.assertAdmin();
+    if (!updates || updates.length === 0) return { success: true, synced: 0, failed: 0, errors: [] };
 
     const CHUNK_SIZE = 5;
     const errors: string[] = [];
+    let synced = 0;
 
     for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
       const chunk = updates.slice(i, i + CHUNK_SIZE);
@@ -937,20 +1019,24 @@ export async function bulkUpdateProductVisibility(
         )
       );
       results.forEach((res, idx) => {
-        if (!res.success) errors.push(`Product ${chunk[idx].productId}: ${res.error}`);
+        if (res.success) synced++;
+        else errors.push(`Product ${chunk[idx].productId}: ${res.error}`);
       });
     }
 
     revalidatePath("/admin/marketing/merchant-center");
 
-    if (errors.length > 0) {
-      return { success: false, error: `${errors.length} product(s) failed: ${errors[0]}` };
-    }
-    return { success: true, message: "Bulk sync completed successfully!" };
+    return {
+      success: errors.length === 0,
+      synced,
+      failed: errors.length,
+      errors,
+      error: errors.length > 0 ? `${errors.length} product(s) failed: ${errors[0]}` : undefined,
+    };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to process bulk sync.";
     console.error("Error in bulkUpdateProductVisibility:", error);
-    return { success: false, error: msg };
+    return { success: false, synced: 0, failed: updates?.length ?? 0, errors: [msg], error: msg };
   }
 }
 

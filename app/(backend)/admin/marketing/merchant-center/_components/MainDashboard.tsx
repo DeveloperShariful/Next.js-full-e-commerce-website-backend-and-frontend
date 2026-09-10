@@ -34,6 +34,8 @@ interface SyncLogEntry {
     slug: string;
     featuredImage: string | null;
     sku: string | null;
+    productType?: string;
+    variantCount?: number;
   };
 }
 

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { db } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import PurchaseTracker from './_components/PurchaseTracker';
+import GoogleCustomerReviews from './_components/GoogleCustomerReviews';
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -46,39 +47,47 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
 
   if (!orderId) return notFound();
 
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    select: {
-      id: true,
-      orderNumber: true,
-      orderDate: true,
-      total: true,
-      subtotal: true,
-      shippingTotal: true,
-      discountTotal: true,
-      guestEmail: true,
-      userId: true,
-      shippingAddress: true,
-      billingAddress: true,
-      shippingMethod: true,
-      paymentMethod: true,
-      affiliateId: true,
-      referrals: { select: { affiliateId: true } },
-      items: {
-        select: {
-          productId: true,
-          variantId: true,
-          productName: true,
-          variantName: true,
-          quantity: true,
-          price: true,
-          total: true,
-          image: true,
-          product: { select: { productCode: true } },
+  const [order, marketingConfig] = await Promise.all([
+    db.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        orderNumber: true,
+        orderDate: true,
+        total: true,
+        subtotal: true,
+        shippingTotal: true,
+        discountTotal: true,
+        guestEmail: true,
+        userId: true,
+        user: { select: { email: true } },
+        shippingAddress: true,
+        billingAddress: true,
+        shippingMethod: true,
+        paymentMethod: true,
+        affiliateId: true,
+        referrals: { select: { affiliateId: true } },
+        items: {
+          select: {
+            productId: true,
+            variantId: true,
+            productName: true,
+            variantName: true,
+            quantity: true,
+            price: true,
+            total: true,
+            image: true,
+            product: { select: { productCode: true, barcode: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    // Google Customer Reviews opt-in-এর জন্য merchant id + target country
+    db.marketingIntegration.findUnique({
+      where: { id: "marketing_config" },
+      select: { gmcMerchantId: true, gmcTargetCountry: true },
+    }),
+  ]);
 
   if (!order) {
     return (
@@ -130,6 +139,19 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
     image: item.image ?? "",
   }));
 
+  // ── Google Customer Reviews opt-in ──
+  // Transdirect আসল ETA দেয় না, তাই order তারিখ + ৭ দিন ধরা হয় — Google এই
+  // তারিখের কিছুদিন পর কাস্টমারকে সার্ভে ইমেইল পাঠায়।
+  const gcrEta = new Date(order.orderDate);
+  gcrEta.setDate(gcrEta.getDate() + 7);
+  const gcrEstimatedDelivery = gcrEta.toISOString().slice(0, 10);
+  const gcrEmail = order.guestEmail?.trim() || order.user?.email?.trim() || "";
+  // products অ্যারে শুধু GTIN নেয় — barcode থাকলে পাঠানো হয় (এখন কোনোটায় নেই,
+  // পরে GTIN যোগ হলে auto per-product review-ও আসবে)
+  const gcrGtins = order.items
+    .map((i) => i.product?.barcode?.trim())
+    .filter((b): b is string => !!b);
+
   return (
     <div className="min-h-[80vh] bg-gray-50 py-6 px-4">
       <PurchaseTracker
@@ -140,6 +162,17 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
         shipping={parseFloat(String(order.shippingTotal))}
         items={trackedItems}
       />
+
+      {marketingConfig?.gmcMerchantId && gcrEmail && (
+        <GoogleCustomerReviews
+          merchantId={marketingConfig.gmcMerchantId}
+          orderId={String(order.orderNumber)}
+          email={gcrEmail}
+          deliveryCountry={marketingConfig.gmcTargetCountry || "AU"}
+          estimatedDeliveryDate={gcrEstimatedDelivery}
+          productGtins={gcrGtins}
+        />
+      )}
 
 
       <div className="max-w-4xl mx-auto space-y-4">

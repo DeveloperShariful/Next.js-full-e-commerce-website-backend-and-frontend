@@ -324,7 +324,7 @@ export default function ProductTable({
           </div>
         )}
         <div className="overflow-x-auto ">
-          <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse table-fixed min-w-[1200px]">
+          <table className="w-full text-left text-[13px] text-[#3c434a] border-collapse table-fixed min-w-[1405px] md:min-w-[1200px]">
             <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-normal text-[#1d2327]">
               <tr>
                 <th className="p-2 w-8 text-center border-r border-[#e2e4e7]">
@@ -332,13 +332,13 @@ export default function ProductTable({
                 </th>
                 <th className="p-2 w-10 font-medium border-r border-[#e2e4e7]">ID</th>
                 <th className="p-2 w-16 md:w-24 border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
-                <th className="p-2 font-medium w-auto md:w-[450px]">Name</th>
+                <th className="p-2 font-medium w-[280px] md:w-[450px]">Name</th>
                 <th className="p-2 font-medium w-28">SKU</th>
                 <th className="p-2 font-medium w-20">Stock</th>
                 <th className="p-2 font-medium w-28">Price</th>
-                <th className="p-2 font-medium w-14">Cost</th>
+                <th className="p-2 pr-5 font-medium w-24">Cost</th>
                 <th className="p-2 font-medium w-32">Categories</th>
-                <th className="p-2 font-medium w-auto">Tags</th>
+                <th className="p-2 font-medium w-[215px] md:w-auto">Tags</th>
                 <th className="p-2 font-medium w-12 text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
                 <th className="p-2 font-medium w-28">Date</th>
                 <th className="p-2 font-medium w-20">Brands</th>
@@ -370,7 +370,7 @@ export default function ProductTable({
                       </td>
 
                       <td className=" align-middle border-r border-[#f0f0f1]">
-                         <div className="w-full aspect-square bg-[#f0f0f1]  rounded-[2px] flex items-center justify-center overflow-hidden">
+                         <div className="w-full aspect-square bg-[#f0f0f1] md:p-px rounded-[2px] flex items-center justify-center overflow-hidden">
                             {displayImage ? (
                                <img src={displayImage} alt="" className="h-full w-full object-cover" />
                             ) : (
@@ -437,7 +437,7 @@ export default function ProductTable({
                          )}
                       </td>
 
-                      <td className="p-1 pt-[14px] text-[#50575e]">
+                      <td className="p-2 pr-5 pt-[14px] text-[#50575e] whitespace-nowrap">
                          {product.costPerItem ? formatPrice(product.costPerItem) : "—"}
                       </td>
                       
@@ -485,13 +485,13 @@ export default function ProductTable({
                 </th>
                 <th className="p-2 w-10 font-medium border-r border-[#e2e4e7]">ID</th>
                 <th className="p-1 w-16 md:w-24 text-center border-r border-[#e2e4e7]"><ImageIcon size={14} className="mx-auto text-[#8c8f94]" /></th>
-                <th className="p-2 font-medium w-auto md:w-[280px]">Name</th>
+                <th className="p-2 font-medium w-[280px] md:w-[280px]">Name</th>
                 <th className="p-2 font-medium w-28">SKU</th>
                 <th className="p-2 font-medium w-20">Stock</th>
                 <th className="p-2 font-medium w-28">Price</th>
-                <th className="p-2 font-medium w-16">Cost</th>
+                <th className="p-2 pr-5 font-medium w-24">Cost</th>
                 <th className="p-2 font-medium w-32">Categories</th>
-                <th className="p-2 font-medium w-auto">Tags</th>
+                <th className="p-2 font-medium w-[215px] md:w-auto">Tags</th>
                 <th className="p-2 font-medium w-12 text-center"><Star size={14} className="mx-auto text-[#8c8f94]" /></th>
                 <th className="p-2 font-medium">Date</th>
                 <th className="p-2 font-medium">Brands</th>

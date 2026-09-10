@@ -14,13 +14,23 @@ export default function Tag() {
     const [isExpanded, setIsExpanded] = useState(true);
 
     const addTag = () => {
-        if(input.trim()) {
-            const newTag = input.trim();
-            if (!tags.includes(newTag)) {
-                setValue("tags", [...tags, newTag], { shouldDirty: true, shouldValidate: true });
-            }
-            setInput("");
+        // ✅ FIX: আগে পুরো input-টাকেই একটা tag বানাতো ("A, B, C" → একটাই tag),
+        // যদিও নিচে লেখা "Separate tags with commas"। এখন comma দিয়ে ভেঙে প্রতিটা
+        // আলাদা tag হিসেবে যোগ হয় (ফাঁকা আর duplicate বাদ দিয়ে)।
+        const parts = input
+            .split(",")
+            .map(t => t.trim())
+            .filter(Boolean);
+        if (parts.length === 0) return;
+
+        const merged = [...tags];
+        for (const t of parts) {
+            if (!merged.includes(t)) merged.push(t);
         }
+        if (merged.length !== tags.length) {
+            setValue("tags", merged, { shouldDirty: true, shouldValidate: true });
+        }
+        setInput("");
     };
 
     const removeTag = (tagToRemove: string) => {
@@ -46,8 +56,9 @@ export default function Tag() {
                             value={input} 
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault(); 
+                                // Enter অথবা comma — দুটোতেই tag commit হয়
+                                if (e.key === 'Enter' || e.key === ',') {
+                                    e.preventDefault();
                                     addTag();
                                 }
                             }}

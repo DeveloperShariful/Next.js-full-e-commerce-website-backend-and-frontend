@@ -28,6 +28,20 @@ function stripHtmlTags(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// কিছু পুরনো/import করা variant-এর `name` "{product name} - {value}" আকারে সেভ
+// থাকে। parent title-এর সাথে সেই পুরো নাম আবার জোড়া দিলে catalog-এ title ডাবল
+// হয়ে যায়। তাই suffix-এ বসানোর আগে leading product-name প্রিফিক্স ছেঁটে ফেলা হয়।
+function stripProductNamePrefix(variantName: string, productName: string): string {
+  const name = (variantName || "").trim();
+  const pn = (productName || "").trim();
+  if (!pn) return name;
+  const prefix = `${pn} - `;
+  if (name.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return name.slice(prefix.length).trim() || name;
+  }
+  return name;
+}
+
 // Image/video URLs are stored complete in the database — Hostinger's upload.php
 // returns the full URL, and Cloudinary / Vercel Blob URLs are absolute too. So
 // nothing needs prefixing or rewriting here.
@@ -209,7 +223,7 @@ export async function GET() {
       if (product.productType === "VARIABLE" && product.variants.length > 0) {
         product.variants.forEach((variant) => {
           const variantId = `${product.id}_${variant.id}`;
-          const variantTitle = `${finalTitle} - ${variant.name}`;
+          const variantTitle = `${finalTitle} - ${stripProductNamePrefix(variant.name, product.name)}`;
           const variantAvailability = product.isPreOrder ? "preorder" : ((variant.trackQuantity === false || variant.stock > 0) ? "in stock" : "out of stock");
           const variantStock = safeStock(variant.stock);
 

@@ -211,6 +211,22 @@ function pickVariantAttr(
   return undefined;
 }
 
+// কিছু পুরনো/import করা variant-এর `name` "{product name} - {value}" আকারে সেভ
+// থাকে (বর্তমান "Generate" শুধু attribute মান লেখে — যেমন "M" / "Red / L")।
+// parent title-এর সাথে সেই পুরো নাম আবার জোড়া দিলে GMC-তে title ডাবল হয়ে যায়
+// ("GoBike Crew T-Shirt … - GoBike Crew T-Shirt … - 130")। তাই title suffix-এ
+// বসানোর আগে variant.name থেকে leading product-name প্রিফিক্স ছেঁটে ফেলা হয়।
+function stripProductNamePrefix(variantName: string, productName: string): string {
+  const name = (variantName || "").trim();
+  const pn = (productName || "").trim();
+  if (!pn) return name;
+  const prefix = `${pn} - `;
+  if (name.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return name.slice(prefix.length).trim() || name;
+  }
+  return name;
+}
+
 // parent-এর জন্য বানানো productAttributes-কে base ধরে একটা variant-এর জন্য
 // override করা কপি বানায় — title/price/availability/image/identifier/color/size
 // সব variant-লেভেল, আর item_group_id সেট করা হয়।
@@ -230,7 +246,7 @@ function buildVariantProductAttributes(
   attrs.title =
     variant.googleTitle && variant.googleTitle.trim() && !isSeoTemplate(variant.googleTitle)
       ? variant.googleTitle.trim()
-      : `${baseAttributes.title ?? product.name} - ${variant.name}`;
+      : `${baseAttributes.title ?? product.name} - ${stripProductNamePrefix(variant.name, product.name)}`;
   if (variant.googleDescription && variant.googleDescription.trim()) {
     attrs.description = stripHtmlTags(variant.googleDescription);
   }

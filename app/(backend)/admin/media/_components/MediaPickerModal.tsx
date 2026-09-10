@@ -173,7 +173,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white w-full max-w-5xl max-h-[90vh] flex flex-col rounded-sm shadow-2xl">
+      <div className="bg-white w-full max-w-[1500px] max-h-[94vh] flex flex-col rounded-sm shadow-2xl">
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#c3c4c7] bg-[#f6f7f7] shrink-0">
@@ -287,6 +287,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                   <div
                     key={file.id}
                     onClick={() => toggleSelect(file.id)}
+                    title={file.filename}
                     className={`group relative aspect-square cursor-pointer select-none bg-white overflow-hidden ${
                       isSelected ? 'outline outline-[3px] outline-[#2271b1] z-10' : ''
                     }`}
@@ -328,7 +329,9 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                       </div>
                     )}
 
-                    <div className="absolute bottom-0 inset-x-0 bg-[#1d2327]/80 text-white text-[9px] px-1.5 py-[3px] truncate opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    {/* Hover করলে পুরো ফাইলনেম — আগে truncate (এক লাইন …) ছিল, এখন
+                        wrap করে সম্পূর্ণ নাম দেখায়। */}
+                    <div className="absolute bottom-0 inset-x-0 bg-[#1d2327]/90 text-white text-[10px] leading-snug px-1.5 py-1 whitespace-normal break-words opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                       {file.filename}
                     </div>
                   </div>

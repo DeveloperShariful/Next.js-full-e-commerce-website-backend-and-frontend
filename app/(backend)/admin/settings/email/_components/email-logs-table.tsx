@@ -282,7 +282,9 @@ export const EmailLogsTable = ({ logs, meta, currentPage, onPageChange, search, 
                         </TableCell>
                         <TableCell>
                             <Badge variant="outline" className={
-                                log.status === 'SENT' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                log.status === 'SENT' ? 'bg-green-50 text-green-700 border-green-200' :
+                                // SUPPRESSED = ইচ্ছাকৃত skip (bounced address), FAILED-এর মতো আসল error নয়
+                                log.status === 'SUPPRESSED' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                 'bg-red-50 text-red-700 border-red-200'
                             }>
                                 {log.status}

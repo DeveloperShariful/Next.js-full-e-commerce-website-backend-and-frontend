@@ -1,3 +1,5 @@
+import dns from "dns";
+
 // The abandoned-checkout capture endpoint saves whatever the customer has
 // typed so far, debounced 2s after each keystroke (see CheckoutClient.tsx) —
 // so a brief pause mid-domain (e.g. right after "user@gmail.c", before
@@ -56,4 +58,41 @@ function autocorrectTruncatedDomain(email: string): string {
 export function sanitizeEmail(email: string): string {
   const trimmed = email.trim().toLowerCase().replace(/\.+$/, "");
   return autocorrectTruncatedDomain(trimmed);
+}
+
+// ⚠️ FIX: format regex + autocorrect উপরে ধরে "গঠনগতভাবে বৈধ" ঠিকানা, কিন্তু
+// domain-ই বাস্তবে নেই এমন টাইপো (gmail.comc, live.com.ah) ধরে না — এগুলোই
+// ৭-দিনের abandoned-cart সিরিজে বারবার "Address not found" bounce করছিল।
+// এই ফাংশন DNS MX lookup করে দেখে domain-টা মেইল গ্রহণ করার মতো আছে কিনা।
+//
+// ইচ্ছাকৃতভাবে "fail-open": শুধু domain সত্যিই না থাকলে (ENOTFOUND/ENODATA,
+// দুটোতেই + A-record fallback চেক) false দেয়। DNS timeout/সাময়িক resolver
+// সমস্যায় (অন্য যেকোনো error code) true (allow) দেয় — একটা transient DNS
+// blip-এর জন্য আসল কাস্টমারকে block করা হবে না।
+export async function hasDeliverableDomain(email: string): Promise<boolean> {
+  const at = email.lastIndexOf("@");
+  if (at === -1) return false;
+  const domain = email.slice(at + 1);
+  if (!domain) return false;
+
+  try {
+    const mx = await dns.promises.resolveMx(domain);
+    return mx.length > 0; // resolveMx সফল হলে সাধারণত অন্তত ১টা রেকর্ড থাকেই
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === "ENOTFOUND" || code === "ENODATA") {
+      // MX নেই — A/AAAA record দিয়ে domain-টা আদৌ resolve হয় কিনা শেষ চেষ্টা
+      try {
+        const a = await dns.promises.resolve4(domain).catch(() => []);
+        const aaaa = a.length > 0 ? a : await dns.promises.resolve6(domain).catch(() => []);
+        return aaaa.length > 0;
+      } catch {
+        return false;
+      }
+    }
+    // timeout / resolver সমস্যা / অন্য কোনো error — নিশ্চিত না, তাই ব্লক করা হলো না
+    return true;
+  }
+
+  return true;
 }

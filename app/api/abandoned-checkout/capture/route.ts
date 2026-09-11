@@ -5,7 +5,7 @@ import { db } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { headers } from 'next/headers';
 import { Prisma } from '@prisma/client';
-import { sanitizeEmail } from '@/lib/sanitize-email';
+import { sanitizeEmail, hasDeliverableDomain } from '@/lib/sanitize-email';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -24,6 +24,14 @@ export async function POST(request: Request) {
     // "user@gmail.c" outright instead of saving them and emailing a bounce
     // for the next 7 days.
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      return NextResponse.json({ success: false }, { status: 400 });
+    }
+    // ⚠️ FIX: উপরের regex শুধু গঠন যাচাই করে — "gmail.comc", "live.com.ah"-এর
+    // মতো টাইপো-করা কিন্তু গঠনগতভাবে বৈধ domain ধরত না, যেগুলো পরে ৭-দিনের
+    // reminder সিরিজে বারবার bounce করত। এখন DNS MX/A লুকআপ দিয়ে domain-টা
+    // আদৌ মেইল নিতে পারে কিনা যাচাই হয় (background capture call, তাই এই
+    // ~১০০ms delay checkout UI-কে block করে না)।
+    if (!(await hasDeliverableDomain(email))) {
       return NextResponse.json({ success: false }, { status: 400 });
     }
     if (!Array.isArray(cartItems) || cartItems.length === 0) {

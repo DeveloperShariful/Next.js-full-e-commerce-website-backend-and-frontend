@@ -3,6 +3,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { after } from "next/server";
 
 interface NotificationPayload {
   trigger: string;
@@ -112,23 +113,33 @@ export async function sendNotification({
       }
     });
 
-    // ব্যাকগ্রাউন্ডে কিউ প্রসেসরকে কল করা হচ্ছে (fire-and-forget — order কে block করে না)
-    try {
-        const isLocal = process.env.NODE_ENV === 'development';
-        // localhost-এ NEXT_PUBLIC_APP_URL production-এ point করে, তাই development-এ localhost force করা হচ্ছে
-        const appUrl = isLocal ? "http://localhost:3000" : (process.env.NEXT_PUBLIC_APP_URL || "https://gobike.au");
+    // ব্যাকগ্রাউন্ডে কিউ প্রসেসরকে কল করা হচ্ছে (order-কে block করে না)।
+    // ⚠️ FIX: আগে এটা plain fire-and-forget fetch() ছিল (await/after() ছাড়া) —
+    // Vercel serverless response পাঠানোর সাথে সাথে function জমে গেলে এই কলটা
+    // মাঝপথে কেটে যেত (GMC sync-এ যে EPIPE বাগ পাওয়া গিয়েছিল ঠিক একই ধরনের)।
+    // fail করলে email PENDING-এ আটকে থাকত যতক্ষণ না backup cron (যেটা শুধু
+    // Sydney সকাল ৯-সন্ধ্যা ৬টায় চলে) ধরত — রাতের order confirmation email
+    // অনেক ঘণ্টা দেরি হতে পারত। after() Vercel-কে function জীবিত রাখতে বলে
+    // যতক্ষণ না এই কলটা শেষ হয়।
+    after(async () => {
+        try {
+            const isLocal = process.env.NODE_ENV === 'development';
+            // localhost-এ NEXT_PUBLIC_APP_URL production-এ point করে, তাই development-এ localhost force করা হচ্ছে
+            const appUrl = isLocal ? "http://localhost:3000" : (process.env.NEXT_PUBLIC_APP_URL || "https://gobike.au");
 
-        fetch(`${appUrl}/api/email/process-email-queue`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.CRON_SECRET || ''}`,
-            },
-            cache: 'no-store'
-        }).catch(err => console.error("Auto-trigger queue failed", err));
-    } catch (e) {
-        // Ignore trigger errors, cron will pick it up
-    }
+            await fetch(`${appUrl}/api/email/process-email-queue`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.CRON_SECRET || ''}`,
+                },
+                cache: 'no-store'
+            });
+        } catch (err) {
+            // cron backup ধরে নেবে (business hours-এর মধ্যে)
+            console.error("Auto-trigger queue failed", err);
+        }
+    });
 
     return { success: true };
 

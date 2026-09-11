@@ -88,6 +88,7 @@ export async function GET(req: Request) {
     // ── SEQUENTIAL processing: one email at a time (prevents SMTP rate-limit)
     // Even with 50+ emails queued, each is sent individually and safely logged.
     let processedCount = 0;
+    let suppressedCount = 0;
 
     for (const item of pendingItems) {
       // Atomic lock: only one worker can flip PENDING → PROCESSING per item
@@ -97,6 +98,36 @@ export async function GET(req: Request) {
       });
 
       if (lock.count === 0) continue; // Already locked by another worker
+
+      // ⛔ Bounce suppression — এই ঠিকানায় আগে hard bounce ধরা পড়েছে (দেখুন
+      // app/api/cron/check-bounces/route.ts), তাই আর পাঠানোর চেষ্টাই করা হয় না।
+      // CANCELLED করা হলো, FAILED নয় — এটা error নয়, ইচ্ছাকৃত skip, retry-ও হবে না।
+      const isSuppressed = await db.suppressedEmail.findUnique({
+        where: { email: item.recipient.trim().toLowerCase() },
+        select: { id: true }
+      });
+      if (isSuppressed) {
+        await db.$transaction([
+          db.notificationQueue.update({
+            where: { id: item.id },
+            data: { status: "CANCELLED", error: "Recipient is on the bounce suppression list." }
+          }),
+          db.emailLog.create({
+            data: {
+              recipient: item.recipient,
+              subject: `[${item.templateSlug}]`,
+              templateSlug: item.templateSlug,
+              status: "SUPPRESSED",
+              errorMessage: "Recipient previously hard-bounced — send skipped.",
+              orderId: item.orderId,
+              userId: item.userId,
+              metadata: item.metadata ?? {}
+            }
+          })
+        ]);
+        suppressedCount++;
+        continue;
+      }
 
       let subject = `[${item.templateSlug}]`;
       // try-এর বাইরে declare করা — catch block-এও access দরকার, যাতে ব্যর্থ
@@ -210,6 +241,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       success: true,
       processed: processedCount,
+      suppressed: suppressedCount,
       total: pendingItems.length
     });
 

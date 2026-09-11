@@ -5,7 +5,7 @@
 import { headers } from 'next/headers';
 import { db } from '@/lib/prisma';
 import { sendNotification } from '@/app/api/email/send-notification';
-import { stripHtml } from '@/lib/sanitize';
+import { stripHtml, isValidEmailFormat } from '@/lib/sanitize';
 
 const RATE_LIMIT = 3;
 const WINDOW_MS = 30 * 60 * 1000; // 30 minutes
@@ -34,6 +34,14 @@ export async function submitContactForm(formData: FormData) {
     return { success: false, message: 'Please fill in all required fields.' };
   }
 
+  // ⚠️ FIX: email format-ই যাচাই হতো না — এই `email` পরে সরাসরি nodemailer-এর
+  // `replyTo`-তে যায় (নিচে); newline/whitespace থাকলে সেটা SMTP header
+  // injection-এর ঝুঁকি তৈরি করত। এই check whitespace (তাই \n/\r) থাকা মানেই
+  // reject করে।
+  if (!isValidEmailFormat(email)) {
+    return { success: false, message: 'Please enter a valid email address.' };
+  }
+
   try {
     await db.systemLog.create({
       data: { level: 'INFO', source: 'CONTACT_RATE_LIMIT', message: rateKey, context: { ip, email } },
@@ -41,7 +49,8 @@ export async function submitContactForm(formData: FormData) {
   } catch { /* log failure is non-critical */ }
 
   try {
-    const formattedMessage = message.replace(/\n/g, '<br>');
+    // \n → <br> এখন email-generator.ts-এর textToSafeHtml() করে (escape করার
+    // *পরে*) — এখানে আগে থেকে করলে generator আবার escape করে ফেলত (&lt;br&gt;)
 
     // ১. অ্যাডমিনকে ইমেইল পাঠানো হচ্ছে (replyTo যুক্ত করা হলো)
     await sendNotification({
@@ -52,7 +61,7 @@ export async function submitContactForm(formData: FormData) {
         customer_name: name,
         customer_email: email,
         customer_phone: phone || 'Not provided',
-        message: formattedMessage
+        message
       }
     });
 
@@ -62,7 +71,7 @@ export async function submitContactForm(formData: FormData) {
       recipient: email,
       data: {
         customer_name: name,
-        message: formattedMessage
+        message
       }
     });
 

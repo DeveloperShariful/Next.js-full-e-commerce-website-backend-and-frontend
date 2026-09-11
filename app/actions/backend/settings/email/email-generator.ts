@@ -1,6 +1,7 @@
 // app/actions/backend/settings/email/email-generator.ts
 
 import { formatTz } from "@/lib/store-time";
+import { textToSafeHtml } from "@/lib/sanitize";
 
 interface EmailOrderItem {
   productName: string;
@@ -78,12 +79,20 @@ const getReadablePaymentMethod = (method: string | null) => {
   return formattedMap[method] || method.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 };
 
+// ⚠️ FIX: আগে এখানে কোনো escaping হতো না — কাস্টমারের দেওয়া free-text (নাম,
+// ঠিকানা, message ইত্যাদি) হুবহু email HTML-এ বসে যেত। কেউ নামের জায়গায়
+// `</p><a href="evil.com">...</a>` টাইপ কিছু দিলে সেটা GoBike-এর নিজের
+// trusted transactional email-এর ভেতরেই fake link/banner হিসেবে ঢুকে যেত
+// (HTML/phishing-injection)। এখন lib/sanitize.ts-এর textToSafeHtml() দিয়ে
+// প্রতিটা মান বসানোর আগে HTML strip + entity-escape করা হয়, আর তারপর \n
+// স্বাভাবিকভাবে <br>-তে বদলে যায় (escape-এর *পরে*, তাই নিজের < > ছোঁয় না)।
 const safeReplace = (text: string, variables: Record<string, string | number | null | undefined>) => {
     if (!text) return "";
     let result = text;
     Object.keys(variables).forEach(key => {
         const value = variables[key];
-        const safeValue = value === null || value === undefined ? "" : String(value);
+        const raw = value === null || value === undefined ? "" : String(value);
+        const safeValue = textToSafeHtml(raw);
         const regex = new RegExp(`{${key}}`, "g");
         result = result.replace(regex, safeValue);
     });

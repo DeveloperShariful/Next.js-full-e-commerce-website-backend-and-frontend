@@ -53,3 +53,16 @@ export function textToSafeHtml(input: string | null | undefined): string {
   // 3. Convert newline characters to <br> — the ONLY HTML tag we ever emit
   return escaped.replace(/\n/g, '<br>');
 }
+
+/**
+ * Basic email format check — no whitespace anywhere (so no embedded \n/\r,
+ * which also blocks SMTP header-injection via fields like nodemailer's
+ * `replyTo`), an "@", and a dot in the domain part. This does NOT verify the
+ * domain/mailbox actually exists (that needs a DNS MX lookup, a separate,
+ * heavier check) — it only rejects obviously malformed input before it's
+ * saved or used to send mail.
+ */
+export function isValidEmailFormat(input: string | null | undefined): boolean {
+  if (!input) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim());
+}

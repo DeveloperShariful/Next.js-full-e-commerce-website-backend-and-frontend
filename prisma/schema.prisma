@@ -2164,6 +2164,35 @@ model EmailLog {
   @@index([createdAt(sort: Desc)])
 }
 
+// ============================================================================
+// EMAIL BOUNCE SUPPRESSION
+// ----------------------------------------------------------------------------
+// SMTP পাঠানোর সময় সফল দেখালেও (server accept করে), আসল fail হয় পরে —
+// receiving server bounce notice পাঠায় আমাদের নিজের sending mailbox-এ (এখানে
+// SMTP-এর কোনো real-time webhook নেই, তাই সেই mailbox IMAP দিয়ে পড়ে bounce
+// detect করা হয় — দেখুন app/api/cron/check-bounces/route.ts)। hard bounce
+// (স্থায়ী — address/domain নেই) পাওয়া গেলে এখানে যোগ হয়, process-email-queue
+// প্রতিটা send-এর আগে এই টেবিল চেক করে skip করে। soft/temporary bounce
+// (mailbox full ইত্যাদি) এখানে যোগ হয় না — retry হতে পারে বলে।
+enum SuppressionReason {
+  HARD_BOUNCE
+  COMPLAINT
+  MANUAL
+}
+
+model SuppressedEmail {
+  id        String            @id @default(uuid())
+  // সবসময় lowercase রাখা হয় — case-insensitive lookup-এর জন্য (queue-তে যে
+  // ইমেইল আসে সেটাও lowercase করে তুলনা করা হয়)
+  email     String            @unique
+  reason    SuppressionReason @default(HARD_BOUNCE)
+  // Gmail-এর আসল bounce message (SMTP কোড + কারণ) — admin panel-এ দেখানোর জন্য
+  detail    String?           @db.Text
+  createdAt DateTime          @default(now())
+
+  @@index([createdAt(sort: Desc)])
+}
+
 model ActivityLog {
   id         String   @id @default(uuid())
   userId     String

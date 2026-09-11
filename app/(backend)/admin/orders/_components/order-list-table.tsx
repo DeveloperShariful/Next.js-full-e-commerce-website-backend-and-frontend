@@ -353,15 +353,17 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                         <Link href={`/admin/orders/${order.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline">
                                             #{highlight(order.orderNumber, activeQuery)} {highlight(customerName, activeQuery)}
                                         </Link>
-                                        
-                                        {order.recoveredFromAbandonedCart && (
-                                            <span className="inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap bg-[#f0e6fb] text-[#7c3aed] mt-1">
-                                                ↩ Recovered Cart
-                                            </span>
-                                        )}
 
-                                        <div className="text-[12px] text-[#646970] mt-1 xl:hidden">
-                                            Origin: {originText}
+                                        {/* "Recovered Cart" badge নামের পাশে নয় — Origin-এর সাথেই দেখানো
+                                            হয় (নিচে, এবং xl breakpoint-এ Origin কলামে), যেহেতু এটা
+                                            origin/traffic-source-এর সাথে সম্পর্কিত তথ্য */}
+                                        <div className="text-[12px] text-[#646970] mt-1 xl:hidden flex flex-wrap items-center gap-1.5">
+                                            {order.recoveredFromAbandonedCart && (
+                                                <span className="inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap bg-[#f0e6fb] text-[#7c3aed]">
+                                                    ↩ Recovered Cart
+                                                </span>
+                                            )}
+                                            <span>Origin: {originText}</span>
                                         </div>
 
                                         <div className="text-[12px] text-[#646970] mt-1 md:hidden">
@@ -503,15 +505,18 @@ export const OrderListTable = ({ orders, isTrashView = false, timezone = "UTC", 
                                     <Link href={`/admin/orders/${order.id}`} onClick={saveScroll} className="font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline break-words">
                                         #{highlight(order.orderNumber, activeQuery)} {highlight(customerName, activeQuery)}
                                     </Link>
-                                    {order.recoveredFromAbandonedCart && (
-                                        <span className="inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap bg-[#f0e6fb] text-[#7c3aed] mt-1 ml-0">
-                                            ↩ Recovered Cart
-                                        </span>
-                                    )}
                                     <div className="text-[12px] text-[#646970] mt-1">{displayDate}</div>
                                 </div>
                                 <div className="shrink-0 text-right">
                                     {isTrashView ? getStatusBadge('DELETED') : getStatusBadge(order.status)}
+                                    {/* origin-এর সাথেই "Recovered Cart" — নামের পাশে আলাদা করে নয় */}
+                                    {order.recoveredFromAbandonedCart && (
+                                        <div className="mt-1">
+                                            <span className="inline-flex items-center px-[8px] py-[3px] rounded-[3px] font-bold text-[11px] leading-[1] whitespace-nowrap bg-[#f0e6fb] text-[#7c3aed]">
+                                                ↩ Recovered Cart
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="text-[11px] text-[#646970] mt-1 max-w-[120px] truncate" title={originText}>{originText}</div>
                                 </div>
                             </div>

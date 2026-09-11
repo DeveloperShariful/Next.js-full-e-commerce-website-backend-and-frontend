@@ -1214,6 +1214,8 @@ model Order {
   subscriptionId String?
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
+  reviewReminder ReviewReminder?
+
   deletedAt DateTime?
   version   Int       @default(1)
 
@@ -2191,6 +2193,31 @@ model SuppressedEmail {
   createdAt DateTime          @default(now())
 
   @@index([createdAt(sort: Desc)])
+}
+
+enum ReviewReminderStopReason {
+  REVIEWED // কাস্টমার order-এর কোনো product review করে দিয়েছে
+  EXHAUSTED // ৫টা reminder-ই পাঠানো শেষ, কোনো review আসেনি
+  STATUS_CHANGED // delivery-পরবর্তী সময়ে order status COMPLETED/DELIVERED থেকে সরে গেছে (যেমন refund)
+}
+
+// একটা COMPLETED/DELIVERED order-এর জন্য review-reminder drip sequence
+// ট্র্যাক করে — AbandonedCheckout মডেলের remindersSent/lastReminder প্যাটার্নই
+// অনুসরণ করা হয়েছে (app/api/cron/abandoned-checkout/route.ts দ্রষ্টব্য)।
+// Order-এ কোনো deliveredAt/completedAt timestamp না থাকায়, এই row-টা প্রথম
+// তৈরি হওয়ার সময়টাই (createdAt) "eligible হওয়ার সময়" হিসেবে ব্যবহৃত হয়।
+model ReviewReminder {
+  id             String                     @id @default(uuid())
+  orderId        String                     @unique
+  order          Order                      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  remindersSent  Int                        @default(0)
+  lastReminderAt DateTime?
+  isActive       Boolean                    @default(true)
+  stoppedReason  ReviewReminderStopReason?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@index([isActive])
 }
 
 model ActivityLog {

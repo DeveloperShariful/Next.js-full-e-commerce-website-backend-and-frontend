@@ -596,6 +596,58 @@ const DEFAULT_TEMPLATES = [
         heading: 'This Is Goodbye (For Now)',
         content: `<p>Hi {customer_name},</p><p>This is our final reminder about the items in your cart — we won't keep reaching out after this. Your 10% code is still active if you'd like to complete your order tonight.</p><div style="background:#006eff;border-radius:10px;padding:20px;text-align:center;margin:22px auto;max-width:440px;"><p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#cfe6ff;text-transform:uppercase;letter-spacing:1.5px;">Our Best Offer — Final Day</p><p style="margin:0;font-size:26px;font-weight:800;color:#ffffff;letter-spacing:2px;font-family:monospace;">GOBIKE10</p><p style="margin:8px 0 0;font-size:13px;color:#eaf3ff;">10% off your entire order — enter this code at checkout.</p></div><p style="margin-top:20px;">Thank you for considering <strong>GoBike Australia</strong> — we hope to see you again soon!</p>`,
     },
+
+    // =======================================================================
+    // --- REVIEW REMINDERS (post-delivery drip, 5 steps, ~2 days apart) ---
+    // Stops automatically once the customer reviews any product from the
+    // order (see app/api/cron/review-reminders/route.ts). No discount code
+    // is ever offered here — reviews must stay unincentivized.
+    // =======================================================================
+    {
+        slug: 'review_reminder_1',
+        name: 'Review Reminder — Step 1',
+        triggerEvent: 'REVIEW_REMINDER_1',
+        recipientType: 'customer',
+        subject: "How's your Order #{order_number} working out, {customer_name}?",
+        heading: "We'd Love To Know What You Think!",
+        content: `<p>Hi {customer_name},</p><p>It's been a couple of days since your order arrived — we hope you're loving it already!</p><p>If you have 30 seconds, a quick star rating means a lot to us (and helps other riders know what to expect):</p>`,
+    },
+    {
+        slug: 'review_reminder_2',
+        name: 'Review Reminder — Step 2',
+        triggerEvent: 'REVIEW_REMINDER_2',
+        recipientType: 'customer',
+        subject: 'Help another rider make the right choice 🚲',
+        heading: 'Your Experience Could Help Someone Else',
+        content: `<p>Hi {customer_name},</p><p>Before buying, most people read reviews from real riders like you — not just our own product description.</p><p>A short, honest review (good or bad!) genuinely helps the next customer decide with confidence:</p>`,
+    },
+    {
+        slug: 'review_reminder_3',
+        name: 'Review Reminder — Step 3',
+        triggerEvent: 'REVIEW_REMINDER_3',
+        recipientType: 'customer',
+        subject: 'We personally read every single review',
+        heading: 'A Small Note From The GoBike Team',
+        content: `<p>Hi {customer_name},</p><p>We're a small Australian team, and every review that comes in — we actually read it ourselves. Not just for the stars, but to keep improving what we offer.</p><p>If you've got a moment, we'd genuinely appreciate hearing from you:</p>`,
+    },
+    {
+        slug: 'review_reminder_4',
+        name: 'Review Reminder — Step 4',
+        triggerEvent: 'REVIEW_REMINDER_4',
+        recipientType: 'customer',
+        subject: 'Just 2 quick questions about Order #{order_number}',
+        heading: 'Make It Easy — Answer These 2 Things',
+        content: `<p>Hi {customer_name},</p><p>Not sure what to write? Just answer these in a sentence or two:</p><ul style="text-align:left;max-width:420px;margin:12px auto;padding-left:20px;color:#444;font-size:14px;line-height:1.8;"><li>What do you like most about it?</li><li>Would you recommend it to a friend?</li></ul><p>That's it — a star rating alone is perfectly fine too:</p>`,
+    },
+    {
+        slug: 'review_reminder_5',
+        name: 'Review Reminder — Step 5 (Final)',
+        triggerEvent: 'REVIEW_REMINDER_5',
+        recipientType: 'customer',
+        subject: 'Last note about your GoBike order (promise!)',
+        heading: 'This Is Our Final Reminder',
+        content: `<p>Hi {customer_name},</p><p>This is the last email we'll send about this — we don't want to overdo it!</p><p>If you've been meaning to leave a review, now's a good time. And if not, no worries at all — thanks again for shopping with us, and enjoy the ride!</p>`,
+    },
 ];
 
 export async function getEmailTemplates() {

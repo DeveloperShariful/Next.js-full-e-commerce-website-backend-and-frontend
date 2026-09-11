@@ -161,6 +161,16 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
           report_date: metaStr('report_date', new Date().toISOString().split('T')[0]),
           submit_url:  metaStr('submit_url',  `${appUrl}/admin/reports`),
       };
+  } else if (template.triggerEvent?.startsWith('REVIEW_REMINDER_')) {
+      // process-email-queue/route.ts item.orderId থাকলেই full Order load করে
+      // `order` prop পাঠায় — কিন্তু review-reminder-এর জন্য সেই generic
+      // "order confirmation" style variables (billing address থেকে নাম ইত্যাদি)
+      // না নিয়ে, cron যা পাঠিয়েছে (customer_name/order_number) সেটাই ব্যবহার
+      // করা হচ্ছে, নিচে reviewProductsHtml (products_html) আলাদাভাবে বসবে।
+      variables = {
+          customer_name: metaStr('customer_name', 'Customer'),
+          order_number: metaStr('order_number', 'N/A'),
+      };
   } else if (order) {
       const currency = order.currency || "$";
       const formatMoney = (amount: number) => {
@@ -202,7 +212,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
   // ============================================================
   let orderDetailsHtml = "";
 
-  if (order && !template.triggerEvent?.includes("WARRANTY") && template.triggerEvent !== "PASSWORD_RESET" && template.triggerEvent !== "NEWSLETTER_SUBSCRIPTION" && !template.triggerEvent?.includes("CONTACT_FORM") && template.triggerEvent !== "DAILY_REPORT") {
+  if (order && !template.triggerEvent?.includes("WARRANTY") && template.triggerEvent !== "PASSWORD_RESET" && template.triggerEvent !== "NEWSLETTER_SUBSCRIPTION" && !template.triggerEvent?.includes("CONTACT_FORM") && template.triggerEvent !== "DAILY_REPORT" && !template.triggerEvent?.startsWith("REVIEW_REMINDER_")) {
       const currency = order.currency || "$";
       const formatMoney = (amount: number) => {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount).replace('USD', currency);
@@ -378,6 +388,19 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
             </table>
           `;
       }
+  }
+
+  // ==========================================
+  // REVIEW REMINDER — product review-links block
+  // ==========================================
+  // cron (app/api/cron/review-reminders/route.ts) নিজেই এই HTML বানিয়ে
+  // metadata.products_html হিসেবে পাঠায় (product name DB থেকে আসে, trusted
+  // server-side data — safeReplace()-এর escape-through-placeholder পথে গেলে
+  // নিজের <a href> ট্যাগগুলোই escape হয়ে যেত, তাই WARRANTY media_urls-এর
+  // মতো সরাসরি raw injection)।
+  let reviewProductsHtml = "";
+  if (template.triggerEvent?.startsWith('REVIEW_REMINDER_') && typeof metadata?.products_html === 'string') {
+      reviewProductsHtml = metadata.products_html as string;
   }
 
   // ==========================================
@@ -612,6 +635,12 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
       return `href="${trackedUrl}"`;
     });
   }
+  if (emailLogId && reviewProductsHtml) {
+    reviewProductsHtml = reviewProductsHtml.replace(/href="(https?:\/\/[^"]+)"/g, (_match, originalUrl) => {
+      const trackedUrl = `${appUrl}/api/email/track-click/${emailLogId}?to=${encodeURIComponent(originalUrl)}`;
+      return `href="${trackedUrl}"`;
+    });
+  }
 
   return `
 <!DOCTYPE html>
@@ -693,6 +722,7 @@ export const generateEmailHtml = ({ order, config, template, metadata, timezone 
                             </div>
 
                             ${mediaHtml}
+                            ${reviewProductsHtml}
                             ${actionButton}
                             ${trackingInfoHtml}
                             ${orderDetailsHtml}

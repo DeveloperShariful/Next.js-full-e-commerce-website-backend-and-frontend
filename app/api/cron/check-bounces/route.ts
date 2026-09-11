@@ -23,6 +23,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/prisma";
 import { ImapFlow } from "imapflow";
 import { simpleParser, type ParsedMail } from "mailparser";
+import { getStoreTimezone } from "@/lib/get-store-timezone";
+import { toZonedTime } from "date-fns-tz";
 
 export const maxDuration = 60;
 
@@ -125,6 +127,14 @@ export async function GET(req: Request) {
     if (bearerSecret !== cronSecret && searchParams.get("secret") !== cronSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+  }
+
+  // অন্য cron-গুলোর (process-email-queue, transdirect-status-sync) মতোই —
+  // শুধু Sydney local সকাল ৯টা-সন্ধ্যা ৬টার মধ্যে চলবে, বাকি সময় skip।
+  const storeTimezone = await getStoreTimezone();
+  const localHour = toZonedTime(new Date(), storeTimezone).getHours();
+  if (localHour < 9 || localHour >= 18) {
+    return NextResponse.json({ message: `Outside business hours (${storeTimezone} ${localHour}:00) — skipped.` }, { status: 200 });
   }
 
   const config = await db.emailConfiguration.findUnique({ where: { id: "email_config" } });

@@ -2,51 +2,51 @@
   "crons": [
     {
       "path": "/api/cron/affiliate-check",
-      "schedule": "0 23 * * *"
+      "schedule": "1 23 * * *"
     },
     {
       "path": "/api/email/process-email-queue?scheduled=1",
-      "schedule": "*/30 0-8,22,23 * * *"
+      "schedule": "0,30 0-8,22,23 * * *"
     },
     {
       "path": "/api/cron/abandoned-checkout",
-      "schedule": "0 0 * * *"
+      "schedule": "21 0 * * *"
     },
     {
       "path": "/api/cron/abandoned-checkout",
-      "schedule": "0 8 * * *"
+      "schedule": "21 8 * * *"
     },
     {
       "path": "/api/cron/cleanup-logs",
-      "schedule": "0 23 * * *"
+      "schedule": "6 23 * * *"
     },
     {
       "path": "/api/cron/sync-transdirect",
-      "schedule": "0 23 * * *"
+      "schedule": "11 23 * * *"
     },
     {
       "path": "/api/cron/transdirect-status-sync",
-      "schedule": "*/30 0-8,23 * * *"
+      "schedule": "10,40 0-8,23 * * *"
     },
     {
       "path": "/api/cron/sync-analytics",
-      "schedule": "0 0 * * *"
+      "schedule": "26 0 * * *"
     },
     {
       "path": "/api/cron/sync-analytics",
-      "schedule": "0 4 * * *"
+      "schedule": "26 4 * * *"
     },
     {
       "path": "/api/cron/sync-analytics",
-      "schedule": "0 8 * * *"
+      "schedule": "26 8 * * *"
     },
     {
       "path": "/api/cron/daily-report-reminder",
-      "schedule": "0 23 * * *"
+      "schedule": "16 23 * * *"
     },
     {
       "path": "/api/cron/check-bounces",
-      "schedule": "*/30 * * * *"
+      "schedule": "20,50 * * * *"
     }
   ]
 }

@@ -4,19 +4,23 @@ import React from "react";
 import Link from "next/link";
 import { formatTz } from "@/lib/store-time";
 import type { VisitorLogPage } from "@/app/actions/backend/visitors/visitor-insights.actions";
+import VisitorChannelCountryFilter from "./visitor-channel-country-filter";
 
 interface Props {
   log: VisitorLogPage;
   timezone: string;
   basePathWithQuery: string; // pagination লিংক বানানোর জন্য বাকি সব query param সহ base path
+  channelOptions: string[];
+  countryOptions: string[];
 }
 
-export default function VisitorLogTable({ log, timezone, basePathWithQuery }: Props) {
+export default function VisitorLogTable({ log, timezone, basePathWithQuery, channelOptions, countryOptions }: Props) {
   return (
     <div className="border border-[#c3c4c7] shadow-sm rounded-sm overflow-hidden bg-white mt-6">
-      <div className="p-4 border-b border-[#c3c4c7] bg-[#f8f9f9] flex items-center justify-between">
-        <span className="text-[13px] font-semibold text-[#1d2327]">Recent Visitors</span>
-        <span className="text-[12px] text-[#646970]">{log.totalCount} total</span>
+      <div className="p-4 border-b border-[#c3c4c7] bg-[#f8f9f9] flex flex-wrap items-center justify-between gap-3">
+        <span className="text-[13px] font-semibold text-[#1d2327] shrink-0">Recent Visitors</span>
+        <VisitorChannelCountryFilter channelOptions={channelOptions} countryOptions={countryOptions} />
+        <span className="text-[12px] text-[#646970] shrink-0">{log.totalCount} total</span>
       </div>
 
       {log.rows.length === 0 ? (

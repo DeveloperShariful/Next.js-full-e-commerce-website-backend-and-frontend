@@ -241,14 +241,18 @@ export interface VisitorLogPage {
 // একবারে সব row DB থেকে টেনে না আনতে হয় (performance)। reachedCheckoutOnly/
 // reachedCartOnly দিলে শুধু সেই পেজ পর্যন্ত পৌঁছানো visitor-দের list দেখাবে —
 // Overview-এর "Reached Checkout"/"Reached Cart" সংখ্যাটার প্রমাণ হিসেবে
-// (ক্লিক করলে এই filtered list-এই আসবে)। searchQuery দিলে IP address বা
-// channel name দিয়ে filter হয় (দুটোই indexed column-এর ওপর contains — বড়
-// ডেটাতেও date-range-এর মধ্যেই সীমাবদ্ধ থাকে বলে সস্তা)।
+// (ক্লিক করলে এই filtered list-এই আসবে)। channelFilter/countryFilter দিলে
+// ঠিক সেই channel/country-র visitor-রাই দেখাবে (Overview-এর breakdown
+// টেবিলের row ক্লিক করলে, বা Recent Visitors-এর নিজের dropdown filter থেকে)।
+// searchQuery দিলে IP address বা channel name দিয়ে filter হয় (দুটোই indexed
+// column-এর ওপর contains — বড় ডেটাতেও date-range-এর মধ্যেই সীমাবদ্ধ থাকে বলে সস্তা)।
 export async function getVisitorLog(
   current: DateRange,
   page: number,
   reachedCheckoutOnly = false,
   reachedCartOnly = false,
+  channelFilter?: string,
+  countryFilter?: string,
   searchQuery?: string
 ): Promise<VisitorLogPage> {
   // ⚠️ FIX: Math.max(1, NaN) === NaN, ক্ল্যাম্প করে না — caller (page.tsx) নিজে
@@ -256,10 +260,14 @@ export async function getVisitorLog(
   // যেন কখনো Prisma-তে NaN skip না পৌঁছায়।
   const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
   const trimmedSearch = searchQuery?.trim();
+  const trimmedChannel = channelFilter?.trim();
+  const trimmedCountry = countryFilter?.trim();
   const where = {
     createdAt: { gte: current.from, lte: current.to },
     ...(reachedCheckoutOnly ? { reachedCheckout: true } : {}),
     ...(reachedCartOnly ? { reachedCart: true } : {}),
+    ...(trimmedChannel ? { channel: trimmedChannel } : {}),
+    ...(trimmedCountry ? { country: trimmedCountry } : {}),
     ...(trimmedSearch
       ? {
           OR: [
@@ -303,6 +311,33 @@ export async function getVisitorLog(
     totalCount,
     totalPages: Math.max(1, Math.ceil(totalCount / LOG_PAGE_SIZE)),
     page: safePage,
+  };
+}
+
+// Recent Visitors-এর channel/country dropdown filter populate করার জন্য —
+// এই date-range-এ আসলেই যা যা channel/country দেখা গেছে শুধু সেগুলোই (হার্ডকোড
+// লিস্ট না), তাই সবসময় up-to-date থাকে। getVisitorInsightsData()-এর মতো ভারী
+// aggregation (percentage/count) দরকার নেই এখানে — শুধু distinct value, তাই
+// আলাদা, হালকা query (channel/country দুটোতেই ইতিমধ্যে index আছে)।
+export async function getVisitorFilterOptions(current: DateRange): Promise<{ channels: string[]; countries: string[] }> {
+  const [channelRows, countryRows] = await Promise.all([
+    db.siteVisit.findMany({
+      where: { createdAt: { gte: current.from, lte: current.to } },
+      select: { channel: true },
+      distinct: ["channel"],
+      orderBy: { channel: "asc" },
+    }),
+    db.siteVisit.findMany({
+      where: { createdAt: { gte: current.from, lte: current.to }, country: { not: null } },
+      select: { country: true },
+      distinct: ["country"],
+      orderBy: { country: "asc" },
+    }),
+  ]);
+
+  return {
+    channels: channelRows.map((r) => r.channel),
+    countries: countryRows.map((r) => r.country as string),
   };
 }
 

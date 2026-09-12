@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { getVisitorInsightsData, getVisitorLog } from "@/app/actions/backend/visitors/visitor-insights.actions";
+import { getVisitorInsightsData, getVisitorLog, getVisitorFilterOptions } from "@/app/actions/backend/visitors/visitor-insights.actions";
 import { parseDateRange } from "@/app/actions/backend/analytics/shared.utils";
 import { getStoreTimezone } from "@/lib/get-store-timezone";
 
@@ -14,7 +14,7 @@ import VisitorLogTable from "./_components/visitor-log-table";
 import VisitorSearchBar from "./_components/visitor-search-bar";
 import SetupGuide from "./_components/setup-guide";
 
-type SearchParams = Promise<{ period?: string; compare?: string; from?: string; to?: string; vpage?: string; tab?: string; checkout?: string; cart?: string; q?: string }>;
+type SearchParams = Promise<{ period?: string; compare?: string; from?: string; to?: string; vpage?: string; tab?: string; checkout?: string; cart?: string; channel?: string; country?: string; q?: string }>;
 
 interface PageProps {
   searchParams: SearchParams;
@@ -41,6 +41,8 @@ export default async function VisitorsPage(props: PageProps) {
   const activeTab = searchParams.tab === "recent" ? "recent" : searchParams.tab === "guide" ? "guide" : "overview";
   const checkoutOnly = searchParams.checkout === "1";
   const cartOnly = searchParams.cart === "1";
+  const channelFilter = searchParams.channel?.trim() || "";
+  const countryFilter = searchParams.country?.trim() || "";
   const searchQuery = searchParams.q?.trim() || "";
 
   const timezone = await getStoreTimezone();
@@ -48,9 +50,10 @@ export default async function VisitorsPage(props: PageProps) {
 
   // যে ট্যাবে আছি শুধু সেটার জন্যই ডেটা আনা হচ্ছে — অন্য ট্যাবের ভারী query
   // (aggregation বা paginated log) অকারণে চালানো হবে না (performance)
-  const [data, log] = await Promise.all([
+  const [data, log, filterOptions] = await Promise.all([
     activeTab === "overview" ? getVisitorInsightsData(dates.current, dates.previous, timezone) : null,
-    activeTab === "recent" ? getVisitorLog(dates.current, vpage, checkoutOnly, cartOnly, searchQuery) : null,
+    activeTab === "recent" ? getVisitorLog(dates.current, vpage, checkoutOnly, cartOnly, channelFilter, countryFilter, searchQuery) : null,
+    activeTab === "recent" ? getVisitorFilterOptions(dates.current) : null,
   ]);
 
   // ট্যাব/pagination লিংক বানানোর জন্য — date-range filter সবসময় বজায় থাকবে
@@ -65,6 +68,33 @@ export default async function VisitorsPage(props: PageProps) {
   // আসবে — সংখ্যাটার প্রমাণ হিসেবে সরাসরি সেই visitor-দের list দেখানো যায়।
   const checkoutProofLink = `/admin/visitors?${baseFilterQuery}&tab=recent&checkout=1`;
   const cartProofLink = `/admin/visitors?${baseFilterQuery}&tab=recent&cart=1`;
+
+  // ⚠️ FIX: আগে প্রতিটা "Clear filter"/basePathWithQuery ম্যানুয়াল string-concat
+  // দিয়ে বানানো হতো (checkoutOnly ? "&checkout=1" : "" ...) — filter dimension
+  // বাড়তে থাকলে (এখন channel/country যোগ হলো) সেটা ভুলপ্রবণ হয়ে যেত, আর প্রতিটা
+  // "Clear X" আসলে ভুলভাবে বাকি সব filter-ও মুছে দিত। এখন URLSearchParams দিয়ে
+  // ঠিক যা active থাকার কথা শুধু সেটাই বসানো হয় — প্রতিটা "Clear X" শুধু নিজের
+  // filter-টাই মোছে, বাকিগুলো (search/checkout/cart/channel/country) অক্ষত থাকে।
+  const buildRecentLink = (overrides: {
+    checkout?: boolean;
+    cart?: boolean;
+    channel?: string;
+    country?: string;
+    search?: string;
+  }) => {
+    const p = new URLSearchParams(baseFilterQuery);
+    p.set("tab", "recent");
+    if (overrides.checkout) p.set("checkout", "1");
+    if (overrides.cart) p.set("cart", "1");
+    if (overrides.channel) p.set("channel", overrides.channel);
+    if (overrides.country) p.set("country", overrides.country);
+    if (overrides.search) p.set("q", overrides.search);
+    return `/admin/visitors?${p.toString()}`;
+  };
+
+  const recentBaseHref = `/admin/visitors?${baseFilterQuery}&tab=recent`;
+  const cartRecentBaseHref = `${recentBaseHref}&cart=1`;
+  const checkoutRecentBaseHref = `${recentBaseHref}&checkout=1`;
 
   const channelRows = data?.channelBreakdown.map((c) => ({ label: c.channel, count: c.count, percentage: c.percentage })) ?? [];
   const countryRows = data?.countryBreakdown.map((c) => ({ label: c.country, count: c.count, percentage: c.percentage })) ?? [];
@@ -113,20 +143,20 @@ export default async function VisitorsPage(props: PageProps) {
 
           <h3 className="text-[13px] font-semibold text-[#50575e] uppercase tracking-wide mb-2">All Visitors</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <BreakdownTable title="By Channel" labelHeader="Channel" rows={channelRows} />
-            <BreakdownTable title="By Country" labelHeader="Country" rows={countryRows} />
+            <BreakdownTable title="By Channel" labelHeader="Channel" rows={channelRows} filterKey="channel" baseHref={recentBaseHref} />
+            <BreakdownTable title="By Country" labelHeader="Country" rows={countryRows} filterKey="country" baseHref={recentBaseHref} />
           </div>
 
           <h3 className="text-[13px] font-semibold text-[#50575e] uppercase tracking-wide mb-2">Visitors Who Reached Cart</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <BreakdownTable title="By Channel" labelHeader="Channel" rows={cartChannelRows} />
-            <BreakdownTable title="By Country" labelHeader="Country" rows={cartCountryRows} />
+            <BreakdownTable title="By Channel" labelHeader="Channel" rows={cartChannelRows} filterKey="channel" baseHref={cartRecentBaseHref} />
+            <BreakdownTable title="By Country" labelHeader="Country" rows={cartCountryRows} filterKey="country" baseHref={cartRecentBaseHref} />
           </div>
 
           <h3 className="text-[13px] font-semibold text-[#50575e] uppercase tracking-wide mb-2">Visitors Who Reached Checkout</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <BreakdownTable title="By Channel" labelHeader="Channel" rows={checkoutChannelRows} />
-            <BreakdownTable title="By Country" labelHeader="Country" rows={checkoutCountryRows} />
+            <BreakdownTable title="By Channel" labelHeader="Channel" rows={checkoutChannelRows} filterKey="channel" baseHref={checkoutRecentBaseHref} />
+            <BreakdownTable title="By Country" labelHeader="Country" rows={checkoutCountryRows} filterKey="country" baseHref={checkoutRecentBaseHref} />
           </div>
         </>
       ) : null}
@@ -138,7 +168,7 @@ export default async function VisitorsPage(props: PageProps) {
               <span className="text-[13px] text-[#664d03]">
                 Showing only visitors who reached the checkout page ({log.totalCount} of them, in this date range).
               </span>
-              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+              <Link href={buildRecentLink({ cart: cartOnly, channel: channelFilter, country: countryFilter, search: searchQuery })} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
                 Clear filter
               </Link>
             </div>
@@ -148,7 +178,22 @@ export default async function VisitorsPage(props: PageProps) {
               <span className="text-[13px] text-[#3730a3]">
                 Showing only visitors who reached the cart page ({log.totalCount} of them, in this date range).
               </span>
-              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+              <Link href={buildRecentLink({ checkout: checkoutOnly, channel: channelFilter, country: countryFilter, search: searchQuery })} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+                Clear filter
+              </Link>
+            </div>
+          ) : null}
+          {channelFilter || countryFilter ? (
+            <div className="mb-4 flex items-center justify-between bg-[#f5f3ff] border border-[#ddd6fe] rounded-sm px-4 py-2.5">
+              <span className="text-[13px] text-[#5b21b6]">
+                {channelFilter && countryFilter
+                  ? <>Showing only visitors from <strong className="capitalize">{channelFilter}</strong> in <strong>{countryFilter}</strong></>
+                  : channelFilter
+                    ? <>Showing only visitors from channel <strong className="capitalize">{channelFilter}</strong></>
+                    : <>Showing only visitors from <strong>{countryFilter}</strong></>}
+                {" "}({log.totalCount} of them, in this date range).
+              </span>
+              <Link href={buildRecentLink({ checkout: checkoutOnly, cart: cartOnly, search: searchQuery })} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
                 Clear filter
               </Link>
             </div>
@@ -158,7 +203,7 @@ export default async function VisitorsPage(props: PageProps) {
               <span className="text-[13px] text-[#0a4b78]">
                 Showing results for &quot;{searchQuery}&quot; ({log.totalCount} matches, in this date range).
               </span>
-              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}${cartOnly ? "&cart=1" : ""}`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+              <Link href={buildRecentLink({ checkout: checkoutOnly, cart: cartOnly, channel: channelFilter, country: countryFilter })} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
                 Clear search
               </Link>
             </div>
@@ -166,7 +211,9 @@ export default async function VisitorsPage(props: PageProps) {
           <VisitorLogTable
             log={log}
             timezone={timezone}
-            basePathWithQuery={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}${cartOnly ? "&cart=1" : ""}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+            basePathWithQuery={buildRecentLink({ checkout: checkoutOnly, cart: cartOnly, channel: channelFilter, country: countryFilter, search: searchQuery })}
+            channelOptions={filterOptions?.channels ?? []}
+            countryOptions={filterOptions?.countries ?? []}
           />
         </>
       ) : null}

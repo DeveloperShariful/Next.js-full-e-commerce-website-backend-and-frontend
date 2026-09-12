@@ -1,6 +1,7 @@
 //File: app/(backend)/admin/visitors/_components/breakdown-table.tsx
 
 import React from "react";
+import Link from "next/link";
 import { formatNumber } from "@/app/actions/backend/analytics/shared.utils";
 
 interface Row {
@@ -13,9 +14,14 @@ interface Props {
   title: string;
   labelHeader: string;
   rows: Row[];
+  // দেওয়া থাকলে প্রতিটা row ক্লিকযোগ্য হয়ে যায় — Recent Visitors ট্যাবে ঠিক
+  // সেই channel/country দিয়ে filtered গিয়ে পড়ে (baseHref-এর সাথে
+  // &{filterKey}={label} জোড়া লেগে)। না দিলে (undefined) row plain টেক্সটই থাকে।
+  filterKey?: "channel" | "country";
+  baseHref?: string;
 }
 
-export default function BreakdownTable({ title, labelHeader, rows }: Props) {
+export default function BreakdownTable({ title, labelHeader, rows, filterKey, baseHref }: Props) {
   return (
     <div className="border border-[#c3c4c7] shadow-sm rounded-sm overflow-hidden bg-white flex flex-col h-full">
       <div className="p-4 border-b border-[#c3c4c7] bg-[#f8f9f9]">
@@ -35,7 +41,18 @@ export default function BreakdownTable({ title, labelHeader, rows }: Props) {
           <tbody>
             {rows.map((row) => (
               <tr key={row.label} className="hover:bg-[#f6f7f7] border-b border-[#f0f0f1] last:border-b-0">
-                <td className="py-2 px-4 text-[13px] text-[#2c3338] capitalize">{row.label}</td>
+                <td className="py-2 px-4 text-[13px] text-[#2c3338] capitalize">
+                  {filterKey && baseHref ? (
+                    <Link
+                      href={`${baseHref}&${filterKey}=${encodeURIComponent(row.label)}`}
+                      className="hover:text-[#2271b1] hover:underline"
+                    >
+                      {row.label}
+                    </Link>
+                  ) : (
+                    row.label
+                  )}
+                </td>
                 <td className="py-2 px-4 text-[13px] text-[#2c3338] text-right">{formatNumber(row.count)}</td>
                 <td className="py-2 px-4 text-[13px] text-[#2c3338] text-right">{row.percentage}%</td>
               </tr>

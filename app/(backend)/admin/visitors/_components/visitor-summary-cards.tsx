@@ -8,14 +8,18 @@ import type { VisitorInsightsData } from "@/app/actions/backend/visitors/visitor
 interface Props {
   data: VisitorInsightsData;
   checkoutProofLink: string;
+  cartProofLink: string;
 }
 
-export default function VisitorSummaryCards({ data, checkoutProofLink }: Props) {
+export default function VisitorSummaryCards({ data, checkoutProofLink, cartProofLink }: Props) {
   const percentChange = calculatePercentageChange(data.totalVisitors, data.previousTotalVisitors);
   const isPositive = percentChange >= 0;
 
   const topChannel = data.channelBreakdown[0];
   const topCountry = data.countryBreakdown[0];
+  const cartPercentage = data.totalVisitors > 0
+    ? Number(((data.reachedCartCount / data.totalVisitors) * 100).toFixed(1))
+    : 0;
   const checkoutPercentage = data.totalVisitors > 0
     ? Number(((data.reachedCheckoutCount / data.totalVisitors) * 100).toFixed(1))
     : 0;
@@ -36,6 +40,12 @@ export default function VisitorSummaryCards({ data, checkoutProofLink }: Props) 
       ),
     },
     {
+      title: "Reached Cart",
+      value: formatNumber(data.reachedCartCount),
+      sub: `${cartPercentage}% of total visitors — click to see the list (proof)`,
+      href: cartProofLink,
+    },
+    {
       title: "Reached Checkout",
       value: formatNumber(data.reachedCheckoutCount),
       sub: `${checkoutPercentage}% of total visitors — click to see the list (proof)`,
@@ -54,7 +64,7 @@ export default function VisitorSummaryCards({ data, checkoutProofLink }: Props) 
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-0 border border-[#c3c4c7] bg-white shadow-sm mb-6 rounded-sm">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-0 border border-[#c3c4c7] bg-white shadow-sm mb-6 rounded-sm">
       {cards.map((card, index) => {
         const inner = (
           <>

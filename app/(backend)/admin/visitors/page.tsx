@@ -14,7 +14,7 @@ import VisitorLogTable from "./_components/visitor-log-table";
 import VisitorSearchBar from "./_components/visitor-search-bar";
 import SetupGuide from "./_components/setup-guide";
 
-type SearchParams = Promise<{ period?: string; compare?: string; from?: string; to?: string; vpage?: string; tab?: string; checkout?: string; q?: string }>;
+type SearchParams = Promise<{ period?: string; compare?: string; from?: string; to?: string; vpage?: string; tab?: string; checkout?: string; cart?: string; q?: string }>;
 
 interface PageProps {
   searchParams: SearchParams;
@@ -33,9 +33,14 @@ export default async function VisitorsPage(props: PageProps) {
   const compare = searchParams.compare !== undefined ? searchParams.compare : "previous_period";
   const customFrom = searchParams.from;
   const customTo = searchParams.to;
-  const vpage = searchParams.vpage ? parseInt(searchParams.vpage, 10) : 1;
+  // ⚠️ FIX: parseInt("abc") → NaN, আর সেটা getVisitorLog-এর skip গণনায় গেলে
+  // Prisma "NaN is not a valid Int" error দিয়ে পুরো পেজ crash করত (কেউ URL-এ
+  // ?vpage=abc বসালে বা কোনো bug থেকে)। এখন non-positive/NaN হলে 1-এ fallback।
+  const parsedVpage = searchParams.vpage ? parseInt(searchParams.vpage, 10) : 1;
+  const vpage = Number.isFinite(parsedVpage) && parsedVpage > 0 ? parsedVpage : 1;
   const activeTab = searchParams.tab === "recent" ? "recent" : searchParams.tab === "guide" ? "guide" : "overview";
   const checkoutOnly = searchParams.checkout === "1";
+  const cartOnly = searchParams.cart === "1";
   const searchQuery = searchParams.q?.trim() || "";
 
   const timezone = await getStoreTimezone();
@@ -45,7 +50,7 @@ export default async function VisitorsPage(props: PageProps) {
   // (aggregation বা paginated log) অকারণে চালানো হবে না (performance)
   const [data, log] = await Promise.all([
     activeTab === "overview" ? getVisitorInsightsData(dates.current, dates.previous, timezone) : null,
-    activeTab === "recent" ? getVisitorLog(dates.current, vpage, checkoutOnly, searchQuery) : null,
+    activeTab === "recent" ? getVisitorLog(dates.current, vpage, checkoutOnly, cartOnly, searchQuery) : null,
   ]);
 
   // ট্যাব/pagination লিংক বানানোর জন্য — date-range filter সবসময় বজায় থাকবে
@@ -56,12 +61,15 @@ export default async function VisitorsPage(props: PageProps) {
   if (customTo) filterQuery.set("to", customTo);
   const baseFilterQuery = filterQuery.toString();
 
-  // "Reached Checkout" card থেকে ক্লিক করলে এই filter-সহ লিংকে আসবে — সংখ্যাটার
-  // প্রমাণ হিসেবে সরাসরি সেই visitor-দের list দেখানো যায়।
+  // "Reached Checkout"/"Reached Cart" card থেকে ক্লিক করলে এই filter-সহ লিংকে
+  // আসবে — সংখ্যাটার প্রমাণ হিসেবে সরাসরি সেই visitor-দের list দেখানো যায়।
   const checkoutProofLink = `/admin/visitors?${baseFilterQuery}&tab=recent&checkout=1`;
+  const cartProofLink = `/admin/visitors?${baseFilterQuery}&tab=recent&cart=1`;
 
   const channelRows = data?.channelBreakdown.map((c) => ({ label: c.channel, count: c.count, percentage: c.percentage })) ?? [];
   const countryRows = data?.countryBreakdown.map((c) => ({ label: c.country, count: c.count, percentage: c.percentage })) ?? [];
+  const cartChannelRows = data?.cartChannelBreakdown.map((c) => ({ label: c.channel, count: c.count, percentage: c.percentage })) ?? [];
+  const cartCountryRows = data?.cartCountryBreakdown.map((c) => ({ label: c.country, count: c.count, percentage: c.percentage })) ?? [];
   const checkoutChannelRows = data?.checkoutChannelBreakdown.map((c) => ({ label: c.channel, count: c.count, percentage: c.percentage })) ?? [];
   const checkoutCountryRows = data?.checkoutCountryBreakdown.map((c) => ({ label: c.country, count: c.count, percentage: c.percentage })) ?? [];
 
@@ -97,7 +105,7 @@ export default async function VisitorsPage(props: PageProps) {
 
       {activeTab === "overview" && data ? (
         <>
-          <VisitorSummaryCards data={data} checkoutProofLink={checkoutProofLink} />
+          <VisitorSummaryCards data={data} checkoutProofLink={checkoutProofLink} cartProofLink={cartProofLink} />
 
           <div className="mb-6">
             <VisitorTrendChart data={data.dailyTrend} />
@@ -107,6 +115,12 @@ export default async function VisitorsPage(props: PageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <BreakdownTable title="By Channel" labelHeader="Channel" rows={channelRows} />
             <BreakdownTable title="By Country" labelHeader="Country" rows={countryRows} />
+          </div>
+
+          <h3 className="text-[13px] font-semibold text-[#50575e] uppercase tracking-wide mb-2">Visitors Who Reached Cart</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <BreakdownTable title="By Channel" labelHeader="Channel" rows={cartChannelRows} />
+            <BreakdownTable title="By Country" labelHeader="Country" rows={cartCountryRows} />
           </div>
 
           <h3 className="text-[13px] font-semibold text-[#50575e] uppercase tracking-wide mb-2">Visitors Who Reached Checkout</h3>
@@ -129,12 +143,22 @@ export default async function VisitorsPage(props: PageProps) {
               </Link>
             </div>
           ) : null}
+          {cartOnly ? (
+            <div className="mb-4 flex items-center justify-between bg-[#eef2ff] border border-[#c7d2fe] rounded-sm px-4 py-2.5">
+              <span className="text-[13px] text-[#3730a3]">
+                Showing only visitors who reached the cart page ({log.totalCount} of them, in this date range).
+              </span>
+              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+                Clear filter
+              </Link>
+            </div>
+          ) : null}
           {searchQuery ? (
             <div className="mb-4 flex items-center justify-between bg-[#e5f5fa] border border-[#8fd1e8] rounded-sm px-4 py-2.5">
               <span className="text-[13px] text-[#0a4b78]">
                 Showing results for &quot;{searchQuery}&quot; ({log.totalCount} matches, in this date range).
               </span>
-              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
+              <Link href={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}${cartOnly ? "&cart=1" : ""}`} className="text-[13px] text-[#2271b1] hover:underline shrink-0 ml-3">
                 Clear search
               </Link>
             </div>
@@ -142,7 +166,7 @@ export default async function VisitorsPage(props: PageProps) {
           <VisitorLogTable
             log={log}
             timezone={timezone}
-            basePathWithQuery={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
+            basePathWithQuery={`/admin/visitors?${baseFilterQuery}&tab=recent${checkoutOnly ? "&checkout=1" : ""}${cartOnly ? "&cart=1" : ""}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ""}`}
           />
         </>
       ) : null}

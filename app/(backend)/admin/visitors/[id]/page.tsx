@@ -69,6 +69,16 @@ export default async function VisitorDetailPage({ params, searchParams }: PagePr
             <ProofRow label="Visit Time" value={formatTz(visit.createdAt, timezone, "MMMM d, yyyy 'at' h:mm:ss a")} />
             <ProofRow label="Time on Site" value={formatDuration(visit.durationSeconds)} />
             <ProofRow
+              label="Reached Cart"
+              value={
+                visit.reachedCart ? (
+                  <span className="text-[#4338ca] font-semibold">Yes</span>
+                ) : (
+                  <span className="text-[#646970]">No</span>
+                )
+              }
+            />
+            <ProofRow
               label="Reached Checkout"
               value={
                 visit.reachedCheckout ? (

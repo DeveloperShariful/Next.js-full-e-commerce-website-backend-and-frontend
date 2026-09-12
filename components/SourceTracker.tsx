@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { trackVisitAction } from '@/app/actions/frontend/affiliate/trackVisitAction';
-import { logSiteVisit, markCheckoutReached } from '@/app/actions/frontend/analytics/logSiteVisit';
+import { logSiteVisit, markCheckoutReached, markCartReached } from '@/app/actions/frontend/analytics/logSiteVisit';
 
 const UTM_STORAGE_KEY = 'utm_data';
 const UTM_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 দিন — AffiliateClick cookie-র সাথে মেলানো
@@ -39,6 +39,7 @@ function getCleanParam(searchParams: URLSearchParams, key: string): string | nul
 const VISIT_ID_KEY = 'gb_visit_id';
 const VISIT_START_KEY = 'gb_visit_start';
 const CHECKOUT_MARKED_KEY = 'gb_checkout_marked';
+const CART_MARKED_KEY = 'gb_cart_marked';
 
 // পেজ hidden হওয়ার মুহূর্তে (ট্যাব বদল/বন্ধ) sendBeacon দিয়ে "কতক্ষণ ছিল" পাঠানো
 // হয় — একই SiteVisit row-এ আপডেট হয়, নতুন row তৈরি হয় না। sendBeacon ব্যবহার
@@ -163,6 +164,18 @@ const SourceTracker = () => {
         if (visitId && !sessionStorage.getItem(CHECKOUT_MARKED_KEY)) {
           sessionStorage.setItem(CHECKOUT_MARKED_KEY, '1');
           markCheckoutReached(visitId).catch(() => {});
+        }
+      } catch {}
+    }
+
+    // cart পেজে পৌঁছালো কিনা — reachedCheckout-এর একই প্যাটার্ন (স্বতন্ত্র সিগন্যাল,
+    // সেশনে একবারই মার্ক হয়)।
+    if (pathname === '/cart') {
+      try {
+        const visitId = sessionStorage.getItem(VISIT_ID_KEY);
+        if (visitId && !sessionStorage.getItem(CART_MARKED_KEY)) {
+          sessionStorage.setItem(CART_MARKED_KEY, '1');
+          markCartReached(visitId).catch(() => {});
         }
       } catch {}
     }

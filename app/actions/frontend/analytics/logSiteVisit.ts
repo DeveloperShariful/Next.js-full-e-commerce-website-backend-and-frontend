@@ -2,6 +2,7 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { security } from "@/lib/security";
 import { cookies, headers } from "next/headers";
 import { randomUUID } from "crypto";
 
@@ -59,6 +60,24 @@ const AI_ASSISTANT_HOSTS = [
   "x.ai",
 ];
 
+// SourceTracker.tsx-এর getCleanParam()-এর একই সমস্যা click-ID-তেও আছে — ভাঙা
+// Tracking Template/Final URL suffix সেটআপে একই param (যেমন gclid) দুইবার
+// থাকতে পারে: একবার un-substituted placeholder (যেমন literal "{gclid}"),
+// একবার Google-এর নিজের সঠিক মান। plain .get() শুধু প্রথমটাই দেয় — এখানে
+// ভুল/গার্বেজ clickId আর ভুল channel ("google_ads" literal placeholder সহ)
+// ধরিয়ে দিতে পারে। Google-এর নিজের auto-tag/Final URL suffix সবসময় সবার
+// শেষে বসে, তাই getAll() থেকে খালি/placeholder বাদ দিয়ে সবার শেষের পরিষ্কার
+// মানটা নেওয়া হচ্ছে।
+const CLICK_ID_PLACEHOLDER_PATTERN = /^\{+[^{}]*\}+$/;
+function getCleanQueryParam(searchParams: URLSearchParams, key: string): string | null {
+  let result: string | null = null;
+  for (const value of searchParams.getAll(key)) {
+    const trimmed = value.trim();
+    if (trimmed && !CLICK_ID_PLACEHOLDER_PATTERN.test(trimmed)) result = trimmed;
+  }
+  return result;
+}
+
 function classifyChannel(params: {
   utmSource?: string | null;
   utmMedium?: string | null;
@@ -76,7 +95,7 @@ function classifyChannel(params: {
   // কোনো source-ই ১০০% নিশ্চিত করে বলে না যে একই ক্লিকে দুটো কখনো একসাথে আসে
   // না — তাই ঝুঁকি এড়াতে gclid-কে আগে প্রাধান্য দেওয়া হচ্ছে, যাতে ভুলবশত কোনো
   // paid Google Shopping ad click ভুলভাবে "google_organic_shopping" হয়ে না যায়।
-  const gclid = params.searchParams.get("gclid") || params.searchParams.get("dclid");
+  const gclid = getCleanQueryParam(params.searchParams, "gclid") || getCleanQueryParam(params.searchParams, "dclid");
   if (gclid) {
     return { channel: "google_ads", clickId: `gclid=${gclid}` };
   }
@@ -87,14 +106,14 @@ function classifyChannel(params: {
   // সীমারেখা ঝাপসা করে দিয়েছে (দুটোতেই এই একই ট্যাগ ব্যবহার করে) — তাই একটাই
   // চ্যানেল নামে দুটো তথ্যই রাখা হচ্ছে: এটা organic (paid না), আর Merchant
   // Center/Shopping feed থেকেই এসেছে।
-  const srsltid = params.searchParams.get("srsltid");
+  const srsltid = getCleanQueryParam(params.searchParams, "srsltid");
   if (srsltid) {
     return { channel: "google_organic_shopping", clickId: `srsltid=${srsltid}` };
   }
 
   // ১. বাকি Ad/click platform ID (gclid/dclid ইতিমধ্যে উপরে হ্যান্ডেল হয়ে গেছে)
   for (const [param, platform] of Object.entries(CLICK_ID_PLATFORMS)) {
-    const value = params.searchParams.get(param);
+    const value = getCleanQueryParam(params.searchParams, param);
     if (value) {
       const isPaid = INHERENTLY_PAID_PARAMS.has(param) || isPaidMedium;
       // fbclid Facebook আর Instagram দুটোতেই যোগ হয় (একই Meta click ID) — কিন্তু
@@ -167,8 +186,31 @@ export async function logSiteVisit(data: {
 
     const cookieStore = await cookies();
 
-    // এক সেশনে একবারই row তৈরি হবে — প্রতিটা page view-এ না (performance)
-    if (cookieStore.get(SESSION_LOGGED_COOKIE)) {
+    // ⚠️ FIX: এই cookie-র value আগে শুধু "1" ছিল (flag), আর SiteVisit row-এর
+    // id শুধু sessionStorage-এ (tab-scoped) থাকত। ফলে কেউ একটা tab বন্ধ করে
+    // ৩০ মিনিটের ভেতর নতুন tab খুললে — সেই নতুন tab-এর sessionStorage খালি,
+    // কিন্তু এই cookie (browser-wide) তখনও valid, তাই skip হয়ে যেত visitId
+    // ছাড়াই — নতুন tab কখনো markCartReached/markCheckoutReached কল করতে
+    // পারত না, reachedCart/reachedCheckout সিগন্যাল পুরোপুরি হারিয়ে যেত।
+    // এখন cookie-র value-ই হলো visitId, তাই skip হলেও সঠিক visitId ফেরত যায়
+    // — যেকোনো tab, একই ৩০-মিনিট window-এ, একই row-কে চিনতে পারবে।
+    const existingSession = cookieStore.get(SESSION_LOGGED_COOKIE);
+    if (existingSession) {
+      return { success: true, skipped: true, visitId: existingSession.value || undefined };
+    }
+
+    // ⚠️ FIX: এই action আগে সম্পূর্ণ rate-limit ছাড়া ছিল — server action সরাসরি
+    // HTTP দিয়ে call করা যায় (UI/cookie ছাড়াই), তাই কোনো script/bot অসীম fake
+    // SiteVisit row বানিয়ে dashboard-এর সব সংখ্যা (Total Visitors, channel/
+    // country breakdown) নষ্ট করে দিতে পারত। lib/security.ts-এর existing
+    // IP-based rate-limit utility ব্যবহার করা হলো (একই IP থেকে প্রতি মিনিটে
+    // সর্বোচ্চ ৩০টা নতুন visit-log — স্বাভাবিক shared-IP (office/mobile carrier
+    // NAT) ব্যবহারেও যথেষ্ট, কিন্তু script-এর burst আটকাবে)। এটা dedup cookie
+    // চেকের *পরে* বসানো হয়েছে, যাতে স্বাভাবিক repeat pageview (যেগুলো এমনিতেই
+    // উপরের cookie check-এ skip হয়ে যায়) প্রতিবার rate-limit query না চালায়।
+    try {
+      await security.checkRateLimit("log_site_visit", 30, 60);
+    } catch {
       return { success: true, skipped: true };
     }
 
@@ -239,7 +281,7 @@ export async function logSiteVisit(data: {
       },
     });
 
-    cookieStore.set(SESSION_LOGGED_COOKIE, "1", {
+    cookieStore.set(SESSION_LOGGED_COOKIE, newVisit.id, {
       maxAge: SESSION_LOGGED_MAX_AGE,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -260,6 +302,15 @@ export async function logSiteVisit(data: {
 export async function markCheckoutReached(visitId: string) {
   try {
     await db.siteVisit.update({ where: { id: visitId }, data: { reachedCheckout: true } });
+  } catch {
+    // পুরনো/ভুল visitId হলে নীরবে ignore — fire-and-forget কল, ব্যবহারকারী কিছু দেখবে না
+  }
+}
+
+// cart পেজ লোড হলে একবার কল হয় — markCheckoutReached-এর হুবহু একই প্যাটার্ন।
+export async function markCartReached(visitId: string) {
+  try {
+    await db.siteVisit.update({ where: { id: visitId }, data: { reachedCart: true } });
   } catch {
     // পুরনো/ভুল visitId হলে নীরবে ignore — fire-and-forget কল, ব্যবহারকারী কিছু দেখবে না
   }

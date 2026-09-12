@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { getCachedAffiliateSettings } from "@/lib/global-settings-cache";
 
 export async function GET(
   request: NextRequest,
@@ -26,23 +27,43 @@ export async function GET(
   const ua = request.headers.get("user-agent") || "";
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
 
-  // Create AffiliateClick + increment link counter in parallel
-  const [click] = await Promise.all([
-    db.affiliateClick.create({
-      data: {
-        affiliateId: link.affiliate.id,
-        ipAddress: ip,
-        userAgent: ua,
-        referrer: request.headers.get("referer") || "",
-        landingPage: link.destinationUrl,
-        deviceType: /mobile/i.test(ua) ? "mobile" : "desktop",
-      }
-    }),
-    db.affiliateLink.update({
-      where: { id: link.id },
-      data: { clickCount: { increment: 1 } }
-    })
-  ]);
+  // FIX: আগে এখানে কোনো dedup ছিল না — একই short link বারবার ক্লিক করলে
+  // (বুকমার্ক, লিংক-প্রিভিউ বট, বারবার শেয়ার করা একই পোস্টে ক্লিক) প্রতিবার
+  // নতুন AffiliateClick + clickCount বাড়তো। trackVisitAction.ts/
+  // /api/tracking/click-এর একই admin-configurable dedup window এখানেও
+  // বসানো হলো — সাম্প্রতিক click থাকলে নতুন row/counter-increment ছাড়াই
+  // সেই click পুনরায় ব্যবহার হবে, শুধু cookie রিফ্রেশ হবে।
+  const { clickDedupWindowMinutes } = await getCachedAffiliateSettings();
+  const dedupWindowMs = (clickDedupWindowMinutes ?? 1) * 60 * 1000;
+
+  const recentClick = await db.affiliateClick.findFirst({
+    where: {
+      affiliateId: link.affiliate.id,
+      ipAddress: ip,
+      createdAt: { gte: new Date(Date.now() - dedupWindowMs) },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  let click = recentClick;
+  if (!click) {
+    [click] = await Promise.all([
+      db.affiliateClick.create({
+        data: {
+          affiliateId: link.affiliate.id,
+          ipAddress: ip,
+          userAgent: ua,
+          referrer: request.headers.get("referer") || "",
+          landingPage: link.destinationUrl,
+          deviceType: /mobile/i.test(ua) ? "mobile" : "desktop",
+        }
+      }),
+      db.affiliateLink.update({
+        where: { id: link.id },
+        data: { clickCount: { increment: 1 } }
+      })
+    ]);
+  }
 
   const destination = new URL(link.destinationUrl);
   const response = NextResponse.redirect(destination);

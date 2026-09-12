@@ -2,9 +2,20 @@
 "use server";
 
 import { db } from "@/lib/prisma";
+import { OrderStatus } from "@prisma/client";
 import { toZonedTime } from "date-fns-tz";
 import { addDays, format } from "date-fns";
 import type { DateRange } from "@/app/actions/backend/analytics/shared.utils";
+
+// একটা visitorId-এর নামে Order row থাকলেই সেটাকে "order placed" ধরা ঠিক না —
+// DRAFT (কখনো submit-ই হয়নি), CANCELLED, FAILED — এগুলো real conversion না,
+// dead-end। বাকি সব (এমনকি PENDING/AWAITING_PAYMENT — bank transfer/COD-এ
+// payment confirm হওয়ার আগেও কাস্টমার আসলে order বসিয়েই দিয়েছে) গণনা হয়।
+const NON_QUALIFYING_ORDER_STATUSES: OrderStatus[] = [
+  OrderStatus.DRAFT,
+  OrderStatus.CANCELLED,
+  OrderStatus.FAILED,
+];
 
 export interface VisitorDailyPoint {
   date: string; // yyyy-MM-dd, store-timezone local calendar day
@@ -26,10 +37,13 @@ export interface CountryBreakdown {
 export interface VisitorInsightsData {
   totalVisitors: number;
   previousTotalVisitors: number;
+  reachedCartCount: number;
   reachedCheckoutCount: number;
   dailyTrend: VisitorDailyPoint[];
   channelBreakdown: ChannelBreakdown[];
   countryBreakdown: CountryBreakdown[];
+  cartChannelBreakdown: ChannelBreakdown[];
+  cartCountryBreakdown: CountryBreakdown[];
   checkoutChannelBreakdown: ChannelBreakdown[];
   checkoutCountryBreakdown: CountryBreakdown[];
 }
@@ -42,15 +56,19 @@ export async function getVisitorInsightsData(
   const [
     totalVisitors,
     previousTotalVisitors,
+    reachedCartCount,
     reachedCheckoutCount,
     dailyRows,
     channelRows,
     countryRows,
+    cartChannelRows,
+    cartCountryRows,
     checkoutChannelRows,
     checkoutCountryRows,
   ] = await Promise.all([
     db.siteVisit.count({ where: { createdAt: { gte: current.from, lte: current.to } } }),
     db.siteVisit.count({ where: { createdAt: { gte: previous.from, lte: previous.to } } }),
+    db.siteVisit.count({ where: { createdAt: { gte: current.from, lte: current.to }, reachedCart: true } }),
     db.siteVisit.count({ where: { createdAt: { gte: current.from, lte: current.to }, reachedCheckout: true } }),
 
     // Postgres-এর নিজের date_trunc দিয়ে গ্রুপ করা হচ্ছে (raw row fetch করে JS-এ
@@ -81,6 +99,22 @@ export async function getVisitorInsightsData(
     db.siteVisit.groupBy({
       by: ["country"],
       where: { createdAt: { gte: current.from, lte: current.to }, country: { not: null } },
+      _count: { country: true },
+      orderBy: { _count: { country: "desc" } },
+    }),
+
+    // reachedCart: true দিয়ে scope করা — "কোন channel/country থেকে আসা visitor
+    // cart পর্যন্ত গিয়েছে" (checkout breakdown-এর ঠিক একই প্যাটার্ন, cart-এ)।
+    db.siteVisit.groupBy({
+      by: ["channel"],
+      where: { createdAt: { gte: current.from, lte: current.to }, reachedCart: true },
+      _count: { channel: true },
+      orderBy: { _count: { channel: "desc" } },
+    }),
+
+    db.siteVisit.groupBy({
+      by: ["country"],
+      where: { createdAt: { gte: current.from, lte: current.to }, reachedCart: true, country: { not: null } },
       _count: { country: true },
       orderBy: { _count: { country: "desc" } },
     }),
@@ -135,6 +169,22 @@ export async function getVisitorInsightsData(
       percentage: totalVisitors > 0 ? Number(((r._count.country / totalVisitors) * 100).toFixed(1)) : 0,
     }));
 
+  // এই দুটোর percentage মোট visitor-এর তুলনায় না, reachedCartCount-এর তুলনায় —
+  // "cart পর্যন্ত যাওয়া visitor-দের কত % কোন channel/country থেকে" বোঝাতে।
+  const cartChannelBreakdown: ChannelBreakdown[] = cartChannelRows.map((r) => ({
+    channel: r.channel,
+    count: r._count.channel,
+    percentage: reachedCartCount > 0 ? Number(((r._count.channel / reachedCartCount) * 100).toFixed(1)) : 0,
+  }));
+
+  const cartCountryBreakdown: CountryBreakdown[] = cartCountryRows
+    .filter((r) => r.country)
+    .map((r) => ({
+      country: r.country as string,
+      count: r._count.country,
+      percentage: reachedCartCount > 0 ? Number(((r._count.country / reachedCartCount) * 100).toFixed(1)) : 0,
+    }));
+
   // এই দুটোর percentage মোট visitor-এর তুলনায় না, reachedCheckoutCount-এর
   // তুলনায় — "checkout পর্যন্ত যাওয়া visitor-দের কত % কোন channel/country থেকে" বোঝাতে।
   const checkoutChannelBreakdown: ChannelBreakdown[] = checkoutChannelRows.map((r) => ({
@@ -154,10 +204,13 @@ export async function getVisitorInsightsData(
   return {
     totalVisitors,
     previousTotalVisitors,
+    reachedCartCount,
     reachedCheckoutCount,
     dailyTrend,
     channelBreakdown,
     countryBreakdown,
+    cartChannelBreakdown,
+    cartCountryBreakdown,
     checkoutChannelBreakdown,
     checkoutCountryBreakdown,
   };
@@ -172,6 +225,8 @@ export interface VisitorLogRow {
   country: string | null;
   landingPage: string;
   reachedCheckout: boolean;
+  reachedCart: boolean;
+  hasOrder: boolean;
   ipAddress: string | null;
 }
 
@@ -183,22 +238,28 @@ export interface VisitorLogPage {
 }
 
 // প্রতিটা individual visitor row-এর তালিকা — pagination সহ, যাতে বড় ডেটাতেও
-// একবারে সব row DB থেকে টেনে না আনতে হয় (performance)। reachedCheckoutOnly
-// দিলে শুধু checkout পর্যন্ত পৌঁছানো visitor-দের list দেখাবে — Overview-এর
-// "Reached Checkout" সংখ্যাটার প্রমাণ হিসেবে (ক্লিক করলে এই filtered list-এই আসবে)।
-// searchQuery দিলে IP address বা channel name দিয়ে filter হয় (দুটোই indexed
-// column-এর ওপর contains — বড় ডেটাতেও date-range-এর মধ্যেই সীমাবদ্ধ থাকে বলে সস্তা)।
+// একবারে সব row DB থেকে টেনে না আনতে হয় (performance)। reachedCheckoutOnly/
+// reachedCartOnly দিলে শুধু সেই পেজ পর্যন্ত পৌঁছানো visitor-দের list দেখাবে —
+// Overview-এর "Reached Checkout"/"Reached Cart" সংখ্যাটার প্রমাণ হিসেবে
+// (ক্লিক করলে এই filtered list-এই আসবে)। searchQuery দিলে IP address বা
+// channel name দিয়ে filter হয় (দুটোই indexed column-এর ওপর contains — বড়
+// ডেটাতেও date-range-এর মধ্যেই সীমাবদ্ধ থাকে বলে সস্তা)।
 export async function getVisitorLog(
   current: DateRange,
   page: number,
   reachedCheckoutOnly = false,
+  reachedCartOnly = false,
   searchQuery?: string
 ): Promise<VisitorLogPage> {
-  const safePage = Math.max(1, page);
+  // ⚠️ FIX: Math.max(1, NaN) === NaN, ক্ল্যাম্প করে না — caller (page.tsx) নিজে
+  // guard করলেও এই exported action সরাসরি অন্য কোথাও ভুল ইনপুট দিয়ে call হলে
+  // যেন কখনো Prisma-তে NaN skip না পৌঁছায়।
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
   const trimmedSearch = searchQuery?.trim();
   const where = {
     createdAt: { gte: current.from, lte: current.to },
     ...(reachedCheckoutOnly ? { reachedCheckout: true } : {}),
+    ...(reachedCartOnly ? { reachedCart: true } : {}),
     ...(trimmedSearch
       ? {
           OR: [
@@ -215,13 +276,30 @@ export async function getVisitorLog(
       orderBy: { createdAt: "desc" },
       skip: (safePage - 1) * LOG_PAGE_SIZE,
       take: LOG_PAGE_SIZE,
-      select: { id: true, createdAt: true, channel: true, country: true, landingPage: true, reachedCheckout: true, ipAddress: true },
+      select: { id: true, createdAt: true, channel: true, country: true, landingPage: true, reachedCheckout: true, reachedCart: true, ipAddress: true, visitorId: true },
     }),
     db.siteVisit.count({ where }),
   ]);
 
+  // "Order: Yes/No" — এই page-এর সব visitorId একসাথে batch করে ১টা query-তে
+  // চেক করা হচ্ছে (N+1 এড়াতে), matching Order.visitorId থাকলেই qualifying
+  // ধরা হয় (DRAFT/CANCELLED/FAILED বাদে — উপরের NON_QUALIFYING_ORDER_STATUSES)।
+  const visitorIds = [...new Set(rows.map((r) => r.visitorId))];
+  const convertedVisitorIds = visitorIds.length
+    ? await db.order.findMany({
+        where: {
+          visitorId: { in: visitorIds },
+          deletedAt: null,
+          status: { notIn: NON_QUALIFYING_ORDER_STATUSES },
+        },
+        select: { visitorId: true },
+        distinct: ["visitorId"],
+      })
+    : [];
+  const orderedVisitorIdSet = new Set(convertedVisitorIds.map((o) => o.visitorId));
+
   return {
-    rows,
+    rows: rows.map(({ visitorId, ...row }) => ({ ...row, hasOrder: orderedVisitorIdSet.has(visitorId) })),
     totalCount,
     totalPages: Math.max(1, Math.ceil(totalCount / LOG_PAGE_SIZE)),
     page: safePage,
@@ -236,8 +314,14 @@ export async function getVisitorDetail(id: string) {
   const visit = await db.siteVisit.findUnique({ where: { id } });
   if (!visit) return null;
 
+  // list page-এর getVisitorLog()-এর সাথে সামঞ্জস্য রেখে একই qualifying filter
+  // (DRAFT/CANCELLED/FAILED order-কে "converted" ধরা হয় না)
   const convertedOrder = await db.order.findFirst({
-    where: { visitorId: visit.visitorId },
+    where: {
+      visitorId: visit.visitorId,
+      deletedAt: null,
+      status: { notIn: NON_QUALIFYING_ORDER_STATUSES },
+    },
     orderBy: { createdAt: "asc" },
     select: { id: true, orderNumber: true, createdAt: true },
   });

@@ -4,6 +4,7 @@
 import { db } from "@/lib/prisma";
 import { cookies, headers } from "next/headers";
 import { revalidateTag } from "next/cache";
+import { getCachedAffiliateSettings } from "@/lib/global-settings-cache";
 
 export async function trackVisitAction(data: {
   affiliateSlug?: string | null;
@@ -61,7 +62,27 @@ export async function trackVisitAction(data: {
       });
 
       if (affiliate) {
-        const click = await db.affiliateClick.create({
+        // FIX: আগে এখানে কোনো dedup ছিল না — একই affiliate link-এ page
+        // refresh/বারবার visit (বা এই action আর /api/tracking/click দুটোই
+        // একই ?ref= click-এ একসাথে fire হওয়ায়) প্রতিবার নতুন AffiliateClick
+        // row তৈরি হতো, click count আর conversion-rate নষ্ট করে দিত।
+        // /api/tracking/click-এ ব্যবহৃত একই admin-configurable dedup window
+        // এখানেও বসানো হলো — সাম্প্রতিক click থাকলে নতুন row না বানিয়ে
+        // সেই click-টাই পুনরায় ব্যবহার হবে (cookie ঠিকভাবে সেট হবে, শুধু
+        // duplicate row তৈরি হবে না)।
+        const { clickDedupWindowMinutes } = await getCachedAffiliateSettings();
+        const dedupWindowMs = (clickDedupWindowMinutes ?? 1) * 60 * 1000;
+
+        const recentClick = await db.affiliateClick.findFirst({
+          where: {
+            affiliateId: affiliate.id,
+            ipAddress,
+            createdAt: { gte: new Date(Date.now() - dedupWindowMs) },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        const click = recentClick ?? await db.affiliateClick.create({
           data: {
             affiliateId: affiliate.id,
             ipAddress,
@@ -75,7 +96,9 @@ export async function trackVisitAction(data: {
           }
         });
 
-        revalidateTag(`affiliate-stats-${affiliate.id}`, "default");
+        if (!recentClick) {
+          revalidateTag(`affiliate-stats-${affiliate.id}`, "default");
+        }
 
         // à¦…à¦¤à§à¦¯à¦¨à§à¦¤ à¦¸à¦¿à¦•à¦¿à¦‰à¦° à¦•à§à¦•à¦¿ à¦¸à§‡à¦Ÿ (Server-side)
         const expiry = (affiliate.cookieDuration || 30) * 24 * 60 * 60;

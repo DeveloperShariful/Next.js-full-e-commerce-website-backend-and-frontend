@@ -11,7 +11,6 @@ import { CartProvider } from '@/context/CartContext';
 import { CompareProvider } from '@/context/CompareContext';
 
 import AffiliateTracker from "./_components/affiliate-tracker";
-import { AffiliateTrackerProvider } from "@/app/providers/affiliate-tracker-provider";
 import SourceTracker from "@/components/SourceTracker";
 import DelayedScripts from "@/components/DelayedScripts";
 import KlaviyoIdentifier from "@/components/KlaviyoIdentifier";
@@ -47,8 +46,17 @@ export default async function FrontLayout({ children }: { children: React.ReactN
             <SourceTracker />
           </Suspense>
 
-          {/* Affiliate session tracking — root layout থেকে এখানে move করা হয়েছে */}
-          <AffiliateTrackerProvider />
+          {/* ⚠️ FIX: <AffiliateTrackerProvider /> (useAffiliateTracker হুক, hardcoded
+              "ref" param) এখানে সরিয়ে দেওয়া হলো — এটা AffiliateTracker (উপরে,
+              admin-configurable param + cookie-attribution সহ)-এর সাথে একই
+              ?ref= click-এ একসাথে fire হতো, প্রতি real click-এ ২টা করে
+              AffiliateClick row তৈরি করে click-count/conversion-rate ডাবল-কাউন্ট
+              করে ফেলত। AffiliateTracker এককভাবেই এখন (dedup যোগ করার পর)
+              পুরো কাজটা সঠিকভাবে করে — এই duplicate tracker আর দরকার নেই।
+              hooks/use-affiliate-tracker.ts, app/providers/affiliate-tracker-provider.tsx,
+              app/api/tracking/click/route.ts — এই ৩টা ফাইল এখন আর কোথাও
+              ব্যবহৃত হয় না (গ্রেপ করে যাচাই করা), কিন্তু ফাইল ডিলিট না করে
+              রেখে দেওয়া হলো। */}
 
           <TopBar />
           <ConditionalHeader>

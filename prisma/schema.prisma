@@ -1240,6 +1240,7 @@ model Order {
   @@index([deletedAt])
   @@index([guestEmail])
   @@index([subscriptionId])
+  @@index([visitorId])
   @@index([recoveredFromAbandonedCart])
 }
 
@@ -2816,6 +2817,7 @@ model SiteVisit {
   deviceType  String?
   durationSeconds Int? // page hide/unload-এ sendBeacon দিয়ে আপডেট হয় — সেশনে কতক্ষণ ছিল
   reachedCheckout Boolean @default(false) // /checkout পেজে পৌঁছেছিল কিনা — order বসাক বা না বসাক, স্বতন্ত্র সিগন্যাল
+  reachedCart     Boolean @default(false) // /cart পেজে পৌঁছেছিল কিনা — reachedCheckout-এর একই প্যাটার্ন
   createdAt   DateTime @default(now())
 
   @@index([createdAt])

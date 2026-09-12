@@ -3,21 +3,30 @@
 "use server";
 
 import { db } from "@/lib/prisma";
-import { OrderStatus } from "@prisma/client";
 import { startOfYear, endOfYear } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { SUCCESS_STATUSES } from "@/app/actions/backend/analytics/shared.utils";
 
 export async function getGraphData(nowUtc: Date, timezone: string) {
   const nowZoned = toZonedTime(nowUtc, timezone);
   const yearStart = fromZonedTime(startOfYear(nowZoned), timezone);
   const yearEnd   = fromZonedTime(endOfYear(nowZoned), timezone);
 
+  // ⚠️ FIX: আগে এখানে `total` (subtotal+shipping+tax+surcharge-discount) যোগ
+  // হতো, আর কোনো paymentStatus/deletedAt filter-ই ছিল না — ফলে unpaid,
+  // refunded, এমনকি trash করা order-ও যোগ হয়ে যেত। এখন Store Performance
+  // card (fetch-stats.ts) আর Analytics (sync-analytics/route.ts,
+  // analytics/shared.utils.ts) দুটোই যে সংজ্ঞা ব্যবহার করে — সেই একই
+  // SUCCESS_STATUSES (analytics-এর single-source-of-truth) + deletedAt:null
+  // filter, আর max(0, subtotal-discountTotal) formula — এখানেও বসানো হলো,
+  // যাতে চার্টের সংখ্যা বাকি ড্যাশবোর্ডের "Net Sales"-এর সাথে মিলে যায়।
   const yearOrders = await db.order.findMany({
     where: {
       createdAt: { gte: yearStart, lte: yearEnd },
-      status: { not: OrderStatus.CANCELLED }
+      status: { in: SUCCESS_STATUSES },
+      deletedAt: null,
     },
-    select: { createdAt: true, total: true }
+    select: { createdAt: true, subtotal: true, discountTotal: true }
   });
 
   const graphData = Array(12).fill(0).map((_, i) => ({
@@ -28,7 +37,7 @@ export async function getGraphData(nowUtc: Date, timezone: string) {
   yearOrders.forEach(order => {
     // Group by month in store timezone (not UTC)
     const month = toZonedTime(order.createdAt, timezone).getMonth();
-    graphData[month].total += Number(order.total);
+    graphData[month].total += Math.max(0, Number(order.subtotal) - Number(order.discountTotal));
   });
 
   return graphData;

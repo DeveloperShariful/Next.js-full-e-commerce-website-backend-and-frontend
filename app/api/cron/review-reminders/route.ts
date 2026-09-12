@@ -27,10 +27,12 @@ const QUALIFYING_STATUSES: OrderStatus[] = [OrderStatus.COMPLETED, OrderStatus.D
 const REMINDER_GAP_MS = 2 * 24 * 60 * 60 * 1000; // ২ দিন
 const MAX_REMINDERS = 5;
 // পুরনো backlog (অনেক পুরনো delivered/completed order যেগুলো কখনো review
-// পায়নি) — সবগুলোকে একসাথে না পাঠিয়ে, প্রতি cron run-এ সর্বোচ্চ এতগুলো real
+// পায়নি) — সবগুলোকে একসাথে না পাঠিয়ে, প্রতি cron *hit*-এ সর্বোচ্চ এতগুলো real
 // send — বাকিটা "due" অবস্থায়ই থেকে যায় (lastReminderAt না বদলানোয় পরের
-// দিনের run-এ আবার এই batch-এর সামনের দিকেই আসবে), ফলে dhape-dhape ধীরে
-// ধীরে পুরো backlog শেষ হয় — inbox/SMTP-তে হঠাৎ burst পড়ে না।
+// hit-এ আবার এই batch-এর সামনের দিকেই আসবে)। vercel.json অনুযায়ী এই cron
+// দিনে ৬বার হিট হয় (Sydney business hours-এর ভেতরে ছড়ানো), তাই প্রতিদিন
+// সর্বোচ্চ ৬×১৫=৯০টা reminder mail যেতে পারে — dhape-dhape কিন্তু আগের
+// তুলনায় দ্রুত পুরো backlog শেষ হয়, inbox/SMTP-তে হঠাৎ বড় burst পড়ে না।
 const MAX_SENDS_PER_RUN = 15;
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://gobike.au").replace(/\/+$/, "");
 
@@ -55,13 +57,15 @@ export async function GET(req: Request) {
   }
 
   // অন্য cron-গুলোর (check-bounces, abandoned-checkout) মতোই — শুধু Sydney
-  // local সকাল ৮টা-সন্ধ্যা ৬টার মধ্যেই চলবে, বাকি সময় skip। এটা এখন এমনিতেই
-  // vercel.json-এর fixed UTC সময়ের কারণে এই window-এর ভেতরেই পড়ে, কিন্তু
-  // explicit check থাকলে schedule বদলালে বা কেউ manually URL হিট করলেও
-  // নিরাপদ থাকে।
+  // local সকাল ৯টা-সন্ধ্যা ৬টার মধ্যেই চলবে, বাকি সময় skip। vercel.json-এ
+  // দিনে ৬বার (23,1,3,5,7,8 UTC = Sydney 9am,11am,1pm,3pm,5pm,6pm) হিট হয়,
+  // প্রতিবারে সর্বোচ্চ MAX_SENDS_PER_RUN — তাই সারাদিনে সর্বোচ্চ ৬×১৫=৯০টা
+  // reminder mail যেতে পারে, বড় backlog দ্রুত (কিন্তু এখনো নিয়ন্ত্রিতভাবে)
+  // শেষ করার জন্য। এই explicit check থাকায় schedule বদলালে বা কেউ manually
+  // URL হিট করলেও ৯টা-৬টার বাইরে কিছু পাঠাবে না।
   const storeTimezone = await getStoreTimezone();
   const localHour = toZonedTime(new Date(), storeTimezone).getHours();
-  if (localHour < 8 || localHour >= 18) {
+  if (localHour < 9 || localHour >= 18) {
     return NextResponse.json({ message: `Outside business hours (${storeTimezone} ${localHour}:00) — skipped.` }, { status: 200 });
   }
 

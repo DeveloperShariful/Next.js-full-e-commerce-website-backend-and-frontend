@@ -29,11 +29,21 @@ export function BusinessPulse({ data, label }: BusinessPulseProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "PENDING":    return "bg-[#fff5eb] text-[#c05621] border-[#fbd38d]";
-      case "PROCESSING": return "bg-[#f0f6fc] text-[#2271b1] border-[#c5d9ed]";
-      case "DELIVERED":  return "bg-[#f0fdf4] text-[#166534] border-[#bbf7d0]";
-      case "CANCELLED":  return "bg-[#fef2f2] text-[#991b1b] border-[#fecaca]";
-      default:           return "bg-[#f6f7f7] text-[#50575e] border-[#c3c4c7]";
+      case "DRAFT":             return "bg-[#f8fafc] text-[#475569] border-[#cbd5e1]";
+      case "PENDING":           return "bg-[#fff5eb] text-[#c05621] border-[#fbd38d]";
+      case "AWAITING_PAYMENT":  return "bg-[#fefce8] text-[#854d0e] border-[#fde047]";
+      case "PROCESSING":        return "bg-[#f0f6fc] text-[#2271b1] border-[#c5d9ed]";
+      case "PACKED":            return "bg-[#eef2ff] text-[#4338ca] border-[#c7d2fe]";
+      case "SHIPPED":           return "bg-[#ecfeff] text-[#0e7490] border-[#a5f3fc]";
+      case "DELIVERED":         return "bg-[#f0fdf4] text-[#166534] border-[#bbf7d0]";
+      case "COMPLETED":         return "bg-[#ecfdf5] text-[#047857] border-[#a7f3d0]";
+      case "READY_FOR_PICKUP":  return "bg-[#f5f3ff] text-[#6d28d9] border-[#ddd6fe]";
+      case "PARTIALLY_PAID":    return "bg-[#f0fdfa] text-[#0f766e] border-[#99f6e4]";
+      case "CANCELLED":         return "bg-[#fef2f2] text-[#991b1b] border-[#fecaca]";
+      case "FAILED":            return "bg-[#fff1f2] text-[#be123c] border-[#fecdd3]";
+      case "REFUNDED":          return "bg-[#fdf2f8] text-[#9d174d] border-[#fbcfe8]";
+      case "RETURNED":          return "bg-[#fdf4ff] text-[#a21caf] border-[#f5d0fe]";
+      default:                  return "bg-[#f6f7f7] text-[#50575e] border-[#c3c4c7]";
     }
   };
 

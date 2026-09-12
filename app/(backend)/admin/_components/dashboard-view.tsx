@@ -39,13 +39,13 @@ export function DashboardView({ data, timezone }: DashboardViewProps) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h1 className="text-[23px] font-normal text-[#1d2327]">Dashboard</h1>
 
-        <div className="flex items-center gap-1 text-[13px]">
-          <span className="text-[#8c8f94] mr-1"><CalendarDays size={14} /></span>
+        <div className="flex items-center gap-0.5 text-[13px] max-w-full overflow-x-auto">
+          <span className="text-[#8c8f94] mr-1 shrink-0"><CalendarDays size={14} /></span>
           {(["today", "yesterday", "week", "month", "this_month"] as const).map((range) => (
             <button
               key={range}
               onClick={() => setActiveRange(range)}
-              className={`px-2 py-1 transition-colors ${
+              className={`px-1.5 py-1 shrink-0 whitespace-nowrap transition-colors ${
                 activeRange === range
                   ? "font-semibold text-[#1d2327]"
                   : "text-[#2271b1] hover:underline"
